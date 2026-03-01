@@ -1,0 +1,19 @@
+\ hello.fs — Hello World for the CoCo Forth executor kernel
+
+: HELLO
+  CHAR H EMIT
+  CHAR E EMIT
+  CHAR L EMIT
+  CHAR L EMIT
+  CHAR O EMIT
+  CHAR , EMIT
+  32 EMIT
+  CHAR W EMIT
+  CHAR O EMIT
+  CHAR R EMIT
+  CHAR L EMIT
+  CHAR D EMIT
+  CHAR ! EMIT
+;
+
+HELLO HALT
