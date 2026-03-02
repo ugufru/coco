@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 9: Numbers on Screen — Getting Started with Color Forth</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page">
+
+    <!-- Chapter opener -->
+    <div class="chapter-opener">
+      <div class="illustration illustration-opener">
+        <span class="ill-label">Illustration</span>
+        CoCo character standing beside a chalkboard showing the
+        equation "6 × 7 = ?" with a large question mark where the
+        answer should be. The character is holding a piece of chalk
+        and looking at the stack (drawn as a column of blocks) where
+        the number 42 is clearly visible on top. The character looks
+        puzzled — the answer is right there on the stack, but the
+        screen is empty.
+      </div>
+      <div class="chapter-label">CHAPTER 9</div>
+      <div class="chapter-title">Numbers on Screen</div>
+      <div class="chapter-green-bar"></div>
+    </div>
+
+    <!-- Page 1 -->
+    <div class="page-header">
+      <span>NUMBERS ON SCREEN</span>
+      <span>1</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>The Invisible Number Problem</h2>
+
+      <p>
+        After Chapter 7 you can compare numbers. After Chapter 8
+        you can read keys. But there's a gap: you still can't
+        <em>show</em> a computed result. Try this mentally —
+        <code>6 7 *</code> puts 42 on the stack, but nothing
+        appears on screen. To display it you'd have to somehow
+        decompose 42 into the characters '4' and '2' and emit
+        them. That's exactly what this chapter builds.
+      </p>
+
+      <h2>* — Multiply</h2>
+
+      <div class="rule-box">
+        <h3>* &nbsp;<span style="font-weight:normal; font-size:0.85em;">( n1 n2 -- prod )</span></h3>
+        <p>Pop two values, push their product (low 16 bits).</p>
+      </div>
+
+<pre class="forth">6 7 *     \ stack: ( 42 )
+3 100 *   \ stack: ( 300 )
+-3 4 *    \ stack: ( -12 )</pre>
+
+      <p>
+        Signed and unsigned values mix freely — <code>*</code>
+        gives the correct low 16 bits in all cases.
+      </p>
+
+      <h2>/MOD — Divide with Remainder</h2>
+
+      <div class="illustration illustration-aside">
+        <span class="ill-label">Illustration</span>
+        A pie cut into slices. "17 slices, 5 people: each gets 3,
+        with 2 left over." The quotient (3) and remainder (2) sit
+        on the stack as two separate values. Remainder is below,
+        quotient is on top.
+      </div>
+
+      <div class="rule-box">
+        <h3>/MOD &nbsp;<span style="font-weight:normal; font-size:0.85em;">( n1 n2 -- rem quot )</span></h3>
+        <p>Divide n1 by n2. Push remainder, then quotient
+        (quotient on top).</p>
+      </div>
+
+<pre class="forth">17 5 /MOD   \ stack: ( 2 3 )  — rem=2, quot=3
+10 3 /MOD   \ stack: ( 1 3 )  — rem=1, quot=3
+ 7 7 /MOD   \ stack: ( 0 1 )  — rem=0, quot=1</pre>
+
+      <p>
+        Having both results at once is the key:
+        <code>42 10 /MOD</code> gives 2 (remainder) and 4
+        (quotient) in a single step, which is exactly what
+        a decimal digit extractor needs.
+      </p>
+
+      <h2>The Decimal Output Algorithm</h2>
+
+      <p>
+        To print the number 423, you need to produce three
+        characters — '4', '2', '3' — in that order. But
+        <code>/MOD</code> extracts the <em>last</em> digit first:
+      </p>
+
+      <table style="border-collapse: collapse; margin: 1.2em 2em; font-family: 'Courier New', Courier, monospace; font-size: 0.88em;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--green);">
+            <th style="padding: 6px 20px 6px 0; text-align: left; font-family: Georgia, serif;">Step</th>
+            <th style="padding: 6px 20px 6px 0; text-align: left; font-family: Georgia, serif;">Quotient</th>
+            <th style="padding: 6px 0; text-align: left; font-family: Georgia, serif;">Remainder (digit)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style="padding: 5px 20px 5px 0;">423 ÷ 10</td><td style="padding: 5px 20px 5px 0;">42</td><td style="padding: 5px 0;">3</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">42 ÷ 10</td> <td style="padding: 5px 20px 5px 0;">4</td> <td style="padding: 5px 0;">2</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">4 ÷ 10</td>  <td style="padding: 5px 20px 5px 0;">0</td> <td style="padding: 5px 0;">4</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        The digits come out backwards (3, 2, 4) but we need to
+        print them forwards (4, 2, 3). The trick: recurse
+        <em>before</em> printing. Process the quotient first
+        (which recurses deeper), then print the remainder on
+        the way back out.
+      </p>
+
+    </div>
+
+    <!-- Page 2 -->
+    <div class="page-header">
+      <span>NUMBERS ON SCREEN</span>
+      <span>2</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>Building the Print Words in Forth</h2>
+
+      <p>
+        All four words below are defined in Forth — no new
+        machine code needed. Each one builds on what already
+        exists.
+      </p>
+
+      <h3>NEGATE — flip the sign</h3>
+
+<pre class="forth">: NEGATE   0 SWAP - ;</pre>
+
+      <p>
+        Pushes 0, swaps it beneath the number, then subtracts:
+        <code>0 − n = −n</code>. Already works with
+        <code>SWAP</code> and <code>-</code> from Chapter 2.
+      </p>
+
+      <h3>?DUP — duplicate only if non-zero</h3>
+
+<pre class="forth">: ?DUP   DUP IF DUP THEN ;</pre>
+
+      <p>
+        Duplicates TOS, tests it with <code>IF</code> (consuming
+        the duplicate), then duplicates again only if non-zero.
+        If TOS is 0, the stack is unchanged.
+      </p>
+
+      <h3>U. — print an unsigned number</h3>
+
+<pre class="forth">: U.  ( u -- )
+  10 /MOD
+  ?DUP IF U. THEN
+  CHAR 0 + EMIT ;</pre>
+
+      <p>
+        Divide by 10: remainder is the low digit, quotient is
+        the rest. If the quotient is non-zero, recurse to print
+        higher digits first. Then print the remainder digit by
+        adding its value to <code>CHAR 0</code> (ASCII 48).
+      </p>
+
+      <div class="rule-box">
+        <h3>U.(42) call tree</h3>
+        <pre style="margin: 0.3em 0 0; background: none; border: none; padding: 0; font-size: 0.9em;">U.(42)
+  10 /MOD → rem=2, quot=4
+  quot ≠ 0 → recurse:
+    U.(4)
+      10 /MOD → rem=4, quot=0
+      quot = 0 → no recurse
+      print '4'
+  print '2'
+output: 42</pre>
+      </div>
+
+      <h3>. — print a signed number</h3>
+
+<pre class="forth">: .  ( n -- )
+  DUP 0 &lt; IF NEGATE CHAR - EMIT THEN
+  U. ;</pre>
+
+      <p>
+        Tests the sign first. If negative: negate it and print
+        a minus sign, leaving the positive absolute value.
+        Then pass to <code>U.</code> for the digits.
+      </p>
+
+      <div class="tip">
+        <p>
+          These four words are not in the kernel — they live in
+          your Forth source. This is the Forth way: start with
+          a small kernel of machine-code primitives, then build
+          everything else as defined words. <code>NEGATE</code>
+          didn't need new assembly; it needed only
+          <code>SWAP</code> and <code>-</code>.
+        </p>
+      </div>
+
+    </div>
+
+    <!-- Page 3 -->
+    <div class="page-header">
+      <span>NUMBERS ON SCREEN</span>
+      <span>3</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>Chapter Program</h2>
+
+<pre class="forth">\ Chapter 9 example — Numbers on Screen
+
+: NEGATE   0 SWAP - ;
+: ?DUP     DUP IF DUP THEN ;
+
+: U.  ( u -- )
+  10 /MOD
+  ?DUP IF U. THEN
+  CHAR 0 + EMIT ;
+
+: .  ( n -- )
+  DUP 0 &lt; IF NEGATE CHAR - EMIT THEN
+  U. ;
+
+: MAIN
+  6 7 *   . CR     \ 42
+  -3 4 *  . CR     \ -12
+  1000    . CR     \ 1000
+  -1      . CR ;   \ -1
+
+MAIN HALT</pre>
+
+      <div class="screen-wrap">
+        <div class="screen-label">Your CoCo's screen:</div>
+        <div class="screen">42<br>-12<br>1000<br>-1</div>
+      </div>
+
+      <div class="diy">
+        <div class="diy-header">Do-It-Yourself</div>
+        <div class="illustration illustration-small" style="margin: 12px 0 0 16px;">
+          <span class="ill-label">Illustration</span>
+          CoCo character holding a large digit card showing "42",
+          triumphant expression, with smaller digit cards for "4"
+          and "2" floating nearby. A stack diagram in the background
+          shows the recursive calls neatly stacked.
+        </div>
+        <div class="diy-body">
+          <ol>
+            <li>
+              What does <code>65535 U.</code> print? Is this what
+              you expected for the largest unsigned 16-bit value?
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              What does <code>42 5 /MOD . 32 EMIT . CR</code>
+              print? Think about which value is TOS after /MOD.
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              Write <code>SQ</code> — prints the square of a number.
+              <code>5 SQ</code> should print <code>25</code>.
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              What is <code>-1</code> as a 16-bit unsigned number?
+              What does <code>-1 U.</code> print, and why?
+              <div class="answer-line"></div>
+            </li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- Learned in this chapter -->
+      <div class="learned">
+        <div class="learned-header">Learned in Chapter 9</div>
+        <div class="learned-cols">
+          <div class="learned-col">
+            <h4>Forth Words</h4>
+            <dl>
+              <dt>*</dt>
+              <dd>( n1 n2 -- prod ) multiply</dd>
+              <dt>/MOD</dt>
+              <dd>( n1 n2 -- rem quot ) divide</dd>
+              <dt>NEGATE</dt>
+              <dd>( n -- -n ) flip sign</dd>
+              <dt>?DUP</dt>
+              <dd>( n -- n n | 0 ) dup if non-zero</dd>
+              <dt>U.</dt>
+              <dd>( u -- ) print unsigned integer</dd>
+              <dt>.</dt>
+              <dd>( n -- ) print signed integer</dd>
+            </dl>
+          </div>
+          <div class="learned-col">
+            <h4>Patterns</h4>
+            <p><code>n . CR</code> to print a number on its own line</p>
+            <p><code>n1 n2 /MOD</code> gives both remainder and quotient</p>
+            <p>Recursive <code>U.</code> prints digits in correct order</p>
+            <p>Building new words from old ones without assembly</p>
+          </div>
+          <div class="learned-col">
+            <h4>Concepts</h4>
+            <p>Repeated ÷10 extracts decimal digits (last first)</p>
+            <p>Recurse before printing reverses the order</p>
+            <p>Forth builds utility words from primitives</p>
+            <p>Signed . handles sign, delegates digits to U.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="notes">
+        <div class="notes-label">Notes:</div>
+        <div class="notes-lines">
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="nav">
+      <a href="08-read-the-keyboard.html">← Chapter 8: Read the Keyboard</a>
+      <span class="spacer"></span>
+      <a href="10-calculator.html">Chapter 10: The Calculator →</a>
+    </div>
+
+  </div>
+</body>
+</html>

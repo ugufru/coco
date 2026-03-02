@@ -79,6 +79,9 @@ CFA_STORE       FDB     CODE_STORE
 CFA_DO          FDB     CODE_DO
 CFA_LOOP        FDB     CODE_LOOP
 CFA_I           FDB     CODE_I
+CFA_MUL         FDB     CODE_MUL
+CFA_DIVMOD      FDB     CODE_DIVMOD
+CFA_KEY         FDB     CODE_KEY
 CFA_0BRANCH     FDB     CODE_0BRANCH
 CFA_BRANCH      FDB     CODE_BRANCH
 CFA_EQ          FDB     CODE_EQ
@@ -283,6 +286,73 @@ CODE_I
         STD     ,--U            ; push onto data stack
         LDY     ,X++            ; NEXT
         JMP     [,Y]
+
+;;; ─── * ( n1 n2 -- prod ) ─────────────────────────────────────────────────────
+;;; 16×16 → 16 signed/unsigned multiply (low 16 bits of product).
+;;;
+;;; Algorithm: low16(n1 × n2) = n1l×n2l + (n1h×n2l + n1l×n2h)×256
+;;;   n1 at U+2..U+3 (hi..lo), n2 at U..U+1 (hi..lo)
+;;; Uses S stack for two single-byte temporaries; restores S before NEXT.
+
+CODE_MUL
+        LDA     2,U             ; A = n1_hi
+        LDB     1,U             ; B = n2_lo
+        MUL                     ; D = n1_hi × n2_lo
+        PSHS    B               ; save low byte (cross term 1)
+        LDA     3,U             ; A = n1_lo
+        LDB     ,U              ; B = n2_hi
+        MUL                     ; D = n1_lo × n2_hi
+        ADDB    ,S+             ; cross_sum = cross1 + low8(n1_lo×n2_hi), pop S
+        PSHS    B               ; save cross_sum
+        LDA     3,U             ; A = n1_lo
+        LDB     1,U             ; B = n2_lo
+        MUL                     ; D = n1_lo × n2_lo (base product)
+        ADDA    ,S+             ; result_hi = base_hi + cross_sum, pop S
+        LEAU    4,U             ; pop both operands
+        STD     ,--U            ; push result
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── /MOD ( n1 n2 -- rem quot ) ──────────────────────────────────────────────
+;;; Unsigned 16÷16 division via repeated subtraction.
+;;; n1 = dividend (NOS), n2 = divisor (TOS).
+;;; Pushes remainder then quotient (quotient on top).
+;;; Division by zero loops forever — caller must ensure n2 ≠ 0.
+
+CODE_DIVMOD
+        LDD     ,U              ; D = divisor
+        PSHS    D               ; save divisor on S stack
+        LDD     2,U             ; D = dividend
+        LEAU    4,U             ; pop both operands from data stack
+        LDY     #0              ; Y = quotient = 0
+DIVMOD_LOOP
+        CMPD    ,S              ; dividend − divisor (unsigned)
+        BLO     DIVMOD_DONE     ; if dividend < divisor, we're done
+        SUBD    ,S              ; dividend −= divisor
+        LEAY    1,Y             ; quotient++
+        BRA     DIVMOD_LOOP
+DIVMOD_DONE
+        LEAS    2,S             ; restore S (pop saved divisor)
+        STD     ,--U            ; push remainder (D = remainder)
+        STY     ,--U            ; push quotient (Y = quotient)
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── KEY ( -- c ) ────────────────────────────────────────────────────────────
+;;; Block until a key is pressed; push its ASCII value.
+;;; Uses POLCAT via the ROM hook at $A000 (Extended Colour BASIC).
+;;; POLCAT returns the ASCII char in A, or 0 if no key is pressed.
+;;; KEYIN saves and restores U, X, B so the Forth registers are safe.
+
+CODE_KEY
+KEYPOLL         JSR     [$A000]         ; call POLCAT via ROM hook
+                TSTA                    ; A = 0 means no key yet
+                BEQ     KEYPOLL
+                TFR     A,B             ; move char to low byte
+                CLRA                    ; high byte = 0
+                STD     ,--U            ; push char onto data stack
+                LDY     ,X++            ; NEXT
+                JMP     [,Y]
 
 ;;; ─── 0BRANCH ( flag -- ) ────────────────────────────────────────────────────
 ;;; Pop flag; if zero, apply signed offset from thread; else skip over it.
