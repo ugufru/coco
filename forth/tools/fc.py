@@ -110,6 +110,8 @@ def parse(tokens):
     do_stack = []
     if_counter = 0
     if_stack = []
+    begin_counter = 0
+    begin_stack = []
     i = 0
 
     while i < len(tokens):
@@ -122,6 +124,7 @@ def parse(tokens):
             current_items = []
             do_stack = []
             if_stack = []
+            begin_stack = []
 
         elif tok == ';':
             if current_def is None:
@@ -130,6 +133,8 @@ def parse(tokens):
                 raise SyntaxError(f"Unclosed DO in definition: {current_def!r}")
             if if_stack:
                 raise SyntaxError(f"Unclosed IF in definition: {current_def!r}")
+            if begin_stack:
+                raise SyntaxError(f"Unclosed BEGIN in definition: {current_def!r}")
             definitions[current_def] = current_items
             current_def = None
             current_items = None
@@ -160,6 +165,25 @@ def parse(tokens):
                 raise SyntaxError("LOOP without DO")
             target = current_items if current_def else main_thread
             target.append(('loop_back', do_stack.pop()))
+
+        elif tok.upper() == 'BEGIN':
+            target = current_items if current_def else main_thread
+            label = f'__begin_{begin_counter}'
+            begin_counter += 1
+            begin_stack.append(label)
+            target.append(('label', label))
+
+        elif tok.upper() == 'AGAIN':
+            if not begin_stack:
+                raise SyntaxError("AGAIN without BEGIN")
+            target = current_items if current_def else main_thread
+            target.append(('again_back', begin_stack.pop()))
+
+        elif tok.upper() == 'UNTIL':
+            if not begin_stack:
+                raise SyntaxError("UNTIL without BEGIN")
+            target = current_items if current_def else main_thread
+            target.append(('until_back', begin_stack.pop()))
 
         elif tok.upper() == 'IF':
             target = current_items if current_def else main_thread
@@ -214,6 +238,8 @@ def item_size(item):
     if kind == 'loop_back':  return 4    # CFA_LOOP (2) + offset cell (2)
     if kind == 'if_fwd':     return 4    # CFA_0BRANCH (2) + forward offset cell (2)
     if kind == 'else_fwd':   return 4    # CFA_BRANCH (2) + forward offset cell (2)
+    if kind == 'again_back': return 4    # CFA_BRANCH (2) + backward offset cell (2)
+    if kind == 'until_back': return 4    # CFA_0BRANCH (2) + backward offset cell (2)
     return 2                             # word reference: CFA address
 
 
@@ -294,6 +320,14 @@ def compile_forth(definitions, variables, main_thread, symbols, app_base):
             emit_word(label_map[item[1]] - (offset_cell_addr + 2))
         elif kind == 'else_fwd':
             emit_word(CFA_BRANCH)
+            offset_cell_addr = app_base + len(buf)
+            emit_word(label_map[item[1]] - (offset_cell_addr + 2))
+        elif kind == 'again_back':
+            emit_word(CFA_BRANCH)
+            offset_cell_addr = app_base + len(buf)
+            emit_word(label_map[item[1]] - (offset_cell_addr + 2))
+        elif kind == 'until_back':
+            emit_word(CFA_0BRANCH)
             offset_cell_addr = app_base + len(buf)
             emit_word(label_map[item[1]] - (offset_cell_addr + 2))
         else:

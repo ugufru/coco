@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 10: The Calculator — Getting Started with Color Forth</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page">
+
+    <!-- Chapter opener -->
+    <div class="chapter-opener">
+      <div class="illustration illustration-opener">
+        <span class="ill-label">Illustration</span>
+        CoCo character standing beside a large hand-held calculator,
+        but it has no equals key — only +, -, *, /. The character
+        is typing on the CoCo keyboard while the calculator's display
+        shows a stack of numbers. A thought bubble from the character
+        reads "3 ENTER 4 ENTER + ..." The vibe is curious, not confused.
+      </div>
+      <div class="chapter-label">CHAPTER 10</div>
+      <div class="chapter-title">The Calculator</div>
+      <div class="chapter-green-bar"></div>
+    </div>
+
+    <!-- Page 1 -->
+    <div class="page-header">
+      <span>THE CALCULATOR</span>
+      <span>1</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>Running Forever</h2>
+
+      <p>
+        Every program so far has run to completion and stopped.
+        A calculator is different — it should keep running until
+        you decide to quit. That calls for a loop with no natural
+        exit: <strong>BEGIN … AGAIN</strong>.
+      </p>
+
+      <div class="rule-box">
+        <h3>BEGIN … AGAIN</h3>
+        <p>Loop unconditionally. Execution jumps back to
+        <code>BEGIN</code> every time <code>AGAIN</code> is reached.
+        The only way out is <code>EXIT</code> from inside the loop
+        body (or <code>HALT</code>).</p>
+      </div>
+
+<pre class="forth">: FOREVER
+  BEGIN
+    KEY EMIT
+  AGAIN ;</pre>
+
+      <p>
+        <code>FOREVER</code> reads a key and echoes it, then loops
+        back immediately. It never returns.
+        <code>BEGIN</code> marks the branch target;
+        <code>AGAIN</code> emits an unconditional backward branch.
+      </p>
+
+      <h2>BEGIN … flag UNTIL</h2>
+
+      <div class="rule-box">
+        <h3>BEGIN … flag UNTIL</h3>
+        <p>Loop until the flag on TOS is non-zero (true).
+        <code>UNTIL</code> pops the flag and branches back to
+        <code>BEGIN</code> if it is zero; falls through if non-zero.</p>
+      </div>
+
+<pre class="forth">\ count up from 0, stop when TOS = 5
+: COUNT5
+  0
+  BEGIN
+    DUP . CR
+    1 +
+    DUP 5 =
+  UNTIL
+  DROP ;</pre>
+
+      <p>
+        <code>BEGIN…AGAIN</code> and <code>BEGIN…UNTIL</code> compile
+        to the same branch primitives as <code>IF…THEN</code> — just
+        pointed backwards. No new kernel code is needed.
+      </p>
+
+      <h2>Reverse Polish Notation</h2>
+
+      <div class="illustration illustration-aside">
+        <span class="ill-label">Illustration</span>
+        Two columns side by side. Left column "Ordinary": "3 + 4 ="
+        with an equals key circled. Right column "RPN": "3 ENTER
+        4 ENTER +" with no equals key. The stack is drawn as a
+        column of blocks beside the RPN column, growing as each
+        value is entered.
+      </div>
+
+      <p>
+        Forth's stack is already an RPN calculator. You push
+        numbers, apply operators, and read results — all without
+        an "equals" key. The challenge is writing the loop that
+        reads keys and decides what to do with them.
+      </p>
+
+      <p>
+        Our calculator uses single-digit entry (0–9) to keep
+        the input code simple. Type a digit to push it; type an
+        operator to compute.
+      </p>
+
+    </div>
+
+    <!-- Page 2 -->
+    <div class="page-header">
+      <span>THE CALCULATOR</span>
+      <span>2</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>DIGIT? — Test and Classify a Key</h2>
+
+      <p>
+        The main loop needs to ask: "is this key a digit, or an
+        operator?" <code>DIGIT?</code> answers that question and
+        leaves the key on the stack so the caller can use it
+        either way.
+      </p>
+
+<pre class="forth">: DIGIT?  ( c -- c flag )
+  DUP CHAR 0 < IF 0 EXIT THEN
+  DUP CHAR 9 > IF 0 EXIT THEN
+  -1 ;</pre>
+
+      <p>
+        The <code>EXIT</code> pattern returns early from a word.
+        If the character is below <code>'0'</code>, we push 0 and
+        exit immediately — no need to test further. If it's above
+        <code>'9'</code>, same treatment. Only if both tests fail
+        do we fall through to push <code>-1</code> (true).
+      </p>
+
+      <div class="rule-box">
+        <h3>EXIT  &nbsp;<span style="font-weight:normal; font-size:0.85em;">( -- )</span></h3>
+        <p>Return from the current word immediately, as if
+        <code>;</code> had been reached. Useful for early-return
+        patterns inside <code>IF … THEN</code>.</p>
+      </div>
+
+      <h2>DISPATCH — Handle an Operator Key</h2>
+
+<pre class="forth">: DISPATCH  ( key -- )
+  DUP CHAR + = IF DROP +              . CR EXIT THEN
+  DUP CHAR - = IF DROP -              . CR EXIT THEN
+  DUP CHAR * = IF DROP *              . CR EXIT THEN
+  DUP CHAR / = IF DROP /MOD SWAP DROP . CR EXIT THEN
+  DUP 13 =     IF DROP DUP            . CR EXIT THEN
+  DUP CHAR C = IF DROP DROP                  EXIT THEN
+  DROP ;</pre>
+
+      <p>
+        Each line tests one key character and — if it matches —
+        drops the key, performs the operation, and <code>EXIT</code>s.
+        The pattern is a chain of <code>DUP = IF … EXIT THEN</code>
+        tests; exactly one branch runs, or the final <code>DROP</code>
+        silently discards an unrecognised key.
+      </p>
+
+      <table style="border-collapse: collapse; margin: 1.2em 2em; font-family: 'Courier New', Courier, monospace; font-size: 0.88em;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--green);">
+            <th style="padding: 6px 20px 6px 0; text-align: left; font-family: Georgia, serif;">Key</th>
+            <th style="padding: 6px 20px 6px 0; text-align: left; font-family: Georgia, serif;">Action</th>
+            <th style="padding: 6px 0; text-align: left; font-family: Georgia, serif;">Stack effect</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style="padding:5px 20px 5px 0;">+</td><td style="padding:5px 20px 5px 0;">add</td><td style="padding:5px 0;">( n1 n2 -- n1+n2 ) print</td></tr>
+          <tr><td style="padding:5px 20px 5px 0;">-</td><td style="padding:5px 20px 5px 0;">subtract</td><td style="padding:5px 0;">( n1 n2 -- n1-n2 ) print</td></tr>
+          <tr><td style="padding:5px 20px 5px 0;">*</td><td style="padding:5px 20px 5px 0;">multiply</td><td style="padding:5px 0;">( n1 n2 -- n1*n2 ) print</td></tr>
+          <tr><td style="padding:5px 20px 5px 0;">/</td><td style="padding:5px 20px 5px 0;">divide</td><td style="padding:5px 0;">( n1 n2 -- n1/n2 ) print</td></tr>
+          <tr><td style="padding:5px 20px 5px 0;">ENTER (13)</td><td style="padding:5px 20px 5px 0;">peek at TOS</td><td style="padding:5px 0;">( n -- n ) print without consuming</td></tr>
+          <tr><td style="padding:5px 20px 5px 0;">C</td><td style="padding:5px 20px 5px 0;">clear TOS</td><td style="padding:5px 0;">( n -- ) drop top value</td></tr>
+        </tbody>
+      </table>
+
+      <h2>CALC — The Main Loop</h2>
+
+<pre class="forth">: CALC
+  BEGIN
+    KEY DIGIT? IF
+      DUP EMIT 32 EMIT   \ echo digit and a space
+      CHAR 0 -
+    ELSE
+      DISPATCH
+    THEN
+  AGAIN ;</pre>
+
+      <p>
+        Wait for a key. If it's a digit, subtract <code>CHAR 0</code>
+        (48) to convert the ASCII code to a numeric value and push
+        it. Otherwise hand the key character to <code>DISPATCH</code>.
+        Then loop forever.
+      </p>
+
+    </div>
+
+    <!-- Page 3 -->
+    <div class="page-header">
+      <span>THE CALCULATOR</span>
+      <span>3</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>Chapter Program</h2>
+
+<pre class="forth">\ Chapter 10 example — The Calculator
+
+: NEGATE   0 SWAP - ;
+: ?DUP     DUP IF DUP THEN ;
+
+: U.  ( u -- )
+  10 /MOD
+  ?DUP IF U. THEN
+  CHAR 0 + EMIT ;
+
+: .  ( n -- )
+  DUP 0 &lt; IF NEGATE CHAR - EMIT THEN
+  U. ;
+
+: DIGIT?  ( c -- c flag )
+  DUP CHAR 0 &lt; IF 0 EXIT THEN
+  DUP CHAR 9 > IF 0 EXIT THEN
+  -1 ;
+
+: DISPATCH  ( key -- )
+  DUP CHAR + = IF DROP +              . CR EXIT THEN
+  DUP CHAR - = IF DROP -              . CR EXIT THEN
+  DUP CHAR * = IF DROP *              . CR EXIT THEN
+  DUP CHAR / = IF DROP /MOD SWAP DROP . CR EXIT THEN
+  DUP 13 =     IF DROP DUP            . CR EXIT THEN
+  DUP CHAR C = IF DROP DROP                  EXIT THEN
+  DROP ;
+
+: CALC
+  BEGIN
+    KEY DIGIT? IF
+      DUP EMIT 32 EMIT   \ echo digit and a space
+      CHAR 0 -
+    ELSE
+      DISPATCH
+    THEN
+  AGAIN ;
+
+CALC HALT</pre>
+
+      <div class="screen-wrap">
+        <div class="screen-label">Session example (keystrokes: 3 4 + 2 * ENTER):</div>
+        <div class="screen">3 4 7<br>2 14<br>14</div>
+      </div>
+
+      <div class="diy">
+        <div class="diy-header">Do-It-Yourself</div>
+        <div class="illustration illustration-small" style="margin: 12px 0 0 16px;">
+          <span class="ill-label">Illustration</span>
+          CoCo character typing on the keyboard with a stack of
+          numbered blocks growing beside the screen. The screen
+          shows "7" after typing "3 4 +". The character looks
+          pleased — the calculator works!
+        </div>
+        <div class="diy-body">
+          <ol>
+            <li>
+              Type <code>3</code>, <code>4</code>, <code>+</code>.
+              What appears? Now type <code>2</code>, <code>*</code>.
+              What do you get?
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              What happens if you type <code>9</code>, <code>3</code>,
+              <code>/</code>? What is the result of integer division?
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              What does <code>C</code> do if you type it when the
+              stack has one value on it? What if you type it when
+              the stack is empty? (Hint: try it.)
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              <code>DISPATCH</code> ignores unrecognised keys.
+              How would you add a <code>D</code> key that duplicates
+              TOS? Write the line you'd add.
+              <div class="answer-line"></div>
+            </li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- Learned in this chapter -->
+      <div class="learned">
+        <div class="learned-header">Learned in Chapter 10</div>
+        <div class="learned-cols">
+          <div class="learned-col">
+            <h4>Forth Words</h4>
+            <dl>
+              <dt>BEGIN … AGAIN</dt>
+              <dd>Infinite loop — no exit unless EXIT/HALT</dd>
+              <dt>BEGIN … UNTIL</dt>
+              <dd>Loop until flag is non-zero</dd>
+              <dt>EXIT</dt>
+              <dd>( -- ) return from current word early</dd>
+            </dl>
+          </div>
+          <div class="learned-col">
+            <h4>Patterns</h4>
+            <p><code>DUP n = IF … EXIT THEN</code> — dispatch on value</p>
+            <p><code>DUP X &lt; IF 0 EXIT THEN</code> — early-return test</p>
+            <p><code>CHAR 0 -</code> converts ASCII digit to number</p>
+          </div>
+          <div class="learned-col">
+            <h4>Concepts</h4>
+            <p>BEGIN…AGAIN is an unconditional backward branch</p>
+            <p>AGAIN and UNTIL reuse the same branch primitives as IF/ELSE/THEN</p>
+            <p>EXIT enables clean multi-exit word design</p>
+            <p>RPN calculators are a natural fit for a stack machine</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="notes">
+        <div class="notes-label">Notes:</div>
+        <div class="notes-lines">
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="nav">
+      <a href="09-numbers.html">← Chapter 9: Numbers on Screen</a>
+      <span class="spacer"></span>
+      <a href="11-guessing-game.html">Chapter 11: The Guessing Game →</a>
+    </div>
+
+  </div>
+</body>
+</html>
