@@ -3,6 +3,9 @@ forth/kernel/build/
 
 # Extracted text from PDF (large, reproducible)
 coco_technical_reference.txt
+coco_technical_reference.pdf
+
+*.bin
 
 # macOS
 .DS_Store
