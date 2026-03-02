@@ -74,6 +74,7 @@ are the kernel's problem, not the application's.
 | `forth/tools/fc.py` | Forth cross-compiler (source → DECB binary) |
 | `forth/hello/hello.fs` | Hello World — the first application |
 | `forth/kernel/README.md` | Kernel architecture and build instructions |
+| `getting-started/` | Tutorial book: *Getting Started with Color Forth* |
 | `COCO_RENOVATION.md` | Original vision document |
 | `coco_technical_reference.pdf` | TRS-80 CoCo technical reference manual |
 
@@ -95,4 +96,88 @@ images (`bas12.rom`, `extbas11.rom`) in `~/.xroar/roms/`.
 Working: kernel boots, clears screen, executes cross-compiled Forth bytecode.
 `HELLO, WORLD!` runs on a CoCo 2 from a Forth source file written on a Mac.
 
-The first wave.
+Six tutorial chapters complete.
+
+---
+
+## Roadmap
+
+This project has three tracks in flight. Here's where each one stands.
+
+---
+
+### Track 1 — Tutorial book (`getting-started/`)
+
+A complete beginner's guide: *Getting Started with Color Forth*. Eleven
+chapters, each with a chapter program and DIY exercises.
+
+| # | Chapter | Status |
+|---|---------|--------|
+| 1 | Meet Your Stack | done |
+| 2 | Say Something | done |
+| 3 | Make Your Own Words | done |
+| 4 | The Stack Is Your Friend | done |
+| 5 | Remember Things | done |
+| 6 | Count and Loop | done |
+| 7 | Decisions | not started |
+| 8 | Read the Keyboard | not started |
+| 9 | Anywhere on Screen | not started |
+| 10 | Guess My Number | not started |
+| 11 | Getting It onto Your CoCo | not started |
+
+Each chapter requires:
+- A chapter HTML file in `getting-started/`
+- A working example `.fs` file in `getting-started/examples/NN/`
+- Any new kernel primitives needed by that chapter
+- Corresponding `fc.py` compiler support for any new control structures
+
+---
+
+### Track 2 — Kernel primitives (`forth/kernel/kernel.asm`)
+
+The kernel must grow to support the tutorial chapters and eventual applications.
+
+| Primitive group | Status |
+|----------------|--------|
+| Stack: DUP, DROP, SWAP, OVER | done |
+| Arithmetic: +, - | done |
+| Memory: @, ! | done |
+| Output: EMIT, CR | done |
+| Control: DO, LOOP, I | done |
+| Comparison: =, <>, <, >, 0= | not started |
+| Branching: IF/ELSE/THEN support (0BRANCH, BRANCH) | not started |
+| Input: KEY | not started |
+| Cursor: AT (row/col positioning) | not started |
+| Math: *, /, MOD, ABS, MIN, MAX | not started |
+| Logic: AND, OR, XOR, NOT | not started |
+| Return stack: R>, >R, R@ | not started |
+| String output: TYPE, COUNT | not started |
+
+---
+
+### Track 3 — Compiler (`forth/tools/fc.py`)
+
+The cross-compiler must support every control structure used in the tutorials.
+
+| Feature | Status |
+|---------|--------|
+| Literals, word calls | done |
+| Colon definitions, EXIT | done |
+| VARIABLE, @, ! | done |
+| CHAR | done |
+| DO, LOOP, I | done |
+| IF, ELSE, THEN (forward branch + backpatch) | not started |
+| BEGIN, UNTIL / BEGIN, WHILE, REPEAT | not started |
+| String literals (S", .") | not started |
+| Constants (CONSTANT) | not started |
+
+---
+
+### Beyond the tutorial
+
+Once the eleven chapters and their supporting infrastructure are complete,
+the next phase is real hardware deployment:
+
+- Serial loader (bit-banged via PIA at $FF20/$FF22) for loading bytecode over RS-232
+- ROM cartridge image: kernel + loader burned to flash, bootable from the pak slot
+- SD card integration: store and load `.bin` files from a CoCoSDC-compatible interface
