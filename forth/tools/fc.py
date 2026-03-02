@@ -55,6 +55,8 @@ def kernel_words(symbols):
         'drop': 'CFA_DROP',
         'swap': 'CFA_SWAP',
         'over': 'CFA_OVER',
+        '@':    'CFA_FETCH',
+        '!':    'CFA_STORE',
     }
     result = {}
     for forth_name, sym_name in names.items():
@@ -79,6 +81,7 @@ def parse(tokens):
     """
     Walk the token stream and return:
         definitions  — OrderedDict of name → [items]
+        variables    — list of variable names (in declaration order)
         main_thread  — [items]  (top-level calls, after all definitions)
 
     Each item is one of:
@@ -86,6 +89,7 @@ def parse(tokens):
         ('word', name_str)
     """
     definitions = {}   # preserves insertion order (Python 3.7+)
+    variables   = []   # variable names in declaration order
     main_thread = []
 
     current_def = None
@@ -108,6 +112,13 @@ def parse(tokens):
             current_def = None
             current_items = None
 
+        elif tok.upper() == 'VARIABLE':
+            if current_def is not None:
+                raise SyntaxError("VARIABLE inside a definition is not supported")
+            i += 1
+            var_name = tokens[i].lower()
+            variables.append(var_name)
+
         elif tok.upper() == 'CHAR':
             i += 1
             char_tok = tokens[i]
@@ -128,7 +139,7 @@ def parse(tokens):
     if current_def is not None:
         raise SyntaxError(f"Unterminated definition: {current_def!r}")
 
-    return definitions, main_thread
+    return definitions, variables, main_thread
 
 
 # ── Compiler ──────────────────────────────────────────────────────────────────
@@ -142,17 +153,19 @@ def item_size(item):
         return 2    # CFA address
 
 
-def compile_forth(definitions, main_thread, symbols, app_base):
+def compile_forth(definitions, variables, main_thread, symbols, app_base):
     """
     Two-pass compiler.
 
     Layout in the output binary:
-        [app_base]              main thread
-        [app_base + main_size]  word definitions (DOCOL … EXIT)
+        [app_base]                          main thread
+        [app_base + main_size]              word definitions (DOCOL … EXIT)
+        [app_base + main_size + defs_size]  variable cells (DOVAR + 2-byte data)
 
     Returns a bytearray to be loaded at app_base.
     """
     DOCOL    = symbols['DOCOL']
+    DOVAR    = symbols['DOVAR']
     CFA_EXIT = symbols['CFA_EXIT']
     CFA_LIT  = symbols['CFA_LIT']
     kwords   = kernel_words(symbols)
@@ -168,6 +181,12 @@ def compile_forth(definitions, main_thread, symbols, app_base):
         cursor += 2                                      # DOCOL (the CFA cell)
         cursor += sum(item_size(it) for it in items)
         cursor += 2                                      # CFA_EXIT
+
+    var_cfa = {}    # name → address of the variable's CFA cell in the output
+    for name in variables:
+        var_cfa[name] = cursor
+        cursor += 2                                      # DOVAR (the CFA cell)
+        cursor += 2                                      # data cell (16-bit, init 0)
 
     # ── Pass 2: generate binary ───────────────────────────────────────────────
 
@@ -185,6 +204,8 @@ def compile_forth(definitions, main_thread, symbols, app_base):
             name = val
             if name in word_cfa:
                 emit_word(word_cfa[name])
+            elif name in var_cfa:
+                emit_word(var_cfa[name])
             elif name in kwords:
                 emit_word(kwords[name])
             else:
@@ -200,6 +221,11 @@ def compile_forth(definitions, main_thread, symbols, app_base):
         for item in items:
             resolve(item)
         emit_word(CFA_EXIT)
+
+    # Variable definitions
+    for name in variables:
+        emit_word(DOVAR)        # CFA cell
+        emit_word(0)            # data cell, initialized to 0
 
     return buf
 
@@ -270,11 +296,11 @@ def main():
     app_base = int(args.base, 16)
     out_file = args.output or str(Path(args.source).with_suffix('.bin'))
 
-    symbols    = load_symbols(args.kernel)
-    source     = Path(args.source).read_text()
-    tokens     = tokenize(source)
-    defs, main = parse(tokens)
-    code       = compile_forth(defs, main, symbols, app_base)
+    symbols              = load_symbols(args.kernel)
+    source               = Path(args.source).read_text()
+    tokens               = tokenize(source)
+    defs, variables, main = parse(tokens)
+    code                 = compile_forth(defs, variables, main, symbols, app_base)
 
     if args.kernel_bin:
         # Combine kernel + app into one DECB binary.
@@ -289,6 +315,8 @@ def main():
 
     if defs:
         print(f"  words: {', '.join(defs)}")
+    if variables:
+        print(f"  vars:  {', '.join(variables)}")
 
 
 if __name__ == '__main__':

@@ -47,6 +47,18 @@ DOCOL
         LDY     ,X++            ; NEXT
         JMP     [,Y]
 
+;;; DOVAR — enter a variable definition
+;;;   Called via JMP [,Y] where Y = address of the variable's CFA cell.
+;;;   The CFA contains the address of DOVAR.
+;;;   The 2-byte data cell begins at Y+2, immediately after the CFA cell.
+;;;   Push the data cell address, then NEXT.
+
+DOVAR
+        LEAY    2,Y             ; Y = address of variable's data cell (Y+2)
+        STY     ,--U            ; push that address onto data stack
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
 ;;; ─── CFA table ───────────────────────────────────────────────────────────────
 ;;; Each entry is a 2-byte pointer to the primitive's machine code.
 ;;; The thread stores addresses of these CFA entries.
@@ -62,6 +74,8 @@ CFA_DUP         FDB     CODE_DUP
 CFA_DROP        FDB     CODE_DROP
 CFA_SWAP        FDB     CODE_SWAP
 CFA_OVER        FDB     CODE_OVER
+CFA_FETCH       FDB     CODE_FETCH
+CFA_STORE       FDB     CODE_STORE
 
 ;;; ─── EXIT ( -- ) ─────────────────────────────────────────────────────────────
 ;;; Return from a colon definition.
@@ -185,6 +199,31 @@ CODE_SWAP
 CODE_OVER
         LDD     2,U             ; D = NOS (n1)
         STD     ,--U            ; push copy on top (2-byte pre-decrement)
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── @ ( addr -- n ) ─────────────────────────────────────────────────────────
+;;; Fetch a 16-bit value from the address on top of stack.
+;;;   Before: [ addr | ... ]
+;;;   After:  [ value | ... ]
+
+CODE_FETCH
+        LDY     ,U              ; Y = address (TOS)
+        LDD     ,Y              ; D = 16-bit value at that address
+        STD     ,U              ; replace TOS with fetched value
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── ! ( n addr -- ) ─────────────────────────────────────────────────────────
+;;; Store a 16-bit value at the address on top of stack.
+;;;   Before: [ addr | n | ... ]   TOS=addr, NOS=n
+;;;   After:  [ ... ]              both popped
+
+CODE_STORE
+        LDY     ,U              ; Y = address (TOS)
+        LDD     2,U             ; D = value (NOS)
+        STD     ,Y              ; store value at address
+        LEAU    4,U             ; pop both addr (TOS) and value (NOS)
         LDY     ,X++            ; NEXT
         JMP     [,Y]
 
