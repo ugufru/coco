@@ -76,6 +76,9 @@ CFA_SWAP        FDB     CODE_SWAP
 CFA_OVER        FDB     CODE_OVER
 CFA_FETCH       FDB     CODE_FETCH
 CFA_STORE       FDB     CODE_STORE
+CFA_DO          FDB     CODE_DO
+CFA_LOOP        FDB     CODE_LOOP
+CFA_I           FDB     CODE_I
 
 ;;; ─── EXIT ( -- ) ─────────────────────────────────────────────────────────────
 ;;; Return from a colon definition.
@@ -229,6 +232,50 @@ CODE_STORE
 
 ;;; ─── HALT ────────────────────────────────────────────────────────────────────
 ;;; Spin forever — end of application.
+
+;;; ─── DO ( limit start -- ) ( R: -- start limit ) ────────────────────────────
+;;; Pop limit and start from data stack, push both onto return stack.
+;;; Return stack layout after DO: TOS=index(start), NOS=limit.
+
+CODE_DO
+        LDD     ,U              ; D = start (TOS)
+        LDY     2,U             ; Y = limit (NOS)
+        LEAU    4,U             ; pop both from data stack
+        STY     ,--S            ; push limit → NOS of return stack
+        STD     ,--S            ; push index → TOS of return stack
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── LOOP ( -- ) ( R: index limit -- or loop continues ) ────────────────────
+;;; Increment index (TOS of R). If equal to limit (NOS of R), pop both and
+;;; fall through (skip the back-branch offset cell). Otherwise branch back
+;;; via the signed 16-bit offset that follows CFA_LOOP in the thread.
+
+CODE_LOOP
+        LDD     ,S              ; D = index (TOS of R)
+        ADDD    #1
+        STD     ,S              ; store incremented index
+        CMPD    2,S             ; compare with limit (NOS of R)
+        BEQ     LOOP_DONE
+        LDD     ,X              ; D = back-branch offset
+        LEAX    2,X             ; advance IP past the offset cell
+        LEAX    D,X             ; apply signed offset
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+LOOP_DONE
+        LEAS    4,S             ; pop index + limit from return stack
+        LEAX    2,X             ; skip over the offset cell
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── I ( -- n ) ──────────────────────────────────────────────────────────────
+;;; Copy the current loop index (TOS of return stack) to the data stack.
+
+CODE_I
+        LDD     ,S              ; D = loop index (TOS of R)
+        STD     ,--U            ; push onto data stack
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
 
 CODE_HALT
         BRA     CODE_HALT

@@ -57,6 +57,7 @@ def kernel_words(symbols):
         'over': 'CFA_OVER',
         '@':    'CFA_FETCH',
         '!':    'CFA_STORE',
+        'i':    'CFA_I',
     }
     result = {}
     for forth_name, sym_name in names.items():
@@ -85,8 +86,11 @@ def parse(tokens):
         main_thread  — [items]  (top-level calls, after all definitions)
 
     Each item is one of:
-        ('lit',  int_value)
-        ('word', name_str)
+        ('lit',       int_value)
+        ('word',      name_str)
+        ('label',     name_str)   — 0 bytes; marks a position for DO back-reference
+        ('do',)                   — 2 bytes; emits CFA_DO
+        ('loop_back', name_str)   — 4 bytes; emits CFA_LOOP + signed offset to label
     """
     definitions = {}   # preserves insertion order (Python 3.7+)
     variables   = []   # variable names in declaration order
@@ -94,6 +98,8 @@ def parse(tokens):
 
     current_def = None
     current_items = None
+    do_counter = 0
+    do_stack = []
     i = 0
 
     while i < len(tokens):
@@ -104,10 +110,13 @@ def parse(tokens):
             name = tokens[i].lower()
             current_def = name
             current_items = []
+            do_stack = []
 
         elif tok == ';':
             if current_def is None:
                 raise SyntaxError("';' without ':'")
+            if do_stack:
+                raise SyntaxError(f"Unclosed DO in definition: {current_def!r}")
             definitions[current_def] = current_items
             current_def = None
             current_items = None
@@ -124,6 +133,20 @@ def parse(tokens):
             char_tok = tokens[i]
             item = ('lit', ord(char_tok[0]))
             (current_items if current_def else main_thread).append(item)
+
+        elif tok.upper() == 'DO':
+            target = current_items if current_def else main_thread
+            label = f'__do_{do_counter}'
+            do_counter += 1
+            do_stack.append(label)
+            target.append(('do',))
+            target.append(('label', label))
+
+        elif tok.upper() == 'LOOP':
+            if not do_stack:
+                raise SyntaxError("LOOP without DO")
+            target = current_items if current_def else main_thread
+            target.append(('loop_back', do_stack.pop()))
 
         else:
             # Integer literal or word reference
@@ -146,11 +169,12 @@ def parse(tokens):
 
 def item_size(item):
     """Bytes emitted for a single IR item."""
-    kind, _ = item
-    if kind == 'lit':
-        return 4    # CFA_LIT (2) + value (2)
-    else:
-        return 2    # CFA address
+    kind = item[0]
+    if kind == 'lit':        return 4    # CFA_LIT (2) + value (2)
+    if kind == 'label':      return 0    # marker only, no bytes
+    if kind == 'do':         return 2    # CFA_DO
+    if kind == 'loop_back':  return 4    # CFA_LOOP (2) + offset cell (2)
+    return 2                             # word reference: CFA address
 
 
 def compile_forth(definitions, variables, main_thread, symbols, app_base):
@@ -168,18 +192,32 @@ def compile_forth(definitions, variables, main_thread, symbols, app_base):
     DOVAR    = symbols['DOVAR']
     CFA_EXIT = symbols['CFA_EXIT']
     CFA_LIT  = symbols['CFA_LIT']
+    CFA_DO   = symbols['CFA_DO']
+    CFA_LOOP = symbols['CFA_LOOP']
     kwords   = kernel_words(symbols)
 
     # ── Pass 1: calculate addresses ───────────────────────────────────────────
+    # label_map records the address of each ('label', name) marker.
+    # scan() must be used instead of sum(item_size) so that 0-size labels
+    # are recorded at the correct position before DO is emitted.
 
-    main_size = sum(item_size(it) for it in main_thread)
+    label_map = {}
+
+    def scan(items, start):
+        cursor = start
+        for item in items:
+            if item[0] == 'label':
+                label_map[item[1]] = cursor
+            cursor += item_size(item)
+        return cursor
+
+    cursor = scan(main_thread, app_base)
 
     word_cfa = {}   # name → address of the word's CFA cell in the output
-    cursor = app_base + main_size
     for name, items in definitions.items():
         word_cfa[name] = cursor
         cursor += 2                                      # DOCOL (the CFA cell)
-        cursor += sum(item_size(it) for it in items)
+        cursor = scan(items, cursor)
         cursor += 2                                      # CFA_EXIT
 
     var_cfa = {}    # name → address of the variable's CFA cell in the output
@@ -196,12 +234,20 @@ def compile_forth(definitions, variables, main_thread, symbols, app_base):
         buf.extend(struct.pack('>H', val & 0xFFFF))
 
     def resolve(item):
-        kind, val = item
+        kind = item[0]
         if kind == 'lit':
             emit_word(CFA_LIT)
-            emit_word(val)
+            emit_word(item[1])
+        elif kind == 'label':
+            pass    # 0 bytes; position already recorded in label_map
+        elif kind == 'do':
+            emit_word(CFA_DO)
+        elif kind == 'loop_back':
+            emit_word(CFA_LOOP)
+            offset_cell_addr = app_base + len(buf)
+            emit_word(label_map[item[1]] - (offset_cell_addr + 2))
         else:
-            name = val
+            name = item[1]
             if name in word_cfa:
                 emit_word(word_cfa[name])
             elif name in var_cfa:
