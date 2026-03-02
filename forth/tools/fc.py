@@ -49,6 +49,7 @@ def kernel_words(symbols):
         'halt': 'CFA_HALT',
         'exit': 'CFA_EXIT',
         '+':    'CFA_ADD',
+        'cr':   'CFA_CR',
     }
     result = {}
     for forth_name, sym_name in names.items():

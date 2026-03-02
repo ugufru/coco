@@ -1,0 +1,24 @@
+\ Chapter 2 example — Say Something
+\ Displays a two-line title card on the CoCo screen.
+
+: DASH  CHAR - EMIT ;
+
+: RULE
+  DASH DASH DASH DASH DASH DASH DASH DASH DASH DASH DASH
+  CR ;
+
+: TITLE
+  CHAR C EMIT
+  CHAR O EMIT
+  CHAR L EMIT
+  CHAR O EMIT
+  CHAR R EMIT
+  32 EMIT
+  CHAR F EMIT
+  CHAR O EMIT
+  CHAR R EMIT
+  CHAR T EMIT
+  CHAR H EMIT
+  CR ;
+
+TITLE RULE HALT

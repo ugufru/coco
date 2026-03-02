@@ -56,6 +56,7 @@ CFA_LIT         FDB     CODE_LIT
 CFA_EMIT        FDB     CODE_EMIT
 CFA_HALT        FDB     CODE_HALT
 CFA_ADD         FDB     CODE_ADD
+CFA_CR          FDB     CODE_CR
 
 ;;; ─── EXIT ( -- ) ─────────────────────────────────────────────────────────────
 ;;; Return from a colon definition.
@@ -113,6 +114,22 @@ CODE_ADD
         LEAU    2,U             ; pop TOS: U now points at n1
         ADDD    ,U              ; D = n2 + n1
         STD     ,U              ; write sum back; n1 slot becomes result
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── CR ( -- ) ───────────────────────────────────────────────────────────────
+;;; Advance cursor to the start of the next row.
+;;; new_cursor = (cursor + 32) & $FFE0  — rounds up to next multiple of 32.
+
+CODE_CR
+        LDD     VAR_CUR         ; D = current cursor (0–511)
+        ADDD    #32             ; move into next-row region
+        ANDB    #$E0            ; clear low 5 bits → align to column 0
+        CMPD    #NSCR           ; past end of screen?
+        BLO     CR_OK
+        LDD     #0              ; wrap to top-left
+CR_OK
+        STD     VAR_CUR         ; save new cursor
         LDY     ,X++            ; NEXT
         JMP     [,Y]
 
