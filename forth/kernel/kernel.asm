@@ -56,6 +56,7 @@ CFA_LIT         FDB     CODE_LIT
 CFA_EMIT        FDB     CODE_EMIT
 CFA_HALT        FDB     CODE_HALT
 CFA_ADD         FDB     CODE_ADD
+CFA_SUB         FDB     CODE_SUB
 CFA_CR          FDB     CODE_CR
 
 ;;; ─── EXIT ( -- ) ─────────────────────────────────────────────────────────────
@@ -114,6 +115,19 @@ CODE_ADD
         LEAU    2,U             ; pop TOS: U now points at n1
         ADDD    ,U              ; D = n2 + n1
         STD     ,U              ; write sum back; n1 slot becomes result
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── - ( n1 n2 -- diff ) ────────────────────────────────────────────────────
+;;; Pop two values, push n1 - n2.
+;;;   Before: [ n2 | n1 | ... ]   U points at n2 (TOS)
+;;;   After:  [ n1-n2 | ... ]
+
+CODE_SUB
+        LDD     2,U             ; D = NOS (n1)
+        SUBD    ,U              ; D = n1 - n2 (TOS)
+        LEAU    2,U             ; pop TOS: U now points at n1
+        STD     ,U              ; write difference back; n1 slot becomes result
         LDY     ,X++            ; NEXT
         JMP     [,Y]
 

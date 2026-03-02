@@ -49,6 +49,7 @@ def kernel_words(symbols):
         'halt': 'CFA_HALT',
         'exit': 'CFA_EXIT',
         '+':    'CFA_ADD',
+        '-':    'CFA_SUB',
         'cr':   'CFA_CR',
     }
     result = {}
