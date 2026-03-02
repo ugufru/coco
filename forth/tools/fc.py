@@ -58,6 +58,11 @@ def kernel_words(symbols):
         '@':    'CFA_FETCH',
         '!':    'CFA_STORE',
         'i':    'CFA_I',
+        '=':    'CFA_EQ',
+        '<>':   'CFA_NEQ',
+        '<':    'CFA_LT',
+        '>':    'CFA_GT',
+        '0=':   'CFA_ZEQU',
     }
     result = {}
     for forth_name, sym_name in names.items():
@@ -100,6 +105,8 @@ def parse(tokens):
     current_items = None
     do_counter = 0
     do_stack = []
+    if_counter = 0
+    if_stack = []
     i = 0
 
     while i < len(tokens):
@@ -111,12 +118,15 @@ def parse(tokens):
             current_def = name
             current_items = []
             do_stack = []
+            if_stack = []
 
         elif tok == ';':
             if current_def is None:
                 raise SyntaxError("';' without ':'")
             if do_stack:
                 raise SyntaxError(f"Unclosed DO in definition: {current_def!r}")
+            if if_stack:
+                raise SyntaxError(f"Unclosed IF in definition: {current_def!r}")
             definitions[current_def] = current_items
             current_def = None
             current_items = None
@@ -148,6 +158,31 @@ def parse(tokens):
             target = current_items if current_def else main_thread
             target.append(('loop_back', do_stack.pop()))
 
+        elif tok.upper() == 'IF':
+            target = current_items if current_def else main_thread
+            label = f'__if_{if_counter}'
+            if_counter += 1
+            if_stack.append(('if', label))
+            target.append(('if_fwd', label))
+
+        elif tok.upper() == 'ELSE':
+            if not if_stack or if_stack[-1][0] != 'if':
+                raise SyntaxError("ELSE without IF")
+            _, if_label = if_stack.pop()
+            target = current_items if current_def else main_thread
+            else_label = f'__else_{if_counter}'
+            if_counter += 1
+            if_stack.append(('else', else_label))
+            target.append(('else_fwd', else_label))
+            target.append(('label', if_label))
+
+        elif tok.upper() == 'THEN':
+            if not if_stack or if_stack[-1][0] not in ('if', 'else'):
+                raise SyntaxError("THEN without IF")
+            _, label = if_stack.pop()
+            target = current_items if current_def else main_thread
+            target.append(('label', label))
+
         else:
             # Integer literal or word reference
             try:
@@ -174,6 +209,8 @@ def item_size(item):
     if kind == 'label':      return 0    # marker only, no bytes
     if kind == 'do':         return 2    # CFA_DO
     if kind == 'loop_back':  return 4    # CFA_LOOP (2) + offset cell (2)
+    if kind == 'if_fwd':     return 4    # CFA_0BRANCH (2) + forward offset cell (2)
+    if kind == 'else_fwd':   return 4    # CFA_BRANCH (2) + forward offset cell (2)
     return 2                             # word reference: CFA address
 
 
@@ -192,9 +229,11 @@ def compile_forth(definitions, variables, main_thread, symbols, app_base):
     DOVAR    = symbols['DOVAR']
     CFA_EXIT = symbols['CFA_EXIT']
     CFA_LIT  = symbols['CFA_LIT']
-    CFA_DO   = symbols['CFA_DO']
-    CFA_LOOP = symbols['CFA_LOOP']
-    kwords   = kernel_words(symbols)
+    CFA_DO       = symbols['CFA_DO']
+    CFA_LOOP     = symbols['CFA_LOOP']
+    CFA_0BRANCH  = symbols['CFA_0BRANCH']
+    CFA_BRANCH   = symbols['CFA_BRANCH']
+    kwords       = kernel_words(symbols)
 
     # ── Pass 1: calculate addresses ───────────────────────────────────────────
     # label_map records the address of each ('label', name) marker.
@@ -244,6 +283,14 @@ def compile_forth(definitions, variables, main_thread, symbols, app_base):
             emit_word(CFA_DO)
         elif kind == 'loop_back':
             emit_word(CFA_LOOP)
+            offset_cell_addr = app_base + len(buf)
+            emit_word(label_map[item[1]] - (offset_cell_addr + 2))
+        elif kind == 'if_fwd':
+            emit_word(CFA_0BRANCH)
+            offset_cell_addr = app_base + len(buf)
+            emit_word(label_map[item[1]] - (offset_cell_addr + 2))
+        elif kind == 'else_fwd':
+            emit_word(CFA_BRANCH)
             offset_cell_addr = app_base + len(buf)
             emit_word(label_map[item[1]] - (offset_cell_addr + 2))
         else:

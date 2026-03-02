@@ -79,6 +79,13 @@ CFA_STORE       FDB     CODE_STORE
 CFA_DO          FDB     CODE_DO
 CFA_LOOP        FDB     CODE_LOOP
 CFA_I           FDB     CODE_I
+CFA_0BRANCH     FDB     CODE_0BRANCH
+CFA_BRANCH      FDB     CODE_BRANCH
+CFA_EQ          FDB     CODE_EQ
+CFA_NEQ         FDB     CODE_NEQ
+CFA_LT          FDB     CODE_LT
+CFA_GT          FDB     CODE_GT
+CFA_ZEQU        FDB     CODE_ZEQU
 
 ;;; ─── EXIT ( -- ) ─────────────────────────────────────────────────────────────
 ;;; Return from a colon definition.
@@ -275,6 +282,114 @@ CODE_I
         LDD     ,S              ; D = loop index (TOS of R)
         STD     ,--U            ; push onto data stack
         LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── 0BRANCH ( flag -- ) ────────────────────────────────────────────────────
+;;; Pop flag; if zero, apply signed offset from thread; else skip over it.
+
+CODE_0BRANCH
+        LDD     ,U
+        LEAU    2,U
+        BNE     OBR_SKIP
+        LDD     ,X
+        LEAX    2,X
+        LEAX    D,X
+        LDY     ,X++
+        JMP     [,Y]
+OBR_SKIP
+        LEAX    2,X
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── BRANCH ( -- ) ───────────────────────────────────────────────────────────
+;;; Unconditional branch via signed offset cell in the thread.
+
+CODE_BRANCH
+        LDD     ,X
+        LEAX    2,X
+        LEAX    D,X
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── = ( n1 n2 -- flag ) ─────────────────────────────────────────────────────
+;;; Push -1 if n1 = n2, else push 0.
+
+CODE_EQ
+        LDD     2,U
+        SUBD    ,U
+        LEAU    4,U
+        BNE     EQ_FALSE
+        LDD     #$FFFF
+        BRA     EQ_DONE
+EQ_FALSE
+        LDD     #0
+EQ_DONE
+        STD     ,--U
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── <> ( n1 n2 -- flag ) ────────────────────────────────────────────────────
+;;; Push -1 if n1 <> n2, else push 0.
+
+CODE_NEQ
+        LDD     2,U
+        SUBD    ,U
+        LEAU    4,U
+        BEQ     NEQ_FALSE
+        LDD     #$FFFF
+        BRA     NEQ_DONE
+NEQ_FALSE
+        LDD     #0
+NEQ_DONE
+        STD     ,--U
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── < ( n1 n2 -- flag ) ─────────────────────────────────────────────────────
+;;; Push -1 if n1 < n2 (signed), else push 0.
+
+CODE_LT
+        LDD     2,U
+        CMPD    ,U
+        LEAU    4,U
+        BGE     LT_FALSE
+        LDD     #$FFFF
+        BRA     LT_DONE
+LT_FALSE
+        LDD     #0
+LT_DONE
+        STD     ,--U
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── > ( n1 n2 -- flag ) ─────────────────────────────────────────────────────
+;;; Push -1 if n1 > n2 (signed), else push 0.
+
+CODE_GT
+        LDD     2,U
+        CMPD    ,U
+        LEAU    4,U
+        BLE     GT_FALSE
+        LDD     #$FFFF
+        BRA     GT_DONE
+GT_FALSE
+        LDD     #0
+GT_DONE
+        STD     ,--U
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── 0= ( n -- flag ) ────────────────────────────────────────────────────────
+;;; Push -1 if n = 0, else push 0.  (Replaces TOS in-place.)
+
+CODE_ZEQU
+        LDD     ,U
+        BNE     ZEQU_F
+        LDD     #$FFFF
+        BRA     ZEQU_S
+ZEQU_F  LDD     #0
+ZEQU_S  STD     ,U
+        LDY     ,X++
         JMP     [,Y]
 
 CODE_HALT
