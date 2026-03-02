@@ -51,6 +51,10 @@ def kernel_words(symbols):
         '+':    'CFA_ADD',
         '-':    'CFA_SUB',
         'cr':   'CFA_CR',
+        'dup':  'CFA_DUP',
+        'drop': 'CFA_DROP',
+        'swap': 'CFA_SWAP',
+        'over': 'CFA_OVER',
     }
     result = {}
     for forth_name, sym_name in names.items():

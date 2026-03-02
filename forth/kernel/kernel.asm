@@ -58,6 +58,10 @@ CFA_HALT        FDB     CODE_HALT
 CFA_ADD         FDB     CODE_ADD
 CFA_SUB         FDB     CODE_SUB
 CFA_CR          FDB     CODE_CR
+CFA_DUP         FDB     CODE_DUP
+CFA_DROP        FDB     CODE_DROP
+CFA_SWAP        FDB     CODE_SWAP
+CFA_OVER        FDB     CODE_OVER
 
 ;;; ─── EXIT ( -- ) ─────────────────────────────────────────────────────────────
 ;;; Return from a colon definition.
@@ -144,6 +148,43 @@ CODE_CR
         LDD     #0              ; wrap to top-left
 CR_OK
         STD     VAR_CUR         ; save new cursor
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── DUP ( n -- n n ) ────────────────────────────────────────────────────────
+;;; Duplicate the top of stack.
+
+CODE_DUP
+        LDD     ,U              ; D = TOS
+        STD     ,--U            ; push copy (2-byte pre-decrement)
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── DROP ( n -- ) ───────────────────────────────────────────────────────────
+;;; Discard the top of stack.
+
+CODE_DROP
+        LEAU    2,U             ; pop TOS (discard)
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── SWAP ( n1 n2 -- n2 n1 ) ─────────────────────────────────────────────────
+;;; Exchange the top two stack items.
+
+CODE_SWAP
+        LDD     ,U              ; D = TOS (n2)
+        LDY     2,U             ; Y = NOS (n1)
+        STD     2,U             ; old TOS → NOS slot
+        STY     ,U              ; old NOS → TOS slot
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── OVER ( n1 n2 -- n1 n2 n1 ) ─────────────────────────────────────────────
+;;; Copy the second stack item to the top.
+
+CODE_OVER
+        LDD     2,U             ; D = NOS (n1)
+        STD     ,--U            ; push copy on top (2-byte pre-decrement)
         LDY     ,X++            ; NEXT
         JMP     [,Y]
 
