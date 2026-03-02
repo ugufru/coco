@@ -55,6 +55,7 @@ CFA_EXIT        FDB     CODE_EXIT
 CFA_LIT         FDB     CODE_LIT
 CFA_EMIT        FDB     CODE_EMIT
 CFA_HALT        FDB     CODE_HALT
+CFA_ADD         FDB     CODE_ADD
 
 ;;; ─── EXIT ( -- ) ─────────────────────────────────────────────────────────────
 ;;; Return from a colon definition.
@@ -69,7 +70,7 @@ CODE_EXIT
 
 CODE_LIT
         LDD     ,X++            ; fetch literal from thread, advance IP past it
-        STD     ,-U             ; push onto data stack (A=high, B=low)
+        STD     ,--U            ; push onto data stack (A=high, B=low)
         LDY     ,X++            ; NEXT
         JMP     [,Y]
 
@@ -99,6 +100,19 @@ CODE_EMIT
         LDY     #0              ; wrap to top-left
 EMIT_OK
         STY     VAR_CUR         ; save cursor position
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── + ( n1 n2 -- sum ) ──────────────────────────────────────────────────────
+;;; Pop two values, push their sum.
+;;;   Before: [ n2 | n1 | ... ]   U points at n2 (TOS)
+;;;   After:  [ n1+n2 | ... ]
+
+CODE_ADD
+        LDD     ,U              ; D = TOS (n2), no auto-increment
+        LEAU    2,U             ; pop TOS: U now points at n1
+        ADDD    ,U              ; D = n2 + n1
+        STD     ,U              ; write sum back; n1 slot becomes result
         LDY     ,X++            ; NEXT
         JMP     [,Y]
 

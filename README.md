@@ -1,9 +1,11 @@
-# CoCo — Modern Bytecode for the Color Computer
+# Bananas — Modern Bytecode for the Color Computer
 
 This repository is the starting point for something that hasn't been done:
 writing fully realized, modern applications for the TRS-80 Color Computer
 using a cross-compiled Forth bytecode toolchain — no traditional native
 development, no on-device assembler, no 1982 workflow.
+
+This is Bananas.
 
 The CoCo runs the code. Everything else happens on modern hardware.
 
