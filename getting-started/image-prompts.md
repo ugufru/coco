@@ -15,9 +15,9 @@ For openers use `height:100%; object-fit:cover` instead of `height:auto`.
 
 ## Cover (index.html)
 
-| File | Type |
-|------|------|
-| `cover-1.jpg` | cover (340×200px) |
+| File | Type | Done |
+|------|------|------|
+| `cover-1.png` | cover (340×200px) | ✅ |
 
 CoCo character in a lab coat, holding a soldering iron in one hand and a Forth source
 listing in the other. Behind it: a real Color Computer on a workbench, screen glowing
@@ -29,15 +29,15 @@ scene.
 
 ## Chapter 1 — Meet Your Stack
 
-| File | Type |
-|------|------|
-| `chapter1-1.jpg` | opener |
-| `chapter1-2.jpg` | aside |
-| `chapter1-3.jpg` | small |
-| `chapter1-4.jpg` | bug (54×54px icon) |
-| `chapter1-5.jpg` | aside |
-| `chapter1-6.jpg` | bug (54×54px icon) |
-| `chapter1-7.jpg` | small |
+| File | Type | Done |
+|------|------|------|
+| `chapter1-1.png` | opener | ✅ |
+| `chapter1-2.png` | aside | ✅ |
+| `chapter1-3.png` | small | ✅ |
+| `chapter1-4.png` | bug (54×54px icon) | ✅ |
+| `chapter1-5.png` | aside | ✅ |
+| `chapter1-6.png` | bug (54×54px icon) | ✅ |
+| `chapter1-7.png` | small | ✅ |
 
 **chapter1-1** (opener)
 CoCo character standing proudly next to a tall tower of numbered blocks (65, 1, 42…),
@@ -69,12 +69,12 @@ looking ready and eager.
 
 ## Chapter 2 — Say Something
 
-| File | Type |
-|------|------|
-| `chapter2-1.jpg` | opener |
-| `chapter2-2.jpg` | aside |
-| `chapter2-3.jpg` | aside |
-| `chapter2-4.jpg` | small |
+| File | Type | Done |
+|------|------|------|
+| `chapter2-1.png` | opener | ✅ |
+| `chapter2-2.png` | aside | ✅ |
+| `chapter2-3.png` | aside | ✅ |
+| `chapter2-4.png` | small | ✅ |
 
 **chapter2-1** (opener)
 CoCo character at an old manual typewriter, yanking the carriage return lever with a
@@ -100,12 +100,12 @@ background waiting for input.
 
 ## Chapter 3 — Make Your Own Words
 
-| File | Type |
-|------|------|
-| `chapter3-1.jpg` | opener |
-| `chapter3-2.jpg` | aside |
-| `chapter3-3.jpg` | aside |
-| `chapter3-4.jpg` | small |
+| File | Type | Done |
+|------|------|------|
+| `chapter3-1.png` | opener | ✅ |
+| `chapter3-2.png` | aside | ✅ |
+| `chapter3-3.png` | aside | ✅ |
+| `chapter3-4.png` | small | ✅ |
 
 **chapter3-1** (opener)
 CoCo character holding a big stamp labeled "LETTER" and pressing it onto a grid of
@@ -130,12 +130,12 @@ expression.
 
 ## Chapter 4 — The Stack Is Your Friend
 
-| File | Type |
-|------|------|
-| `chapter4-1.jpg` | opener |
-| `chapter4-2.jpg` | aside |
-| `chapter4-3.jpg` | aside |
-| `chapter4-4.jpg` | small |
+| File | Type | Done |
+|------|------|------|
+| `chapter4-1.png` | opener | ✅ |
+| `chapter4-2.png` | aside | ✅ |
+| `chapter4-3.png` | aside | ✅ |
+| `chapter4-4.png` | small | ✅ |
 
 **chapter4-1** (opener)
 CoCo character as a juggler, keeping four numbered plates in the air labeled DUP, DROP,
@@ -160,11 +160,11 @@ student.
 
 ## Chapter 5 — Remember Things
 
-| File | Type |
-|------|------|
-| `chapter5-1.jpg` | opener |
-| `chapter5-2.jpg` | aside |
-| `chapter5-3.jpg` | small |
+| File | Type | Done |
+|------|------|------|
+| `chapter5-1.png` | opener | ✅ |
+| `chapter5-2.png` | aside | ✅ |
+| `chapter5-3.png` | small | ✅ |
 
 **chapter5-1** (opener)
 CoCo character sticking a Post-it note labeled "BASE = 7" onto a bulletin board. A
@@ -187,11 +187,11 @@ slot.
 
 ## Chapter 6 — Count and Loop
 
-| File | Type |
-|------|------|
-| `chapter6-1.jpg` | opener |
-| `chapter6-2.jpg` | aside |
-| `chapter6-3.jpg` | small |
+| File | Type | Done |
+|------|------|------|
+| `chapter6-1.png` | opener | ✅ |
+| `chapter6-2.png` | aside | ✅ |
+| `chapter6-3.png` | small | |
 
 **chapter6-1** (opener)
 CoCo character standing in front of a chalkboard with the letters A through Z written
@@ -214,11 +214,11 @@ the far side like a ticker tape.
 
 ## Chapter 7 — Decisions
 
-| File | Type |
-|------|------|
-| `chapter7-1.jpg` | opener |
-| `chapter7-2.jpg` | aside |
-| `chapter7-3.jpg` | small |
+| File | Type | Done |
+|------|------|------|
+| `chapter7-1.png` | opener | |
+| `chapter7-2.png` | aside | |
+| `chapter7-3.png` | small | |
 
 **chapter7-1** (opener)
 CoCo character standing at a fork in the road. One path is labeled PASS and leads
@@ -241,11 +241,11 @@ decision.
 
 ## Chapter 8 — Read the Keyboard
 
-| File | Type |
-|------|------|
-| `chapter8-1.jpg` | opener |
-| `chapter8-2.jpg` | aside |
-| `chapter8-3.jpg` | small |
+| File | Type | Done |
+|------|------|------|
+| `chapter8-1.png` | opener | |
+| `chapter8-2.png` | aside | |
+| `chapter8-3.png` | small | |
 
 **chapter8-1** (opener)
 CoCo character sitting at the keyboard with one finger hovering over the Y key. The
@@ -267,17 +267,21 @@ it.
 
 ## Chapter 9 — Numbers on Screen
 
-Chapter 9 images already done: `chapter9-1.jpg`, `chapter9-2.jpg`, `chapter9-3.jpg`.
+| File | Type | Done |
+|------|------|------|
+| `chapter9-1.jpg` | opener | ✅ |
+| `chapter9-2.jpg` | aside | ✅ |
+| `chapter9-3.jpg` | small | ✅ |
 
 ---
 
 ## Chapter 10 — The Calculator
 
-| File | Type |
-|------|------|
-| `chapter10-1.jpg` | opener |
-| `chapter10-2.jpg` | aside |
-| `chapter10-3.jpg` | small |
+| File | Type | Done |
+|------|------|------|
+| `chapter10-1.png` | opener | |
+| `chapter10-2.png` | aside | |
+| `chapter10-3.png` | small | |
 
 **chapter10-1** (opener)
 CoCo character standing beside a large hand-held calculator, but it has no equals key —
@@ -299,9 +303,9 @@ calculator works!
 
 ## Chapter 11 — Anywhere on Screen
 
-| File | Type |
-|------|------|
-| `chapter11-1.jpg` | opener |
+| File | Type | Done |
+|------|------|------|
+| `chapter11-1.png` | opener | |
 
 **chapter11-1** (opener)
 The CoCo screen drawn as a 32×16 grid of numbered cells, like graph paper. The CoCo
@@ -313,9 +317,9 @@ cell. Expression: proud and precise.
 
 ## Chapter 12 — The Guessing Game
 
-| File | Type |
-|------|------|
-| `chapter12-1.jpg` | opener |
+| File | Type | Done |
+|------|------|------|
+| `chapter12-1.png` | opener | |
 
 **chapter12-1** (opener)
 CoCo character with a mischievous grin, hiding a number card (showing "7") behind its
@@ -326,9 +330,9 @@ beside "GUESS: ". The character's expression says "I know something you don't."
 
 ## Chapter 13 — Getting It onto Your CoCo
 
-| File | Type |
-|------|------|
-| `chapter13-1.jpg` | opener |
+| File | Type | Done |
+|------|------|------|
+| `chapter13-1.png` | opener | |
 
 **chapter13-1** (opener)
 CoCo character on a workbench beside a real Color Computer, triumphantly pressing a
