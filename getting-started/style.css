@@ -28,7 +28,7 @@ body {
 /* ── Page wrapper ──────────────────────────────────────────────────────── */
 
 .page {
-  max-width: 720px;
+  max-width: 1100px;
   background: #fff;
   margin: 0 auto;
   min-height: 100vh;
@@ -38,7 +38,7 @@ body {
 
 .page-header {
   border-top: 3px solid var(--green);
-  padding: 8px 56px 0;
+  padding: 8px 64px 0;
   display: flex;
   justify-content: space-between;
   align-items: baseline;
@@ -51,16 +51,17 @@ body {
 /* ── Page content area ─────────────────────────────────────────────────── */
 
 .content {
-  padding: 28px 56px 48px;
+  padding: 28px 64px 48px;
 }
 
 /* ── Chapter opener ────────────────────────────────────────────────────── */
 
 .chapter-opener {
-  padding: 32px 56px 0;
-  min-height: 420px;
-  display: flex;
-  flex-direction: column;
+  padding: 36px 64px 0;
+  min-height: 280px;
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  grid-template-rows: auto auto 1fr auto;
 }
 
 .chapter-label {
@@ -76,7 +77,6 @@ body {
   font-weight: bold;
   color: var(--text);
   line-height: 1.15;
-  max-width: 580px;
   text-transform: uppercase;
 }
 
@@ -88,10 +88,10 @@ body {
 }
 
 .chapter-green-bar {
+  grid-column: 1 / 3;
   background: var(--green-solid);
-  flex: 1;
-  min-height: 140px;
-  margin-top: 32px;
+  min-height: 72px;
+  margin-top: 20px;
 }
 
 /* ── Section headings ──────────────────────────────────────────────────── */
@@ -243,7 +243,7 @@ pre.shell .comment { color: #888; }
   border: 2px dashed var(--green);
   padding: 16px 22px;
   margin: 2em auto;
-  max-width: 540px;
+  max-width: 680px;
 }
 
 .rule-box h3 {
@@ -399,7 +399,7 @@ pre.shell .comment { color: #888; }
 .nav {
   display: flex;
   justify-content: space-between;
-  padding: 16px 56px;
+  padding: 16px 64px;
   border-top: 1px solid #ddd;
   font-size: 0.88em;
   background: #fafafa;
@@ -432,7 +432,7 @@ pre.shell .comment { color: #888; }
 .cover-hero {
   background: var(--green-solid);
   color: #fff;
-  padding: 44px 56px 36px;
+  padding: 44px 64px 36px;
 }
 
 .cover-eyebrow {
@@ -462,7 +462,7 @@ pre.shell .comment { color: #888; }
 }
 
 .cover-toc {
-  padding: 36px 56px 48px;
+  padding: 36px 64px 48px;
 }
 
 .cover-toc h2 {
@@ -542,12 +542,16 @@ pre.shell .comment { color: #888; }
   margin-bottom: 2px;
 }
 
-/* Floated right in chapter opener, alongside the title */
+/* Right column of chapter opener grid, spans all title rows */
 .illustration-opener {
-  width: 200px;
-  height: 170px;
-  float: right;
-  margin: 0 0 20px 24px;
+  grid-column: 2;
+  grid-row: 1 / 4;
+  width: auto;
+  height: auto;
+  min-height: 180px;
+  float: none;
+  margin: 0 0 0 40px;
+  align-self: stretch;
 }
 
 /* Medium — floated right alongside body text */
@@ -590,7 +594,10 @@ pre.shell .comment { color: #888; }
 .clearfix::after { content: ""; display: table; clear: both; }
 
 @media (max-width: 640px) {
-  .content, .chapter-opener, .page-header, .nav { padding-left: 20px; padding-right: 20px; }
+  .content, .page-header, .nav { padding-left: 20px; padding-right: 20px; }
+  .chapter-opener { padding-left: 20px; padding-right: 20px; display: flex; flex-direction: column; min-height: auto; }
+  .illustration-opener { grid-column: unset; grid-row: unset; float: none; width: 100%; height: 110px; min-height: unset; margin: 0 0 12px 0; align-self: auto; }
+  .chapter-green-bar { grid-column: unset; }
   .tip { float: none; width: auto; margin-left: 0; }
   pre.forth, pre.shell, .screen-wrap { margin-left: 0; margin-right: 0; }
   .learned-cols { grid-template-columns: 1fr; }
