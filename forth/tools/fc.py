@@ -66,6 +66,7 @@ def kernel_words(symbols):
         '<':    'CFA_LT',
         '>':    'CFA_GT',
         '0=':   'CFA_ZEQU',
+        'at':   'CFA_AT',
     }
     result = {}
     for forth_name, sym_name in names.items():

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 13: Getting It onto Your CoCo — Getting Started with Color Forth</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page">
+
+    <!-- Chapter opener -->
+    <div class="chapter-opener">
+      <div class="illustration illustration-opener">
+        <span class="ill-label">Illustration</span>
+        CoCo character on a workbench beside a real Color Computer,
+        triumphantly pressing a key. The screen is glowing with the
+        "GUESS MY NUMBER" title. A USB cable trails off to a laptop
+        in the background. The character is holding a microSD card
+        in one hand and a floppy disk in the other, looking pleased.
+      </div>
+      <div class="chapter-label">CHAPTER 13</div>
+      <div class="chapter-title">Getting It onto Your CoCo</div>
+      <div class="chapter-green-bar"></div>
+    </div>
+
+    <!-- Page 1 -->
+    <div class="page-header">
+      <span>GETTING IT ONTO YOUR COCO</span>
+      <span>1</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>From Cross-Compiled Binary to Real Hardware</h2>
+
+      <p>
+        Every program in this book was cross-compiled on your modern
+        computer and tested in XRoar. The output is a standard
+        DECB <code>.bin</code> file — the same format the CoCo's
+        BASIC uses for <code>CLOADM</code>. Getting it to real
+        hardware means copying that file somewhere the CoCo can
+        read it.
+      </p>
+
+      <p>
+        There are three practical paths, depending on what
+        hardware you have.
+      </p>
+
+      <h2>Path 1 — CoCoSDC (Recommended)</h2>
+
+      <p>
+        The <strong>CoCoSDC</strong> is a cartridge that gives the
+        CoCo a real SD card slot. It presents the SD card as a
+        standard disk drive to BASIC.
+      </p>
+
+      <ol>
+        <li>Copy your <code>.bin</code> file to a FAT-formatted
+            SD card on your modern computer.</li>
+        <li>Insert the SD card in the CoCoSDC.</li>
+        <li>At the BASIC prompt, type:
+<pre class="forth">CLOADM"GUESS.BIN"</pre>
+            BASIC loads both the kernel block and the app block,
+            then executes at the kernel's <code>START</code> address.</li>
+      </ol>
+
+      <p>
+        The <code>.bin</code> file contains two data blocks (kernel
+        at <code>$1000</code>, app at <code>$2000</code>) and an
+        end block with the exec address. <code>CLOADM</code> loads
+        them all and jumps to the exec address automatically.
+      </p>
+
+      <h2>Path 2 — DriveWire 4</h2>
+
+      <p>
+        <strong>DriveWire 4</strong> runs on your modern computer
+        and connects to the CoCo via a USB-to-serial adapter. It
+        presents virtual disk drives to the CoCo over the serial link.
+      </p>
+
+      <ol>
+        <li>Install DriveWire 4 on your computer and place your
+            <code>.bin</code> file in a virtual disk directory.</li>
+        <li>Connect the USB-serial adapter between computer and
+            CoCo's serial port (or bit-banger port).</li>
+        <li>At the BASIC prompt:
+<pre class="forth">CLOADM"GUESS.BIN"</pre>
+            BASIC fetches the file over the serial link exactly
+            as if it were a physical disk drive.</li>
+      </ol>
+
+    </div>
+
+    <!-- Page 2 -->
+    <div class="page-header">
+      <span>GETTING IT ONTO YOUR COCO</span>
+      <span>2</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>Path 3 — Cassette Tape</h2>
+
+      <p>
+        If you have a CoCo but none of the modern storage options,
+        the audio output of your computer can stand in for a tape
+        deck. The <code>decb</code> tool from the
+        <strong>toolshed</strong> package converts a <code>.bin</code>
+        file to a <code>.wav</code> audio file; the CoCo reads it
+        over its cassette input.
+      </p>
+
+<pre class="shell"><span class="prompt">$</span> decb copy -t guess.bin guess.wav
+<span class="comment"># play guess.wav to the CoCo's cassette input while running:</span>
+<span class="comment"># CLOADM (CoCo waits for tone, then loads)</span></pre>
+
+      <p>
+        Cassette loading is slow (about 1500 baud) and sensitive
+        to audio levels, but it works on any unmodified CoCo with
+        a standard audio cable.
+      </p>
+
+      <h2>What CLOADM Does</h2>
+
+      <p>
+        Regardless of the path, <code>CLOADM</code> does the same
+        thing: it reads data blocks from the source, copies each
+        block's payload to the specified load address in RAM,
+        then jumps to the exec address in the end block.
+        For Color Forth binaries:
+      </p>
+
+      <table style="border-collapse: collapse; margin: 1.2em 2em; font-family: 'Courier New', Courier, monospace; font-size: 0.88em;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--green);">
+            <th style="padding: 6px 20px 6px 0; text-align: left; font-family: Georgia, serif;">Block</th>
+            <th style="padding: 6px 20px 6px 0; text-align: left; font-family: Georgia, serif;">Load address</th>
+            <th style="padding: 6px 0; text-align: left; font-family: Georgia, serif;">Contents</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style="padding:5px 20px 5px 0;">Cursor init</td><td style="padding:5px 20px 5px 0;"><code>$0050</code></td><td style="padding:5px 0;">2-byte cursor variable (0)</td></tr>
+          <tr><td style="padding:5px 20px 5px 0;">Kernel</td>     <td style="padding:5px 20px 5px 0;"><code>$1000</code></td><td style="padding:5px 0;">DOCOL, CFAs, primitives, START</td></tr>
+          <tr><td style="padding:5px 20px 5px 0;">Application</td><td style="padding:5px 20px 5px 0;"><code>$2000</code></td><td style="padding:5px 0;">Compiled Forth thread</td></tr>
+          <tr><td style="padding:5px 20px 5px 0;">Exec</td>       <td style="padding:5px 20px 5px 0;"><code>$1225</code> (approx)</td><td style="padding:5px 0;">Jumps to START in kernel</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        START clears the screen, initialises the stacks, and
+        begins executing the application thread at <code>$2000</code>.
+        BASIC is gone — the CoCo is running your Forth program.
+      </p>
+
+      <h2>Staying in XRoar</h2>
+
+      <p>
+        XRoar is a full-speed, cycle-accurate CoCo 2 emulator.
+        For development purposes it is indistinguishable from
+        real hardware. The <code>-run</code> flag loads and
+        executes the binary exactly as <code>CLOADM</code> would:
+      </p>
+
+<pre class="shell"><span class="prompt">$</span> xroar -machine coco2bus \
+        -bas ~/.xroar/roms/bas12.rom \
+        -extbas ~/.xroar/roms/extbas11.rom \
+        -run getting-started/examples/12/guess.bin</pre>
+
+    </div>
+
+    <!-- Page 3 -->
+    <div class="page-header">
+      <span>GETTING IT ONTO YOUR COCO</span>
+      <span>3</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>The Full Build Workflow</h2>
+
+      <p>
+        Here is the complete path from Forth source to running program,
+        whether you target XRoar or real hardware:
+      </p>
+
+<pre class="shell"><span class="comment"># 1. Write or edit your Forth source</span>
+<span class="prompt">$</span> edit getting-started/examples/12/guess.fs
+
+<span class="comment"># 2. Build the kernel (only needed if kernel.asm changed)</span>
+<span class="prompt">$</span> cd forth/kernel &amp;&amp; make
+
+<span class="comment"># 3. Cross-compile your Forth source</span>
+<span class="prompt">$</span> python3 forth/tools/fc.py guess.fs \
+        --kernel forth/kernel/build/kernel.map \
+        --kernel-bin forth/kernel/build/kernel.bin \
+        --output guess.bin
+
+<span class="comment"># 4a. Run in XRoar</span>
+<span class="prompt">$</span> xroar -machine coco2bus -run guess.bin
+
+<span class="comment"># 4b. Or copy to SD card for CoCoSDC</span>
+<span class="prompt">$</span> cp guess.bin /Volumes/COCO/</pre>
+
+      <p>
+        Steps 2 and 3 are fast — a full rebuild takes under a second
+        on any modern computer. The edit-compile-run loop is tight
+        enough that you'll iterate many times per session.
+      </p>
+
+      <h2>What's Next</h2>
+
+      <p>
+        You've built a complete Forth system from scratch: a kernel
+        of 6809 machine-code primitives, a cross-compiler, and
+        twelve chapters of progressively more capable programs.
+        The natural next steps from here are:
+      </p>
+
+      <ul>
+        <li><strong>String printing</strong> — a PRINT word that
+            takes a counted string from memory, so you don't need
+            to chain hundreds of CHAR/EMIT calls.</li>
+        <li><strong>Multi-digit input</strong> — extend DIGIT? into
+            a word that reads a full decimal number from the
+            keyboard.</li>
+        <li><strong>Graphics</strong> — the VDG supports
+            semigraphics modes where each character cell becomes
+            a 2×3 block of colour. Stack-based coordinate maths
+            makes this surprisingly clean.</li>
+        <li><strong>An interactive interpreter</strong> — the
+            ultimate destination: type Forth words directly at
+            the CoCo prompt and execute them immediately.</li>
+      </ul>
+
+      <div class="tip">
+        <p>
+          Every program in this book was written with the tools
+          introduced in that same book. The kernel is about 500
+          bytes of assembly; the cross-compiler is about 400 lines
+          of Python. Small tools, built carefully, go a long way.
+        </p>
+      </div>
+
+      <!-- Learned in this chapter -->
+      <div class="learned">
+        <div class="learned-header">Learned in Chapter 13</div>
+        <div class="learned-cols">
+          <div class="learned-col">
+            <h4>Deployment Paths</h4>
+            <p>CoCoSDC — SD card cartridge, fastest</p>
+            <p>DriveWire 4 — virtual disk over USB-serial</p>
+            <p>Cassette — audio file via <code>decb</code> tool</p>
+          </div>
+          <div class="learned-col">
+            <h4>The Binary</h4>
+            <p>DECB <code>.bin</code> format: data blocks + exec block</p>
+            <p><code>CLOADM</code> loads and jumps to exec address</p>
+            <p>Kernel at <code>$1000</code>, app at <code>$2000</code></p>
+          </div>
+          <div class="learned-col">
+            <h4>The Workflow</h4>
+            <p>Edit → <code>make</code> → <code>fc.py</code> → XRoar</p>
+            <p>Same binary runs on emulator and real hardware</p>
+            <p>Full rebuild takes under one second</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="notes">
+        <div class="notes-label">Notes:</div>
+        <div class="notes-lines">
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="nav">
+      <a href="12-the-guessing-game.html">← Chapter 12: The Guessing Game</a>
+      <span class="spacer"></span>
+      <span style="color:#999; font-style:italic;">End of Getting Started</span>
+    </div>
+
+  </div>
+</body>
+</html>

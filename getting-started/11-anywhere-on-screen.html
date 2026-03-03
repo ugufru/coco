@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 11: Anywhere on Screen — Getting Started with Color Forth</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page">
+
+    <!-- Chapter opener -->
+    <div class="chapter-opener">
+      <div class="illustration illustration-opener">
+        <span class="ill-label">Illustration</span>
+        The CoCo screen drawn as a 32×16 grid of numbered cells, like
+        graph paper. The CoCo character is standing beside it holding
+        a ruler, pointing at a specific cell (col 10, row 3) where
+        the letter C sits. A dotted line runs from the character's
+        finger to the cell. Expression: proud and precise.
+      </div>
+      <div class="chapter-label">CHAPTER 11</div>
+      <div class="chapter-title">Anywhere on Screen</div>
+      <div class="chapter-green-bar"></div>
+    </div>
+
+    <!-- Page 1 -->
+    <div class="page-header">
+      <span>ANYWHERE ON SCREEN</span>
+      <span>1</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>The Cursor Problem</h2>
+
+      <p>
+        Every word you've written so far prints at the cursor and
+        advances it. That's fine for running text, but it makes
+        layout impossible — you can't put a label at column 8 and
+        a value at column 20 on the same row without printing
+        exactly the right number of spaces in between.
+      </p>
+
+      <p>
+        The fix is to set the cursor directly.
+        <code>AT</code> takes a column and row and jumps the cursor
+        there instantly, no spaces needed.
+      </p>
+
+      <h2>AT — Jump the Cursor</h2>
+
+      <div class="rule-box">
+        <h3>AT &nbsp;<span style="font-weight:normal; font-size:0.85em;">( col row -- )</span></h3>
+        <p>Set the cursor to column <em>col</em>, row <em>row</em>.
+        The next <code>EMIT</code> or <code>CR</code> writes there.</p>
+      </div>
+
+<pre class="forth">10  3 AT  CHAR H EMIT   \ 'H' at column 10, row 3
+ 0  0 AT  CHAR * EMIT   \ '*' at top-left corner
+31 15 AT  CHAR . EMIT   \ '.' at bottom-right corner</pre>
+
+      <h2>The Screen Is a Grid</h2>
+
+      <p>
+        The CoCo's text screen is 32 columns wide and 16 rows tall.
+        Columns run 0–31 left to right; rows run 0–15 top to bottom.
+        <code>AT</code> computes the offset as
+        <code>row × 32 + col</code> and stores it in the cursor
+        register — that's all it does.
+      </p>
+
+      <table style="border-collapse: collapse; margin: 1.2em 2em; font-family: 'Courier New', Courier, monospace; font-size: 0.88em;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--green);">
+            <th style="padding: 6px 20px 6px 0; text-align: left; font-family: Georgia, serif;">Position</th>
+            <th style="padding: 6px 20px 6px 0; text-align: left; font-family: Georgia, serif;">AT call</th>
+            <th style="padding: 6px 0; text-align: left; font-family: Georgia, serif;">Offset</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style="padding:5px 20px 5px 0;">top-left</td>   <td style="padding:5px 20px 5px 0;"><code> 0  0 AT</code></td><td style="padding:5px 0;">0</td></tr>
+          <tr><td style="padding:5px 20px 5px 0;">col 10, row 3</td><td style="padding:5px 20px 5px 0;"><code>10  3 AT</code></td><td style="padding:5px 0;">3×32+10 = 106</td></tr>
+          <tr><td style="padding:5px 20px 5px 0;">bottom-right</td><td style="padding:5px 20px 5px 0;"><code>31 15 AT</code></td><td style="padding:5px 0;">15×32+31 = 511</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        After <code>AT</code>, the cursor is set. Subsequent
+        <code>EMIT</code> calls advance it normally — so you
+        only need one <code>AT</code> to start a run of text;
+        you don't need <code>AT</code> for every character.
+      </p>
+
+    </div>
+
+    <!-- Page 2 -->
+    <div class="page-header">
+      <span>ANYWHERE ON SCREEN</span>
+      <span>2</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>Drawing Lines with AT + DO</h2>
+
+      <p>
+        <code>AT</code> positions the cursor once; a
+        <code>DO</code> loop emits the rest. This gives you
+        a clean word for drawing horizontal bars:
+      </p>
+
+<pre class="forth">: HBAR  ( len col row -- )
+  AT  0 DO CHAR - EMIT LOOP ;</pre>
+
+      <p>
+        <code>AT</code> pops <em>col</em> and <em>row</em>,
+        leaving <em>len</em> on the stack. The loop emits
+        <em>len</em> dashes. The cursor advances automatically
+        after each <code>EMIT</code>, so the dashes appear in
+        a row without a second <code>AT</code>.
+      </p>
+
+<pre class="forth">20  4  2 HBAR   \ 20 dashes starting at col 4, row 2
+20  4  4 HBAR   \ same at row 4 — a second bar below</pre>
+
+      <h2>Combining AT and Text</h2>
+
+      <p>
+        Once you have <code>AT</code>, you can build any fixed
+        layout: labels, borders, status displays. Call <code>AT</code>
+        to jump to the right spot, then emit your text normally.
+        Here is a word that draws a labelled divider:
+      </p>
+
+<pre class="forth">: DIVIDER  ( row -- )
+  22  SWAP  HBAR         \ 22 dashes from col 4
+   4  OVER AT            \ back to col 4, same row
+  CHAR [ EMIT
+  22  OVER 1 + AT        \ col 22, same row
+  CHAR ] EMIT
+  DROP ;</pre>
+
+      <div class="tip">
+        <p>
+          The rule: <code>AT</code> for position, then
+          <code>EMIT</code>/<code>CR</code> for content. One
+          <code>AT</code> starts a run; it does not need to be
+          repeated for every character.
+        </p>
+      </div>
+
+    </div>
+
+    <!-- Page 3 -->
+    <div class="page-header">
+      <span>ANYWHERE ON SCREEN</span>
+      <span>3</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>Chapter Program</h2>
+
+<pre class="forth">\ Chapter 11 example — Anywhere on Screen
+
+: HBAR  ( len col row -- )
+  AT  0 DO CHAR - EMIT LOOP ;
+
+: MAIN
+  \ Title centred on row 3
+  10  3 AT
+  CHAR C EMIT CHAR O EMIT CHAR L EMIT CHAR O EMIT CHAR R EMIT
+  32 EMIT
+  CHAR F EMIT CHAR O EMIT CHAR R EMIT CHAR T EMIT CHAR H EMIT
+
+  \ Underline the title
+  11 10  4 HBAR
+
+  \ Tagline on row 6
+  10  6 AT
+  CHAR O EMIT CHAR N EMIT 32 EMIT
+  CHAR Y EMIT CHAR O EMIT CHAR U EMIT CHAR R EMIT 32 EMIT
+  CHAR C EMIT CHAR O EMIT CHAR C EMIT CHAR O EMIT
+
+  \ Park cursor at bottom-left
+  0 15 AT ;
+
+MAIN HALT</pre>
+
+      <div class="screen-wrap">
+        <div class="screen-label">Your CoCo's screen:</div>
+        <div class="screen" style="position:relative; height:6em;">
+          <span style="position:absolute; left:calc(10 * 0.88ch * 1.08); top:calc(3 * 1.4em);">COLOR FORTH</span>
+          <span style="position:absolute; left:calc(10 * 0.88ch * 1.08); top:calc(4 * 1.4em);">-----------</span>
+          <span style="position:absolute; left:calc(10 * 0.88ch * 1.08); top:calc(6 * 1.4em);">ON YOUR COCO</span>
+        </div>
+      </div>
+
+      <div class="diy">
+        <div class="diy-header">Do-It-Yourself</div>
+        <div class="diy-body">
+          <ol>
+            <li>
+              Change <code>HBAR</code> to use <code>CHAR =</code>
+              instead of <code>CHAR -</code>. What does the underline
+              look like?
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              Add a second tagline on row 8:
+              <code>CHAR V EMIT CHAR E EMIT CHAR R EMIT</code>
+              <code>32 EMIT CHAR 1 EMIT CHAR . EMIT CHAR 0 EMIT</code>.
+              Where do you need to put the <code>AT</code>?
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              Write <code>BOX</code> — draw a top and bottom bar with
+              <code>HBAR</code> 8 rows apart, at the same column.
+              <code>: BOX  ( col row -- )  ...</code>
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              What happens if you call <code>31 15 AT</code> and then
+              <code>CHAR X EMIT</code>? Does the screen scroll?
+              <div class="answer-line"></div>
+            </li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- Learned in this chapter -->
+      <div class="learned">
+        <div class="learned-header">Learned in Chapter 11</div>
+        <div class="learned-cols">
+          <div class="learned-col">
+            <h4>Forth Words</h4>
+            <dl>
+              <dt>AT</dt>
+              <dd>( col row -- ) jump cursor to position</dd>
+              <dt>HBAR</dt>
+              <dd>defined word — draw a horizontal line</dd>
+            </dl>
+          </div>
+          <div class="learned-col">
+            <h4>Patterns</h4>
+            <p><code>col row AT</code> then emit text — one AT starts a run</p>
+            <p><code>len col row HBAR</code> draws a dash line</p>
+            <p>Park cursor with <code>0 15 AT</code> when done</p>
+          </div>
+          <div class="learned-col">
+            <h4>Concepts</h4>
+            <p>Screen is a 32×16 grid, offset = row×32+col</p>
+            <p>AT sets the cursor; EMIT advances it normally</p>
+            <p>Fixed layouts need AT; running text does not</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="notes">
+        <div class="notes-label">Notes:</div>
+        <div class="notes-lines">
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="nav">
+      <a href="10-calculator.html">← Chapter 10: The Calculator</a>
+      <span class="spacer"></span>
+      <a href="12-the-guessing-game.html">Chapter 12: The Guessing Game →</a>
+    </div>
+
+  </div>
+</body>
+</html>

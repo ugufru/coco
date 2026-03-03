@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 12: The Guessing Game — Getting Started with Color Forth</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page">
+
+    <!-- Chapter opener -->
+    <div class="chapter-opener">
+      <div class="illustration illustration-opener">
+        <span class="ill-label">Illustration</span>
+        CoCo character with a mischievous grin, hiding a number
+        card (showing "7") behind its back. The screen in the
+        background shows "GUESS MY NUMBER" with a blinking cursor
+        beside "GUESS: ". The character's expression says "I know
+        something you don't."
+      </div>
+      <div class="chapter-label">CHAPTER 12</div>
+      <div class="chapter-title">The Guessing Game</div>
+      <div class="chapter-green-bar"></div>
+    </div>
+
+    <!-- Page 1 -->
+    <div class="page-header">
+      <span>THE GUESSING GAME</span>
+      <span>1</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>Putting It All Together</h2>
+
+      <p>
+        This chapter is the capstone. The guessing game uses
+        every tool built since Chapter 1: the stack, defined words,
+        variables, loops, decisions, keyboard input, number printing,
+        cursor positioning. None of it is new — what's new is how
+        it fits together into a real, playable program.
+      </p>
+
+      <h2>The Design</h2>
+
+      <p>
+        The CoCo picks a secret number between 1 and 9. You type
+        digits until you find it. Each guess gets a hint: TOO HIGH
+        or TOO LOW. The screen shows your current try count.
+      </p>
+
+      <div class="rule-box">
+        <h3>Game Loop</h3>
+        <pre style="margin:0.3em 0 0; background:none; border:none; padding:0; font-size:0.9em;">show title screen
+press any key → pick secret number
+loop:
+  show GUESS: prompt + try count
+  wait for digit key
+  if guess = secret → CORRECT! stop
+  if guess &lt; secret → TOO LOW
+  if guess &gt; secret → TOO HIGH</pre>
+      </div>
+
+      <h2>Picking a Secret Number</h2>
+
+      <p>
+        The CoCo has no clock, so we use the player's own keypress
+        to seed the random number. When the game shows
+        <code>PRESS ANY KEY</code>, <code>KEY</code> blocks until
+        they press something. Whatever character they press
+        (A, space, ENTER — anything) becomes the seed:
+      </p>
+
+<pre class="forth">: PICK
+  KEY 31 * 7 + 9 /MOD DROP 1 + SECRET ! ;</pre>
+
+      <p>
+        Multiply the ASCII code by 31, add 7, take the remainder
+        mod 9, add 1. The result is 1–9. Different keys give
+        different numbers; the same key always gives the same
+        number, but players don't think about that.
+      </p>
+
+    </div>
+
+    <!-- Page 2 -->
+    <div class="page-header">
+      <span>THE GUESSING GAME</span>
+      <span>2</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>Screen Layout with AT</h2>
+
+      <p>
+        Each message lives in its own word. <code>AT</code> jumps
+        the cursor to a fixed position; the <code>EMIT</code> calls
+        that follow write text there. The key words:
+      </p>
+
+<pre class="forth">: .PROMPT
+  5  6 AT
+  CHAR G EMIT CHAR U EMIT CHAR E EMIT CHAR S EMIT CHAR S EMIT
+  CHAR : EMIT 32 EMIT 32 EMIT ;   \ trailing spaces clear prev digit
+
+: .HI
+  5 10 AT
+  CHAR T EMIT CHAR O EMIT CHAR O EMIT 32 EMIT
+  CHAR H EMIT CHAR I EMIT CHAR G EMIT CHAR H EMIT 32 EMIT 32 EMIT ;
+
+: .LO
+  5 10 AT
+  CHAR T EMIT CHAR O EMIT CHAR O EMIT 32 EMIT
+  CHAR L EMIT CHAR O EMIT CHAR W EMIT 32 EMIT 32 EMIT 32 EMIT ;</pre>
+
+      <p>
+        <code>.HI</code> and <code>.LO</code> both write to row 10.
+        The trailing spaces in <code>.LO</code> erase the extra
+        letters from <code>.HI</code> ("HIGH" is four letters,
+        "LOW" is three — a space must overwrite the stray H).
+      </p>
+
+      <h2>The Game Loop</h2>
+
+<pre class="forth">: PLAY
+  0 TRIES !
+  .TITLE .PRESS
+  PICK                     \ wait for keypress; set SECRET
+  BEGIN
+    .PROMPT .TRIES
+    KEY DIGIT? IF
+      DUP EMIT             \ echo the digit
+      CHAR 0 -             \ convert ASCII to value
+      TRIES @ 1 + TRIES !
+      .TRIES
+      DUP SECRET @ = IF
+        DROP .WIN EXIT     \ correct — show win and return
+      THEN
+      SECRET @ &lt; IF .LO ELSE .HI THEN
+    ELSE
+      DROP                 \ ignore non-digit keys
+    THEN
+  AGAIN ;</pre>
+
+      <p>
+        <code>DUP SECRET @ =</code> leaves the guess on the stack
+        while it tests equality. If equal: <code>DROP .WIN EXIT</code>
+        — discard the guess, show the win message, and leave
+        <code>PLAY</code> via <code>EXIT</code>. If not equal,
+        the guess is still on the stack for the <code>&lt;</code>
+        comparison that produces the hint.
+      </p>
+
+    </div>
+
+    <!-- Page 3 -->
+    <div class="page-header">
+      <span>THE GUESSING GAME</span>
+      <span>3</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>Chapter Program</h2>
+
+<pre class="forth">\ Chapter 12 example — The Guessing Game
+
+: NEGATE   0 SWAP - ;
+: ?DUP     DUP IF DUP THEN ;
+: U.  ( u -- )  10 /MOD ?DUP IF U. THEN CHAR 0 + EMIT ;
+: .   ( n -- )  DUP 0 &lt; IF NEGATE CHAR - EMIT THEN U. ;
+
+: DIGIT?  ( c -- c flag )
+  DUP CHAR 0 &lt; IF 0 EXIT THEN
+  DUP CHAR 9 > IF 0 EXIT THEN
+  -1 ;
+
+: HBAR  ( len col row -- )
+  AT  0 DO CHAR - EMIT LOOP ;
+
+VARIABLE SECRET
+VARIABLE TRIES
+
+: PICK
+  KEY 31 * 7 + 9 /MOD DROP 1 + SECRET ! ;
+
+: .TITLE
+  8  1 AT
+  CHAR G EMIT CHAR U EMIT CHAR E EMIT CHAR S EMIT CHAR S EMIT 32 EMIT
+  CHAR M EMIT CHAR Y EMIT 32 EMIT
+  CHAR N EMIT CHAR U EMIT CHAR M EMIT CHAR B EMIT CHAR E EMIT CHAR R EMIT
+  24  4  2 HBAR ;
+
+: .PRESS   8  4 AT
+  CHAR P EMIT CHAR R EMIT CHAR E EMIT CHAR S EMIT CHAR S EMIT 32 EMIT
+  CHAR A EMIT CHAR N EMIT CHAR Y EMIT 32 EMIT
+  CHAR K EMIT CHAR E EMIT CHAR Y EMIT ;
+
+: .PROMPT  5  6 AT
+  CHAR G EMIT CHAR U EMIT CHAR E EMIT CHAR S EMIT CHAR S EMIT
+  CHAR : EMIT 32 EMIT 32 EMIT ;
+
+: .TRIES   5  8 AT
+  CHAR T EMIT CHAR R EMIT CHAR I EMIT CHAR E EMIT
+  CHAR S EMIT CHAR : EMIT 32 EMIT  TRIES @ . ;
+
+: .HI      5 10 AT
+  CHAR T EMIT CHAR O EMIT CHAR O EMIT 32 EMIT
+  CHAR H EMIT CHAR I EMIT CHAR G EMIT CHAR H EMIT 32 EMIT 32 EMIT ;
+
+: .LO      5 10 AT
+  CHAR T EMIT CHAR O EMIT CHAR O EMIT 32 EMIT
+  CHAR L EMIT CHAR O EMIT CHAR W EMIT 32 EMIT 32 EMIT 32 EMIT ;
+
+: .WIN     5 10 AT
+  CHAR C EMIT CHAR O EMIT CHAR R EMIT CHAR R EMIT
+  CHAR E EMIT CHAR C EMIT CHAR T EMIT CHAR ! EMIT 32 EMIT 32 EMIT ;
+
+: PLAY
+  0 TRIES !
+  .TITLE .PRESS
+  PICK
+  BEGIN
+    .PROMPT .TRIES
+    KEY DIGIT? IF
+      DUP EMIT
+      CHAR 0 -
+      TRIES @ 1 + TRIES !
+      .TRIES
+      DUP SECRET @ = IF
+        DROP .WIN EXIT
+      THEN
+      SECRET @ &lt; IF .LO ELSE .HI THEN
+    ELSE
+      DROP
+    THEN
+  AGAIN ;
+
+PLAY HALT</pre>
+
+      <div class="screen-wrap">
+        <div class="screen-label">Mid-game screen (secret is 7, player has guessed 3 and 9):</div>
+        <div class="screen">
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;GUESS MY NUMBER<br>
+          &nbsp;<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;------------------------<br>
+          &nbsp;<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;GUESS: 9 &nbsp;<br>
+          &nbsp;<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TRIES: 2<br>
+          &nbsp;<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TOO HIGH
+        </div>
+      </div>
+
+      <div class="diy">
+        <div class="diy-header">Do-It-Yourself</div>
+        <div class="diy-body">
+          <ol>
+            <li>
+              Press different keys at the "PRESS ANY KEY" prompt.
+              Do you get different secret numbers? Try A, B, and C.
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              Add a word <code>.RANGE</code> that prints
+              <code>1 TO 9</code> on row 3 at column 10, and call
+              it from <code>.TITLE</code>. Does it help the player?
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              After <code>.WIN</code>, print the secret number so
+              the player can see it. Where in <code>PLAY</code> do
+              you add this?
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              Change the range from 1–9 to 1–5 by modifying one
+              number in <code>PICK</code>. Which number changes,
+              and to what?
+              <div class="answer-line"></div>
+            </li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- Learned in this chapter -->
+      <div class="learned">
+        <div class="learned-header">Learned in Chapter 12</div>
+        <div class="learned-cols">
+          <div class="learned-col">
+            <h4>Patterns</h4>
+            <p>Seed RNG from keypress: <code>KEY 31 * 7 + 9 /MOD DROP 1 +</code></p>
+            <p>One word per screen region keeps game logic clean</p>
+            <p>Trailing spaces in messages erase leftover characters</p>
+          </div>
+          <div class="learned-col">
+            <h4>Techniques</h4>
+            <p><code>DUP SECRET @ =</code> tests without consuming</p>
+            <p><code>EXIT</code> inside BEGIN…AGAIN escapes the loop</p>
+            <p>Screen layout defined once; loop just calls the words</p>
+          </div>
+          <div class="learned-col">
+            <h4>Concepts</h4>
+            <p>A complete program is many small words working together</p>
+            <p>Each word does one job and is easy to test alone</p>
+            <p>The stack carries data between words invisibly</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="notes">
+        <div class="notes-label">Notes:</div>
+        <div class="notes-lines">
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="nav">
+      <a href="11-anywhere-on-screen.html">← Chapter 11: Anywhere on Screen</a>
+      <span class="spacer"></span>
+      <a href="13-onto-your-coco.html">Chapter 13: Getting It onto Your CoCo →</a>
+    </div>
+
+  </div>
+</body>
+</html>

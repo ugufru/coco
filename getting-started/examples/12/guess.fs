@@ -1,0 +1,83 @@
+\ Chapter 12 example — The Guessing Game
+
+: NEGATE   0 SWAP - ;
+: ?DUP     DUP IF DUP THEN ;
+: U.  ( u -- )  10 /MOD ?DUP IF U. THEN CHAR 0 + EMIT ;
+: .   ( n -- )  DUP 0 < IF NEGATE CHAR - EMIT THEN U. ;
+
+: DIGIT?  ( c -- c flag )
+  DUP CHAR 0 < IF 0 EXIT THEN
+  DUP CHAR 9 > IF 0 EXIT THEN
+  -1 ;
+
+: HBAR  ( len col row -- )
+  AT  0 DO CHAR - EMIT LOOP ;
+
+VARIABLE SECRET
+VARIABLE TRIES
+
+\ Seed the RNG from the player's keypress and pick a secret 1-9
+: PICK
+  KEY 31 * 7 + 9 /MOD DROP 1 + SECRET ! ;
+
+\ Screen layout words
+: .TITLE
+  8  1 AT
+  CHAR G EMIT CHAR U EMIT CHAR E EMIT CHAR S EMIT CHAR S EMIT 32 EMIT
+  CHAR M EMIT CHAR Y EMIT 32 EMIT
+  CHAR N EMIT CHAR U EMIT CHAR M EMIT CHAR B EMIT CHAR E EMIT CHAR R EMIT
+  24  4  2 HBAR ;
+
+: .PRESS
+  8  4 AT
+  CHAR P EMIT CHAR R EMIT CHAR E EMIT CHAR S EMIT CHAR S EMIT 32 EMIT
+  CHAR A EMIT CHAR N EMIT CHAR Y EMIT 32 EMIT
+  CHAR K EMIT CHAR E EMIT CHAR Y EMIT ;
+
+: .PROMPT
+  5  6 AT
+  CHAR G EMIT CHAR U EMIT CHAR E EMIT CHAR S EMIT CHAR S EMIT
+  CHAR : EMIT 32 EMIT 32 EMIT ;   \ trailing spaces clear previous digit
+
+: .TRIES
+  5  8 AT
+  CHAR T EMIT CHAR R EMIT CHAR I EMIT CHAR E EMIT
+  CHAR S EMIT CHAR : EMIT 32 EMIT
+  TRIES @ . ;
+
+: .HI
+  5 10 AT
+  CHAR T EMIT CHAR O EMIT CHAR O EMIT 32 EMIT
+  CHAR H EMIT CHAR I EMIT CHAR G EMIT CHAR H EMIT 32 EMIT 32 EMIT ;
+
+: .LO
+  5 10 AT
+  CHAR T EMIT CHAR O EMIT CHAR O EMIT 32 EMIT
+  CHAR L EMIT CHAR O EMIT CHAR W EMIT 32 EMIT 32 EMIT 32 EMIT ;
+
+: .WIN
+  5 10 AT
+  CHAR C EMIT CHAR O EMIT CHAR R EMIT CHAR R EMIT
+  CHAR E EMIT CHAR C EMIT CHAR T EMIT CHAR ! EMIT 32 EMIT 32 EMIT ;
+
+: PLAY
+  0 TRIES !
+  .TITLE .PRESS
+  PICK                     \ wait for keypress; set SECRET
+  BEGIN
+    .PROMPT .TRIES
+    KEY DIGIT? IF
+      DUP EMIT             \ echo the digit
+      CHAR 0 -             \ convert ASCII to value
+      TRIES @ 1 + TRIES !
+      .TRIES
+      DUP SECRET @ = IF
+        DROP .WIN EXIT     \ correct — show win and return
+      THEN
+      SECRET @ < IF .LO ELSE .HI THEN
+    ELSE
+      DROP                 \ ignore non-digit keys
+    THEN
+  AGAIN ;
+
+PLAY HALT

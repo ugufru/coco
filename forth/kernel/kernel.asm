@@ -89,6 +89,7 @@ CFA_NEQ         FDB     CODE_NEQ
 CFA_LT          FDB     CODE_LT
 CFA_GT          FDB     CODE_GT
 CFA_ZEQU        FDB     CODE_ZEQU
+CFA_AT          FDB     CODE_AT
 
 ;;; ─── EXIT ( -- ) ─────────────────────────────────────────────────────────────
 ;;; Return from a colon definition.
@@ -459,6 +460,19 @@ CODE_ZEQU
         BRA     ZEQU_S
 ZEQU_F  LDD     #0
 ZEQU_S  STD     ,U
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; AT ( col row -- )
+;;; Set cursor to row*32+col by storing the result in VAR_CUR.
+CODE_AT
+        LDB     1,U             ; row low byte (TOS, 0–15)
+        LDA     #32
+        MUL                     ; D = row*32 (0–480, fits in 9 bits)
+        ADDB    3,U             ; + col low byte (NOS, 0–31)
+        ADCA    #0              ; propagate carry
+        LEAU    4,U             ; pop both stack values
+        STD     VAR_CUR
         LDY     ,X++
         JMP     [,Y]
 
