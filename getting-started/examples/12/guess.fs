@@ -66,6 +66,7 @@ VARIABLE TRIES
   PICK                     \ wait for keypress; set SECRET
   BEGIN
     .PROMPT .TRIES
+    12  6 AT          \ park cursor at input slot (aligns with tries count)
     KEY DIGIT? IF
       DUP EMIT             \ echo the digit
       CHAR 0 -             \ convert ASCII to value

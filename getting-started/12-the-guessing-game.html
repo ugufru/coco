@@ -128,6 +128,7 @@ loop:
   PICK                     \ wait for keypress; set SECRET
   BEGIN
     .PROMPT .TRIES
+    12  6 AT          \ park cursor at input slot
     KEY DIGIT? IF
       DUP EMIT             \ echo the digit
       CHAR 0 -             \ convert ASCII to value
@@ -221,6 +222,7 @@ VARIABLE TRIES
   PICK
   BEGIN
     .PROMPT .TRIES
+    12  6 AT          \ park cursor at input slot
     KEY DIGIT? IF
       DUP EMIT
       CHAR 0 -
