@@ -72,7 +72,7 @@ loop:
       </p>
 
 <pre class="forth">: PICK
-  KEY 31 * 7 + 9 /MOD DROP 1 + SECRET ! ;</pre>
+  KEY 31 * 3 + 9 /MOD DROP 1 + SECRET ! ;</pre>
 
       <p>
         Multiply the ASCII code by 31, add 7, take the remainder
@@ -182,7 +182,7 @@ VARIABLE SECRET
 VARIABLE TRIES
 
 : PICK
-  KEY 31 * 7 + 9 /MOD DROP 1 + SECRET ! ;
+  KEY 31 * 3 + 9 /MOD DROP 1 + SECRET ! ;
 
 : .TITLE
   8  1 AT

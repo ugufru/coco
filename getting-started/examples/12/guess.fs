@@ -18,7 +18,7 @@ VARIABLE TRIES
 
 \ Seed the RNG from the player's keypress and pick a secret 1-9
 : PICK
-  KEY 31 * 7 + 9 /MOD DROP 1 + SECRET ! ;
+  KEY 31 * 3 + 9 /MOD DROP 1 + SECRET ! ;
 
 \ Screen layout words
 : .TITLE
