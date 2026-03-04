@@ -221,37 +221,39 @@ MAIN HALT</pre>
         <div class="screen">YES<br>NO<br>YES</div>
       </div>
 
-      <div class="diy">
-        <div class="diy-header">Do-It-Yourself</div>
-        <div class="illustration illustration-small" style="width:266px;height:auto;margin:12px 0 0 16px;padding:0;border:none;background:none;">
-          <img src="images/chapter8-3.png" alt="CoCo character with a floating question mark key, listening for a keypress" style="width:100%;height:auto;display:block;">
+      <div style="display:flex; gap:1.5em; align-items:flex-start;">
+        <div class="diy" style="flex:1;">
+          <div class="diy-header">Do-It-Yourself</div>
+          <div class="diy-body">
+            <ol>
+              <li>
+                Add <code>DUP EMIT</code> right after <code>KEY</code>
+                in YORN so it echoes the key before deciding YES or NO.
+                What changes on screen?
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                What does <code>KEY</code> return if you press Enter?
+                Hint: check the ASCII table on page 1.
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                Write <code>MATCH</code> — reads a key, prints WIN if
+                it matches <code>CHAR S</code>, LOSE otherwise. What
+                key do you press to win?
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                What happens if you call <code>KEY</code> but never
+                press a key? What does that tell you about how KEY
+                is implemented?
+                <div class="answer-line"></div>
+              </li>
+            </ol>
+          </div>
         </div>
-        <div class="diy-body">
-          <ol>
-            <li>
-              Add <code>DUP EMIT</code> right after <code>KEY</code>
-              in YORN so it echoes the key before deciding YES or NO.
-              What changes on screen?
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              What does <code>KEY</code> return if you press Enter?
-              Hint: check the ASCII table on page 1.
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              Write <code>MATCH</code> — reads a key, prints WIN if
-              it matches <code>CHAR S</code>, LOSE otherwise. What
-              key do you press to win?
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              What happens if you call <code>KEY</code> but never
-              press a key? What does that tell you about how KEY
-              is implemented?
-              <div class="answer-line"></div>
-            </li>
-          </ol>
+        <div class="illustration illustration-small" style="width:266px;flex-shrink:0;padding:0;border:none;background:none;">
+          <img src="images/chapter8-3.png" alt="CoCo character with a floating question mark key, listening for a keypress" style="width:100%;height:auto;display:block;">
         </div>
       </div>
 
