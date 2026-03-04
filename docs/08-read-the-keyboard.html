@@ -44,11 +44,11 @@
 
       <h2>KEY — Wait for a Keypress</h2>
 
-      <div class="illustration illustration-aside" style="width:220px;height:auto;padding:0;border:none;background:none;">
+      <div class="illustration illustration-aside" style="width:293px;height:auto;padding:0;border:none;background:none;">
         <img src="images/chapter8-2.png" alt="Y key dropping its ASCII value 89 onto the data stack" style="width:100%;height:auto;display:block;">
       </div>
 
-      <div class="rule-box">
+      <div class="rule-box" style="overflow:hidden">
         <h3>KEY &nbsp;<span style="font-weight:normal; font-size:0.85em;">( -- c )</span></h3>
         <p>Wait until a key is pressed. Push its ASCII character
         code onto the stack. Does not echo the character.</p>
@@ -65,7 +65,7 @@
         The simplest use: read a key and immediately display it.
       </p>
 
-<pre class="forth">KEY EMIT</pre>
+<pre class="forth" style="overflow:hidden">KEY EMIT</pre>
 
       <p>
         Press any key — that character appears on screen. The
@@ -73,7 +73,7 @@
         displays it.
       </p>
 
-      <h2>What KEY Returns</h2>
+      <h2 style="clear:right;">What KEY Returns</h2>
 
       <p>
         <code>KEY</code> pushes a standard ASCII value: letters
@@ -223,7 +223,7 @@ MAIN HALT</pre>
 
       <div class="diy">
         <div class="diy-header">Do-It-Yourself</div>
-        <div class="illustration illustration-small" style="width:200px;height:auto;margin:12px 0 0 16px;padding:0;border:none;background:none;">
+        <div class="illustration illustration-small" style="width:266px;height:auto;margin:12px 0 0 16px;padding:0;border:none;background:none;">
           <img src="images/chapter8-3.png" alt="CoCo character with a floating question mark key, listening for a keypress" style="width:100%;height:auto;display:block;">
         </div>
         <div class="diy-body">

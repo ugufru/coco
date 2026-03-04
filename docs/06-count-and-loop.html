@@ -53,7 +53,7 @@
 
       <h2>DO … LOOP — Counted Repetition</h2>
 
-      <div class="illustration illustration-aside" style="width:220px;height:auto;padding:0;border:none;background:none;">
+      <div class="illustration illustration-aside" style="width:293px;height:auto;padding:0;border:none;background:none;">
         <img src="images/chapter6-2.png" alt="Conveyor belt with bins numbered 0 through 4, robotic arm above performing the same action, counter advancing" style="width:100%;height:auto;display:block;">
       </div>
 
@@ -61,7 +61,7 @@
         The basic form is:
       </p>
 
-<pre class="forth">limit start DO  <em>body</em>  LOOP</pre>
+<pre class="forth" style="overflow:hidden">limit start DO  <em>body</em>  LOOP</pre>
 
       <p>
         <code>DO</code> pops <em>limit</em> and <em>start</em> from
@@ -71,7 +71,7 @@
         back or falls through.
       </p>
 
-      <div class="rule-box">
+      <div class="rule-box" style="overflow:hidden">
         <h3>limit start DO &nbsp;<em>body</em>&nbsp; LOOP</h3>
         <p>Run <em>body</em> for index = start, start+1, …, limit−1.
         The loop ends when the index reaches <em>limit</em>.</p>
@@ -90,7 +90,7 @@
         printing A, B, C, D, E.
       </p>
 
-      <h2>I — The Loop Index</h2>
+      <h2 style="clear:right;">I — The Loop Index</h2>
 
       <p>
         Inside a <code>DO … LOOP</code>, the word <code>I</code>
@@ -243,7 +243,7 @@ MAIN HALT</pre>
 
       <div class="diy">
         <div class="diy-header">Do-It-Yourself</div>
-        <div class="illustration illustration-small" style="width:200px;height:auto;margin:12px 0 0 16px;padding:0;border:none;background:none;">
+        <div class="illustration illustration-small" style="width:266px;height:auto;margin:12px 0 0 16px;padding:0;border:none;background:none;">
           <img src="images/chapter6-3.png" alt="CoCo character beside a large LOOP gear meshing with a smaller I gear, ticker tape of letters spilling out" style="width:100%;height:auto;display:block;">
         </div>
         <div class="diy-body">

@@ -44,7 +44,7 @@
 
       <h2>Comparison Words</h2>
 
-      <div class="illustration illustration-aside" style="width:220px;height:auto;padding:0;border:none;background:none;">
+      <div class="illustration illustration-aside" style="width:293px;height:auto;padding:0;border:none;background:none;">
         <img src="images/chapter7-2.png" alt="Balance scale with n1 and n2 blocks, TRUE flag hanging from the fulcrum" style="width:100%;height:auto;display:block;">
       </div>
 
@@ -53,7 +53,7 @@
         result called a <em>flag</em>:
       </p>
 
-      <div class="rule-box">
+      <div class="rule-box" style="overflow:hidden">
         <h3>= &nbsp;&lt;&gt; &nbsp;&lt; &nbsp;&gt;</h3>
         <p>( n1 n2 -- flag )<br>
         Compare n1 and n2. Push −1 (true) if the relationship
@@ -64,13 +64,13 @@
         A few quick examples at the top level — no definition needed:
       </p>
 
-<pre class="forth">3 3 =     \ flag = -1  (true — they're equal)
+<pre class="forth" style="overflow:hidden">3 3 =     \ flag = -1  (true — they're equal)
 3 5 =     \ flag = 0   (false)
 3 5 &lt;     \ flag = -1  (true — 3 is less than 5)
 5 3 &lt;     \ flag = 0   (false)
 5 3 &gt;     \ flag = -1  (true — 5 is greater than 3)</pre>
 
-      <h2>True and False in Forth</h2>
+      <h2 style="clear:right;">True and False in Forth</h2>
 
       <p>
         Forth uses numbers as flags: <strong>0 means false</strong>,
@@ -248,7 +248,7 @@ MAIN HALT</pre>
 
       <div class="diy">
         <div class="diy-header">Do-It-Yourself</div>
-        <div class="illustration illustration-small" style="width:200px;height:auto;margin:12px 0 0 16px;padding:0;border:none;background:none;">
+        <div class="illustration illustration-small" style="width:266px;height:auto;margin:12px 0 0 16px;padding:0;border:none;background:none;">
           <img src="images/chapter7-3.png" alt="CoCo character holding stacks of cards with a question mark above, sorting into Y and N piles" style="width:100%;height:auto;display:block;">
         </div>
         <div class="diy-body">
