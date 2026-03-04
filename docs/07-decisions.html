@@ -87,7 +87,7 @@
         Forth exploits this in bitmasking idioms.</p>
       </div>
 
-      <h2>IF … THEN — Simple Branch</h2>
+      <h2 style="clear:right;">IF … THEN — Simple Branch</h2>
 
       <p>
         The simplest decision structure runs a block of words only
@@ -246,36 +246,38 @@ MAIN HALT</pre>
         50 &lt; 50 is false → PASS.
       </p>
 
-      <div class="diy">
-        <div class="diy-header">Do-It-Yourself</div>
-        <div class="illustration illustration-small" style="width:266px;height:auto;margin:12px 0 0 16px;padding:0;border:none;background:none;">
-          <img src="images/chapter7-3.png" alt="CoCo character holding stacks of cards with a question mark above, sorting into Y and N piles" style="width:100%;height:auto;display:block;">
+      <div style="display:flex; gap:1.5em; align-items:flex-start;">
+        <div class="diy" style="flex:1;">
+          <div class="diy-header">Do-It-Yourself</div>
+          <div class="diy-body">
+            <ol>
+              <li>
+                Change the passing threshold from 50 to 70. What does
+                <code>65 GRADE</code> print now?
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                Write <code>POSITIVE?</code> — prints <code>Y</code>
+                if n &gt; 0, <code>N</code> otherwise. What does
+                <code>0 POSITIVE?</code> print?
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                Combine loops and decisions: loop 0 to 9, printing
+                <code>L</code> for values &lt; 5 and <code>H</code>
+                for the rest. What does the output look like?
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                What is the Forth value for "true"? Is any non-zero
+                number treated as true or false by <code>IF</code>?
+                <div class="answer-line"></div>
+              </li>
+            </ol>
+          </div>
         </div>
-        <div class="diy-body">
-          <ol>
-            <li>
-              Change the passing threshold from 50 to 70. What does
-              <code>65 GRADE</code> print now?
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              Write <code>POSITIVE?</code> — prints <code>Y</code>
-              if n &gt; 0, <code>N</code> otherwise. What does
-              <code>0 POSITIVE?</code> print?
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              Combine loops and decisions: loop 0 to 9, printing
-              <code>L</code> for values &lt; 5 and <code>H</code>
-              for the rest. What does the output look like?
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              What is the Forth value for "true"? Is any non-zero
-              number treated as true or false by <code>IF</code>?
-              <div class="answer-line"></div>
-            </li>
-          </ol>
+        <div class="illustration illustration-small" style="width:266px;flex-shrink:0;padding:0;border:none;background:none;">
+          <img src="images/chapter7-3.png" alt="CoCo character holding stacks of cards with a question mark above, sorting into Y and N piles" style="width:100%;height:auto;display:block;">
         </div>
       </div>
 
