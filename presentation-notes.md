@@ -1,4 +1,4 @@
-# CoCo / Bananas — Presentation Speaking Notes
+# Bare Naked Forth — Presentation Speaking Notes
 
 *10-minute talk*
 
@@ -32,7 +32,7 @@ The 6809 has two hardware stack pointers, S and U. Forth is defined by two stack
 
 The architecture became **Indirect Threaded Code (ITC)**: a small kernel (~100 bytes of 6809 assembly) acts as the inner interpreter. Everything else — applications, programs, the tutorial programs — is cross-compiled Forth bytecode that the kernel executes natively.
 
-The name for this became **Bananas**.
+The name for this became **Bare Naked Forth**.
 
 ---
 

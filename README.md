@@ -1,4 +1,4 @@
-# Bananas — Modern Bytecode for the Color Computer
+# Bare Naked Forth — Modern Bytecode for the Color Computer
 
 A cross-compiled Forth toolchain for the TRS-80 Color Computer. Write Forth
 on a modern machine. Run it natively on the CoCo's 6809.

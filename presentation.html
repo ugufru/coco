@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bare Naked Forth</title>
+  <style>
+    :root {
+      --black:      #0a0e0a;
+      --dark:       #111911;
+      --green:      #3c6e3c;
+      --green-mid:  #4a8c4a;
+      --green-bright: #6fcf6f;
+      --green-glow: #5fb85f;
+      --amber:      #d4a017;
+      --text:       #d4cfc8;
+      --text-dim:   #8a8a7a;
+      --white:      #f0ece4;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: #000;
+      font-family: Georgia, 'Times New Roman', serif;
+      overflow: hidden;
+    }
+
+    /* ── Deck container ── */
+    #deck {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── Slide ── */
+    .slide {
+      display: none;
+      position: relative;
+      width: min(100vw, calc(100vh * 16/9));
+      height: min(100vh, calc(100vw * 9/16));
+      background: var(--black);
+      overflow: hidden;
+      color: var(--text);
+    }
+    .slide.active { display: flex; flex-direction: column; }
+
+    /* scanline overlay */
+    .slide::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0px, transparent 3px,
+        rgba(0,0,0,0.18) 3px, rgba(0,0,0,0.18) 4px
+      );
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    /* ── Green header bar ── */
+    .slide-header {
+      background: var(--green);
+      padding: 0.45em 1.2em;
+      font-family: 'Impact', 'Arial Black', sans-serif;
+      font-size: 1em;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    /* ── Content area ── */
+    .slide-body {
+      flex: 1;
+      display: flex;
+      padding: 1.4em 2em;
+      gap: 1.6em;
+      overflow: hidden;
+    }
+    .slide-body.center {
+      align-items: center; justify-content: center; text-align: center;
+      flex-direction: column;
+    }
+    .slide-body.split {
+      flex-direction: row;
+      align-items: center;
+    }
+    .slide-body.split .left  { flex: 1.1; }
+    .slide-body.split .right { flex: 0.9; display: flex; align-items: center; justify-content: center; }
+
+    /* ── Typography ── */
+    h1 {
+      font-family: 'Impact', 'Arial Black', sans-serif;
+      font-size: 4.5em;
+      text-transform: uppercase;
+      line-height: 1;
+      color: var(--green-bright);
+      text-shadow: 0 0 40px rgba(111, 207, 111, 0.5);
+      letter-spacing: -0.01em;
+    }
+    h2 {
+      font-family: 'Impact', 'Arial Black', sans-serif;
+      font-size: 2.6em;
+      text-transform: uppercase;
+      color: var(--white);
+      line-height: 1.1;
+      letter-spacing: 0.01em;
+      margin-bottom: 0.4em;
+    }
+    h3 {
+      font-family: 'Impact', 'Arial Black', sans-serif;
+      font-size: 1.5em;
+      color: var(--green-bright);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 0.5em;
+    }
+    p { font-size: 1em; line-height: 1.6; color: var(--text); margin-bottom: 0.5em; }
+    .big-quote {
+      font-size: 1.8em;
+      font-style: italic;
+      color: var(--white);
+      line-height: 1.4;
+      text-align: center;
+      max-width: 80%;
+    }
+    .sub {
+      font-size: 1em;
+      color: var(--text-dim);
+      margin-top: 0.4em;
+      font-style: italic;
+    }
+
+    /* ── Bullet lists ── */
+    ul.bullets {
+      list-style: none;
+      padding: 0;
+    }
+    ul.bullets li {
+      padding: 0.4em 0 0.4em 1.6em;
+      position: relative;
+      font-size: 1em;
+      line-height: 1.5;
+      border-bottom: 1px solid rgba(60,110,60,0.2);
+      color: var(--text);
+    }
+    ul.bullets li::before {
+      content: '▶';
+      position: absolute; left: 0;
+      color: var(--green-bright);
+      font-size: 0.7em;
+      top: 0.65em;
+    }
+    ul.bullets li strong { color: var(--white); }
+    ul.bullets.large li { font-size: 1.15em; padding: 0.55em 0 0.55em 1.8em; }
+
+    /* ── Code terminal box ── */
+    .terminal {
+      background: #060d06;
+      border: 2px solid var(--green);
+      border-radius: 4px;
+      padding: 0.9em 1.2em;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.92em;
+      color: var(--green-bright);
+      line-height: 1.7;
+      box-shadow: 0 0 20px rgba(111, 207, 111, 0.2);
+    }
+    .terminal .prompt { color: var(--text-dim); }
+    .terminal .comment { color: #4a7a4a; }
+
+    /* ── Highlight box ── */
+    .callout {
+      border-left: 4px solid var(--green-bright);
+      padding: 0.7em 1em;
+      background: rgba(60,110,60,0.12);
+      margin: 0.6em 0;
+      font-size: 0.95em;
+    }
+    .callout strong { color: var(--green-bright); }
+
+    /* ── Images ── */
+    .slide-img {
+      max-height: 100%;
+      max-width: 100%;
+      object-fit: contain;
+      filter: saturate(0.9) brightness(0.92);
+    }
+
+    /* ── Placeholder image ── */
+    .img-placeholder {
+      border: 2px dashed var(--green);
+      border-radius: 4px;
+      padding: 1.5em 1em;
+      text-align: center;
+      color: var(--text-dim);
+      font-style: italic;
+      font-size: 0.85em;
+      line-height: 1.5;
+      min-width: 200px;
+      min-height: 140px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── Comparison table ── */
+    .compare {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95em;
+    }
+    .compare th {
+      background: var(--green);
+      color: #fff;
+      padding: 0.5em 1em;
+      font-family: 'Impact', 'Arial Black', sans-serif;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-weight: normal;
+      text-align: left;
+    }
+    .compare td {
+      padding: 0.5em 1em;
+      border-bottom: 1px solid rgba(60,110,60,0.25);
+      color: var(--text);
+    }
+    .compare tr:nth-child(even) td { background: rgba(60,110,60,0.08); }
+    .compare td.good { color: var(--green-bright); font-weight: bold; }
+    .compare td.bad  { color: #a06060; }
+
+    /* ── Workflow diagram ── */
+    .flow {
+      display: flex; align-items: center; gap: 0.6em;
+      justify-content: center; flex-wrap: wrap;
+    }
+    .flow-box {
+      background: var(--dark);
+      border: 2px solid var(--green);
+      border-radius: 4px;
+      padding: 0.6em 1em;
+      font-family: 'Courier New', monospace;
+      font-size: 1em;
+      color: var(--green-bright);
+      text-align: center;
+      white-space: nowrap;
+    }
+    .flow-arrow {
+      color: var(--green-mid);
+      font-size: 1.4em;
+    }
+
+    /* ── Slide counter ── */
+    #counter {
+      position: fixed; bottom: 12px; right: 20px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.7em;
+      color: var(--green);
+      z-index: 999;
+      letter-spacing: 0.1em;
+    }
+
+    /* ── Title slide specifics ── */
+    .title-slide { background: var(--black); }
+    .title-slide .slide-body {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.5em 2.5em;
+    }
+    .title-left { flex: 1.2; }
+    .title-right { flex: 0.8; display: flex; align-items: center; justify-content: center; }
+    .title-eyebrow {
+      font-family: 'Courier New', monospace;
+      color: var(--green-bright);
+      letter-spacing: 0.2em;
+      font-size: 0.85em;
+      text-transform: uppercase;
+      margin-bottom: 0.5em;
+    }
+    .title-tagline {
+      margin-top: 0.8em;
+      font-size: 1.05em;
+      color: var(--text-dim);
+      font-style: italic;
+      max-width: 480px;
+      line-height: 1.5;
+    }
+    .title-meta {
+      margin-top: 1.6em;
+      font-family: 'Courier New', monospace;
+      font-size: 0.8em;
+      color: var(--green);
+      letter-spacing: 0.1em;
+    }
+
+    /* ── Green glow rule ── */
+    .glow-rule {
+      border: none;
+      border-top: 2px solid var(--green);
+      box-shadow: 0 0 8px rgba(111,207,111,0.4);
+      margin: 0.6em 0;
+    }
+
+    /* ── Chapter grid ── */
+    .chapter-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.4em;
+      font-size: 0.82em;
+    }
+    .chapter-item {
+      border: 1px solid rgba(60,110,60,0.4);
+      padding: 0.4em 0.6em;
+      border-radius: 2px;
+      background: rgba(60,110,60,0.08);
+    }
+    .chapter-item .num { color: var(--green-bright); font-family: 'Courier New', monospace; margin-right: 0.3em; }
+    .chapter-item .title-ch { color: var(--white); }
+
+    /* ── Big number stat ── */
+    .stat-row { display: flex; gap: 2em; justify-content: center; margin: 0.8em 0; }
+    .stat { text-align: center; }
+    .stat .num { font-family: 'Impact', 'Arial Black', sans-serif; font-size: 3em; color: var(--green-bright); line-height: 1; }
+    .stat .label { font-size: 0.8em; color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 0.2em; }
+
+    /* ── Responsive font scaling ── */
+    .slide { font-size: calc(min(100vw, calc(100vh * 16/9)) / 72); }
+  </style>
+</head>
+<body>
+<div id="deck">
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 1 — TITLE
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="slide title-slide active">
+    <div class="slide-header">TRS-80 Color Computer · 2026</div>
+    <div class="slide-body">
+      <div class="title-left">
+        <div class="title-eyebrow">▶ introducing</div>
+        <h1>Bare<br>Naked<br>Forth</h1>
+        <hr class="glow-rule">
+        <div class="title-tagline">
+          A cross-compiled, token-threaded Forth for the TRS-80 Color Computer.
+          No OS. No disk. No clothes.
+        </div>
+        <div class="title-meta">[ PRESS → OR SPACE TO ADVANCE ]</div>
+      </div>
+      <div class="title-right">
+        <img class="slide-img" src="docs/images/cover-1.png"
+             alt="CoCo character in a lab coat at a workbench with a Color Computer">
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 2 — THE HOOK
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="slide-header">The Question</div>
+    <div class="slide-body center">
+      <div class="big-quote">
+        "What if Tandy had made better<br>software decisions in 1982?"
+      </div>
+      <hr class="glow-rule" style="width:50%; margin: 0.8em auto;">
+      <p style="color: var(--text-dim); font-size: 1em; max-width: 60%; text-align:center;">
+        The hardware was never the problem. The cassette interface, the 32-column editor,
+        the assembler that couldn't handle a real project — those were.
+        And they were all software.
+      </p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 3 — THE HARDWARE
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="slide-header">The Hardware</div>
+    <div class="slide-body split">
+      <div class="left">
+        <h2>The Motorola 6809</h2>
+        <ul class="bullets large" style="margin-top:0.5em;">
+          <li><strong>Two 16-bit index registers</strong> — X and Y</li>
+          <li><strong>Two stack pointers</strong> — S and U</li>
+          <li><strong>PC-relative addressing</strong> — position-independent code is natural</li>
+          <li><strong>Clean, orthogonal ISA</strong> — influenced by the PDP-11</li>
+          <li>Writing 6809 assembly is actually <strong>pleasant</strong></li>
+        </ul>
+        <div class="callout" style="margin-top:1em;">
+          The 6809 was running multitasking operating systems in the early 1980s.
+          The hardware had headroom. <strong>The tooling didn't keep up.</strong>
+        </div>
+      </div>
+      <div class="right">
+        <div class="img-placeholder" style="width:260px; height:200px;">
+          [ Photo: TRS-80 Color Computer 2<br>with ROM cartridge inserted ]
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 4 — RENOVATION NOT EMULATION
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="slide-header">Renovation, Not Emulation</div>
+    <div class="slide-body split">
+      <div class="left">
+        <table class="compare">
+          <thead>
+            <tr><th>Approach</th><th>What it means</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Emulation</td><td>Run old thing on new hardware</td></tr>
+            <tr><td>Preservation</td><td>Archive what existed</td></tr>
+            <tr><td class="good">Renovation</td><td class="good">Keep hardware authentic,<br>replace the software layer</td></tr>
+          </tbody>
+        </table>
+        <div class="callout" style="margin-top: 1em;">
+          <strong>The ROM cartridge:</strong> non-destructive delivery.
+          Pull it out — you have a stock CoCo.
+          Plug it in — you have a modern development environment.
+        </div>
+      </div>
+      <div class="right">
+        <div class="img-placeholder" style="width:260px; height:200px;">
+          [ Photo: CoCo pak slot / ROM cartridge<br>being inserted ]
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 5 — WHY FORTH
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="slide-header">Why Forth?</div>
+    <div class="slide-body split">
+      <div class="left">
+        <h2>The Perfect Fit</h2>
+        <p>Forth is defined by <strong>two stacks</strong>:</p>
+        <ul class="bullets" style="margin: 0.5em 0 0.8em;">
+          <li>A <strong>data stack</strong> for working values</li>
+          <li>A <strong>return stack</strong> for tracking word calls</li>
+        </ul>
+        <p>The 6809 has <strong>two hardware stack pointers</strong>: S and U.</p>
+        <div class="callout" style="margin-top: 0.8em; font-size:1.1em;">
+          This is <strong>not a coincidence</strong>. The 6809 was practically
+          designed to run Forth.
+        </div>
+        <p style="margin-top:0.8em; color: var(--text-dim); font-size:0.9em;">
+          The entire kernel fits in ~1KB of 6809 assembly.
+          Most Forth implementations for the CoCo need a disk and an OS.
+          This one needs neither.
+        </p>
+      </div>
+      <div class="right">
+        <img class="slide-img" style="max-height:65%;" src="docs/images/chapter1-5.png"
+             alt="CoCo character beside a transparent column of numbered stacking boxes">
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 6 — THE ARCHITECTURE
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="slide-header">The Architecture</div>
+    <div class="slide-body split">
+      <div class="left">
+        <h3>Indirect Threaded Code (ITC)</h3>
+        <div class="terminal" style="margin-bottom:0.8em;">
+<span class="comment">; The entire inner interpreter:</span>
+LDY ,X++    <span class="comment">; fetch next CFA, advance IP</span>
+JMP [,Y]    <span class="comment">; jump through CFA to machine code</span>
+        </div>
+        <ul class="bullets">
+          <li><strong>Kernel</strong> — ~1KB of 6809 assembly, 25 primitives</li>
+          <li><strong>CFA dispatch table</strong> — maps tokens to machine code</li>
+          <li><strong>Compiled thread</strong> — a sequence of 2-byte addresses</li>
+          <li>No dictionary on the CoCo</li>
+          <li>No REPL, no OS, no overhead</li>
+        </ul>
+      </div>
+      <div class="right">
+        <div style="width:100%;">
+          <div class="terminal" style="font-size:0.85em; line-height:2;">
+<span style="color:var(--text-dim);">Register assignments:</span>
+X  = IP   <span class="comment">instruction pointer</span>
+U  = DSP  <span class="comment">data stack pointer</span>
+S  = RSP  <span class="comment">return stack pointer</span>
+<br>
+<span style="color:var(--text-dim);">Memory map:</span>
+$1000  kernel + CFA table
+$2000  your compiled Forth
+$7E00  data stack (grows ↓)
+$8000  return stack (grows ↓)
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 7 — THE WORKFLOW
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="slide-header">The Workflow</div>
+    <div class="slide-body" style="flex-direction:column; justify-content:center; gap:1.2em;">
+      <div class="flow" style="font-size:1.1em;">
+        <div class="flow-box">hello.fs<br><span style="font-size:0.75em;color:var(--text-dim);">Forth source</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">fc.py<br><span style="font-size:0.75em;color:var(--text-dim);">cross-compiler</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">hello.bin<br><span style="font-size:0.75em;color:var(--text-dim);">DECB bytecode</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">CoCo 6809<br><span style="font-size:0.75em;color:var(--text-dim);">kernel executes</span></div>
+      </div>
+      <div style="display:flex; gap:1.5em; justify-content:center;">
+        <div class="callout" style="flex:1; max-width:300px;">
+          <strong>On your Mac / Linux:</strong><br>
+          Write Forth source. Run <code>./run.sh hello.fs</code>. Done.
+        </div>
+        <div class="callout" style="flex:1; max-width:300px;">
+          <strong>On the CoCo:</strong><br>
+          The kernel executes the compiled thread.
+          It never sees the source.
+        </div>
+      </div>
+      <div style="text-align:center;">
+        <img class="slide-img" style="max-height: 28%; margin-top:0.3em;"
+             src="docs/images/chapter2-2.png"
+             alt="Factory conveyor belt where each CoCo robot station prints one letter">
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 8 — WHAT WE BUILT
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="slide-header">What We Built</div>
+    <div class="slide-body split">
+      <div class="left">
+        <div class="stat-row">
+          <div class="stat"><div class="num">25</div><div class="label">Primitives</div></div>
+          <div class="stat"><div class="num">~1K</div><div class="label">Kernel bytes</div></div>
+          <div class="stat"><div class="num">64K</div><div class="label">RAM free</div></div>
+        </div>
+        <ul class="bullets" style="margin-top:0.5em;">
+          <li><strong>kernel.asm</strong> — 6809 ITC executor, 25 primitives</li>
+          <li><strong>fc.py</strong> — Forth cross-compiler in Python</li>
+          <li>IF/ELSE/THEN, DO/LOOP, BEGIN/AGAIN/UNTIL</li>
+          <li>Variables, colon definitions, CHAR literals</li>
+          <li><strong>Hello World</strong> — real output on real hardware</li>
+        </ul>
+        <div class="terminal" style="margin-top:0.8em;">
+$ ./run.sh hello.fs
+<span style="color:var(--text-dim);"># kernel assembles, fc.py compiles,</span>
+<span style="color:var(--text-dim);"># XRoar launches...</span>
+<span style="color:#fff;">HELLO, WORLD!</span>
+        </div>
+      </div>
+      <div class="right">
+        <img class="slide-img" style="max-height:75%;" src="docs/images/chapter1-3.png"
+             alt="CoCo character pointing at a glowing letter A on a tiny green screen">
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 9 — THE TUTORIAL
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="slide-header">Getting Started with Bare Naked Forth</div>
+    <div class="slide-body split">
+      <div class="left" style="flex:1.3;">
+        <p style="color:var(--text-dim); margin-bottom:0.7em; font-style:italic;">
+          A 13-chapter beginner's book. No Forth experience required.
+        </p>
+        <div class="chapter-grid">
+          <div class="chapter-item"><span class="num">01</span><span class="title-ch">Meet Your Stack</span></div>
+          <div class="chapter-item"><span class="num">02</span><span class="title-ch">Say Something</span></div>
+          <div class="chapter-item"><span class="num">03</span><span class="title-ch">Make Your Own Words</span></div>
+          <div class="chapter-item"><span class="num">04</span><span class="title-ch">Stack Is Your Friend</span></div>
+          <div class="chapter-item"><span class="num">05</span><span class="title-ch">Remember Things</span></div>
+          <div class="chapter-item"><span class="num">06</span><span class="title-ch">Count and Loop</span></div>
+          <div class="chapter-item"><span class="num">07</span><span class="title-ch">Decisions</span></div>
+          <div class="chapter-item"><span class="num">08</span><span class="title-ch">Read the Keyboard</span></div>
+          <div class="chapter-item"><span class="num">09</span><span class="title-ch">Numbers on Screen</span></div>
+          <div class="chapter-item"><span class="num">10</span><span class="title-ch">The Calculator</span></div>
+          <div class="chapter-item"><span class="num">11</span><span class="title-ch">Anywhere on Screen</span></div>
+          <div class="chapter-item"><span class="num">12</span><span class="title-ch">The Guessing Game</span></div>
+          <div class="chapter-item" style="grid-column: span 3; border-color: var(--green); background: rgba(60,110,60,0.15);">
+            <span class="num">13</span><span class="title-ch">Getting It onto Your CoCo</span>
+          </div>
+        </div>
+      </div>
+      <div class="right" style="flex:0.7;">
+        <img class="slide-img" style="max-height:80%;" src="docs/images/chapter1-7.png"
+             alt="CoCo character sitting at a desk with pencil, blank screen in front, looking ready">
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 10 — VS THE COMPETITION
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="slide-header">vs. Every Other CoCo Forth</div>
+    <div class="slide-body" style="flex-direction:column; justify-content:center; gap:0.8em; padding: 1.2em 3em;">
+      <table class="compare">
+        <thead>
+          <tr><th>System</th><th>Needs OS?</th><th>Needs disk?</th><th>Setup time</th><th>Kernel size</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>NitrOS-9 Forth</td>
+            <td class="bad">Yes (OS-9)</td>
+            <td class="bad">Yes</td>
+            <td class="bad">Hours</td>
+            <td class="bad">Large</td>
+          </tr>
+          <tr>
+            <td>Typical CoCo Forth</td>
+            <td class="bad">Often</td>
+            <td class="bad">Usually</td>
+            <td class="bad">Minutes–hours</td>
+            <td class="bad">Medium</td>
+          </tr>
+          <tr>
+            <td style="color:var(--green-bright); font-weight:bold;">Bare Naked Forth</td>
+            <td class="good">No</td>
+            <td class="good">No</td>
+            <td class="good">Seconds</td>
+            <td class="good">~1KB</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout" style="text-align:center; font-size:1.1em; margin-top:0.5em;">
+        Write Forth on your Mac. Run it on the CoCo.
+        <strong>That's the whole workflow.</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 11 — FUTURE POTENTIAL
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="slide-header">Where This Goes</div>
+    <div class="slide-body split">
+      <div class="left">
+        <h2>Roadmap</h2>
+        <ul class="bullets large">
+          <li><strong>Serial loader</strong> — bit-banged via PIA, load bytecode over RS-232</li>
+          <li><strong>ROM cartridge image</strong> — kernel burned to flash, plug-and-play</li>
+          <li><strong>SD card</strong> — store and load programs via CoCoSDC</li>
+          <li><strong>RP2350 co-processor</strong> — one core on the 6809 bus, one managing the outside world</li>
+          <li><strong>CoCo 1 / 2 / 3</strong> — same bytecode runs everywhere; hardware differences are the kernel's problem</li>
+        </ul>
+      </div>
+      <div class="right">
+        <div class="img-placeholder" style="width:260px; height:220px;">
+          [ Photo: ROM cartridge for CoCo pak slot —<br>or RP2350 dev board ]
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 12 — CLOSING
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="slide-header">The Point</div>
+    <div class="slide-body split">
+      <div class="left">
+        <h2 style="font-size:2em;">Constraints<br>are features.</h2>
+        <hr class="glow-rule" style="margin: 0.7em 0;">
+        <p style="font-size:1.05em;">You feel the 64K. You feel the register pressure.
+        The feedback is immediate and embodied.</p>
+        <p style="margin-top:0.6em;">The 6809 was an elegant processor let down by its
+        ecosystem. <strong>Bare Naked Forth</strong> is the ecosystem it deserved.</p>
+        <div class="callout" style="margin-top:1em; font-size:1.05em;">
+          Same hardware. Different direction.<br>
+          <strong>github.com/ugufru/coco</strong>
+        </div>
+      </div>
+      <div class="right">
+        <img class="slide-img" style="max-height:78%;" src="docs/images/chapter4-1.png"
+             alt="CoCo character juggling plates labeled DUP, DROP, SWAP, OVER, looking relaxed and confident">
+      </div>
+    </div>
+  </div>
+
+</div><!-- /deck -->
+
+<div id="counter"></div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  let current = 0;
+
+  function show(n) {
+    slides[current].classList.remove('active');
+    current = Math.max(0, Math.min(n, slides.length - 1));
+    slides[current].classList.add('active');
+    document.getElementById('counter').textContent =
+      (current + 1) + ' / ' + slides.length;
+  }
+
+  function next() { show(current + 1); }
+  function prev() { show(current - 1); }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); next(); }
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp'   || e.key === 'PageUp')   { e.preventDefault(); prev(); }
+    if (e.key === 'Home') show(0);
+    if (e.key === 'End')  show(slides.length - 1);
+  });
+
+  document.getElementById('deck').addEventListener('click', e => {
+    if (e.clientX > window.innerWidth / 2) next(); else prev();
+  });
+
+  // Touch swipe
+  let tx = 0;
+  document.addEventListener('touchstart', e => { tx = e.touches[0].clientX; });
+  document.addEventListener('touchend',   e => {
+    const dx = e.changedTouches[0].clientX - tx;
+    if (Math.abs(dx) > 40) { if (dx < 0) next(); else prev(); }
+  });
+
+  show(0);
+</script>
+</body>
+</html>
