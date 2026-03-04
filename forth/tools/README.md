@@ -108,8 +108,13 @@ source text
     ├─ tokenize()       strip comments, split on whitespace
     │
     ├─ parse()          walk tokens → IR
-    │                     ('lit', 72)       integer or CHAR literal
-    │                     ('word', 'emit')  word reference
+    │                     ('lit', 72)            integer or CHAR literal
+    │                     ('word', 'emit')        word reference
+    │                     ('do',)                 DO
+    │                     ('label', name)          loop label (for DO back-ref)
+    │                     ('loop_back', name)      LOOP + branch offset
+    │                     ('0branch', offset)      IF / UNTIL branch
+    │                     ('branch', offset)       ELSE / AGAIN branch
     │                   VARIABLE declarations collected separately
     │
     └─ compile_forth()  two passes
@@ -124,30 +129,32 @@ source text
                           word refs   → 2-byte CFA address
                           definitions → DOCOL + body + CFA_EXIT
                           variables   → DOVAR + 2-byte data cell (init 0)
+                          DO/LOOP     → CFA_DO + label / CFA_LOOP + back-offset
+                          IF/ELSE/THEN → CFA_0BRANCH/CFA_BRANCH + forward offset
+                          BEGIN/AGAIN → CFA_BRANCH + back-offset
+                          BEGIN/UNTIL → CFA_0BRANCH + back-offset
 ```
 
 The output is wrapped in DECB block headers and written as a `.bin` file.
-BASIC's `CLOADM` loads it and the kernel's `START` routine jumps to `APP_BASE`.
+BASIC's `LOADM` loads it and the kernel's `START` routine jumps to `APP_BASE`.
 
 ---
 
-## What fc.py does not do
+## What fc.py supports
 
-| Feature | Standard Forth | fc.py |
-|---|---|---|
-| Runs on target | yes | no (runs on host) |
-| Runtime dictionary | yes | no |
-| Name lookup at runtime | yes | no (compile-time only) |
-| Self-hosting | yes | no (written in Python) |
-| `IF` / `THEN` / `LOOP` | yes | not yet |
-| Interactive REPL | yes | no |
-| Source on device | yes | no |
-
-fc.py handles: `: NAME ... ;`, `VARIABLE NAME`, `CHAR X`, integer literals,
-and references to defined words and kernel primitives. That's enough to write
-real programs. The control structures (`IF`, `THEN`, `DO`, `LOOP`) come next
-— they require emitting `BRANCH`/`0BRANCH` addresses with forward-reference
-patching, which is straightforward to add.
+| Feature | Status |
+|---|---|
+| Colon definitions (`: NAME ... ;`) | done |
+| `VARIABLE NAME` | done |
+| `CHAR X` | done |
+| Integer literals | done |
+| `DO … LOOP` with `I` | done |
+| `IF … THEN`, `IF … ELSE … THEN` | done |
+| `BEGIN … AGAIN`, `BEGIN … UNTIL` | done |
+| Runtime dictionary | not applicable (cross-compiler) |
+| `CONSTANT` | not yet |
+| String literals (`S"`, `."`) | not yet |
+| Interactive REPL | not applicable (cross-compiler) |
 
 ---
 
@@ -168,5 +175,5 @@ python3 fc.py source.fs \
 | `--base` | `0x2000` | application load address |
 
 With `--kernel-bin`, the output contains both the kernel block and the app
-block in a single DECB binary. BASIC loads both in one `CLOADM` and jumps to
+block in a single DECB binary. BASIC loads both in one `LOADM` and jumps to
 `START`.

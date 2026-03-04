@@ -72,6 +72,8 @@ processors where Forth fits naturally without compromise.
 |---|---|---|
 | `+` | `( n1 n2 -- sum )` | Add |
 | `-` | `( n1 n2 -- diff )` | Subtract (n1 − n2) |
+| `*` | `( n1 n2 -- product )` | Multiply |
+| `/MOD` | `( n1 n2 -- rem quot )` | Divide: remainder and quotient |
 
 ### Memory
 
@@ -86,8 +88,35 @@ processors where Forth fits naturally without compromise.
 |---|---|---|
 | `EMIT` | `( c -- )` | Write character to video RAM at cursor, advance cursor |
 | `CR` | `( -- )` | Advance cursor to start of next row |
+| `KEY` | `( -- c )` | Wait for a keypress, push ASCII code |
 
-### Control
+### Control flow
+
+| Word | Stack | Description |
+|---|---|---|
+| `0BRANCH` | `( flag -- )` | Branch forward by offset if flag is zero; offset follows in thread |
+| `BRANCH` | `( -- )` | Unconditional branch; offset follows in thread |
+| `DO` | `( limit index -- )` | Begin a counted loop; push limit and index to return stack |
+| `LOOP` | — | Increment index; branch back if index < limit |
+| `I` | `( -- n )` | Push current loop index |
+
+### Comparison
+
+| Word | Stack | Description |
+|---|---|---|
+| `=` | `( n1 n2 -- flag )` | True ($FFFF) if equal |
+| `<>` | `( n1 n2 -- flag )` | True if not equal |
+| `<` | `( n1 n2 -- flag )` | True if n1 < n2 (signed) |
+| `>` | `( n1 n2 -- flag )` | True if n1 > n2 (signed) |
+| `0=` | `( n -- flag )` | True if zero |
+
+### Screen
+
+| Word | Stack | Description |
+|---|---|---|
+| `AT` | `( row col -- )` | Set cursor to row (0–15) and column (0–31) |
+
+### System
 
 | Word | Stack | Description |
 |---|---|---|
@@ -98,16 +127,16 @@ processors where Forth fits naturally without compromise.
 ## Memory layout
 
 ```
-$0050–$0051   VAR_CUR   cursor offset into video RAM (0–511)
-$0400–$05FF   video RAM (32 columns × 16 rows, VDG alphanumeric)
+$0050–$0051   VAR_CUR     cursor offset into video RAM (0–511)
+$0400–$05FF   video RAM   (32 columns × 16 rows, VDG alphanumeric)
 $1000         DOCOL
 $1009         DOVAR
-$1013–$102B   CFA table  (11 entries × 2 bytes)
-$102D–$10D2   machine code for all primitives
-$10D3         CODE_HALT
-$10D5         START  (DECB exec address)
-$10F9–$1FFF   unused  (~1.5K available for new primitives)
-$2000–$xxxx   application  (cross-compiled Forth thread)
+$1013–$1048   CFA table   (29 entries × 2 bytes)
+$1049–$1224   machine code for all primitives
+$1223         CODE_HALT
+$1225         START       (DECB exec address)
+$1227–$1FFF   unused      (~3.5K available for new primitives)
+$2000–$xxxx   application (cross-compiled Forth thread)
 $7E00         data stack base  (U, grows down)
 $7FFE         return stack init (S, grows down from $7FFE)
 ```
