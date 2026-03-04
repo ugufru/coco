@@ -233,34 +233,36 @@ MAIN HALT</pre>
         <div class="screen">42<br>-12<br>1000<br>-1</div>
       </div>
 
-      <div class="diy">
-        <div class="diy-header">Do-It-Yourself</div>
-        <div class="illustration illustration-small" style="width:266px;height:auto;margin:0 0 12px 20px;padding:0;border:none;background:none;">
-          <img src="images/chapter9-3.jpg" alt="CoCo character holding a giant 42 with 4 and 2 floating beside it, and a recursive call stack diagram" style="width:100%;height:auto;display:block;">
+      <div style="display:flex; gap:1.5em; align-items:flex-start;">
+        <div class="diy" style="flex:1;">
+          <div class="diy-header">Do-It-Yourself</div>
+          <div class="diy-body">
+            <ol>
+              <li>
+                What does <code>65535 U.</code> print? Is this what
+                you expected for the largest unsigned 16-bit value?
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                What does <code>42 5 /MOD . 32 EMIT . CR</code>
+                print? Think about which value is TOS after /MOD.
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                Write <code>SQ</code> — prints the square of a number.
+                <code>5 SQ</code> should print <code>25</code>.
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                What is <code>-1</code> as a 16-bit unsigned number?
+                What does <code>-1 U.</code> print, and why?
+                <div class="answer-line"></div>
+              </li>
+            </ol>
+          </div>
         </div>
-        <div class="diy-body">
-          <ol>
-            <li>
-              What does <code>65535 U.</code> print? Is this what
-              you expected for the largest unsigned 16-bit value?
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              What does <code>42 5 /MOD . 32 EMIT . CR</code>
-              print? Think about which value is TOS after /MOD.
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              Write <code>SQ</code> — prints the square of a number.
-              <code>5 SQ</code> should print <code>25</code>.
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              What is <code>-1</code> as a 16-bit unsigned number?
-              What does <code>-1 U.</code> print, and why?
-              <div class="answer-line"></div>
-            </li>
-          </ol>
+        <div class="illustration illustration-small" style="width:266px;flex-shrink:0;padding:0;border:none;background:none;">
+          <img src="images/chapter9-3.jpg" alt="CoCo character holding a giant 42 with 4 and 2 floating beside it, and a recursive call stack diagram" style="width:100%;height:auto;display:block;">
         </div>
       </div>
 

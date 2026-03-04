@@ -241,37 +241,39 @@ MAIN HALT</pre>
         repetition; the loop does all the work.
       </p>
 
-      <div class="diy">
-        <div class="diy-header">Do-It-Yourself</div>
-        <div class="illustration illustration-small" style="width:266px;height:auto;margin:12px 0 0 16px;padding:0;border:none;background:none;">
-          <img src="images/chapter6-3.png" alt="CoCo character beside a large LOOP gear meshing with a smaller I gear, ticker tape of letters spilling out" style="width:100%;height:auto;display:block;">
+      <div style="display:flex; gap:1.5em; align-items:flex-start;">
+        <div class="diy" style="flex:1;">
+          <div class="diy-header">Do-It-Yourself</div>
+          <div class="diy-body">
+            <ol>
+              <li>
+                Change the limit from 26 to 5 in <code>ALPHA</code>.
+                What five letters print?
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                Write <code>BACKW</code> yourself before looking at the
+                example. What does <code>25 I -</code> compute when
+                <code>I</code> is 10?
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                Print the alphabet twice in a row. One approach: call
+                <code>ALPHA</code> twice inside <code>MAIN</code>.
+                Another: change the limit and use math on
+                <code>I</code>. Try both.
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                What happens if you write <code>0 0 DO I LETTER LOOP</code>?
+                Think about it first — does the body run once, or never?
+                <div class="answer-line"></div>
+              </li>
+            </ol>
+          </div>
         </div>
-        <div class="diy-body">
-          <ol>
-            <li>
-              Change the limit from 26 to 5 in <code>ALPHA</code>.
-              What five letters print?
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              Write <code>BACKW</code> yourself before looking at the
-              example. What does <code>25 I -</code> compute when
-              <code>I</code> is 10?
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              Print the alphabet twice in a row. One approach: call
-              <code>ALPHA</code> twice inside <code>MAIN</code>.
-              Another: change the limit and use math on
-              <code>I</code>. Try both.
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              What happens if you write <code>0 0 DO I LETTER LOOP</code>?
-              Think about it first — does the body run once, or never?
-              <div class="answer-line"></div>
-            </li>
-          </ol>
+        <div class="illustration illustration-small" style="width:266px;flex-shrink:0;padding:0;border:none;background:none;">
+          <img src="images/chapter6-3.png" alt="CoCo character beside a large LOOP gear meshing with a smaller I gear, ticker tape of letters spilling out" style="width:100%;height:auto;display:block;">
         </div>
       </div>
 

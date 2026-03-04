@@ -308,38 +308,40 @@ TITLE RULE HALT</pre>
         immediately consume it.
       </p>
 
-      <div class="diy">
-        <div class="diy-header">Do-It-Yourself</div>
-        <div class="illustration illustration-small" style="width:266px;height:auto;margin:12px 0 0 16px;padding:0;border:none;background:none;">
-          <img src="images/chapter2-4.png" alt="CoCo character rolling up sleeves with determined expression, green screen glowing behind" style="width:100%;height:auto;display:block;">
+      <div style="display:flex; gap:1.5em; align-items:flex-start;">
+        <div class="diy" style="flex:1;">
+          <div class="diy-header">Do-It-Yourself</div>
+          <div class="diy-body">
+            <ol>
+              <li>
+                Add a third line to the title card — your name, or anything
+                you like. Define a new word for it and call it after
+                <code>RULE</code>.
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                Write a word called <code>BANNER</code> that calls
+                <code>RULE</code>, then <code>TITLE</code>, then
+                <code>RULE</code> again. What does the screen look like?
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                What happens if you call <code>CR</code> before printing
+                anything? Try it and explain the result.
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                Write a word called <code>SPACE</code> that emits a single
+                space character (<code>32 EMIT</code>). Then use
+                <code>SPACE</code> in a word that prints two words with a
+                gap between them.
+                <div class="answer-line"></div>
+              </li>
+            </ol>
+          </div>
         </div>
-        <div class="diy-body">
-          <ol>
-            <li>
-              Add a third line to the title card — your name, or anything
-              you like. Define a new word for it and call it after
-              <code>RULE</code>.
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              Write a word called <code>BANNER</code> that calls
-              <code>RULE</code>, then <code>TITLE</code>, then
-              <code>RULE</code> again. What does the screen look like?
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              What happens if you call <code>CR</code> before printing
-              anything? Try it and explain the result.
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              Write a word called <code>SPACE</code> that emits a single
-              space character (<code>32 EMIT</code>). Then use
-              <code>SPACE</code> in a word that prints two words with a
-              gap between them.
-              <div class="answer-line"></div>
-            </li>
-          </ol>
+        <div class="illustration illustration-small" style="width:266px;flex-shrink:0;padding:0;border:none;background:none;">
+          <img src="images/chapter2-4.png" alt="CoCo character rolling up sleeves with determined expression, green screen glowing behind" style="width:100%;height:auto;display:block;">
         </div>
       </div>
 

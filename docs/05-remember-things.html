@@ -262,41 +262,43 @@ THIS                      \ prints Z</pre>
         </ul>
       </div>
 
-      <div class="diy">
-        <div class="diy-header">Do-It-Yourself</div>
-        <div class="illustration illustration-small" style="width:266px;height:auto;margin:12px 0 0 16px;padding:0;border:none;background:none;">
-          <img src="images/chapter5-3.png" alt="CoCo character writing offset numbers on a row of mailboxes labeled BASE, SCORE, COUNT" style="width:100%;height:auto;display:block;">
+      <div style="display:flex; gap:1.5em; align-items:flex-start;">
+        <div class="diy" style="flex:1;">
+          <div class="diy-header">Do-It-Yourself</div>
+          <div class="diy-body">
+            <ol>
+              <li>
+                Store the offset of the letter <strong>C</strong> in
+                <code>BASE</code>, then call <code>THIS</code>.
+                What prints?
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                Write a word <code>PREV</code> that prints the letter
+                <em>before</em> the stored one. Hint: it's like
+                <code>NEXT</code> but with <code>1 -</code> instead
+                of <code>1 +</code>.
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                Store a letter offset in <code>BASE</code>, then call
+                <code>THIS NEXT THIS</code>. What three letters appear?
+                Why does the middle one differ?
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                Declare a second variable <code>STEP</code>. Store 3
+                in it. Write a word <code>JUMP</code> that prints the
+                letter <code>STEP</code> positions past whatever is
+                in <code>BASE</code>. What does
+                <code>0 BASE ! 3 STEP ! JUMP</code> print?
+                <div class="answer-line"></div>
+              </li>
+            </ol>
+          </div>
         </div>
-        <div class="diy-body">
-          <ol>
-            <li>
-              Store the offset of the letter <strong>C</strong> in
-              <code>BASE</code>, then call <code>THIS</code>.
-              What prints?
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              Write a word <code>PREV</code> that prints the letter
-              <em>before</em> the stored one. Hint: it's like
-              <code>NEXT</code> but with <code>1 -</code> instead
-              of <code>1 +</code>.
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              Store a letter offset in <code>BASE</code>, then call
-              <code>THIS NEXT THIS</code>. What three letters appear?
-              Why does the middle one differ?
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              Declare a second variable <code>STEP</code>. Store 3
-              in it. Write a word <code>JUMP</code> that prints the
-              letter <code>STEP</code> positions past whatever is
-              in <code>BASE</code>. What does
-              <code>0 BASE ! 3 STEP ! JUMP</code> print?
-              <div class="answer-line"></div>
-            </li>
-          </ol>
+        <div class="illustration illustration-small" style="width:266px;flex-shrink:0;padding:0;border:none;background:none;">
+          <img src="images/chapter5-3.png" alt="CoCo character writing offset numbers on a row of mailboxes labeled BASE, SCORE, COUNT" style="width:100%;height:auto;display:block;">
         </div>
       </div>
 

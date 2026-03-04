@@ -253,38 +253,40 @@ MAIN HALT</pre>
         again, and <code>DROP</code> to clean up what you don't.</p>
       </div>
 
-      <div class="diy" style="overflow:hidden">
-        <div class="diy-header">Do-It-Yourself</div>
-        <div class="illustration illustration-small" style="width:266px;height:auto;margin:12px 0 0 16px;padding:0;border:none;background:none;">
-          <img src="images/chapter4-4.png" alt="CoCo character at a whiteboard showing stack manipulation diagrams for DUP, DROP, SWAP, OVER" style="width:100%;height:auto;display:block;">
+      <div style="display:flex; gap:1.5em; align-items:flex-start; overflow:hidden;">
+        <div class="diy" style="flex:1;">
+          <div class="diy-header">Do-It-Yourself</div>
+          <div class="diy-body">
+            <ol>
+              <li>
+                Use <code>DOUBLE</code> to print any letter of your choice
+                doubled. Then try tripling a letter — what stack words do
+                you need?
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                Write a word <code>TRIPLE</code> that prints a letter three
+                times. Hint: <code>DUP DUP</code> leaves three copies on
+                the stack.
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                Use <code>SWAP</code> to print two letters in reverse
+                order. Push A then B, use SWAP, then print both.
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                What would happen if you wrote <code>: MIRROR2 OVER OVER
+                LETTER LETTER LETTER LETTER ;</code>? Work it out on
+                paper first, then try it. (Hint: what does the stack look
+                like after two OVERs?)
+                <div class="answer-line"></div>
+              </li>
+            </ol>
+          </div>
         </div>
-        <div class="diy-body">
-          <ol>
-            <li>
-              Use <code>DOUBLE</code> to print any letter of your choice
-              doubled. Then try tripling a letter — what stack words do
-              you need?
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              Write a word <code>TRIPLE</code> that prints a letter three
-              times. Hint: <code>DUP DUP</code> leaves three copies on
-              the stack.
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              Use <code>SWAP</code> to print two letters in reverse
-              order. Push A then B, use SWAP, then print both.
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              What would happen if you wrote <code>: MIRROR2 OVER OVER
-              LETTER LETTER LETTER LETTER ;</code>? Work it out on
-              paper first, then try it. (Hint: what does the stack look
-              like after two OVERs?)
-              <div class="answer-line"></div>
-            </li>
-          </ol>
+        <div class="illustration illustration-small" style="width:266px;flex-shrink:0;padding:0;border:none;background:none;">
+          <img src="images/chapter4-4.png" alt="CoCo character at a whiteboard showing stack manipulation diagrams for DUP, DROP, SWAP, OVER" style="width:100%;height:auto;display:block;">
         </div>
       </div>
 

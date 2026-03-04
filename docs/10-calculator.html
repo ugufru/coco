@@ -82,7 +82,7 @@
 
       <h2>Reverse Polish Notation</h2>
 
-      <div class="illustration illustration-aside" style="width:293px;height:auto;padding:0;border:none;background:none;">
+      <div class="illustration illustration-aside" style="width:400px;height:auto;padding:0;border:none;background:none;">
         <img src="images/chapter10-2.png" alt="Ordinary vs RPN comparison: 3+4= on the left, 3 ENTER 4 ENTER + on the right with stack" style="width:100%;height:auto;display:block;">
       </div>
 
@@ -249,37 +249,39 @@ CALC HALT</pre>
         <div class="screen">3 4 7<br>2 14<br>14</div>
       </div>
 
-      <div class="diy">
-        <div class="diy-header">Do-It-Yourself</div>
-        <div class="illustration illustration-small" style="width:266px;height:auto;margin:12px 0 0 16px;padding:0;border:none;background:none;">
-          <img src="images/chapter10-3.png" alt="CoCo character at keyboard with stack showing 7, 4, 3 beside the screen" style="width:100%;height:auto;display:block;">
+      <div style="display:flex; gap:1.5em; align-items:flex-start;">
+        <div class="diy" style="flex:1;">
+          <div class="diy-header">Do-It-Yourself</div>
+          <div class="diy-body">
+            <ol>
+              <li>
+                Type <code>3</code>, <code>4</code>, <code>+</code>.
+                What appears? Now type <code>2</code>, <code>*</code>.
+                What do you get?
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                What happens if you type <code>9</code>, <code>3</code>,
+                <code>/</code>? What is the result of integer division?
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                What does <code>C</code> do if you type it when the
+                stack has one value on it? What if you type it when
+                the stack is empty? (Hint: try it.)
+                <div class="answer-line"></div>
+              </li>
+              <li>
+                <code>DISPATCH</code> ignores unrecognised keys.
+                How would you add a <code>D</code> key that duplicates
+                TOS? Write the line you'd add.
+                <div class="answer-line"></div>
+              </li>
+            </ol>
+          </div>
         </div>
-        <div class="diy-body">
-          <ol>
-            <li>
-              Type <code>3</code>, <code>4</code>, <code>+</code>.
-              What appears? Now type <code>2</code>, <code>*</code>.
-              What do you get?
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              What happens if you type <code>9</code>, <code>3</code>,
-              <code>/</code>? What is the result of integer division?
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              What does <code>C</code> do if you type it when the
-              stack has one value on it? What if you type it when
-              the stack is empty? (Hint: try it.)
-              <div class="answer-line"></div>
-            </li>
-            <li>
-              <code>DISPATCH</code> ignores unrecognised keys.
-              How would you add a <code>D</code> key that duplicates
-              TOS? Write the line you'd add.
-              <div class="answer-line"></div>
-            </li>
-          </ol>
+        <div class="illustration illustration-small" style="width:340px;flex-shrink:0;padding:0;border:none;background:none;">
+          <img src="images/chapter10-3.png" alt="CoCo character at keyboard with stack showing 7, 4, 3 beside the screen" style="width:100%;height:auto;display:block;">
         </div>
       </div>
 
