@@ -191,7 +191,7 @@ slot.
 |------|------|------|
 | `chapter6-1.png` | opener | ✅ |
 | `chapter6-2.png` | aside | ✅ |
-| `chapter6-3.png` | small | |
+| `chapter6-3.png` | small | ✅ |
 
 **chapter6-1** (opener)
 CoCo character standing in front of a chalkboard with the letters A through Z written
@@ -216,9 +216,9 @@ the far side like a ticker tape.
 
 | File | Type | Done |
 |------|------|------|
-| `chapter7-1.png` | opener | |
-| `chapter7-2.png` | aside | |
-| `chapter7-3.png` | small | |
+| `chapter7-1.png` | opener | ✅ |
+| `chapter7-2.png` | aside | ✅ |
+| `chapter7-3.png` | small | ✅ |
 
 **chapter7-1** (opener)
 CoCo character standing at a fork in the road. One path is labeled PASS and leads
@@ -243,9 +243,9 @@ decision.
 
 | File | Type | Done |
 |------|------|------|
-| `chapter8-1.png` | opener | |
-| `chapter8-2.png` | aside | |
-| `chapter8-3.png` | small | |
+| `chapter8-1.png` | opener | ✅ |
+| `chapter8-2.png` | aside | ✅ |
+| `chapter8-3.png` | small | ✅ |
 
 **chapter8-1** (opener)
 CoCo character sitting at the keyboard with one finger hovering over the Y key. The
@@ -279,9 +279,9 @@ it.
 
 | File | Type | Done |
 |------|------|------|
-| `chapter10-1.png` | opener | |
-| `chapter10-2.png` | aside | |
-| `chapter10-3.png` | small | |
+| `chapter10-1.png` | opener | ✅ |
+| `chapter10-2.png` | aside | ✅ |
+| `chapter10-3.png` | small | ✅ |
 
 **chapter10-1** (opener)
 CoCo character standing beside a large hand-held calculator, but it has no equals key —
@@ -305,7 +305,7 @@ calculator works!
 
 | File | Type | Done |
 |------|------|------|
-| `chapter11-1.png` | opener | |
+| `chapter11-1.png` | opener | ✅ |
 
 **chapter11-1** (opener)
 The CoCo screen drawn as a 32×16 grid of numbered cells, like graph paper. The CoCo
@@ -319,7 +319,7 @@ cell. Expression: proud and precise.
 
 | File | Type | Done |
 |------|------|------|
-| `chapter12-1.png` | opener | |
+| `chapter12-1.png` | opener | ✅ |
 
 **chapter12-1** (opener)
 CoCo character with a mischievous grin, hiding a number card (showing "7") behind its
@@ -332,7 +332,7 @@ beside "GUESS: ". The character's expression says "I know something you don't."
 
 | File | Type | Done |
 |------|------|------|
-| `chapter13-1.png` | opener | |
+| `chapter13-1.png` | opener | ✅ |
 
 **chapter13-1** (opener)
 CoCo character on a workbench beside a real Color Computer, triumphantly pressing a
