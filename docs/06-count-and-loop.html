@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 6: Count and Loop — Getting Started with Bare Naked Forth</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page">
+
+    <!-- Chapter opener -->
+    <div class="chapter-opener">
+      <div class="illustration illustration-opener" style="padding:0;border:none;background:none;">
+        <img src="images/chapter6-1.png" alt="CoCo character at a chalkboard with A through Z written in a row, looping arrow below, counter labeled 26" style="width:100%;height:100%;object-fit:cover;display:block;">
+      </div>
+      <div class="chapter-label">CHAPTER 6</div>
+      <div class="chapter-title">Count and Loop</div>
+      <div class="chapter-green-bar"></div>
+    </div>
+
+    <!-- Page 1 -->
+    <div class="page-header">
+      <span>COUNT AND LOOP</span>
+      <span>1</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>The Repetition Problem</h2>
+
+      <p>
+        Suppose you want to print every letter from A to Z. With
+        what you know so far, you'd write:
+      </p>
+
+<pre class="forth">: LETTER  CHAR A + EMIT ;
+
+0 LETTER  1 LETTER  2 LETTER  3 LETTER
+4 LETTER  5 LETTER  6 LETTER  7 LETTER
+...</pre>
+
+      <p>
+        That's 26 separate calls — and if you change your mind about
+        which letters to print, you change 26 lines. There has to be
+        a better way.
+      </p>
+
+      <p>
+        The better way is a <strong>counted loop</strong>. You give
+        it a start and an end, and it repeats the body automatically,
+        giving you a fresh index each time.
+      </p>
+
+      <h2>DO … LOOP — Counted Repetition</h2>
+
+      <div class="illustration illustration-aside" style="width:220px;height:auto;padding:0;border:none;background:none;">
+        <img src="images/chapter6-2.png" alt="Conveyor belt with bins numbered 0 through 4, robotic arm above performing the same action, counter advancing" style="width:100%;height:auto;display:block;">
+      </div>
+
+      <p>
+        The basic form is:
+      </p>
+
+<pre class="forth">limit start DO  <em>body</em>  LOOP</pre>
+
+      <p>
+        <code>DO</code> pops <em>limit</em> and <em>start</em> from
+        the stack. The body runs once for each value from
+        <em>start</em> up to — but not including — <em>limit</em>.
+        <code>LOOP</code> increments the counter and either branches
+        back or falls through.
+      </p>
+
+      <div class="rule-box">
+        <h3>limit start DO &nbsp;<em>body</em>&nbsp; LOOP</h3>
+        <p>Run <em>body</em> for index = start, start+1, …, limit−1.
+        The loop ends when the index reaches <em>limit</em>.</p>
+      </div>
+
+      <p>
+        To print the first five letters:
+      </p>
+
+<pre class="forth">: LETTER  CHAR A + EMIT ;
+
+5 0 DO  I LETTER  LOOP</pre>
+
+      <p>
+        This runs the body five times with index 0, 1, 2, 3, 4 —
+        printing A, B, C, D, E.
+      </p>
+
+      <h2>I — The Loop Index</h2>
+
+      <p>
+        Inside a <code>DO … LOOP</code>, the word <code>I</code>
+        copies the current loop index onto the data stack. It
+        doesn't consume anything — it just lets the body
+        <em>see</em> which iteration is running.
+      </p>
+
+      <div class="rule-box">
+        <h3>I &nbsp;<span style="font-weight:normal; font-size:0.85em;">( -- n )</span></h3>
+        <p>Push the current loop index. Valid only inside a
+        <code>DO … LOOP</code>.</p>
+      </div>
+
+      <p>
+        Because <code>I</code> pushes a number, you can use it in
+        any arithmetic expression — add it to a base character code,
+        subtract it from a limit, or pass it to any word that
+        expects a number.
+      </p>
+
+      <div class="tip">
+        <p><code>I</code> is read-only. You can look at the loop
+        counter but you can't change it from inside the loop body.
+        The counter always advances by exactly 1 each time
+        <code>LOOP</code> executes.</p>
+      </div>
+
+    </div>
+
+    <!-- Page 2 -->
+    <div class="page-header">
+      <span>COUNT AND LOOP</span>
+      <span>2</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>Stack Trace: 5 0 DO I LETTER LOOP</h2>
+
+      <p>
+        Let's trace the first two iterations of
+        <code>5 0 DO I LETTER LOOP</code>:
+      </p>
+
+      <table style="border-collapse: collapse; margin: 1.2em 2em; font-family: 'Courier New', Courier, monospace; font-size: 0.88em;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--green);">
+            <th style="padding: 6px 20px 6px 0; text-align: left; font-family: Georgia, serif;">Step</th>
+            <th style="padding: 6px 20px 6px 0; text-align: left; font-family: Georgia, serif;">Data stack</th>
+            <th style="padding: 6px 0; text-align: left; font-family: Georgia, serif;">Loop index</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style="padding: 5px 20px 5px 0;">5 0</td>          <td style="padding: 5px 20px 5px 0;">( 0 5 )</td>  <td style="padding: 5px 0;">—</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">DO</td>           <td style="padding: 5px 20px 5px 0;">( )</td>      <td style="padding: 5px 0;">0</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">I</td>            <td style="padding: 5px 20px 5px 0;">( 0 )</td>    <td style="padding: 5px 0;">0</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">LETTER → emits A</td><td style="padding: 5px 20px 5px 0;">( )</td>  <td style="padding: 5px 0;">0</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">LOOP → index++</td><td style="padding: 5px 20px 5px 0;">( )</td>    <td style="padding: 5px 0;">1</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">I</td>            <td style="padding: 5px 20px 5px 0;">( 1 )</td>    <td style="padding: 5px 0;">1</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">LETTER → emits B</td><td style="padding: 5px 20px 5px 0;">( )</td>  <td style="padding: 5px 0;">1</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">LOOP → index++</td><td style="padding: 5px 20px 5px 0;">( )</td>    <td style="padding: 5px 0;">2</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">&hellip;</td>     <td style="padding: 5px 20px 5px 0;">&hellip;</td><td style="padding: 5px 0;">&hellip;</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">LOOP (index=5)</td><td style="padding: 5px 20px 5px 0;">( )</td>    <td style="padding: 5px 0;">done</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        When <code>LOOP</code> increments the index to 5, it equals
+        the limit, so the loop exits. Five letters print, then
+        execution continues after <code>LOOP</code>.
+      </p>
+
+      <h2>ALPHA — Print the Full Alphabet</h2>
+
+      <p>
+        With a limit of 26:
+      </p>
+
+<pre class="forth">: ALPHA   26 0 DO  I LETTER  LOOP ;</pre>
+
+      <p>
+        The body runs with index 0, 1, 2, … 25.
+        <code>I LETTER</code> adds the index to
+        <code>CHAR A</code> (65) and emits the result:
+        A (65), B (66), … Z (90). One definition; 26 letters.
+      </p>
+
+      <h2>Offset Arithmetic with I</h2>
+
+      <p>
+        Because <code>I</code> puts a plain number on the stack,
+        you can do arithmetic on it. To print Z down to A, count the
+        offsets from the other end:
+      </p>
+
+<pre class="forth">: BACKW   26 0 DO  25 I - LETTER  LOOP ;</pre>
+
+      <p>
+        When <code>I</code> is 0: <code>25 - 0 = 25</code> → Z.<br>
+        When <code>I</code> is 1: <code>25 - 1 = 24</code> → Y.<br>
+        When <code>I</code> is 25: <code>25 - 25 = 0</code> → A.
+      </p>
+
+      <p>
+        The key is stack order: <code>25</code> is pushed first, so
+        it sits below <code>I</code>. The word <code>-</code>
+        computes NOS&minus;TOS, which is <code>25 - I</code>.
+      </p>
+
+      <div class="tip">
+        <p>Keep track of which value is TOS and which is NOS before
+        a subtract. <code>25 I -</code> gives 25&minus;I.
+        <code>I 25 -</code> would give I&minus;25 — a negative
+        number that would wrap around the character table.</p>
+      </div>
+
+    </div>
+
+    <!-- Page 3 -->
+    <div class="page-header">
+      <span>COUNT AND LOOP</span>
+      <span>3</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>Chapter Program</h2>
+
+<pre class="forth">\ Chapter 6 example — Count and Loop
+
+: LETTER  CHAR A + EMIT ;
+
+: ALPHA   26 0 DO  I LETTER       LOOP ;   \ A→Z
+: BACKW   26 0 DO  25 I - LETTER  LOOP ;   \ Z→A
+
+: MAIN
+  ALPHA CR
+  BACKW CR ;
+
+MAIN HALT</pre>
+
+      <div class="screen-wrap">
+        <div class="screen-label">Your CoCo's screen:</div>
+        <div class="screen">ABCDEFGHIJKLMNOPQRSTUVWXYZ<br>ZYXWVUTSRQPONMLKJIHGFEDCBA</div>
+      </div>
+
+      <p>
+        Two lines, each produced by a single word call. No manual
+        repetition; the loop does all the work.
+      </p>
+
+      <div class="diy">
+        <div class="diy-header">Do-It-Yourself</div>
+        <div class="illustration illustration-small" style="margin: 12px 0 0 16px;">
+          <span class="ill-label">Illustration</span>
+          CoCo character kneeling beside a large gear labeled "LOOP",
+          adjusting its teeth with a wrench. The gear meshes with a
+          smaller gear labeled "I". Output letters spill out from the
+          far side like a ticker tape.
+        </div>
+        <div class="diy-body">
+          <ol>
+            <li>
+              Change the limit from 26 to 5 in <code>ALPHA</code>.
+              What five letters print?
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              Write <code>BACKW</code> yourself before looking at the
+              example. What does <code>25 I -</code> compute when
+              <code>I</code> is 10?
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              Print the alphabet twice in a row. One approach: call
+              <code>ALPHA</code> twice inside <code>MAIN</code>.
+              Another: change the limit and use math on
+              <code>I</code>. Try both.
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              What happens if you write <code>0 0 DO I LETTER LOOP</code>?
+              Think about it first — does the body run once, or never?
+              <div class="answer-line"></div>
+            </li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- Learned in this chapter -->
+      <div class="learned">
+        <div class="learned-header">Learned in Chapter 6</div>
+        <div class="learned-cols">
+          <div class="learned-col">
+            <h4>Forth Words</h4>
+            <dl>
+              <dt>DO</dt>
+              <dd>( limit start -- ) begin counted loop</dd>
+              <dt>LOOP</dt>
+              <dd>( -- ) increment index, branch back or exit</dd>
+              <dt>I</dt>
+              <dd>( -- n ) push current loop index</dd>
+            </dl>
+          </div>
+          <div class="learned-col">
+            <h4>Patterns</h4>
+            <p><code>n 0 DO … LOOP</code> for 0-based count</p>
+            <p><code>I</code> as an offset into a table or alphabet</p>
+            <p>Arithmetic on <code>I</code> to reverse or scale</p>
+            <p>Combining loops with word definitions</p>
+          </div>
+          <div class="learned-col">
+            <h4>Concepts</h4>
+            <p>Loop runs from start up to (not including) limit</p>
+            <p>Index lives on the return stack, not data stack</p>
+            <p><code>I</code> copies it; the loop still advances</p>
+            <p>One loop = many repetitions with one definition</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="notes">
+        <div class="notes-label">Notes:</div>
+        <div class="notes-lines">
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="nav">
+      <a href="05-remember-things.html">← Chapter 5: Remember Things</a>
+      <span class="spacer"></span>
+      <a href="07-decisions.html">Chapter 7: Decisions →</a>
+    </div>
+
+  </div>
+</body>
+</html>

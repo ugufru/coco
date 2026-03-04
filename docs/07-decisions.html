@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 7: Decisions — Getting Started with Bare Naked Forth</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page">
+
+    <!-- Chapter opener -->
+    <div class="chapter-opener">
+      <div class="illustration illustration-opener">
+        <span class="ill-label">Illustration</span>
+        CoCo character standing at a fork in the road. One path is
+        labeled PASS and leads uphill into sunshine; the other is
+        labeled FAIL and leads downward into shadow. The character
+        holds a sign reading "50?" and looks thoughtful, as if
+        weighing the score against the threshold. A small stack of
+        numbers is visible beside the character.
+      </div>
+      <div class="chapter-label">CHAPTER 7</div>
+      <div class="chapter-title">Decisions</div>
+      <div class="chapter-green-bar"></div>
+    </div>
+
+    <!-- Page 1 -->
+    <div class="page-header">
+      <span>DECISIONS</span>
+      <span>1</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>The Branching Problem</h2>
+
+      <p>
+        So far every word you've written runs the same way every
+        time. But useful programs need to <em>choose</em>: print
+        PASS if the score is high enough, print FAIL if it isn't.
+        That choice depends on a value on the stack, and it changes
+        the path of execution.
+      </p>
+
+      <p>
+        Forth gives you a single, clean mechanism for this:
+        <strong>IF … THEN</strong>. Before you can use it, you
+        need a way to produce the yes/no value it acts on.
+      </p>
+
+      <h2>Comparison Words</h2>
+
+      <div class="illustration illustration-aside">
+        <span class="ill-label">Illustration</span>
+        Two numbered blocks sitting on a balance scale. The left
+        block reads "n1", the right reads "n2". A flag — a small
+        triangular banner — hangs from the fulcrum. When n1 is
+        lighter (smaller) the flag reads TRUE; otherwise FALSE.
+        Simple, schematic, no decoration.
+      </div>
+
+      <p>
+        These words each consume two numbers and push a single
+        result called a <em>flag</em>:
+      </p>
+
+      <div class="rule-box">
+        <h3>= &nbsp;&lt;&gt; &nbsp;&lt; &nbsp;&gt;</h3>
+        <p>( n1 n2 -- flag )<br>
+        Compare n1 and n2. Push −1 (true) if the relationship
+        holds; push 0 (false) otherwise.</p>
+      </div>
+
+      <p>
+        A few quick examples at the top level — no definition needed:
+      </p>
+
+<pre class="forth">3 3 =     \ flag = -1  (true — they're equal)
+3 5 =     \ flag = 0   (false)
+3 5 &lt;     \ flag = -1  (true — 3 is less than 5)
+5 3 &lt;     \ flag = 0   (false)
+5 3 &gt;     \ flag = -1  (true — 5 is greater than 3)</pre>
+
+      <h2>True and False in Forth</h2>
+
+      <p>
+        Forth uses numbers as flags: <strong>0 means false</strong>,
+        <strong>−1 ($FFFF) means true</strong>. There is nothing
+        special about these values — they're just 16-bit integers.
+        Any non-zero value is treated as true by <code>IF</code>,
+        but the comparison words always produce exactly 0 or −1.
+      </p>
+
+      <div class="tip">
+        <p>−1 in 16-bit two's complement is $FFFF — all bits set.
+        This is a useful property: <code>AND</code> with −1 leaves
+        a value unchanged; <code>AND</code> with 0 clears it.
+        Forth exploits this in bitmasking idioms.</p>
+      </div>
+
+      <h2>IF … THEN — Simple Branch</h2>
+
+      <p>
+        The simplest decision structure runs a block of words only
+        when the flag is true (non-zero):
+      </p>
+
+<pre class="forth">flag IF  <em>true-words</em>  THEN</pre>
+
+      <div class="rule-box">
+        <h3>IF &nbsp;<em>true-words</em>&nbsp; THEN</h3>
+        <p>Pops the flag. If non-zero, runs <em>true-words</em>
+        then continues after THEN. If zero, skips to THEN
+        immediately.</p>
+      </div>
+
+      <p>
+        A word that prints a message only when the score is under 50:
+      </p>
+
+<pre class="forth">: WARN   50 &lt; IF  CHAR L EMIT CHAR O EMIT CHAR W EMIT  THEN ;</pre>
+
+      <p>
+        <code>80 WARN</code> — 80 &lt; 50 is false (0), so IF skips
+        to THEN; nothing prints.<br>
+        <code>42 WARN</code> — 42 &lt; 50 is true (−1), so IF runs
+        the body; LOW prints.
+      </p>
+
+    </div>
+
+    <!-- Page 2 -->
+    <div class="page-header">
+      <span>DECISIONS</span>
+      <span>2</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>Stack Trace: 42 50 &lt; IF .FAIL THEN</h2>
+
+      <p>
+        Let's trace through a call to <code>GRADE</code> with 42,
+        where GRADE contains <code>50 &lt; IF .FAIL THEN</code>:
+      </p>
+
+      <table style="border-collapse: collapse; margin: 1.2em 2em; font-family: 'Courier New', Courier, monospace; font-size: 0.88em;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--green);">
+            <th style="padding: 6px 20px 6px 0; text-align: left; font-family: Georgia, serif;">Step</th>
+            <th style="padding: 6px 0; text-align: left; font-family: Georgia, serif;">Data stack</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style="padding: 5px 20px 5px 0;">42 (argument)</td>   <td style="padding: 5px 0;">( 42 )</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">50 (literal)</td>    <td style="padding: 5px 0;">( 50 42 )</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">&lt; → 42&lt;50 true</td><td style="padding: 5px 0;">( -1 )</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">IF → flag non-zero</td><td style="padding: 5px 0;">( )</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">.FAIL → prints FAIL</td><td style="padding: 5px 0;">( )</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">THEN → continues</td><td style="padding: 5px 0;">( )</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        Now with 80: <code>&lt;</code> produces 0 (false), so
+        <code>IF</code> skips over <code>.FAIL</code> and jumps
+        directly to <code>THEN</code>. Nothing prints.
+      </p>
+
+      <h2>IF … ELSE … THEN — Both Paths</h2>
+
+      <p>
+        When you want one thing to happen for true <em>and</em>
+        a different thing for false, add an <code>ELSE</code>:
+      </p>
+
+<pre class="forth">flag IF  <em>true-words</em>  ELSE  <em>false-words</em>  THEN</pre>
+
+      <div class="rule-box">
+        <h3>IF &nbsp;<em>true-words</em>&nbsp; ELSE &nbsp;<em>false-words</em>&nbsp; THEN</h3>
+        <p>Pops the flag. If non-zero, runs <em>true-words</em>
+        and skips <em>false-words</em>. If zero, skips to
+        <em>false-words</em>. Either way, continues after
+        THEN.</p>
+      </div>
+
+<pre class="forth">: GRADE  ( score -- )
+  50 &lt; IF .FAIL ELSE .PASS THEN ;</pre>
+
+      <p>
+        Exactly one of the two branches runs; control always
+        reaches THEN afterward.
+      </p>
+
+      <h2>0= — Test for Zero</h2>
+
+      <p>
+        <code>0=</code> flips the flag in-place: it pushes −1 if
+        the top of stack is zero, or 0 if it's anything else.
+      </p>
+
+      <div class="rule-box">
+        <h3>0= &nbsp;<span style="font-weight:normal; font-size:0.85em;">( n -- flag )</span></h3>
+        <p>Push −1 if n is zero, else push 0. Useful for
+        testing equality-to-zero without a literal.</p>
+      </div>
+
+<pre class="forth">0 0=   \ -1  (true — zero is zero)
+5 0=   \ 0   (false — 5 is not zero)</pre>
+
+      <p>
+        <code>0=</code> also turns any non-zero truth value into
+        a canonical 0, and a 0 into −1 — so it's a logical NOT
+        for Forth flags.
+      </p>
+
+      <div class="tip">
+        <p>IFs can be nested. The inner THEN closes the inner IF;
+        the outer THEN closes the outer IF. Keep nesting shallow
+        to stay readable — if you find yourself three levels deep,
+        consider breaking things into named words.</p>
+      </div>
+
+    </div>
+
+    <!-- Page 3 -->
+    <div class="page-header">
+      <span>DECISIONS</span>
+      <span>3</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>Chapter Program</h2>
+
+<pre class="forth">\ Chapter 7 example — Decisions
+
+: .PASS   CHAR P EMIT CHAR A EMIT CHAR S EMIT CHAR S EMIT ;
+: .FAIL   CHAR F EMIT CHAR A EMIT CHAR I EMIT CHAR L EMIT ;
+
+: GRADE  ( score -- )
+  50 &lt; IF .FAIL ELSE .PASS THEN ;
+
+: MAIN
+  80 GRADE CR
+  42 GRADE CR
+  50 GRADE CR ;
+
+MAIN HALT</pre>
+
+      <div class="screen-wrap">
+        <div class="screen-label">Your CoCo's screen:</div>
+        <div class="screen">PASS<br>FAIL<br>PASS</div>
+      </div>
+
+      <p>
+        80 &lt; 50 is false → PASS.<br>
+        42 &lt; 50 is true &nbsp;→ FAIL.<br>
+        50 &lt; 50 is false → PASS.
+      </p>
+
+      <div class="diy">
+        <div class="diy-header">Do-It-Yourself</div>
+        <div class="illustration illustration-small" style="margin: 12px 0 0 16px;">
+          <span class="ill-label">Illustration</span>
+          CoCo character holding a stack of numbered cards, sorting
+          them into two piles: one labeled Y, the other N. A large
+          question mark floats above as if waiting for the decision.
+        </div>
+        <div class="diy-body">
+          <ol>
+            <li>
+              Change the passing threshold from 50 to 70. What does
+              <code>65 GRADE</code> print now?
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              Write <code>POSITIVE?</code> — prints <code>Y</code>
+              if n &gt; 0, <code>N</code> otherwise. What does
+              <code>0 POSITIVE?</code> print?
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              Combine loops and decisions: loop 0 to 9, printing
+              <code>L</code> for values &lt; 5 and <code>H</code>
+              for the rest. What does the output look like?
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              What is the Forth value for "true"? Is any non-zero
+              number treated as true or false by <code>IF</code>?
+              <div class="answer-line"></div>
+            </li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- Learned in this chapter -->
+      <div class="learned">
+        <div class="learned-header">Learned in Chapter 7</div>
+        <div class="learned-cols">
+          <div class="learned-col">
+            <h4>Forth Words</h4>
+            <dl>
+              <dt>=</dt>
+              <dd>( n1 n2 -- flag ) true if equal</dd>
+              <dt>&lt;&gt;</dt>
+              <dd>( n1 n2 -- flag ) true if not equal</dd>
+              <dt>&lt;</dt>
+              <dd>( n1 n2 -- flag ) true if n1 &lt; n2</dd>
+              <dt>&gt;</dt>
+              <dd>( n1 n2 -- flag ) true if n1 &gt; n2</dd>
+              <dt>0=</dt>
+              <dd>( n -- flag ) true if zero</dd>
+              <dt>IF … THEN</dt>
+              <dd>branch on flag</dd>
+              <dt>IF … ELSE … THEN</dt>
+              <dd>two-way branch</dd>
+            </dl>
+          </div>
+          <div class="learned-col">
+            <h4>Patterns</h4>
+            <p><code>n limit &lt; IF … THEN</code> for threshold test</p>
+            <p><code>IF … ELSE … THEN</code> for two paths</p>
+            <p><code>0=</code> as logical NOT</p>
+            <p>Nested IFs for multi-way decisions</p>
+          </div>
+          <div class="learned-col">
+            <h4>Concepts</h4>
+            <p>True = −1 ($FFFF); False = 0</p>
+            <p>Any non-zero value is true to IF</p>
+            <p>Comparisons consume two values, push one flag</p>
+            <p>THEN marks where both branches rejoin</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="notes">
+        <div class="notes-label">Notes:</div>
+        <div class="notes-lines">
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="nav">
+      <a href="06-count-and-loop.html">← Chapter 6: Count and Loop</a>
+      <span class="spacer"></span>
+      <a href="08-read-the-keyboard.html">Chapter 8: Read the Keyboard →</a>
+    </div>
+
+  </div>
+</body>
+</html>

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About Forth — Getting Started with Forth</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page">
+
+    <div class="chapter-opener">
+      <div class="illustration illustration-opener">
+        <span class="ill-label">Illustration</span>
+        CoCo character in an astronomer's coat, standing at a large
+        vintage radio telescope dish, clipboard in hand, night sky behind.
+        Small Forth code snippets float in the air around the dish.
+      </div>
+      <div class="chapter-label">BACKGROUND</div>
+      <div class="chapter-title">About Forth</div>
+      <div class="chapter-green-bar"></div>
+    </div>
+
+    <div class="page-header">
+      <span>ABOUT FORTH</span>
+      <span></span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>Where Forth Came From</h2>
+
+      <p>
+        Forth was invented in the late 1960s by Charles Moore, a programmer
+        at the National Radio Astronomy Observatory. He needed a language
+        small enough to run on the modest computers of the day, expressive
+        enough to talk directly to telescopes, and fast enough to be useful
+        in real time. He built it himself, and named it FOURTH — meaning
+        fourth-generation language. The operating system of the time limited
+        filenames to five characters. It became FORTH.
+      </p>
+
+      <p>
+        The language spread quickly through the 1970s because it solved a
+        real problem: it was tiny, fast, and could be made to run on almost
+        any hardware in a matter of days. FORTH Inc. commercialised it in
+        1976, and implementations appeared for the Intel 8080, Motorola
+        6800, and Zilog Z80. By the early 1980s, there were Forth systems
+        for nearly every microcomputer that existed — including the CoCo.
+      </p>
+
+      <div class="tip">
+        <p>Electronic Arts shipped several games written in Forth in the
+        1980s, including <em>Starflight</em> (1986) and <em>Adventure
+        Construction Set</em> (1984). Forth was everywhere.</p>
+      </div>
+
+      <h2>Forth's Unusual Philosophy</h2>
+
+      <p>
+        Most languages compile your source code into a binary, and that
+        binary runs on the machine. Forth is different: the compiler, the
+        editor, the runtime, and your program all live together in the same
+        environment, on the target machine. You type a word definition at a
+        prompt, and Forth compiles it immediately — into the same dictionary
+        where all the other words live. The system extends itself.
+      </p>
+
+      <p>
+        This philosophy — the language compiling itself, on the machine
+        you're programming — is why Forth has a devoted following fifty
+        years later. It's intimate in a way that most programming
+        environments are not. You are always one step from the hardware.
+      </p>
+
+      <h2>Forth in the Real World</h2>
+
+      <p>
+        Forth has turned up in some surprising places:
+      </p>
+
+      <ul>
+        <li>
+          <strong>OpenFirmware</strong> — an IEEE standard boot environment
+          written in Forth, used as the boot ROM in Apple PowerPC Macs, Sun
+          workstations, IBM POWER machines, and the OLPC XO laptop. Every
+          time a PowerPC Mac started up, Forth ran first.
+        </li>
+        <li>
+          <strong>Philae</strong> — the ESA comet lander that touched down
+          on Comet 67P in 2014 ran Forth in its onboard systems.
+        </li>
+        <li>
+          <strong>Embedded systems</strong> — Forth remains genuinely used
+          in aerospace, industrial control, and safety-critical applications
+          where determinism and tiny footprint matter.
+        </li>
+        <li>
+          <strong>Today</strong> — GForth (GNU Forth) is actively
+          maintained. Mecrisp is popular on ARM Cortex-M microcontrollers.
+          The retro computing community runs Forth on 8-bit machines for
+          the same reasons Moore did in 1969: it fits, it's fast, and
+          it's close to the metal.
+        </li>
+      </ul>
+
+      <h2>How This Forth Is Different</h2>
+
+      <p>
+        Traditional Forth is self-hosted: the compiler lives on the target
+        machine, the dictionary lives in RAM, and you interact with the
+        system directly. That's elegant, but it requires RAM for the
+        dictionary, ROM or disk for the compiler, and some kind of input
+        loop to drive it all. On a stock CoCo, that means a disk drive,
+        an OS, and a Forth system large enough to include its own editor
+        and compiler.
+      </p>
+
+      <p>
+        This project takes a different approach. Instead of running the
+        Forth compiler on the CoCo, we run it on a modern machine — your
+        Mac or Linux computer. You write Forth source in a plain text file.
+        The cross-compiler (<code>fc.py</code>) compiles it into
+        <strong>threaded bytecode</strong>: a compact binary where every
+        word reference is a 2-byte address pointing into the kernel's
+        dispatch table. That binary is loaded onto the CoCo, where a small
+        kernel — roughly 100 bytes of 6809 assembly — executes it.
+      </p>
+
+      <div class="rule-box">
+        <h3>The Key Distinction</h3>
+        <p>
+          Traditional Forth: compiler on the target, dictionary in RAM,
+          interactive at the prompt.
+        </p>
+        <p>
+          This Forth: compiler on the host, no dictionary on the target,
+          pure execution only.
+        </p>
+        <p>
+          The CoCo never sees source text. It only ever executes the
+          compiled result.
+        </p>
+      </div>
+
+      <p>
+        This is sometimes called <strong>token-threaded</strong> Forth in
+        the literature. Word references in the compiled binary are tokens —
+        fixed addresses in a kernel dispatch table — rather than
+        self-describing dictionary entries. It's closer in spirit to how a
+        JVM or Lua bytecode VM works than to how traditional Forth works.
+      </p>
+
+      <p>
+        The trade-off is deliberate. You lose the interactive REPL and the
+        self-extending dictionary. You gain a system that needs no OS, no
+        disk, and no RAM beyond what your program actually uses. The entire
+        runtime fits on a ROM cartridge. Plug it in, load your program,
+        run it.
+      </p>
+
+      <h2>Why the 6809?</h2>
+
+      <p>
+        The Motorola 6809 is an unusually good fit for Forth. Traditional
+        Forth needs two stacks: a data stack for working values, and a
+        return stack for tracking word calls. Most processors have one
+        hardware stack and have to fake the second in software.
+      </p>
+
+      <p>
+        The 6809 has two hardware stack pointers: <code>S</code> and
+        <code>U</code>. They map directly onto Forth's return stack and
+        data stack. Nothing is faked. The 6809 was practically designed
+        for this, which is why Forth runs on it so naturally — and why
+        the kernel is so small.
+      </p>
+
+    </div>
+
+    <div class="nav">
+      <a href="index.html">← Table of Contents</a>
+      <span class="spacer"></span>
+      <a href="01-meet-your-stack.html">Chapter 1: Meet Your Stack →</a>
+    </div>
+
+  </div>
+</body>
+</html>

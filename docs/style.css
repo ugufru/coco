@@ -1,0 +1,605 @@
+/*
+ * Getting Started with Bare Naked Forth — Stylesheet
+ * Style reference: Getting Started with Color BASIC (Tandy, 1980)
+ */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --green:       #3c6e3c;
+  --green-light: #edf4ed;
+  --green-dark:  #2a4d2a;
+  --green-solid: #4a7d4a;
+  --text:        #1a1a1a;
+  --screen-bg:   #0d1f0d;
+  --screen-fg:   #6fcf6f;
+}
+
+body {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--text);
+  background: #e8e4de;
+  margin: 0;
+  padding: 20px 0 60px;
+}
+
+/* ── Page wrapper ──────────────────────────────────────────────────────── */
+
+.page {
+  max-width: 1100px;
+  background: #fff;
+  margin: 0 auto;
+  min-height: 100vh;
+}
+
+/* ── Running page header (content pages) ──────────────────────────────── */
+
+.page-header {
+  border-top: 3px solid var(--green);
+  padding: 8px 64px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-style: italic;
+  font-size: 0.82em;
+  color: var(--green-dark);
+  margin-bottom: 0;
+}
+
+/* ── Page content area ─────────────────────────────────────────────────── */
+
+.content {
+  padding: 28px 64px 48px;
+}
+
+/* ── Chapter opener ────────────────────────────────────────────────────── */
+
+.chapter-opener {
+  padding: 36px 64px 0;
+  min-height: 280px;
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  grid-template-rows: auto auto 1fr auto;
+}
+
+.chapter-label {
+  font-style: italic;
+  font-size: 0.88em;
+  color: #555;
+  letter-spacing: 0.04em;
+  margin-bottom: 18px;
+}
+
+.chapter-title {
+  font-size: 2.5em;
+  font-weight: bold;
+  color: var(--text);
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.chapter-subtitle {
+  font-size: 1.15em;
+  font-style: italic;
+  color: #555;
+  margin-top: 10px;
+}
+
+.chapter-green-bar {
+  grid-column: 1 / 3;
+  background: var(--green-solid);
+  min-height: 72px;
+  margin-top: 20px;
+}
+
+/* ── Section headings ──────────────────────────────────────────────────── */
+
+h2 {
+  font-size: 1.2em;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: var(--text);
+  margin: 2.2em 0 0.7em;
+  letter-spacing: 0.03em;
+}
+
+h3 {
+  font-size: 1em;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: var(--text);
+  margin: 1.8em 0 0.5em;
+  letter-spacing: 0.03em;
+}
+
+/* ── Body text ─────────────────────────────────────────────────────────── */
+
+p {
+  margin-bottom: 1.1em;
+}
+
+ul, ol {
+  padding-left: 1.8em;
+  margin-bottom: 1.1em;
+}
+
+li {
+  margin-bottom: 0.35em;
+}
+
+/* ── Inline code ───────────────────────────────────────────────────────── */
+
+code {
+  font-family: "Courier New", Courier, monospace;
+  font-weight: bold;
+  font-size: 0.94em;
+}
+
+/* ── Forth source listing ──────────────────────────────────────────────── */
+
+pre.forth {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.9em;
+  background: var(--green-light);
+  border-left: 4px solid var(--green);
+  padding: 14px 18px;
+  margin: 1.3em 2em 1.3em;
+  line-height: 1.5;
+  text-transform: uppercase;
+}
+
+/* ── Shell / command listing ───────────────────────────────────────────── */
+
+pre.shell {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.88em;
+  background: #1a1a1a;
+  color: #e0e0e0;
+  padding: 14px 18px;
+  margin: 1.3em 2em 1.3em;
+  line-height: 1.5;
+}
+
+pre.shell .prompt { color: #6fcf6f; }
+pre.shell .comment { color: #888; }
+
+/* ── CoCo screen output ────────────────────────────────────────────────── */
+
+.screen-wrap {
+  margin: 1.5em 2em;
+}
+
+.screen-label {
+  font-size: 0.75em;
+  font-style: italic;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.screen {
+  background: var(--screen-bg);
+  color: var(--screen-fg);
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.88em;
+  line-height: 1.4;
+  padding: 16px 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  min-height: 48px;
+}
+
+/* ── Stack diagram ─────────────────────────────────────────────────────── */
+
+.stack-effect {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.9em;
+  background: var(--green-light);
+  border: 1px solid var(--green);
+  display: inline-block;
+  padding: 1px 8px;
+  margin: 0 2px;
+}
+
+/* ── Tip / sidebar callout ─────────────────────────────────────────────── */
+
+.tip {
+  float: right;
+  clear: right;
+  width: 196px;
+  border: 2px dashed var(--green);
+  padding: 11px 13px;
+  margin: 4px 0 18px 22px;
+  font-style: italic;
+  font-size: 0.82em;
+  line-height: 1.55;
+  color: var(--green-dark);
+}
+
+.tip p { margin-bottom: 0.45em; }
+.tip p:last-child { margin-bottom: 0; }
+
+/* ── Warning / bug callout ─────────────────────────────────────────────── */
+
+.warning {
+  background: var(--green-light);
+  border-left: 4px solid var(--green-solid);
+  padding: 11px 14px;
+  margin: 1.3em 0;
+  font-size: 0.88em;
+  line-height: 1.55;
+}
+
+.warning strong {
+  text-transform: uppercase;
+  font-size: 0.9em;
+  letter-spacing: 0.06em;
+}
+
+/* ── Rules box ─────────────────────────────────────────────────────────── */
+
+.rule-box {
+  border: 2px dashed var(--green);
+  padding: 16px 22px;
+  margin: 2em auto;
+  max-width: 680px;
+}
+
+.rule-box h3 {
+  text-align: center;
+  font-style: italic;
+  color: var(--green-dark);
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 0.88em;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.rule-box p { margin-bottom: 0.5em; font-size: 0.95em; }
+.rule-box p:last-child { margin-bottom: 0; }
+
+/* ── Do-It-Yourself box ────────────────────────────────────────────────── */
+
+.diy {
+  border: 1px solid #bbb;
+  margin: 2.2em 0;
+  background: #fefefe;
+}
+
+.diy-header {
+  background: var(--green-light);
+  border-bottom: 1px solid #bbb;
+  padding: 8px 18px;
+  font-style: italic;
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: 0.82em;
+  letter-spacing: 0.12em;
+  color: var(--green-dark);
+}
+
+.diy-body {
+  padding: 16px 20px;
+}
+
+.diy-body ol {
+  padding-left: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+.diy-body li {
+  margin-bottom: 0.9em;
+}
+
+.answer-line {
+  border-bottom: 1px solid #bbb;
+  min-height: 26px;
+  margin-top: 6px;
+}
+
+/* ── "Learned in this chapter" summary ─────────────────────────────────── */
+
+.learned {
+  margin-top: 3em;
+  border: 3px solid var(--green-solid);
+}
+
+.learned-header {
+  background: var(--green-solid);
+  color: #fff;
+  text-align: center;
+  font-weight: bold;
+  font-size: 0.82em;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 7px 16px;
+}
+
+.learned-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  border-top: none;
+}
+
+.learned-col {
+  padding: 14px 16px;
+  border-right: 1px solid var(--green-solid);
+}
+
+.learned-col:last-child {
+  border-right: none;
+}
+
+.learned-col h4 {
+  font-size: 0.75em;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--green-dark);
+  margin-bottom: 10px;
+  text-align: center;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--green-light);
+}
+
+.learned-col dl {
+  font-size: 0.85em;
+}
+
+.learned-col dt {
+  font-family: "Courier New", Courier, monospace;
+  font-weight: bold;
+  margin-top: 6px;
+}
+
+.learned-col dd {
+  color: #444;
+  font-style: italic;
+  margin-left: 0;
+  margin-bottom: 2px;
+  font-size: 0.92em;
+}
+
+.learned-col p {
+  font-size: 0.88em;
+  color: #444;
+  font-style: italic;
+  margin-bottom: 0.3em;
+}
+
+/* ── Notes section ─────────────────────────────────────────────────────── */
+
+.notes {
+  margin-top: 2em;
+}
+
+.notes-label {
+  font-weight: bold;
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--green-dark);
+  margin-bottom: 12px;
+}
+
+.notes-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.note-line {
+  border-bottom: 1px solid #ccc;
+  height: 30px;
+}
+
+/* ── Navigation ────────────────────────────────────────────────────────── */
+
+.nav {
+  display: flex;
+  justify-content: space-between;
+  padding: 16px 64px;
+  border-top: 1px solid #ddd;
+  font-size: 0.88em;
+  background: #fafafa;
+}
+
+.nav a {
+  color: var(--green-dark);
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.nav a:hover { text-decoration: underline; }
+.nav .spacer { flex: 1; }
+
+/* ── Cover / index page ────────────────────────────────────────────────── */
+
+.cover-rainbow {
+  height: 20px;
+  background: linear-gradient(to right,
+    #c0392b    0%,   #c0392b  14.28%,
+    #e67e22 14.28%,  #e67e22  28.57%,
+    #f1c40f 28.57%,  #f1c40f  42.85%,
+    #27ae60 42.85%,  #27ae60  57.14%,
+    #2980b9 57.14%,  #2980b9  71.43%,
+    #8e44ad 71.43%,  #8e44ad  85.71%,
+    #2c3e50 85.71%
+  );
+}
+
+.cover-hero {
+  background: var(--green-solid);
+  color: #fff;
+  padding: 44px 64px 36px;
+}
+
+.cover-eyebrow {
+  font-size: 0.82em;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  opacity: 0.8;
+  margin-bottom: 12px;
+}
+
+.cover-title {
+  font-size: 3em;
+  font-weight: bold;
+  text-transform: uppercase;
+  line-height: 1.1;
+  margin-bottom: 10px;
+}
+
+.cover-title .word-color {
+  color: #c8e6c8;
+}
+
+.cover-platform {
+  font-style: italic;
+  font-size: 1.05em;
+  opacity: 0.85;
+}
+
+.cover-toc {
+  padding: 36px 64px 48px;
+}
+
+.cover-toc h2 {
+  text-transform: uppercase;
+  font-size: 0.8em;
+  letter-spacing: 0.2em;
+  color: var(--green-dark);
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.toc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.toc-list li {
+  display: flex;
+  align-items: baseline;
+  padding: 9px 0;
+  border-bottom: 1px dotted #ccc;
+  gap: 0;
+}
+
+.toc-num {
+  font-weight: bold;
+  color: var(--green-solid);
+  width: 2.2em;
+  flex-shrink: 0;
+  font-size: 0.95em;
+}
+
+.toc-title {
+  flex: 1;
+}
+
+.toc-title a {
+  font-weight: bold;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.toc-title a:hover { color: var(--green-dark); text-decoration: underline; }
+
+.toc-concept {
+  font-style: italic;
+  color: #777;
+  font-size: 0.88em;
+  margin-left: 8px;
+}
+
+/* ── Illustration placeholders ─────────────────────────────────────────── */
+
+.illustration {
+  border: 2px dashed #c4c0b8;
+  background: #f7f5f0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 12px;
+  color: #b0a898;
+  font-style: italic;
+  font-size: 0.76em;
+  line-height: 1.45;
+  gap: 6px;
+}
+
+.illustration .ill-label {
+  font-style: normal;
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #c8c0b0;
+  margin-bottom: 2px;
+}
+
+/* Right column of chapter opener grid, spans all title rows */
+.illustration-opener {
+  grid-column: 2;
+  grid-row: 1 / 4;
+  width: auto;
+  height: auto;
+  min-height: 180px;
+  float: none;
+  margin: 0 0 0 40px;
+  align-self: stretch;
+}
+
+/* Medium — floated right alongside body text */
+.illustration-aside {
+  width: 148px;
+  height: 130px;
+  float: right;
+  margin: 0 0 16px 20px;
+  clear: right;
+}
+
+/* Small — floated right, tight to text */
+.illustration-small {
+  width: 110px;
+  height: 100px;
+  float: right;
+  margin: 0 0 12px 16px;
+  clear: right;
+}
+
+/* Bug/warning marker — floated left, inline with warning text */
+.illustration-bug {
+  width: 54px;
+  height: 54px;
+  float: left;
+  margin: 2px 12px 4px 0;
+  flex-shrink: 0;
+}
+
+/* Centered standalone — breaks the flow for a visual moment */
+.illustration-center {
+  width: 280px;
+  height: 150px;
+  margin: 1.6em auto;
+  clear: both;
+}
+
+/* ── Utilities ─────────────────────────────────────────────────────────── */
+
+.clearfix::after { content: ""; display: table; clear: both; }
+
+@media (max-width: 640px) {
+  .content, .page-header, .nav { padding-left: 20px; padding-right: 20px; }
+  .chapter-opener { padding-left: 20px; padding-right: 20px; display: flex; flex-direction: column; min-height: auto; }
+  .illustration-opener { grid-column: unset; grid-row: unset; float: none; width: 100%; height: 110px; min-height: unset; margin: 0 0 12px 0; align-self: auto; }
+  .chapter-green-bar { grid-column: unset; }
+  .tip { float: none; width: auto; margin-left: 0; }
+  pre.forth, pre.shell, .screen-wrap { margin-left: 0; margin-right: 0; }
+  .learned-cols { grid-template-columns: 1fr; }
+  .cover-title { font-size: 2.2em; }
+}

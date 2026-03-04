@@ -1,0 +1,14 @@
+\ Chapter 7 example — Decisions
+
+: .PASS   CHAR P EMIT CHAR A EMIT CHAR S EMIT CHAR S EMIT ;
+: .FAIL   CHAR F EMIT CHAR A EMIT CHAR I EMIT CHAR L EMIT ;
+
+: GRADE  ( score -- )
+  50 < IF .FAIL ELSE .PASS THEN ;
+
+: MAIN
+  80 GRADE CR
+  42 GRADE CR
+  50 GRADE CR ;
+
+MAIN HALT

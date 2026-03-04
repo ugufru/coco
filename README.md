@@ -28,7 +28,7 @@ executes natively. The CoCo never sees source text.
 | `forth/run.sh` | One-command build and run script |
 | `forth/kernel/README.md` | Kernel architecture, primitives, memory layout |
 | `forth/tools/README.md` | Cross-compiler internals and usage |
-| `docs/` | Tutorial book: *Getting Started with Color Forth* |
+| `docs/` | Tutorial book: *Getting Started with Bare Naked Forth* |
 | `COCO_RENOVATION.md` | Original vision document |
 | `coco_technical_reference.pdf` | TRS-80 CoCo technical reference |
 
@@ -91,7 +91,7 @@ All 13 tutorial chapters complete with working example programs.
 
 ## Tutorial
 
-`docs/` contains *Getting Started with Color Forth* — a 13-chapter beginner's
+`docs/` contains *Getting Started with Bare Naked Forth* — a 13-chapter beginner's
 book. Each chapter has a working example program and DIY exercises.
 
 | # | Chapter | Concepts |

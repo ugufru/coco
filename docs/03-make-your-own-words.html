@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 3: Make Your Own Words — Getting Started with Bare Naked Forth</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page">
+
+    <!-- Chapter opener -->
+    <div class="chapter-opener">
+      <div class="illustration illustration-opener" style="padding:0;border:none;background:none;">
+        <img src="images/chapter3-1.png" alt="CoCo character pressing a LETTER stamp onto a grid of squares, with COLOR, FORTH and TITLE stamps nearby" style="width:100%;height:100%;object-fit:cover;display:block;">
+      </div>
+      <div class="chapter-label">CHAPTER 3</div>
+      <div class="chapter-title">Make Your Own Words</div>
+      <div class="chapter-green-bar"></div>
+    </div>
+
+    <!-- Page 1 -->
+    <div class="page-header">
+      <span>MAKE YOUR OWN WORDS</span>
+      <span>1</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>Words That Listen to the Stack</h2>
+
+      <p>
+        In the first two chapters, every word you defined did exactly the
+        same thing every time you called it. <code>TITLE</code> always
+        printed <strong>COLOR FORTH</strong>. <code>DASH</code> always
+        printed a dash. <code>RULE</code> always printed eleven of them.
+      </p>
+
+      <p>
+        That's fine for fixed output — but what about words that do
+        <em>different</em> things depending on what's on the stack?
+      </p>
+
+      <p>
+        Here's an idea. The alphabet has 26 letters. The letter
+        <strong>A</strong> is at position 0. <strong>B</strong> is at
+        position 1. <strong>Z</strong> is at position 25. What if you
+        wrote a word called <code>LETTER</code> that takes a position
+        off the stack and prints the letter at that position?
+      </p>
+
+<pre class="forth">: LETTER  CHAR A + EMIT ;</pre>
+
+      <p>
+        That's the whole definition. <code>CHAR A</code> pushes 65 (the
+        ASCII code for A). <code>+</code> adds whatever number was on
+        the stack to 65. <code>EMIT</code> prints the result. So:
+      </p>
+
+      <table style="border-collapse: collapse; margin: 1.2em 2em; font-family: 'Courier New', Courier, monospace; font-size: 0.88em;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--green);">
+            <th style="padding: 6px 20px 6px 0; text-align: left; font-family: Georgia, serif; font-size: 1em;">You write</th>
+            <th style="padding: 6px 20px 6px 0; text-align: left; font-family: Georgia, serif; font-size: 1em;">Prints</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style="padding: 5px 20px 5px 0;">0 LETTER</td><td style="padding: 5px 0;">A</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">1 LETTER</td><td style="padding: 5px 0;">B</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">7 LETTER</td><td style="padding: 5px 0;">H</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">25 LETTER</td><td style="padding: 5px 0;">Z</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        <code>LETTER</code> is a word with a <em>parameter</em>. Its
+        behavior depends on what you give it. This is the stack at work
+        as a parameter-passing mechanism — and it's one of the things
+        that makes Forth so flexible.
+      </p>
+
+      <div class="tip">
+        <p>Stack effect of <code>LETTER</code>: <code>( n -- )</code><br>
+        It takes one number and leaves nothing — consuming the position
+        and printing the letter.</p>
+      </div>
+
+      <h2>Subtraction: Finding the Distance</h2>
+
+      <div class="illustration illustration-aside" style="width:220px;height:auto;padding:0;border:none;background:none;">
+        <img src="images/chapter3-2.png" alt="Ruler across the alphabet with a bracket showing the distance from A to O is 14" style="width:100%;height:auto;display:block;">
+      </div>
+
+      <p>
+        Here's the natural question: if you want to print the letter
+        <strong>O</strong>, what number do you give <code>LETTER</code>?
+        You could count: A=0, B=1, C=2 … O=14. Or you could ask Forth
+        to figure it out for you using subtraction:
+      </p>
+
+<pre class="forth">CHAR O CHAR A -</pre>
+
+      <p>
+        <code>CHAR O</code> pushes 79. <code>CHAR A</code> pushes 65.
+        <code>-</code> pops both and pushes <code>79 - 65 = 14</code>.
+        No counting required.
+      </p>
+
+      <div class="rule-box">
+        <h3>- &nbsp;<span style="font-weight:normal; font-size:0.85em;">( n1 n2 -- diff )</span></h3>
+        <p>Pop two numbers, push <code>n1 - n2</code>. The top of the
+        stack is subtracted <em>from</em> the number below it.</p>
+        <p><code>10 3 -</code> → <code>7</code></p>
+        <p><code>CHAR O CHAR A -</code> → <code>14</code></p>
+      </div>
+
+      <p>
+        So instead of writing <code>14 LETTER</code>, you can write:
+      </p>
+
+<pre class="forth">CHAR O CHAR A - LETTER</pre>
+
+      <p>
+        This reads almost like English: "the distance from A to O, then
+        print that letter." Both produce exactly the same result —
+        <strong>O</strong> on screen. Use whichever is clearer to you.
+      </p>
+
+    </div>
+
+    <!-- Page 2 -->
+    <div class="page-header">
+      <span>MAKE YOUR OWN WORDS</span>
+      <span>2</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>Building a Vocabulary</h2>
+
+      <p>
+        With <code>LETTER</code> in hand, you can write words that spell
+        out anything — and those words read naturally:
+      </p>
+
+<pre class="forth">: SP  32 EMIT ;
+
+: COLOR
+  CHAR C CHAR A - LETTER
+  CHAR O CHAR A - LETTER
+  CHAR L CHAR A - LETTER
+  CHAR O CHAR A - LETTER
+  CHAR R CHAR A - LETTER ;
+
+: FORTH
+  CHAR F CHAR A - LETTER
+  CHAR O CHAR A - LETTER
+  CHAR R CHAR A - LETTER
+  CHAR T CHAR A - LETTER
+  CHAR H CHAR A - LETTER ;
+
+: TITLE  COLOR SP FORTH CR ;
+
+TITLE HALT</pre>
+
+      <div class="screen-wrap">
+        <div class="screen-label">Your CoCo's screen:</div>
+        <div class="screen">COLOR FORTH</div>
+      </div>
+
+      <div class="illustration illustration-aside" style="width:220px;height:auto;padding:0;border:none;background:none;">
+        <img src="images/chapter3-3.png" alt="Pyramid of boxes: LETTER and SP at base, COLOR and FORTH in middle, TITLE at top, with upward arrows" style="width:100%;height:auto;display:block;">
+      </div>
+
+      <p>
+        Look at how the program is organized. At the bottom, tiny words
+        do tiny jobs. At the top, <code>TITLE</code> just says what to
+        do in plain terms. This is the Forth way: build a language that
+        talks about <em>your</em> problem, then write the program in
+        that language.
+      </p>
+
+      <p>
+        The top-level line — <code>TITLE HALT</code> — reads like an
+        instruction you'd give to a person. You've built yourself a
+        language where "print the title" is a single word.
+      </p>
+
+      <div class="tip">
+        <p>Words must be defined before they are used. <code>LETTER</code>
+        must appear before <code>COLOR</code>, and both must appear before
+        <code>TITLE</code>. Forth reads your source from top to bottom
+        and only knows about words it has already seen.</p>
+      </div>
+
+      <h2>What Happens Inside</h2>
+
+      <p>
+        When your program runs <code>TITLE</code>, the interpreter jumps
+        into the <code>TITLE</code> definition and executes each word
+        inside it. <code>COLOR</code> is a word, so the interpreter
+        jumps into <em>that</em> definition. Inside <code>COLOR</code>,
+        the first thing it encounters is <code>CHAR C</code> — which
+        pushes 67 — then <code>CHAR A</code> which pushes 65, then
+        <code>-</code> which leaves 2, then <code>LETTER</code> which
+        adds 65 and emits character 67: <strong>C</strong>.
+      </p>
+
+      <p>
+        The interpreter keeps a tidy record of where to return after
+        each word using the return stack. As long as you don't write
+        words that call each other in circles (which we'll come back to
+        much later), the return stack handles everything automatically.
+      </p>
+
+      <div class="rule-box">
+        <h3>The Forth Vocabulary Model</h3>
+        <p>Every program builds on what came before:</p>
+        <ol style="margin: 0.5em 0 0 1.2em;">
+          <li>Primitive words built into the kernel (<code>EMIT</code>, <code>+</code>, <code>-</code>, <code>CR</code>)</li>
+          <li>Your utility words built from those (<code>LETTER</code>, <code>SP</code>)</li>
+          <li>Your domain words built from utilities (<code>COLOR</code>, <code>FORTH</code>)</li>
+          <li>Your top-level program built from domain words (<code>TITLE</code>)</li>
+        </ol>
+        <p style="margin-top: 0.8em;">Each layer speaks at a higher level than the one below it.</p>
+      </div>
+
+    </div>
+
+    <!-- Page 3 -->
+    <div class="page-header">
+      <span>MAKE YOUR OWN WORDS</span>
+      <span>3</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>Choosing Good Names</h2>
+
+      <p>
+        The names you choose for your words matter more than you might
+        think. A well-named word makes the program read naturally. A
+        badly-named one forces the reader to stop and think.
+      </p>
+
+      <p>
+        Compare these two definitions of the same word:
+      </p>
+
+<pre class="forth">: X  CHAR A + EMIT ;       \ hard to read
+: LETTER  CHAR A + EMIT ;  \ obvious</pre>
+
+      <p>
+        When you later write <code>7 X</code>, the reader wonders:
+        what is X? When you write <code>7 LETTER</code>, the intent is
+        clear. The code becomes its own documentation.
+      </p>
+
+      <p>
+        Forth programmers tend to use short, punchy names for very
+        common things (<code>SP</code>, <code>CR</code>) and
+        descriptive names for domain-specific words (<code>TITLE</code>,
+        <code>LETTER</code>). There are no hard rules — just the goal
+        of readability.
+      </p>
+
+      <div class="diy">
+        <div class="diy-header">Do-It-Yourself</div>
+        <div class="illustration illustration-small" style="width:200px;height:auto;margin:12px 0 0 16px;padding:0;border:none;background:none;">
+          <img src="images/chapter3-4.png" alt="CoCo character at a chalkboard with the alphabet, writing offset numbers beneath each letter" style="width:100%;height:auto;display:block;">
+        </div>
+        <div class="diy-body">
+          <ol>
+            <li>
+              Use <code>LETTER</code> to spell your first name, one
+              letter at a time. Use <code>CHAR X CHAR A -</code> to
+              find the offset for each letter.
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              Define a word called <code>DIGIT</code> that works like
+              <code>LETTER</code> but for the digits 0–9: <code>0 DIGIT</code>
+              prints <strong>0</strong>, <code>7 DIGIT</code> prints
+              <strong>7</strong>. Hint: what is the ASCII code for
+              <strong>0</strong>?
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              Write a word called <code>MY-NAME</code> that prints your
+              full name followed by <code>CR</code>. Then write a word
+              called <code>BANNER</code> that calls <code>TITLE</code>,
+              then <code>MY-NAME</code>.
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              What does <code>CHAR A CHAR A -</code> leave on the stack?
+              What letter does <code>CHAR A CHAR A - LETTER</code> print?
+              <div class="answer-line"></div>
+            </li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- Learned in this chapter -->
+      <div class="learned">
+        <div class="learned-header">Learned in Chapter 3</div>
+        <div class="learned-cols">
+          <div class="learned-col">
+            <h4>Forth Words</h4>
+            <dl>
+              <dt>-</dt>
+              <dd>( n1 n2 -- diff ) subtract</dd>
+              <dt>LETTER</dt>
+              <dd>( n -- ) print the nth letter</dd>
+            </dl>
+          </div>
+          <div class="learned-col">
+            <h4>Patterns</h4>
+            <p>Words that take stack arguments</p>
+            <p><code>CHAR X CHAR A -</code> to find a letter's offset</p>
+            <p>Building layers: primitives → utilities → domain words → program</p>
+          </div>
+          <div class="learned-col">
+            <h4>Concepts</h4>
+            <p>Parameters come from the stack</p>
+            <p>Naming words for readability</p>
+            <p>Forth as a language-building tool</p>
+            <p>Bottom-up programming</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="notes">
+        <div class="notes-label">Notes:</div>
+        <div class="notes-lines">
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="nav">
+      <a href="02-say-something.html">← Chapter 2: Say Something</a>
+      <span class="spacer"></span>
+      <a href="04-stack-is-your-friend.html">Chapter 4: The Stack Is Your Friend →</a>
+    </div>
+
+  </div>
+</body>
+</html>

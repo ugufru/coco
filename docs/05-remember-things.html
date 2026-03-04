@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 5: Remember Things — Getting Started with Bare Naked Forth</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page">
+
+    <!-- Chapter opener -->
+    <div class="chapter-opener">
+      <div class="illustration illustration-opener" style="padding:0;border:none;background:none;">
+        <img src="images/chapter5-1.png" alt="CoCo character sticking a BASE=7 Post-it onto a bulletin board covered with sticky notes including SCORE=0" style="width:100%;height:100%;object-fit:cover;display:block;">
+      </div>
+      <div class="chapter-label">CHAPTER 5</div>
+      <div class="chapter-title">Remember Things</div>
+      <div class="chapter-green-bar"></div>
+    </div>
+
+    <!-- Page 1 -->
+    <div class="page-header">
+      <span>REMEMBER THINGS</span>
+      <span>1</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>The Stack Has a Memory Problem</h2>
+
+      <p>
+        The stack is great for passing values from word to word. But it
+        has one limitation: values on the stack disappear the moment
+        something consumes them.
+      </p>
+
+      <p>
+        Suppose you compute a value that two <em>separate</em> words
+        both need — not two calls in a row, but two words with other
+        work happening in between. <code>DUP</code> won't help if the
+        second copy gets consumed before the second word runs.
+      </p>
+
+      <p>
+        What you need is a <strong>variable</strong>: a named slot in
+        memory that holds a value until you decide to change it.
+      </p>
+
+      <h2>VARIABLE — A Named Memory Cell</h2>
+
+      <div class="illustration illustration-aside" style="width:220px;height:auto;padding:0;border:none;background:none;">
+        <img src="images/chapter5-2.png" alt="Mailbox labeled BASE with number 7 inside, CoCo reaching in, with store and fetch arrows" style="width:100%;height:auto;display:block;">
+      </div>
+
+      <p>
+        The word <code>VARIABLE</code> creates a named two-byte memory
+        cell. You give it a name, and from that point on, that name
+        refers to the cell's <em>address</em>.
+      </p>
+
+<pre class="forth">VARIABLE BASE</pre>
+
+      <p>
+        After this line, <code>BASE</code> is a word. When you run it,
+        it doesn't push a value — it pushes the <em>address</em> of its
+        storage cell. Then you use <code>!</code> and <code>@</code> to
+        store and fetch values at that address.
+      </p>
+
+      <div class="rule-box">
+        <h3>VARIABLE name</h3>
+        <p>Create a 2-byte memory cell named <em>name</em>.
+        Running <em>name</em> pushes its address. The cell
+        starts with value zero.</p>
+      </div>
+
+      <h2>! — Store a Value</h2>
+
+      <p>
+        <code>!</code> (pronounced "store") takes a value and an
+        address, and writes the value into that address.
+      </p>
+
+      <div class="rule-box">
+        <h3>! &nbsp;<span style="font-weight:normal; font-size:0.85em;">( n addr -- )</span></h3>
+        <p>Store <em>n</em> at <em>addr</em>. Both are popped from
+        the stack. The address is on top; the value is below it.</p>
+      </div>
+
+      <p>
+        So to store 7 in <code>BASE</code>:
+      </p>
+
+<pre class="forth">7 BASE !</pre>
+
+      <p>
+        Step by step: <code>7</code> pushes <code>[ 7 ]</code>.
+        <code>BASE</code> pushes the address of its cell:
+        <code>[ addr 7 ]</code>. <code>!</code> pops both and writes
+        7 into that address. Stack is now empty; the value is in memory.
+      </p>
+
+      <h2>@ — Fetch a Value</h2>
+
+      <p>
+        <code>@</code> (pronounced "fetch") takes an address and
+        replaces it with the 16-bit value stored there.
+      </p>
+
+      <div class="rule-box">
+        <h3>@ &nbsp;<span style="font-weight:normal; font-size:0.85em;">( addr -- n )</span></h3>
+        <p>Fetch the 16-bit value stored at <em>addr</em>.
+        The address is consumed; the value is pushed.</p>
+      </div>
+
+      <p>
+        To retrieve what's in <code>BASE</code>:
+      </p>
+
+<pre class="forth">BASE @</pre>
+
+      <p>
+        <code>BASE</code> pushes <code>[ addr ]</code>.
+        <code>@</code> replaces it with <code>[ 7 ]</code> — whatever
+        was last stored. You can call <code>BASE @</code> as many times
+        as you like; the value stays in the cell every time.
+      </p>
+
+      <div class="tip">
+        <p>The variable's name pushes an <em>address</em>, not a value.
+        Think of it like handing someone a mailbox number — they then
+        reach in with <code>@</code> to read the letter, or put one in
+        with <code>!</code>.</p>
+      </div>
+
+    </div>
+
+    <!-- Page 2 -->
+    <div class="page-header">
+      <span>REMEMBER THINGS</span>
+      <span>2</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>Putting It Together</h2>
+
+      <p>
+        Here's the key advantage of a variable: you can write words
+        that read from it without the caller having to pass anything
+        on the stack.
+      </p>
+
+<pre class="forth">: LETTER  CHAR A + EMIT ;
+
+VARIABLE BASE
+
+: THIS    BASE @ LETTER ;       \ print the stored letter
+: NEXT    BASE @ 1 + LETTER ;   \ print the one after it</pre>
+
+      <p>
+        <code>THIS</code> fetches the offset from <code>BASE</code>
+        and prints that letter. <code>NEXT</code> fetches the same
+        offset, adds 1, and prints the next letter.
+        Neither word needs a stack argument — they share data through
+        the variable.
+      </p>
+
+      <h2>A Complete Example</h2>
+
+<pre class="forth">: LETTER  CHAR A + EMIT ;
+
+VARIABLE BASE
+
+: THIS    BASE @ LETTER ;
+: NEXT    BASE @ 1 + LETTER ;
+
+CHAR H CHAR A - BASE !      \ store H offset (7)
+THIS                         \ prints H
+NEXT                         \ prints I
+CR HALT</pre>
+
+      <div class="screen-wrap">
+        <div class="screen-label">Your CoCo's screen:</div>
+        <div class="screen">HI</div>
+      </div>
+
+      <p>
+        Trace: <code>CHAR H CHAR A -</code> computes 7.
+        <code>BASE !</code> stores 7 in <code>BASE</code>
+        (stack is now empty). <code>THIS</code> runs
+        <code>BASE @ LETTER</code>: fetches 7, adds 65,
+        emits H. <code>NEXT</code> runs <code>BASE @ 1 +
+        LETTER</code>: fetches 7 again, adds 1 to get 8,
+        adds 65, emits I. The value in <code>BASE</code>
+        never changes — both calls read the same 7.
+      </p>
+
+      <table style="border-collapse: collapse; margin: 1.2em 2em; font-family: 'Courier New', Courier, monospace; font-size: 0.88em;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--green);">
+            <th style="padding: 6px 20px 6px 0; text-align: left; font-family: Georgia, serif;">Step</th>
+            <th style="padding: 6px 20px 6px 0; text-align: left; font-family: Georgia, serif;">Stack</th>
+            <th style="padding: 6px 0; text-align: left; font-family: Georgia, serif;">BASE cell</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style="padding: 5px 20px 5px 0;">CHAR H CHAR A -</td><td style="padding: 5px 20px 5px 0;">( 7 )</td>     <td style="padding: 5px 0;">0</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">BASE !</td>          <td style="padding: 5px 20px 5px 0;">( )</td>       <td style="padding: 5px 0;">7</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">THIS → BASE @</td>   <td style="padding: 5px 20px 5px 0;">( 7 )</td>     <td style="padding: 5px 0;">7</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">LETTER → emits H</td><td style="padding: 5px 20px 5px 0;">( )</td>       <td style="padding: 5px 0;">7</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">NEXT → BASE @</td>   <td style="padding: 5px 20px 5px 0;">( 7 )</td>     <td style="padding: 5px 0;">7</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">1 +</td>             <td style="padding: 5px 20px 5px 0;">( 8 )</td>     <td style="padding: 5px 0;">7</td></tr>
+          <tr><td style="padding: 5px 20px 5px 0;">LETTER → emits I</td><td style="padding: 5px 20px 5px 0;">( )</td>       <td style="padding: 5px 0;">7</td></tr>
+        </tbody>
+      </table>
+
+      <div class="tip">
+        <p>Notice that <code>BASE</code> still holds 7 after both
+        calls. <code>@</code> reads without erasing — unlike the
+        stack, which disappears when you use it.</p>
+      </div>
+
+    </div>
+
+    <!-- Page 3 -->
+    <div class="page-header">
+      <span>REMEMBER THINGS</span>
+      <span>3</span>
+    </div>
+    <div class="content clearfix">
+
+      <h2>Changing What a Word Does</h2>
+
+      <p>
+        Because <code>THIS</code> reads from <code>BASE</code> at
+        runtime, you can change <code>BASE</code> and
+        <code>THIS</code> will immediately behave differently — without
+        redefining <code>THIS</code>.
+      </p>
+
+<pre class="forth">CHAR H CHAR A - BASE !   \ BASE = 7
+THIS                      \ prints H
+
+CHAR Z CHAR A - BASE !   \ BASE = 25
+THIS                      \ prints Z</pre>
+
+      <p>
+        The word is the same; the data changes. This pattern —
+        behavior controlled by a variable — is one of the most
+        powerful tools in Forth.
+      </p>
+
+      <div class="rule-box">
+        <h3>Variables vs. the Stack</h3>
+        <p>Use the <strong>stack</strong> to pass values between words
+        in a single chain of computation. Use a <strong>variable</strong>
+        when a value needs to:</p>
+        <ul style="margin: 0.5em 0 0 1.2em;">
+          <li>Survive across multiple separate word calls</li>
+          <li>Be shared between words that don't call each other directly</li>
+          <li>Be changed by one word and read by another</li>
+        </ul>
+      </div>
+
+      <div class="diy">
+        <div class="diy-header">Do-It-Yourself</div>
+        <div class="illustration illustration-small" style="width:200px;height:auto;margin:12px 0 0 16px;padding:0;border:none;background:none;">
+          <img src="images/chapter5-3.png" alt="CoCo character writing offset numbers on a row of mailboxes labeled BASE, SCORE, COUNT" style="width:100%;height:auto;display:block;">
+        </div>
+        <div class="diy-body">
+          <ol>
+            <li>
+              Store the offset of the letter <strong>C</strong> in
+              <code>BASE</code>, then call <code>THIS</code>.
+              What prints?
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              Write a word <code>PREV</code> that prints the letter
+              <em>before</em> the stored one. Hint: it's like
+              <code>NEXT</code> but with <code>1 -</code> instead
+              of <code>1 +</code>.
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              Store a letter offset in <code>BASE</code>, then call
+              <code>THIS NEXT THIS</code>. What three letters appear?
+              Why does the middle one differ?
+              <div class="answer-line"></div>
+            </li>
+            <li>
+              Declare a second variable <code>STEP</code>. Store 3
+              in it. Write a word <code>JUMP</code> that prints the
+              letter <code>STEP</code> positions past whatever is
+              in <code>BASE</code>. What does
+              <code>0 BASE ! 3 STEP ! JUMP</code> print?
+              <div class="answer-line"></div>
+            </li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- Learned in this chapter -->
+      <div class="learned">
+        <div class="learned-header">Learned in Chapter 5</div>
+        <div class="learned-cols">
+          <div class="learned-col">
+            <h4>Forth Words</h4>
+            <dl>
+              <dt>VARIABLE name</dt>
+              <dd>( -- ) create a named 2-byte cell</dd>
+              <dt>!</dt>
+              <dd>( n addr -- ) store n at addr</dd>
+              <dt>@</dt>
+              <dd>( addr -- n ) fetch value from addr</dd>
+            </dl>
+          </div>
+          <div class="learned-col">
+            <h4>Patterns</h4>
+            <p><code>value VAR !</code> to store</p>
+            <p><code>VAR @</code> to fetch</p>
+            <p>Words that share state through a variable</p>
+            <p>Changing behavior by changing data, not code</p>
+          </div>
+          <div class="learned-col">
+            <h4>Concepts</h4>
+            <p>Variables hold addresses, not values</p>
+            <p>@ reads without consuming the cell</p>
+            <p>Stack for temporary; variable for persistent</p>
+            <p>Data-driven behavior</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="notes">
+        <div class="notes-label">Notes:</div>
+        <div class="notes-lines">
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+          <div class="note-line"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="nav">
+      <a href="04-stack-is-your-friend.html">← Chapter 4: The Stack Is Your Friend</a>
+      <span class="spacer"></span>
+      <a href="06-count-and-loop.html">Chapter 6: Count and Loop →</a>
+    </div>
+
+  </div>
+</body>
+</html>
