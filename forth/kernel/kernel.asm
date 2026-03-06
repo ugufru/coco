@@ -90,6 +90,7 @@ CFA_LT          FDB     CODE_LT
 CFA_GT          FDB     CODE_GT
 CFA_ZEQU        FDB     CODE_ZEQU
 CFA_AT          FDB     CODE_AT
+CFA_CSTORE      FDB     CODE_CSTORE
 
 ;;; ─── EXIT ( -- ) ─────────────────────────────────────────────────────────────
 ;;; Return from a colon definition.
@@ -474,6 +475,18 @@ CODE_AT
         LEAU    4,U             ; pop both stack values
         STD     VAR_CUR
         LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── C! ( byte addr -- ) ────────────────────────────────────────────────────
+;;; Store the low byte of value to addr. Enables direct video RAM writes for
+;;; VDG semigraphic characters ($80–$FF) without EMIT's encoding.
+
+CODE_CSTORE
+        LDY     ,U              ; Y = address (TOS)
+        LDA     3,U             ; A = low byte of value (NOS)
+        STA     ,Y              ; store byte at address
+        LEAU    4,U             ; pop both
+        LDY     ,X++            ; NEXT
         JMP     [,Y]
 
 CODE_HALT

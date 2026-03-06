@@ -67,6 +67,7 @@ def kernel_words(symbols):
         '>':    'CFA_GT',
         '0=':   'CFA_ZEQU',
         'at':   'CFA_AT',
+        'c!':   'CFA_CSTORE',
     }
     result = {}
     for forth_name, sym_name in names.items():
@@ -214,7 +215,10 @@ def parse(tokens):
         else:
             # Integer literal or word reference
             try:
-                val = int(tok, 0)   # base-0 handles 0x… as hex
+                if tok.startswith('$'):
+                    val = int(tok[1:], 16)  # $ prefix: CoCo/Forth hex notation
+                else:
+                    val = int(tok, 0)   # base-0 handles 0x… as hex
                 item = ('lit', val)
             except ValueError:
                 item = ('word', tok.lower())
