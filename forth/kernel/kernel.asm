@@ -30,7 +30,10 @@ NSCR    EQU     512             ; 32 cols × 16 rows
 
         ORG     $0050
 
-VAR_CUR FDB     0               ; cursor offset into video RAM (0–511)
+VAR_CUR         FDB     0       ; cursor offset into video RAM (0–511)
+VAR_KEY_PREV    FCB     0       ; last accepted key ASCII (KEY debounce)
+VAR_KEY_SHIFT   FCB     0       ; SHIFT flag (nonzero = shift held)
+VAR_KEY_RELCNT  FCB     0       ; release debounce counter
 
 ;;; ─── Kernel ──────────────────────────────────────────────────────────────────
 
@@ -91,6 +94,10 @@ CFA_GT          FDB     CODE_GT
 CFA_ZEQU        FDB     CODE_ZEQU
 CFA_AT          FDB     CODE_AT
 CFA_CSTORE      FDB     CODE_CSTORE
+CFA_AND         FDB     CODE_AND
+CFA_OR          FDB     CODE_OR
+CFA_KBD_SCAN    FDB     CODE_KBD_SCAN
+CFA_KEY_NB      FDB     CODE_KEY_NB
 
 ;;; ─── EXIT ( -- ) ─────────────────────────────────────────────────────────────
 ;;; Return from a colon definition.
@@ -340,21 +347,213 @@ DIVMOD_DONE
         LDY     ,X++            ; NEXT
         JMP     [,Y]
 
+;;; ─── KBD-SCAN ( col_mask -- row_bits ) ──────────────────────────────────────
+;;; Strobe one or more keyboard columns and return the active row bits.
+;;;
+;;; col_mask  — byte written to PIA0-B ($FF02); a bit that is LOW selects that
+;;;             column.  Pass $00 to strobe all columns at once (any-key check).
+;;; row_bits  — bits 0–6 set where a key is pressed (active-high after invert).
+;;;             Bit 7 is always 0 (joystick comparator, masked out).
+;;;
+;;; PIA0-B is restored to $FF (all columns deselected) before returning so a
+;;; strobe is never left asserted across unrelated code.
+
+CODE_KBD_SCAN
+        LDA     1,U             ; A = col_mask (low byte of TOS)
+        STA     $FF02           ; strobe selected column(s)
+        LDB     $FF00           ; B = row data (active-low; pressed = 0)
+        COMB                    ; invert: pressed = 1
+        ANDB    #$7F            ; mask bit 7 (joystick comparator)
+        LDA     #$FF
+        STA     $FF02           ; deselect all columns
+        CLRA                    ; A = 0 (high byte of 16-bit result)
+        STD     ,U              ; replace TOS with row_bits (D = 0:row_bits)
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
 ;;; ─── KEY ( -- c ) ────────────────────────────────────────────────────────────
 ;;; Block until a key is pressed; push its ASCII value.
-;;; Uses POLCAT via the ROM hook at $A000 (Extended Colour BASIC).
-;;; POLCAT returns the ASCII char in A, or 0 if no key is pressed.
-;;; KEYIN saves and restores U, X, B so the Forth registers are safe.
+;;; Uses direct PIA0 scanning — no ROM dependency.
+;;;
+;;; Debounce: scan all columns at once; require the result to CHANGE from the
+;;; previous scan before accepting a key.  A held key triggers once per call.
+;;; Modifier keys (SHIFT/CTRL/ALT return $00 from the table) reset the debounce
+;;; counter so they cannot stall the loop.
 
 CODE_KEY
-KEYPOLL         JSR     [$A000]         ; call POLCAT via ROM hook
-                TSTA                    ; A = 0 means no key yet
-                BEQ     KEYPOLL
-                TFR     A,B             ; move char to low byte
-                CLRA                    ; high byte = 0
-                STD     ,--U            ; push char onto data stack
-                LDY     ,X++            ; NEXT
-                JMP     [,Y]
+KEY_POLL
+        ; Pre-check SHIFT (PB7/PA6)
+        LDA     #$7F            ; strobe column 7 (SHIFT column)
+        STA     $FF02
+        LDA     $FF00
+        COMA
+        ANDA    #$40            ; isolate PA6 (SHIFT row)
+        STA     VAR_KEY_SHIFT   ; save shift flag
+        LDA     #$FF
+        STA     $FF02           ; deselect all columns
+        ; Identify the current key
+        BSR     MATRIX2ASCII    ; A = ASCII (0 if none/modifier)
+        TSTA
+        BNE     KEY_HAVE
+        ; No key — count consecutive "no key" polls for release debounce
+        LDA     VAR_KEY_RELCNT
+        BEQ     KEY_POLL        ; already cleared → keep polling
+        DECA
+        STA     VAR_KEY_RELCNT
+        BNE     KEY_POLL        ; not enough consecutive releases yet
+        CLR     VAR_KEY_PREV    ; confirmed release — allow same key again
+        BRA     KEY_POLL
+KEY_HAVE
+        ; Key is pressed — reset release counter
+        LDB     #40             ; ~40 polls release debounce
+        STB     VAR_KEY_RELCNT
+        ; Same key as last accepted?
+        CMPA    VAR_KEY_PREV    ; A still has MATRIX2ASCII result
+        BEQ     KEY_POLL        ; yes → suppress repeat
+        STA     VAR_KEY_PREV    ; remember this key
+        ; Apply shift if flagged
+        TST     VAR_KEY_SHIFT
+        BEQ     KEY_NOSHF
+        LBSR    SHIFT_APPLY
+KEY_NOSHF
+        TFR     A,B             ; B = ASCII low byte
+        CLRA                    ; A = 0 (high byte)
+        STD     ,--U            ; push character onto data stack
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── MATRIX2ASCII — identify first pressed key; return ASCII in A ────────────
+;;; Scans 8 keyboard columns (PB0–PB7) × 7 rows (PA0–PA6).
+;;; PA7 is the joystick DAC comparator — not a keyboard row — and is masked.
+;;;
+;;; Column strobe sequence: $FE $FD $FB $F7 $EF $DF $BF $7F.
+;;; Generated by SEC + ROLA: rotates the zero-bit left one position each step.
+;;; After $7F, ROLA produces $FF → sentinel for "all 8 columns done".
+;;;
+;;; Entry:  —
+;;; Exit:   A = ASCII of first pressed key, or 0 if none found.
+;;;         Z flag set if A=0.
+;;; Modifies: A, B, Y.   Preserves: X (=IP), U (=DSP), S (=RSP).
+
+MATRIX2ASCII
+        LDY     #KEY_TABLE      ; Y = ASCII table base
+        LDA     #$FE            ; A = column 0 strobe (bit 0 low)
+MAT_COL
+        STA     $FF02           ; assert this column strobe
+        PSHS    A               ; save strobe across row scan
+        LDA     $FF00           ; read row bits (active-low)
+        COMA                    ; invert: pressed=1
+        ANDA    #$7F            ; mask PA7 (joystick comparator)
+        LDB     #7              ; 7 rows to check (PA0–PA6)
+MAT_ROW
+        LSRA                    ; shift bit 0 into carry; advance bit window
+        BCS     MAT_HIT         ; carry set → this row is pressed
+        LEAY    1,Y             ; advance table pointer to next row entry
+        DECB
+        BNE     MAT_ROW
+        ; No key in this column — advance strobe to next column
+        PULS    A               ; restore column strobe
+        ORCC    #$01            ; set carry=1 (6809: no SEC; ROLA needs C=1)
+        ROLA                    ; $FE→$FD→$FB→$F7→$EF→$DF→$BF→$7F→$FF
+        CMPA    #$FF            ; all 8 columns exhausted?
+        BNE     MAT_COL         ; not $FF → still a valid strobe
+        ; No key found across all columns (unexpected after debounce)
+        LDA     #0
+        BRA     MAT_DONE
+MAT_HIT
+        LDA     ,Y              ; A = ASCII for this (col, row)
+        PULS    B               ; discard saved strobe (preserves A; B discarded below)
+MAT_DONE
+        LDB     #$FF
+        STB     $FF02           ; deselect all columns
+        TSTA                    ; set Z flag: Z=1 if A=0 (modifier/no key)
+        RTS
+
+;;; ─── KEY_TABLE — 8 columns × 7 rows ASCII lookup ─────────────────────────────
+;;; 8 columns (PB0–PB7) × 7 rows (PA0–PA6).  Index = col*7 + row.
+;;; PA7 is the joystick DAC comparator, NOT a keyboard row.
+;;; Modifier keys (ALT/CTL/SHF) return $00 so CODE_KEY treats them as transparent.
+;;; Arrow keys use C0 control codes $1C–$1F (FS GS RS US).
+
+KEY_TABLE
+        ; Col 0 ($FE) — PB0
+        FCB     '@','H','P','X','0','8',$0D
+        ; Col 1 ($FD) — PB1
+        FCB     'A','I','Q','Y','1','9',$0C
+        ; Col 2 ($FB) — PB2
+        FCB     'B','J','R','Z','2',':',$03
+        ; Col 3 ($F7) — PB3
+        FCB     'C','K','S',$1C,'3',';',$00
+        ; Col 4 ($EF) — PB4
+        FCB     'D','L','T',$1D,'4',',',$00
+        ; Col 5 ($DF) — PB5
+        FCB     'E','M','U',$1E,'5','-',$00
+        ; Col 6 ($BF) — PB6
+        FCB     'F','N','V',$1F,'6','.',$00
+        ; Col 7 ($7F) — PB7  (row 6 = SHIFT, returns $00 = modifier)
+        FCB     'G','O','W',$20,'7','/',$00
+
+;;; ─── KEY? ( -- char|0 ) ──────────────────────────────────────────────────────
+;;; Non-blocking key check. Returns the ASCII value of a currently-pressed key,
+;;; or 0 if nothing is pressed. Does not spin; returns immediately either way.
+;;;
+;;; Shares MATRIX2ASCII with KEY for the per-column identification scan.
+;;; Modifier-only presses return 0.
+
+CODE_KEY_NB
+        CLR     $FF02           ; strobe all columns
+        LDA     $FF00           ; read all row bits (active-low)
+        COMA                    ; invert: pressed=1
+        ANDA    #$7F            ; mask joystick bit — avoid spurious scan overhead
+        BEQ     KEY_NB_DONE     ; nothing in rows 0–6 → fall through with A=0
+        ; pre-check SHIFT (PB7/PA6)
+        LDA     #$7F
+        STA     $FF02
+        LDA     $FF00
+        COMA
+        ANDA    #$40
+        STA     VAR_KEY_SHIFT   ; save shift flag
+        LDA     #$FF
+        STA     $FF02
+        ; identify key
+        LBSR    MATRIX2ASCII    ; A = ASCII of first pressed key (0 = modifier)
+        BEQ     KEY_NB_DONE     ; modifier only → return 0
+        TST     VAR_KEY_SHIFT
+        BEQ     KEY_NB_DONE2
+        BSR     SHIFT_APPLY
+KEY_NB_DONE2
+KEY_NB_DONE
+        TFR     A,B             ; B = char (or 0)
+        CLRA                    ; A = 0 (high byte)
+        STD     ,--U            ; push result
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── SHIFT_APPLY — transform character in A to its shifted variant ──────────
+;;; Called when SHIFT was detected (pre-checked before MATRIX2ASCII).
+;;; Transforms shiftable characters:
+;;;   $31–$3B  (1–9 : ;) → subtract $10  (! " # $ % & ' ( ) * +)
+;;;   $2C–$2F  (, - . /) → add $10       (< = > ?)
+;;; Letters and other characters are unchanged.
+;;;
+;;; Entry:  A = ASCII character (non-zero)
+;;; Exit:   A = shifted character (or unchanged)
+
+SHIFT_APPLY
+        CMPA    #$2C
+        BLO     SHFT_DONE       ; below ',' → no shift mapping
+        CMPA    #$2F
+        BLS     SHFT_ADD        ; $2C–$2F (, - . /) → add $10
+        CMPA    #$31
+        BLO     SHFT_DONE       ; '0' → no change
+        CMPA    #$3B
+        BHI     SHFT_DONE       ; letters/others → no change
+        SUBA    #$10            ; $31–$3B (1–9 : ;) → shifted symbol
+        RTS
+SHFT_ADD
+        ADDA    #$10            ; $2C–$2F (, - . /) → shifted symbol
+SHFT_DONE
+        RTS
 
 ;;; ─── 0BRANCH ( flag -- ) ────────────────────────────────────────────────────
 ;;; Pop flag; if zero, apply signed offset from thread; else skip over it.
@@ -489,6 +688,30 @@ CODE_CSTORE
         LDY     ,X++            ; NEXT
         JMP     [,Y]
 
+;;; ─── AND ( n1 n2 -- n ) ──────────────────────────────────────────────────────
+;;; Bitwise AND of top two stack items.
+
+CODE_AND
+        LDD     ,U              ; D = TOS (n2)
+        LEAU    2,U             ; pop TOS; U now points at NOS (n1)
+        ANDA    ,U              ; A = n2_hi & n1_hi
+        ANDB    1,U             ; B = n2_lo & n1_lo
+        STD     ,U              ; replace NOS with result
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── OR ( n1 n2 -- n ) ───────────────────────────────────────────────────────
+;;; Bitwise OR of top two stack items.
+
+CODE_OR
+        LDD     ,U              ; D = TOS (n2)
+        LEAU    2,U             ; pop TOS; U now points at NOS (n1)
+        ORA     ,U              ; A = n2_hi | n1_hi
+        ORB     1,U             ; B = n2_lo | n1_lo
+        STD     ,U              ; replace NOS with result
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
 CODE_HALT
         BRA     CODE_HALT
 
@@ -505,6 +728,25 @@ START
 
         LDS     #$8000          ; RSP: first push lands at $7FFE
         LDU     #$7E00          ; DSP: first push lands at $7DFE
+
+        ; ── PIA0 init (bare-metal keyboard scan) ─────────────────────────────
+        ; The 6821 PIA shares each data address between the Data Direction
+        ; Register (DDR) and Data Register: CR bit 2 = 0 → DDR, 1 → Data.
+        ;
+        ; PIA0-A ($FF00/$FF01): keyboard row sense — configure as input
+        CLR     $FF01           ; CR-A: bit 2=0 → next access to $FF00 = DDR
+        CLR     $FF00           ; DDR-A: all 8 bits = input (0)
+        LDA     #$04            ; CR-A: bit 2=1 → select data register, IRQs off
+        STA     $FF01
+        ;
+        ; PIA0-B ($FF02/$FF03): keyboard column strobe — configure as output
+        CLR     $FF03           ; CR-B: bit 2=0 → next access to $FF02 = DDR
+        LDA     #$FF            ; DDR-B: all 8 bits = output (1)
+        STA     $FF02
+        LDA     #$04            ; CR-B: bit 2=1 → select data register, IRQs off
+        STA     $FF03
+        LDA     #$FF            ; deselect all columns (active-low: high = off)
+        STA     $FF02
 
         ; Clear screen to VDG spaces ($60 = normal-video space)
         LDX     #SCREEN
