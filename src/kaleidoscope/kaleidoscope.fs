@@ -136,8 +136,12 @@ VARIABLE dx    VARIABLE dy    VARIABLE dc
   \ Run the pattern (infinite — close XRoar to exit)
   cls-black
   BEGIN
+    $FF $FFD7 C!                  \ SAM double speed (~1.78 MHz)
     step step step step
     step step step step
+    step step step step
+    step step step step
+    $FF $FFD6 C!                  \ SAM normal speed (display refresh)
     vsync
   0 UNTIL ;
 
