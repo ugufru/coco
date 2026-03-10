@@ -34,6 +34,7 @@ VAR_CUR         FDB     0       ; cursor offset into video RAM (0–511)
 VAR_KEY_PREV    FCB     0       ; last accepted key ASCII (KEY debounce)
 VAR_KEY_SHIFT   FCB     0       ; SHIFT flag (nonzero = shift held)
 VAR_KEY_RELCNT  FCB     0       ; release debounce counter
+VAR_KEY_REPDLY  FDB     0       ; auto-repeat countdown (16-bit)
 
 ;;; ─── Kernel ──────────────────────────────────────────────────────────────────
 
@@ -94,6 +95,7 @@ CFA_GT          FDB     CODE_GT
 CFA_ZEQU        FDB     CODE_ZEQU
 CFA_AT          FDB     CODE_AT
 CFA_CSTORE      FDB     CODE_CSTORE
+CFA_CFETCH      FDB     CODE_CFETCH
 CFA_AND         FDB     CODE_AND
 CFA_OR          FDB     CODE_OR
 CFA_KBD_SCAN    FDB     CODE_KBD_SCAN
@@ -380,6 +382,9 @@ CODE_KBD_SCAN
 ;;; Modifier keys (SHIFT/CTRL/ALT return $00 from the table) reset the debounce
 ;;; counter so they cannot stall the loop.
 
+KEY_INIT_DLY    EQU     30      ; initial repeat delay (30 frames = 500ms at 60Hz)
+KEY_RPT_DLY     EQU     5       ; subsequent repeat interval (5 frames = 83ms)
+
 CODE_KEY
 KEY_POLL
         ; Pre-check SHIFT (PB7/PA6)
@@ -395,7 +400,11 @@ KEY_POLL
         BSR     MATRIX2ASCII    ; A = ASCII (0 if none/modifier)
         TSTA
         BNE     KEY_HAVE
-        ; No key — count consecutive "no key" polls for release debounce
+        ; No key — reset repeat timer and count release debounce
+        LDD     #KEY_INIT_DLY   ; reset repeat so holding requires full delay
+        STD     VAR_KEY_REPDLY
+        LDA     $FF03           ; clear any pending VSYNC flag
+        LDA     $FF02
         LDA     VAR_KEY_RELCNT
         BEQ     KEY_POLL        ; already cleared → keep polling
         DECA
@@ -409,8 +418,29 @@ KEY_HAVE
         STB     VAR_KEY_RELCNT
         ; Same key as last accepted?
         CMPA    VAR_KEY_PREV    ; A still has MATRIX2ASCII result
-        BEQ     KEY_POLL        ; yes → suppress repeat
+        BEQ     KEY_REPEAT      ; yes → check auto-repeat timer
+        ; New key — accept it
         STA     VAR_KEY_PREV    ; remember this key
+        LDD     #KEY_INIT_DLY   ; load initial repeat delay
+        STD     VAR_KEY_REPDLY
+        LDA     $FF03           ; clear any pending VSYNC flag
+        LDA     $FF02
+        LDA     VAR_KEY_PREV    ; reload key (D/A were clobbered)
+        BRA     KEY_ACCEPT
+KEY_REPEAT
+        ; Same key held — only decrement on VSYNC (60Hz hardware timer)
+        LDA     $FF03           ; check VSYNC flag (bit 7 of PIA0 CRB)
+        BPL     KEY_POLL        ; no VSYNC yet → poll again
+        LDA     $FF02           ; clear VSYNC flag (read port B data reg)
+        LDD     VAR_KEY_REPDLY
+        SUBD    #1
+        STD     VAR_KEY_REPDLY
+        BNE     KEY_POLL        ; not yet → keep waiting
+        ; Repeat fired — reload with shorter interval
+        LDD     #KEY_RPT_DLY
+        STD     VAR_KEY_REPDLY
+        LDA     VAR_KEY_PREV    ; reload key
+KEY_ACCEPT
         ; Apply shift if flagged
         TST     VAR_KEY_SHIFT
         BEQ     KEY_NOSHF
@@ -685,6 +715,17 @@ CODE_CSTORE
         LDA     3,U             ; A = low byte of value (NOS)
         STA     ,Y              ; store byte at address
         LEAU    4,U             ; pop both
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── C@ ( addr -- byte ) ────────────────────────────────────────────────────
+;;; Fetch a single byte from addr; push it as a 16-bit value (high byte = 0).
+
+CODE_CFETCH
+        LDY     ,U              ; Y = address (TOS)
+        LDB     ,Y              ; B = byte at address
+        CLRA                    ; A = 0 (high byte)
+        STD     ,U              ; replace TOS with result
         LDY     ,X++            ; NEXT
         JMP     [,Y]
 

@@ -5,30 +5,102 @@
 \ MATRIX2ASCII keyboard scan path.
 \
 \ Key behaviour:
-\   Printable keys  → emit character at cursor, advance
-\   ENTER  ($0D)    → move to next row (CR)
-\   CLEAR  ($0C)    → clear screen and home cursor
-\   BREAK  ($03)    → halt
+\   Printable keys  -> emit character at cursor, advance
+\   ENTER  ($0D)    -> move to next row (CR)
+\   CLEAR  ($0C)    -> clear screen and home cursor
+\   BREAK  ($03)    -> halt
+\   LEFT   ($1E)    -> move cursor left (backspace)
+\   RIGHT  ($1F)    -> move cursor right
+\   UP     ($1C)    -> move cursor up one row
+\   DOWN   ($1D)    -> move cursor down one row
 
-\ ── Screen utilities ──────────────────────────────────────────────────────────
+\ ── Variables ────────────────────────────────────────────────────────────────
+
+\ VAR_CUR is the kernel's cursor variable at $0050 (2 bytes).
+\ We also need to track the character "under" the cursor so we can
+\ restore it when the cursor moves.
+
+VARIABLE saved-char
+
+\ ── Cursor helpers ───────────────────────────────────────────────────────────
+
+\ Read the VDG byte at the current cursor position
+: cur@  ( -- vdg-byte )  $0050 @ $0400 + C@ ;
+
+\ Write a VDG byte at the current cursor position
+: cur!  ( vdg-byte -- )  $0050 @ $0400 + C! ;
+
+\ Show cursor: save char under cursor, write cursor block ($EF = inverse block)
+: cursor-on   cur@ saved-char !  $EF cur! ;
+
+\ Hide cursor: restore the saved character
+: cursor-off  saved-char @ cur! ;
+
+\ ── Screen utilities ─────────────────────────────────────────────────────────
 
 \ cls: fill video RAM with VDG spaces ($60) and home the cursor.
-\ $0400 = video RAM base, 512 bytes (32 cols x 16 rows).
 : cls
   512 0 DO  $60 $0400 I + C!  LOOP
-  0 0 AT ;
+  0 0 AT
+  $60 saved-char ! ;
 
-\ ── Main typewriter loop ──────────────────────────────────────────────────────
+\ ── Cursor movement ──────────────────────────────────────────────────────────
+
+\ Backspace: move cursor left, erase character there
+: backspace
+  $0050 @                    \ get cursor offset
+  DUP 0 > IF                \ if > 0
+    1 -  DUP $0050 !         \ decrement and store
+    $0400 +  $60 SWAP C!     \ erase char at new position (VDG space)
+  ELSE
+    DROP
+  THEN ;
+
+\ Move cursor right by 1 (with ceiling at 511)
+: cur-right
+  $0050 @
+  DUP 511 < IF
+    1 +  $0050 !
+  ELSE
+    DROP
+  THEN ;
+
+\ Move cursor up one row (subtract 32, floor at 0)
+: cur-up
+  $0050 @
+  DUP 31 > IF
+    32 -  $0050 !
+  ELSE
+    DROP
+  THEN ;
+
+\ Move cursor down one row (add 32, ceiling at 511)
+: cur-down
+  $0050 @
+  DUP 480 < IF
+    32 +  $0050 !
+  ELSE
+    DROP
+  THEN ;
+
+\ ── Main typewriter loop ────────────────────────────────────────────────────
 
 : typewriter
   cls
+  cursor-on
   BEGIN
     KEY
-    DUP $03 = IF  DROP  halt           THEN
-    DUP $0D = IF  DROP  cr             ELSE
-    DUP $0C = IF  DROP  cls            ELSE
+    cursor-off
+    DUP $03 = IF  DROP  halt                    THEN
+    DUP $0D = IF  DROP  cr                      ELSE
+    DUP $0C = IF  DROP  cls                     ELSE
+    DUP $1E = IF  DROP  backspace                ELSE
+    DUP $1F = IF  DROP  cur-right               ELSE
+    DUP $1C = IF  DROP  cur-up                  ELSE
+    DUP $1D = IF  DROP  cur-down                ELSE
     emit
-    THEN THEN
+    THEN THEN THEN THEN THEN THEN
+    cursor-on
   AGAIN ;
 
 typewriter

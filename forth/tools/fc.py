@@ -68,6 +68,11 @@ def kernel_words(symbols):
         '0=':   'CFA_ZEQU',
         'at':   'CFA_AT',
         'c!':   'CFA_CSTORE',
+        'c@':   'CFA_CFETCH',
+        'and':  'CFA_AND',
+        'or':   'CFA_OR',
+        'kbd-scan': 'CFA_KBD_SCAN',
+        'key?':     'CFA_KEY_NB',
     }
     result = {}
     for forth_name, sym_name in names.items():
@@ -79,11 +84,31 @@ def kernel_words(symbols):
 
 # ── Tokeniser ─────────────────────────────────────────────────────────────────
 
-def tokenize(source):
-    """Strip comments and split into tokens."""
+def tokenize(source, base_dir=None):
+    """Strip comments, resolve INCLUDE directives, and split into tokens.
+
+    INCLUDE <filename> splices the named file's tokens at the point of the
+    directive.  The filename is resolved relative to base_dir (the directory
+    of the including file).  Nested INCLUDEs are handled recursively.
+    """
+    from pathlib import Path as _Path
     source = re.sub(r'\\[^\n]*', '', source)          # line comments
     source = re.sub(r'\(.*?\)', '', source, flags=re.DOTALL)  # block comments
-    return source.split()
+    raw = source.split()
+
+    result = []
+    i = 0
+    while i < len(raw):
+        if raw[i].upper() == 'INCLUDE':
+            i += 1
+            filename = raw[i]
+            filepath = (_Path(base_dir) / filename) if base_dir else _Path(filename)
+            included = tokenize(filepath.read_text(), base_dir=filepath.parent)
+            result.extend(included)
+        else:
+            result.append(raw[i])
+        i += 1
+    return result
 
 
 # ── Parser → IR ───────────────────────────────────────────────────────────────
@@ -147,6 +172,16 @@ def parse(tokens):
             i += 1
             var_name = tokens[i].lower()
             variables.append(var_name)
+
+        elif tok.upper() == 'CONSTANT':
+            if current_def is not None:
+                raise SyntaxError("CONSTANT inside a definition is not supported")
+            i += 1
+            const_name = tokens[i].lower()
+            if not main_thread or main_thread[-1][0] != 'lit':
+                raise SyntaxError(f"CONSTANT {const_name!r} must follow a literal value")
+            val = main_thread.pop()[1]
+            definitions[const_name] = [('lit', val)]
 
         elif tok.upper() == 'CHAR':
             i += 1
@@ -432,8 +467,9 @@ def main():
     out_file = args.output or str(Path(args.source).with_suffix('.bin'))
 
     symbols              = load_symbols(args.kernel)
-    source               = Path(args.source).read_text()
-    tokens               = tokenize(source)
+    src_path             = Path(args.source)
+    source               = src_path.read_text()
+    tokens               = tokenize(source, base_dir=src_path.parent)
     defs, variables, main = parse(tokens)
     code                 = compile_forth(defs, variables, main, symbols, app_base)
 
