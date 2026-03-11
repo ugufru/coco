@@ -100,6 +100,10 @@ CFA_AND         FDB     CODE_AND
 CFA_OR          FDB     CODE_OR
 CFA_KBD_SCAN    FDB     CODE_KBD_SCAN
 CFA_KEY_NB      FDB     CODE_KEY_NB
+CFA_FILL        FDB     CODE_FILL
+CFA_CMOVE       FDB     CODE_CMOVE
+CFA_LSHIFT      FDB     CODE_LSHIFT
+CFA_RSHIFT      FDB     CODE_RSHIFT
 
 ;;; ─── EXIT ( -- ) ─────────────────────────────────────────────────────────────
 ;;; Return from a colon definition.
@@ -750,6 +754,91 @@ CODE_OR
         ORA     ,U              ; A = n2_hi | n1_hi
         ORB     1,U             ; B = n2_lo | n1_lo
         STD     ,U              ; replace NOS with result
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── FILL ( addr count byte -- ) ────────────────────────────────────────────
+;;; Fill count bytes starting at addr with byte (low byte of TOS).
+;;; X (IP) is saved/restored since the fill loop uses X as dest pointer.
+
+CODE_FILL
+        PSHS    X               ; save IP
+        LDB     1,U             ; B = fill byte (low byte of TOS)
+        LDY     2,U             ; Y = count
+        BEQ     FILL_DONE       ; count = 0 → skip loop
+        LDX     4,U             ; X = dest addr
+FILL_LP STB     ,X+
+        LEAY    -1,Y
+        BNE     FILL_LP
+FILL_DONE
+        LEAU    6,U             ; pop 3 cells
+        PULS    X               ; restore IP
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── CMOVE ( src dest count -- ) ───────────────────────────────────────────
+;;; Copy count bytes from src to dest (low-to-high).
+;;; Uses X=dest, Y=src (both saved/restored).  Count on S stack.
+
+CODE_CMOVE
+        PSHS    X               ; save IP
+        LDD     ,U              ; D = count
+        BEQ     CMOV_DONE       ; count = 0 → skip
+        PSHS    D               ; save count on S
+        LDX     2,U             ; X = dest
+        LDY     4,U             ; Y = src
+CMOV_LP LDA     ,Y+             ; A = byte from src
+        STA     ,X+             ; store to dest
+        LDD     ,S              ; count--
+        SUBD    #1
+        STD     ,S
+        BNE     CMOV_LP
+        LEAS    2,S             ; pop count
+CMOV_DONE
+        LEAU    6,U             ; pop 3 cells
+        PULS    X               ; restore IP
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── LSHIFT ( n count -- n' ) ──────────────────────────────────────────────
+;;; Logical left shift n by count bits.
+
+CODE_LSHIFT
+        LDA     1,U             ; A = shift count (low byte of TOS)
+        ANDA    #$0F            ; clamp to 0–15
+        PSHS    A               ; save count on return stack
+        LDD     2,U             ; D = value to shift (NOS)
+        TST     ,S              ; count = 0?
+        BEQ     LSH_DONE
+LSH_LP  ASLB                    ; shift D left one bit
+        ROLA
+        DEC     ,S              ; count--
+        BNE     LSH_LP
+LSH_DONE
+        LEAS    1,S             ; pop count byte
+        LEAU    2,U             ; pop count cell (keep one cell for result)
+        STD     ,U              ; store shifted value
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── RSHIFT ( n count -- n' ) ──────────────────────────────────────────────
+;;; Logical right shift n by count bits.
+
+CODE_RSHIFT
+        LDA     1,U             ; A = shift count (low byte of TOS)
+        ANDA    #$0F            ; clamp to 0–15
+        PSHS    A               ; save count on return stack
+        LDD     2,U             ; D = value to shift (NOS)
+        TST     ,S              ; count = 0?
+        BEQ     RSH_DONE
+RSH_LP  LSRA                    ; shift D right one bit (logical)
+        RORB
+        DEC     ,S              ; count--
+        BNE     RSH_LP
+RSH_DONE
+        LEAS    1,S             ; pop count byte
+        LEAU    2,U             ; pop count cell
+        STD     ,U              ; store shifted value
         LDY     ,X++            ; NEXT
         JMP     [,Y]
 

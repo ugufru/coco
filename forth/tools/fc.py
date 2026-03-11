@@ -73,6 +73,10 @@ def kernel_words(symbols):
         'or':   'CFA_OR',
         'kbd-scan': 'CFA_KBD_SCAN',
         'key?':     'CFA_KEY_NB',
+        'fill':     'CFA_FILL',
+        'cmove':    'CFA_CMOVE',
+        'lshift':   'CFA_LSHIFT',
+        'rshift':   'CFA_RSHIFT',
     }
     result = {}
     for forth_name, sym_name in names.items():
