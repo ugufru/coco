@@ -4,11 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is the **CoCo Renovation** project — a plan to build a self-contained, on-device development environment for the TRS-80 Color Computer (CoCo), delivered as a ROM cartridge. The core distinction from emulation: the real hardware runs, but with a modernized software tooling layer replacing the inadequate 1982-era ecosystem.
+What if the TRS-80 Color Computer had shipped with real developer tools instead of a cramped BASIC prompt? That's the question driving **CoCo Renovation** — a from-scratch development environment delivered on a ROM cartridge, giving the CoCo the toolchain it deserved in 1982 but never got. The real hardware runs. Only the software gets an upgrade.
 
-The project is currently in an **early planning/documentation phase**. The primary artifact is `COCO_RENOVATION.md`, which outlines the vision and components.
+The project includes a **Forth kernel and cross-compiler** (`forth/`), a growing collection of **SG4 semigraphics demos** (`src/`), and a **tutorial series** (`getting-started/`) that walks through building programs from scratch. The long-term vision lives in `COCO_RENOVATION.md`.
 
 ## Target Platform
+
+The 6809 is one of the most elegant 8-bit CPUs ever made — two stack pointers, a real multiply instruction, and an addressing mode for every occasion. The CoCo wrapped it in a machine that sold for under $200 and brought computing home to millions.
 
 - **CPU**: Motorola 6809
 - **Hardware**: TRS-80 Color Computer (CoCo), any model with the pak (cartridge) slot
@@ -17,6 +19,8 @@ The project is currently in an **early planning/documentation phase**. The prima
 - **Storage**: microSD card holds source files, assembled binaries, and projects (FAT16 or custom FS)
 
 ## Planned Components
+
+Everything a developer needs, nothing they don't. Each component earns its bytes in the 64K ROM budget — no bloat, no compromise.
 
 | Component | Role |
 |-----------|------|
@@ -30,6 +34,8 @@ The project is currently in an **early planning/documentation phase**. The prima
 
 ## Existing Ecosystem to Build On / Integrate With
 
+The CoCo community never stopped building. Four decades of accumulated tools, emulators, and OS projects mean we're not starting from zero — we're standing on shoulders.
+
 - **lwasm** — modern 6809 assembler (cross-development); likely the cross-assembler used during development
 - **XRoar / MAME** — accurate CoCo emulators with debugging; primary test environment before real hardware
 - **CoCoSDC** — SD card interface for real CoCo hardware
@@ -40,11 +46,15 @@ The project is currently in an **early planning/documentation phase**. The prima
 
 ## Development Approach (Anticipated)
 
+Write on a modern machine, test in an emulator, deploy to real iron. The classic embedded loop, applied to a machine from 1980.
+
 Components will likely be written in **6809 assembly**, cross-assembled on a modern machine using **lwasm**, and tested under **XRoar or MAME** before deployment to real hardware. The workflow mirrors embedded development: write → cross-assemble → deploy to emulator → iterate → test on hardware.
 
 The 64K ROM budget means each component must be designed with size discipline. The assembler, linker, and editor are the highest-complexity components and likely candidates to start with independently before integration.
 
 ## Key Design Principles (from COCO_RENOVATION.md)
+
+The constraints aren't obstacles — they're the whole point. A 64K ceiling and an 8-bit register file force every design choice to be deliberate.
 
 - **Renovation, not emulation** — the hardware runs authentically; only the software layer changes
 - **Constraints are features** — the 64K limit and 6809 register pressure are intentional; they produce discipline

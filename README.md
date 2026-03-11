@@ -7,6 +7,8 @@ on a modern machine. Run it natively on the CoCo's 6809.
 
 ## How it works
 
+No interpreter sitting between you and the metal. Your Forth compiles to threaded code on a modern machine and runs at full 6809 speed on the CoCo.
+
 ```
 source.fs  →  fc.py (cross-compiler)  →  DECB binary  →  CoCo 6809
 ```
@@ -20,6 +22,8 @@ executes natively. The CoCo never sees source text.
 
 ## What's here
 
+A kernel, a compiler, a tutorial, and a growing library of programs that prove it all works.
+
 | Path | What it is |
 |---|---|
 | `forth/kernel/kernel.asm` | 6809 ITC Forth executor kernel |
@@ -28,6 +32,10 @@ executes natively. The CoCo never sees source text.
 | `forth/run.sh` | One-command build and run script |
 | `forth/kernel/README.md` | Kernel architecture, primitives, memory layout |
 | `forth/tools/README.md` | Cross-compiler internals and usage |
+| `forth/lib/` | Shared Forth libraries (RNG, screen, printing) |
+| `src/tetris/` | Bare Naked Tetris — SG4 semigraphics game |
+| `src/kaleidoscope/` | Kaleidoscope — SG4 symmetric pattern generator |
+| `src/calculator/` | RPN calculator |
 | `docs/` | Tutorial book: *Getting Started with Bare Naked Forth* |
 | `COCO_RENOVATION.md` | Original vision document |
 | `coco_technical_reference.pdf` | TRS-80 CoCo technical reference |
@@ -35,6 +43,8 @@ executes natively. The CoCo never sees source text.
 ---
 
 ## Quick start
+
+From zero to "HELLO, WORLD!" on a CoCo 2 screen in under a minute.
 
 Requires `lwtools` and `xroar` (`brew install lwtools xroar`). CoCo 2 ROM
 images (`bas12.rom`, `extbas11.rom`) in `~/.xroar/roms/`.
@@ -56,6 +66,8 @@ To run any Forth program:
 ---
 
 ## Status
+
+The foundation is solid. The kernel boots, the compiler works, and real programs run on real (emulated) hardware.
 
 Working: kernel boots, clears screen, executes cross-compiled Forth bytecode.
 All 13 tutorial chapters complete with working example programs.
@@ -91,6 +103,8 @@ All 13 tutorial chapters complete with working example programs.
 
 ## Tutorial
 
+Thirteen chapters take you from your first stack push to a working game running on vintage hardware. No prior Forth or 6809 experience needed.
+
 `docs/` contains *Getting Started with Bare Naked Forth* — a 13-chapter beginner's
 book. Each chapter has a working example program and DIY exercises.
 
@@ -115,6 +129,8 @@ Open `docs/index.html` in a browser to read it locally.
 ---
 
 ## Roadmap
+
+Where this goes next — from software-only to cartridge hardware with a co-processor on the bus.
 
 - Serial loader — bit-banged via PIA ($FF20/$FF22) for loading bytecode over RS-232
 - ROM cartridge image — kernel + loader burned to flash, bootable from the pak slot
