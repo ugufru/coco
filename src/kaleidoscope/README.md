@@ -2,6 +2,8 @@
 
 A four-way symmetric pattern generator for the TRS-80 Color Computer, built on the CoCo Forth kernel. Draws random colored pixels in semigraphics-4 mode, mirrored across both axes to create evolving kaleidoscope patterns.
 
+![Kaleidoscope running in XRoar](screenshot.png)
+
 ## How It Works
 
 The 64×32 SG4 pixel grid is divided into four quadrants around the center point (32, 16). Each step picks a random position (dx, dy) and plots it in all four quadrants simultaneously:

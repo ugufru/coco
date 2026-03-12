@@ -2,6 +2,8 @@
 
 Cycles through all 11 MC6847 display modes on the TRS-80 Color Computer. Each mode shows a visual pattern plus the mode name, rendered using whichever technique that mode supports. Press any key to advance to the next mode.
 
+![VDG Mode Demo running in XRoar](screenshot.png)
+
 ## Modes
 
 | Mode | Resolution | Colors | VRAM | Pattern | Text Method |

@@ -2,6 +2,8 @@
 
 A bare-metal keyboard echo test for the TRS-80 Color Computer, built on the CoCo Forth kernel. Types characters to the VDG screen with a visible block cursor and full cursor movement — no BASIC ROM dependency.
 
+![Typewriter running in XRoar](screenshot.png)
+
 ## What It Demonstrates
 
 This demo exercises the kernel's **keyboard and display primitives** end-to-end:

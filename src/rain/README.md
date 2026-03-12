@@ -2,6 +2,8 @@
 
 A Matrix-style falling character effect for the TRS-80 Color Computer. The VDG's green-on-black text mode is a natural fit for the aesthetic — no tricks needed to get the right colors.
 
+![Digital Rain running in XRoar](screenshot.png)
+
 32 independent streams of characters fall at different speeds across the screen. Each stream has a bright head, a dimmer trail of mutating characters, and a black erasing tail. Close XRoar to exit.
 
 ## How It Looks

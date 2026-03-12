@@ -2,6 +2,8 @@
 
 An infix calculator for the TRS-80 Color Computer, built on the CoCo Forth kernel. Demonstrates VDG semigraphic pixel-font digits, direct video RAM writes, and keyboard input — all in ~130 lines of Forth.
 
+![Calculator running in XRoar](screenshot.png)
+
 ## Screen Layout
 
 ```

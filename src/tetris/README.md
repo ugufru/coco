@@ -2,6 +2,8 @@
 
 A full Tetris game for the TRS-80 Color Computer, built on the CoCo Forth kernel using SG4 semigraphics. Real-time game loop with zero-flicker rendering, collision detection, line clearing, scoring, high scores, and difficulty progression — all in ~555 lines of Forth.
 
+![Tetris running in XRoar](screenshot.png)
+
 ## Screen Layout
 
 The 32×16 VDG text display is split into two regions:
