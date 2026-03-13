@@ -6,43 +6,26 @@
 \
 \ Modes: Alpha, SG4, SG6, CG1, RG1, CG2, RG2, CG3, RG3, CG6, RG6
 \
-\ Requires: vdg.fs (mode switching), font5x7.fs (bitmap font)
+\ Requires: vdg.fs, font5x7.fs, datawrite.fs, rg-text.fs, cg-text.fs,
+\           sg6-text.fs
 
 INCLUDE ../../forth/lib/vdg.fs
 INCLUDE ../../forth/lib/font5x7.fs
+INCLUDE ../../forth/lib/datawrite.fs
+INCLUDE ../../forth/lib/rg-text.fs
+INCLUDE ../../forth/lib/cg-text.fs
+INCLUDE ../../forth/lib/sg6-text.fs
 
 \ -- Constants -----------------------------------------------------------
 
 11 CONSTANT NMODES
 $5800 CONSTANT MTAB           \ mode table base (11 x 16 = 176 bytes)
-$58B0 CONSTANT EXTAB          \ CG expand table (16 bytes)
 $3000 CONSTANT GVRAM          \ graphics VRAM (safe: app code < $3000)
 
 \ -- Variables -----------------------------------------------------------
 
 VARIABLE mi                   \ current mode index (0-10)
-VARIABLE tp                   \ data write pointer
-VARIABLE cv                   \ cached VRAM base
-VARIABLE cb                   \ cached bytes per row
 VARIABLE qt                   \ quarter-size scratch
-VARIABLE ftmp                 \ font byte temp (cg-char)
-VARIABLE sg-g                 \ SG6: current glyph address
-VARIABLE sg-d                 \ SG6: current dest address
-
-\ -- Data write helpers --------------------------------------------------
-
-: tb  ( byte -- )  tp @ C!  tp @ 1 + tp ! ;
-: tw  ( word -- )  tp @ !  tp @ 2 + tp ! ;
-
-\ -- CG nibble-expand table (16 bytes at EXTAB) -------------------------
-\ Maps 4 font bits to 1 CG byte.  Each input bit becomes 2 identical bits.
-
-: init-expand
-  EXTAB tp !
-  $00 tb $03 tb $0C tb $0F tb
-  $30 tb $33 tb $3C tb $3F tb
-  $C0 tb $C3 tb $CC tb $CF tb
-  $F0 tb $F3 tb $FC tb $FF tb ;
 
 \ -- Mode table (11 entries x 16 bytes at MTAB) -------------------------
 \
@@ -127,57 +110,6 @@ VARIABLE sg-d                 \ SG6: current dest address
 
 : emit-name  ( -- )
   m-name 8 0 DO DUP I + C@ EMIT LOOP DROP ;
-
-\ -- Font rendering: RG modes (1 bit/pixel) -----------------------------
-\ Font byte maps 1:1 to VRAM byte (5 glyph pixels in bits 7-3).
-
-: rg-char  ( char cx cy -- )
-  8 * cb @ * SWAP + cv @ +    \ dest = vram + cy*8*bpr + cx
-  SWAP glyph-addr SWAP        \ ( glyph dest )
-  7 0 DO
-    OVER I + C@
-    OVER I cb @ * + C!
-  LOOP DROP DROP ;
-
-\ -- Font rendering: CG modes (2 bits/pixel) ----------------------------
-\ Expand each font bit to 2 CG bits via lookup table.
-
-: expand-hi  ( byte -- cg-byte )  4 RSHIFT EXTAB + C@ ;
-: expand-lo  ( byte -- cg-byte )  $08 AND IF $C0 ELSE 0 THEN ;
-
-: cg-char  ( char cx cy -- )
-  8 * cb @ * SWAP 2 * + cv @ +   \ dest = vram + cy*8*bpr + cx*2
-  SWAP glyph-addr SWAP            \ ( glyph dest )
-  7 0 DO
-    OVER I + C@ ftmp !            \ save font byte
-    ftmp @ expand-hi
-    OVER I cb @ * + C!             \ write CG byte 1
-    ftmp @ expand-lo
-    OVER I cb @ * + 1 + C!        \ write CG byte 2
-  LOOP DROP DROP ;
-
-\ -- Font rendering: SG6 mode -------------------------------------------
-\ SG6 disables the internal character ROM (INT*/EXT=1), so EMIT won't
-\ display text.  Instead we use whole SG6 cells as block pixels:
-\ each font pixel becomes one filled cell ($BF) or empty cell ($80).
-\ Characters are 5 cells wide x 7 rows tall.
-
-: sg6-row  ( font-byte -- )
-  \ Write 5 cells for one font row.  Scans bits 7-3 (cols 0-4).
-  \ sg-d @ points to first cell of this row.
-  5 0 DO
-    DUP $80 AND IF $BF ELSE $80 THEN
-    sg-d @ I + C!
-    DUP + \ left-shift by 1 (DUP + = *2)
-  LOOP DROP
-  sg-d @ 32 + sg-d ! ;         \ advance to next screen row
-
-: sg6-char  ( char cx cy -- )
-  32 * SWAP + cv @ + sg-d !    \ sg-d = vram + cy*32 + cx
-  glyph-addr sg-g !
-  7 0 DO
-    sg-g @ I + C@ sg6-row
-  LOOP ;
 
 \ -- Name rendering for graphics modes ----------------------------------
 
