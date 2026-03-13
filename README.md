@@ -79,8 +79,8 @@ All 13 tutorial chapters complete with working example programs.
 | Group | Words |
 |---|---|
 | Threading | DOCOL, DOVAR, EXIT, LIT |
-| Stack | DUP, DROP, SWAP, OVER |
-| Arithmetic | +, -, \*, /MOD |
+| Stack | DUP, DROP, SWAP, OVER, ?DUP |
+| Arithmetic | +, -, \*, /MOD, NEGATE |
 | Memory | @, ! |
 | I/O | EMIT, CR, KEY |
 | Control flow | 0BRANCH, BRANCH, DO, LOOP, I |

@@ -104,6 +104,8 @@ CFA_FILL        FDB     CODE_FILL
 CFA_CMOVE       FDB     CODE_CMOVE
 CFA_LSHIFT      FDB     CODE_LSHIFT
 CFA_RSHIFT      FDB     CODE_RSHIFT
+CFA_NEGATE      FDB     CODE_NEGATE
+CFA_QDUP        FDB     CODE_QDUP
 
 ;;; ─── EXIT ( -- ) ─────────────────────────────────────────────────────────────
 ;;; Return from a colon definition.
@@ -839,6 +841,29 @@ RSH_DONE
         LEAS    1,S             ; pop count byte
         LEAU    2,U             ; pop count cell
         STD     ,U              ; store shifted value
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── NEGATE ( n -- -n ) ──────────────────────────────────────────────────────
+;;; Two's complement negate: -n = ~n + 1.
+
+CODE_NEGATE
+        LDD     ,U              ; D = TOS
+        COMA                    ; ones' complement high byte
+        COMB                    ; ones' complement low byte
+        ADDD    #1              ; two's complement
+        STD     ,U              ; replace TOS
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── ?DUP ( x -- x x | 0 ) ─────────────────────────────────────────────────
+;;; Duplicate TOS only if it is non-zero.
+
+CODE_QDUP
+        LDD     ,U              ; D = TOS
+        BEQ     QDUP_DONE       ; zero → leave stack unchanged
+        STD     ,--U            ; non-zero → push duplicate
+QDUP_DONE
         LDY     ,X++            ; NEXT
         JMP     [,Y]
 

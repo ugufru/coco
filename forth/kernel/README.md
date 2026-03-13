@@ -65,6 +65,7 @@ processors where Forth fits naturally without compromise.
 | `DROP` | `( n -- )` | Discard top of stack |
 | `SWAP` | `( n1 n2 -- n2 n1 )` | Exchange top two items |
 | `OVER` | `( n1 n2 -- n1 n2 n1 )` | Copy second item to top |
+| `?DUP` | `( x -- x x \| 0 )` | Duplicate only if non-zero |
 
 ### Arithmetic
 
@@ -74,6 +75,7 @@ processors where Forth fits naturally without compromise.
 | `-` | `( n1 n2 -- diff )` | Subtract (n1 − n2) |
 | `*` | `( n1 n2 -- product )` | Multiply |
 | `/MOD` | `( n1 n2 -- rem quot )` | Divide: remainder and quotient |
+| `NEGATE` | `( n -- -n )` | Two's complement negate |
 
 ### Memory
 
@@ -131,11 +133,11 @@ $0050–$0051   VAR_CUR     cursor offset into video RAM (0–511)
 $0400–$05FF   video RAM   (32 columns × 16 rows, VDG alphanumeric)
 $1000         DOCOL
 $1009         DOVAR
-$1013–$1048   CFA table   (29 entries × 2 bytes)
-$1049–$1224   machine code for all primitives
-$1223         CODE_HALT
-$1225         START       (DECB exec address)
-$1227–$1FFF   unused      (~3.5K available for new primitives)
+$1013–$1060   CFA table   (31 entries × 2 bytes)
+$1061–$1432   machine code for all primitives
+$1431         CODE_HALT
+$1433         START       (DECB exec address)
+$1453–$1FFF   unused      (~2.9K available for new primitives)
 $2000–$xxxx   application (cross-compiled Forth thread)
 $7E00         data stack base  (U, grows down)
 $7FFE         return stack init (S, grows down from $7FFE)

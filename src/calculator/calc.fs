@@ -10,12 +10,9 @@
 \   Rows 13-14 : [0][C][=][+]
 \   Row  15    : OP: / MEM: status line
 
-\ ── Text output helpers ───────────────────────────────────────────────────────
+\ ── Shared libraries ─────────────────────────────────────────────────────────
 
-: NEGATE   0 SWAP - ;
-: ?DUP     DUP IF DUP THEN ;
-: U.       10 /MOD ?DUP IF U. THEN  CHAR 0 + EMIT ;
-: .        DUP 0 < IF NEGATE CHAR - EMIT THEN  U. ;
+INCLUDE ../../forth/lib/print.fs
 
 \ ── Video RAM primitives ──────────────────────────────────────────────────────
 

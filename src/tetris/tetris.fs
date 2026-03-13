@@ -18,6 +18,7 @@
 INCLUDE ../../forth/lib/rng.fs
 INCLUDE ../../forth/lib/screen.fs
 INCLUDE ../../forth/lib/print.fs
+INCLUDE ../../forth/lib/datawrite.fs
 
 \ ── Normal-video text output ────────────────────────────────────────────────
 \ EMIT writes inverse ($40|char) = dark on green.  vemit writes normal
@@ -48,7 +49,6 @@ VARIABLE go-flag   \ game-over flag
 VARIABLE ck-ok     \ collision check result
 
 VARIABLE dc-tmp    \ color for draw-cell
-VARIABLE pt-w      \ piece table write pointer
 VARIABLE sv-r      \ saved row index for nested loops
 VARIABLE full-f    \ row-full? flag
 VARIABLE clr-n     \ lines cleared this lock
@@ -85,45 +85,43 @@ VARIABLE sg-byte   \ precomputed SG4 byte for current piece
 \ Decode: byte 4 /MOD  ( -- dy dx )  — dx on top, ready for px @ +
 \ Piece colors: piece_index + 1 (1=yellow .. 7=orange).
 
-: pb  ( byte -- )  pt-w @ C!  pt-w @ 1 + pt-w ! ;
-
 : init-pieces
-  $4100 pt-w !
+  $4100 tp !
   \ Piece 0: I
-  0 pb 4 pb 8 pb 12 pb     \ R0: ####
-  0 pb 1 pb 2 pb 3 pb      \ R1: vertical
-  0 pb 4 pb 8 pb 12 pb     \ R2
-  0 pb 1 pb 2 pb 3 pb      \ R3
+  0 tb 4 tb 8 tb 12 tb     \ R0: ####
+  0 tb 1 tb 2 tb 3 tb      \ R1: vertical
+  0 tb 4 tb 8 tb 12 tb     \ R2
+  0 tb 1 tb 2 tb 3 tb      \ R3
   \ Piece 1: O
-  0 pb 4 pb 1 pb 5 pb      \ R0: ##
-  0 pb 4 pb 1 pb 5 pb      \ R1: ##
-  0 pb 4 pb 1 pb 5 pb      \ R2
-  0 pb 4 pb 1 pb 5 pb      \ R3
+  0 tb 4 tb 1 tb 5 tb      \ R0: ##
+  0 tb 4 tb 1 tb 5 tb      \ R1: ##
+  0 tb 4 tb 1 tb 5 tb      \ R2
+  0 tb 4 tb 1 tb 5 tb      \ R3
   \ Piece 2: T
-  0 pb 4 pb 8 pb 5 pb      \ R0: ### with nub down
-  0 pb 1 pb 5 pb 2 pb      \ R1: nub right
-  4 pb 1 pb 5 pb 9 pb      \ R2: nub up
-  4 pb 1 pb 5 pb 6 pb      \ R3: nub left
+  0 tb 4 tb 8 tb 5 tb      \ R0: ### with nub down
+  0 tb 1 tb 5 tb 2 tb      \ R1: nub right
+  4 tb 1 tb 5 tb 9 tb      \ R2: nub up
+  4 tb 1 tb 5 tb 6 tb      \ R3: nub left
   \ Piece 3: S
-  4 pb 8 pb 1 pb 5 pb      \ R0: .## / ##.
-  0 pb 1 pb 5 pb 6 pb      \ R1: vertical
-  4 pb 8 pb 1 pb 5 pb      \ R2
-  0 pb 1 pb 5 pb 6 pb      \ R3
+  4 tb 8 tb 1 tb 5 tb      \ R0: .## / ##.
+  0 tb 1 tb 5 tb 6 tb      \ R1: vertical
+  4 tb 8 tb 1 tb 5 tb      \ R2
+  0 tb 1 tb 5 tb 6 tb      \ R3
   \ Piece 4: Z
-  0 pb 4 pb 5 pb 9 pb      \ R0: ##. / .##
-  4 pb 1 pb 5 pb 2 pb      \ R1: vertical
-  0 pb 4 pb 5 pb 9 pb      \ R2
-  4 pb 1 pb 5 pb 2 pb      \ R3
+  0 tb 4 tb 5 tb 9 tb      \ R0: ##. / .##
+  4 tb 1 tb 5 tb 2 tb      \ R1: vertical
+  0 tb 4 tb 5 tb 9 tb      \ R2
+  4 tb 1 tb 5 tb 2 tb      \ R3
   \ Piece 5: L
-  0 pb 1 pb 2 pb 6 pb      \ R0: #. / #. / ##
-  0 pb 4 pb 8 pb 1 pb      \ R1: ### / #..
-  0 pb 4 pb 5 pb 6 pb      \ R2: ## / .# / .#
-  8 pb 1 pb 5 pb 9 pb      \ R3: ..# / ###
+  0 tb 1 tb 2 tb 6 tb      \ R0: #. / #. / ##
+  0 tb 4 tb 8 tb 1 tb      \ R1: ### / #..
+  0 tb 4 tb 5 tb 6 tb      \ R2: ## / .# / .#
+  8 tb 1 tb 5 tb 9 tb      \ R3: ..# / ###
   \ Piece 6: J
-  4 pb 5 pb 2 pb 6 pb      \ R0: .# / .# / ##
-  0 pb 1 pb 5 pb 9 pb      \ R1: #.. / ###
-  0 pb 4 pb 1 pb 2 pb      \ R2: ## / #. / #.
-  0 pb 4 pb 8 pb 9 pb ;    \ R3: ### / ..#
+  4 tb 5 tb 2 tb 6 tb      \ R0: .# / .# / ##
+  0 tb 1 tb 5 tb 9 tb      \ R1: #.. / ###
+  0 tb 4 tb 1 tb 2 tb      \ R2: ## / #. / #.
+  0 tb 4 tb 8 tb 9 tb ;    \ R3: ### / ..#
 
 \ ── Board operations ────────────────────────────────────────────────────────
 

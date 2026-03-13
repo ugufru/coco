@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Language Reference — Bare Naked Forth</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .ref-table { width: 100%; border-collapse: collapse; margin: 1.3em 0; font-size: 0.92em; }
+    .ref-table th { background: var(--green-light); text-align: left; padding: 6px 10px;
+      font-size: 0.82em; text-transform: uppercase; letter-spacing: 0.08em; color: var(--green-dark);
+      border-bottom: 2px solid var(--green); }
+    .ref-table td { padding: 5px 10px; border-bottom: 1px solid #ddd; vertical-align: top; }
+    .ref-table code { font-size: 0.95em; }
+    .ref-table tr:hover { background: #fafaf5; }
+    .ref-section { margin-top: 2.5em; }
+    .ref-section:first-of-type { margin-top: 1.5em; }
+    .word-name { font-family: "Courier New", Courier, monospace; font-weight: bold; font-size: 1.05em; white-space: nowrap; }
+    .stack-effect { font-family: "Courier New", Courier, monospace; font-size: 0.9em; color: #555; white-space: nowrap; }
+    .lib-path { font-family: "Courier New", Courier, monospace; font-size: 0.85em; color: var(--green-dark); }
+    .group-label { font-size: 0.78em; text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--green-dark); font-weight: bold; margin: 1.8em 0 0.3em; padding-bottom: 4px;
+      border-bottom: 1px solid var(--green); }
+    .intro-note { font-style: italic; color: #555; font-size: 0.92em; margin-bottom: 1.5em; }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- Header -->
+    <div class="chapter-opener">
+      <div class="chapter-label">REFERENCE</div>
+      <div class="chapter-title">Language<br>Reference</div>
+      <div class="chapter-green-bar"></div>
+    </div>
+
+    <div class="page-header">
+      <span>LANGUAGE REFERENCE</span>
+      <span></span>
+    </div>
+    <div class="content clearfix">
+
+      <p class="intro-note">
+        This is the complete word list for Bare Naked Forth. Kernel primitives
+        are implemented in 6809 assembly and are always available. Library words
+        are written in Forth and loaded with <code>INCLUDE</code>. Compiler
+        directives are handled by the cross-compiler (<code>fc.py</code>) and
+        do not generate runtime code.
+      </p>
+
+      <!-- ================================================================== -->
+      <h2>Kernel Primitives</h2>
+      <!-- ================================================================== -->
+
+      <p>These words are implemented in 6809 machine code in <code>kernel.asm</code>.
+      They are always available to every program.</p>
+
+      <!-- Threading -->
+      <div class="group-label">Threading</div>
+      <table class="ref-table">
+        <tr>
+          <th style="width:110px">Word</th>
+          <th style="width:180px">Stack</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td class="word-name">DOCOL</td>
+          <td class="stack-effect">&mdash;</td>
+          <td>Enter a colon definition. Pushes IP to return stack, sets IP to word body. Generated automatically by the compiler for <code>:</code> definitions.</td>
+        </tr>
+        <tr>
+          <td class="word-name">DOVAR</td>
+          <td class="stack-effect">( -- addr )</td>
+          <td>Enter a variable. Pushes the address of the variable's data cell. Generated automatically by the compiler for <code>VARIABLE</code> definitions.</td>
+        </tr>
+        <tr>
+          <td class="word-name">EXIT</td>
+          <td class="stack-effect">&mdash;</td>
+          <td>Return from a colon definition. Pops IP from the return stack. The compiler emits this automatically at the end of every <code>:</code> definition.</td>
+        </tr>
+        <tr>
+          <td class="word-name">LIT</td>
+          <td class="stack-effect">( -- n )</td>
+          <td>Push the next cell in the thread as a 16-bit literal. The compiler emits this before every numeric constant in source code.</td>
+        </tr>
+      </table>
+
+      <!-- Stack -->
+      <div class="group-label">Stack</div>
+      <table class="ref-table">
+        <tr>
+          <th style="width:110px">Word</th>
+          <th style="width:180px">Stack</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td class="word-name">DUP</td>
+          <td class="stack-effect">( n -- n n )</td>
+          <td>Duplicate the top of stack.</td>
+        </tr>
+        <tr>
+          <td class="word-name">DROP</td>
+          <td class="stack-effect">( n -- )</td>
+          <td>Discard the top of stack.</td>
+        </tr>
+        <tr>
+          <td class="word-name">SWAP</td>
+          <td class="stack-effect">( n1 n2 -- n2 n1 )</td>
+          <td>Exchange the top two stack items.</td>
+        </tr>
+        <tr>
+          <td class="word-name">OVER</td>
+          <td class="stack-effect">( n1 n2 -- n1 n2 n1 )</td>
+          <td>Copy the second item to the top of the stack.</td>
+        </tr>
+        <tr>
+          <td class="word-name">?DUP</td>
+          <td class="stack-effect">( x -- x x | 0 )</td>
+          <td>Duplicate only if non-zero. If the top of stack is zero, leave it unchanged.</td>
+        </tr>
+      </table>
+
+      <!-- Arithmetic -->
+      <div class="group-label">Arithmetic</div>
+      <table class="ref-table">
+        <tr>
+          <th style="width:110px">Word</th>
+          <th style="width:180px">Stack</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td class="word-name">+</td>
+          <td class="stack-effect">( n1 n2 -- sum )</td>
+          <td>Add the top two stack items.</td>
+        </tr>
+        <tr>
+          <td class="word-name">-</td>
+          <td class="stack-effect">( n1 n2 -- diff )</td>
+          <td>Subtract. Result is n1 &minus; n2.</td>
+        </tr>
+        <tr>
+          <td class="word-name">*</td>
+          <td class="stack-effect">( n1 n2 -- product )</td>
+          <td>Multiply. Uses the 6809's hardware MUL instruction.</td>
+        </tr>
+        <tr>
+          <td class="word-name">/MOD</td>
+          <td class="stack-effect">( n1 n2 -- rem quot )</td>
+          <td>Divide n1 by n2. Pushes remainder, then quotient.</td>
+        </tr>
+        <tr>
+          <td class="word-name">NEGATE</td>
+          <td class="stack-effect">( n -- -n )</td>
+          <td>Two's complement negate. Flips the sign of the top of stack.</td>
+        </tr>
+      </table>
+
+      <!-- Comparison -->
+      <div class="group-label">Comparison</div>
+      <table class="ref-table">
+        <tr>
+          <th style="width:110px">Word</th>
+          <th style="width:180px">Stack</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td class="word-name">=</td>
+          <td class="stack-effect">( n1 n2 -- flag )</td>
+          <td>True (<code>$FFFF</code>) if n1 equals n2, false (<code>$0000</code>) otherwise.</td>
+        </tr>
+        <tr>
+          <td class="word-name">&lt;&gt;</td>
+          <td class="stack-effect">( n1 n2 -- flag )</td>
+          <td>True if n1 does not equal n2.</td>
+        </tr>
+        <tr>
+          <td class="word-name">&lt;</td>
+          <td class="stack-effect">( n1 n2 -- flag )</td>
+          <td>True if n1 is less than n2 (signed comparison).</td>
+        </tr>
+        <tr>
+          <td class="word-name">&gt;</td>
+          <td class="stack-effect">( n1 n2 -- flag )</td>
+          <td>True if n1 is greater than n2 (signed comparison).</td>
+        </tr>
+        <tr>
+          <td class="word-name">0=</td>
+          <td class="stack-effect">( n -- flag )</td>
+          <td>True if n is zero.</td>
+        </tr>
+      </table>
+
+      <!-- Memory -->
+      <div class="group-label">Memory</div>
+      <table class="ref-table">
+        <tr>
+          <th style="width:110px">Word</th>
+          <th style="width:180px">Stack</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td class="word-name">@</td>
+          <td class="stack-effect">( addr -- n )</td>
+          <td>Fetch a 16-bit value from memory address.</td>
+        </tr>
+        <tr>
+          <td class="word-name">!</td>
+          <td class="stack-effect">( n addr -- )</td>
+          <td>Store a 16-bit value to memory address.</td>
+        </tr>
+        <tr>
+          <td class="word-name">C@</td>
+          <td class="stack-effect">( addr -- byte )</td>
+          <td>Fetch an 8-bit byte from memory address.</td>
+        </tr>
+        <tr>
+          <td class="word-name">C!</td>
+          <td class="stack-effect">( byte addr -- )</td>
+          <td>Store an 8-bit byte to memory address.</td>
+        </tr>
+        <tr>
+          <td class="word-name">FILL</td>
+          <td class="stack-effect">( addr count byte -- )</td>
+          <td>Fill <em>count</em> bytes starting at <em>addr</em> with <em>byte</em>.</td>
+        </tr>
+        <tr>
+          <td class="word-name">CMOVE</td>
+          <td class="stack-effect">( src dest count -- )</td>
+          <td>Copy <em>count</em> bytes from <em>src</em> to <em>dest</em>. Ascending copy (safe when dest &gt; src).</td>
+        </tr>
+      </table>
+
+      <!-- Logic / Bitwise -->
+      <div class="group-label">Logic / Bitwise</div>
+      <table class="ref-table">
+        <tr>
+          <th style="width:110px">Word</th>
+          <th style="width:180px">Stack</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td class="word-name">AND</td>
+          <td class="stack-effect">( n1 n2 -- n3 )</td>
+          <td>Bitwise AND of the top two stack items.</td>
+        </tr>
+        <tr>
+          <td class="word-name">OR</td>
+          <td class="stack-effect">( n1 n2 -- n3 )</td>
+          <td>Bitwise OR of the top two stack items.</td>
+        </tr>
+        <tr>
+          <td class="word-name">LSHIFT</td>
+          <td class="stack-effect">( n count -- n' )</td>
+          <td>Logical left shift n by <em>count</em> bits.</td>
+        </tr>
+        <tr>
+          <td class="word-name">RSHIFT</td>
+          <td class="stack-effect">( n count -- n' )</td>
+          <td>Logical right shift n by <em>count</em> bits.</td>
+        </tr>
+      </table>
+
+      <!-- I/O -->
+      <div class="group-label">I/O</div>
+      <table class="ref-table">
+        <tr>
+          <th style="width:110px">Word</th>
+          <th style="width:180px">Stack</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td class="word-name">EMIT</td>
+          <td class="stack-effect">( c -- )</td>
+          <td>Write character to video RAM at the cursor position and advance the cursor. Converts ASCII to VDG encoding.</td>
+        </tr>
+        <tr>
+          <td class="word-name">CR</td>
+          <td class="stack-effect">( -- )</td>
+          <td>Advance the cursor to the start of the next row.</td>
+        </tr>
+        <tr>
+          <td class="word-name">KEY</td>
+          <td class="stack-effect">( -- c )</td>
+          <td>Wait for a keypress with debounce and auto-repeat. Push the ASCII code. Blocking.</td>
+        </tr>
+        <tr>
+          <td class="word-name">KEY?</td>
+          <td class="stack-effect">( -- c | 0 )</td>
+          <td>Non-blocking key scan. Returns the ASCII code of any pressed key, or 0 if no key is held.</td>
+        </tr>
+        <tr>
+          <td class="word-name">KBD-SCAN</td>
+          <td class="stack-effect">( col-mask -- row-bits )</td>
+          <td>Raw keyboard matrix scan. Writes <em>col-mask</em> to PIA0-B (<code>$FF02</code>) and returns the row bits. Used by the keyboard library for direct key testing.</td>
+        </tr>
+        <tr>
+          <td class="word-name">AT</td>
+          <td class="stack-effect">( row col -- )</td>
+          <td>Set the cursor to the given row (0&ndash;15) and column (0&ndash;31).</td>
+        </tr>
+      </table>
+
+      <!-- Control Flow -->
+      <div class="group-label">Control Flow</div>
+      <table class="ref-table">
+        <tr>
+          <th style="width:110px">Word</th>
+          <th style="width:180px">Stack</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td class="word-name">0BRANCH</td>
+          <td class="stack-effect">( flag -- )</td>
+          <td>Branch forward by the inline offset if flag is zero. Used by the compiler to implement <code>IF</code> and <code>UNTIL</code>.</td>
+        </tr>
+        <tr>
+          <td class="word-name">BRANCH</td>
+          <td class="stack-effect">( -- )</td>
+          <td>Unconditional branch by the inline offset. Used by the compiler for <code>ELSE</code>, <code>AGAIN</code>, and <code>LOOP</code>.</td>
+        </tr>
+        <tr>
+          <td class="word-name">DO</td>
+          <td class="stack-effect">( limit index -- )</td>
+          <td>Begin a counted loop. Pushes limit and index to the return stack.</td>
+        </tr>
+        <tr>
+          <td class="word-name">LOOP</td>
+          <td class="stack-effect">&mdash;</td>
+          <td>Increment the loop index by 1. If index &lt; limit, branch back to the word after <code>DO</code>.</td>
+        </tr>
+        <tr>
+          <td class="word-name">I</td>
+          <td class="stack-effect">( -- n )</td>
+          <td>Push the current loop index onto the data stack.</td>
+        </tr>
+      </table>
+
+      <!-- System -->
+      <div class="group-label">System</div>
+      <table class="ref-table">
+        <tr>
+          <th style="width:110px">Word</th>
+          <th style="width:180px">Stack</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td class="word-name">HALT</td>
+          <td class="stack-effect">&mdash;</td>
+          <td>Spin forever (<code>BRA *</code>). Marks the end of the application.</td>
+        </tr>
+      </table>
+
+      <!-- ================================================================== -->
+      <h2>Compiler Directives</h2>
+      <!-- ================================================================== -->
+
+      <p>These are handled by <code>fc.py</code> at compile time. They do not
+      produce runtime code &mdash; they control how code is generated.</p>
+
+      <table class="ref-table">
+        <tr>
+          <th style="width:160px">Directive</th>
+          <th style="width:180px">Syntax</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td class="word-name">:</td>
+          <td><code>: name ... ;</code></td>
+          <td>Begin a colon definition. Compiles the body as a threaded code sequence with DOCOL header and EXIT tail.</td>
+        </tr>
+        <tr>
+          <td class="word-name">;</td>
+          <td></td>
+          <td>End a colon definition. Emits EXIT.</td>
+        </tr>
+        <tr>
+          <td class="word-name">VARIABLE</td>
+          <td><code>VARIABLE name</code></td>
+          <td>Create a named variable. Allocates a 2-byte data cell initialized to zero. Pushes the cell address when called.</td>
+        </tr>
+        <tr>
+          <td class="word-name">CONSTANT</td>
+          <td><code>n CONSTANT name</code></td>
+          <td>Create a named constant. <em>name</em> compiles as <code>LIT n</code>.</td>
+        </tr>
+        <tr>
+          <td class="word-name">CHAR</td>
+          <td><code>CHAR c</code></td>
+          <td>Push the ASCII value of the next character. <code>CHAR A</code> compiles as <code>LIT 65</code>.</td>
+        </tr>
+        <tr>
+          <td class="word-name">IF</td>
+          <td><code>IF ... THEN</code><br><code>IF ... ELSE ... THEN</code></td>
+          <td>Conditional execution. Pops flag; if zero, skips to <code>ELSE</code> or <code>THEN</code>.</td>
+        </tr>
+        <tr>
+          <td class="word-name">ELSE</td>
+          <td></td>
+          <td>Begin the false branch of an <code>IF</code>.</td>
+        </tr>
+        <tr>
+          <td class="word-name">THEN</td>
+          <td></td>
+          <td>End an <code>IF...ELSE...THEN</code> block.</td>
+        </tr>
+        <tr>
+          <td class="word-name">DO ... LOOP</td>
+          <td><code>limit index DO ... LOOP</code></td>
+          <td>Counted loop. Iterates from <em>index</em> to <em>limit</em>&minus;1. Use <code>I</code> inside the loop to read the current index.</td>
+        </tr>
+        <tr>
+          <td class="word-name">BEGIN ... AGAIN</td>
+          <td><code>BEGIN ... AGAIN</code></td>
+          <td>Infinite loop. The body repeats forever.</td>
+        </tr>
+        <tr>
+          <td class="word-name">BEGIN ... UNTIL</td>
+          <td><code>BEGIN ... flag UNTIL</code></td>
+          <td>Loop with exit condition. Repeats while flag is zero; exits when flag is non-zero.</td>
+        </tr>
+        <tr>
+          <td class="word-name">INCLUDE</td>
+          <td><code>INCLUDE path</code></td>
+          <td>Splice the contents of another Forth file at this point in the source. Paths are relative to the including file. Nested includes are supported.</td>
+        </tr>
+        <tr>
+          <td class="word-name">\ (backslash)</td>
+          <td><code>\ comment text</code></td>
+          <td>Line comment. Everything after <code>\</code> to end of line is ignored.</td>
+        </tr>
+        <tr>
+          <td class="word-name">( )</td>
+          <td><code>( comment text )</code></td>
+          <td>Block comment. Text between <code>(</code> and <code>)</code> is ignored. May span multiple lines.</td>
+        </tr>
+      </table>
+
+      <div class="tip">
+        <p>Numeric literals can be decimal (<code>42</code>) or hexadecimal
+        with a <code>$</code> prefix (<code>$FF02</code>). Negative numbers
+        work too: <code>-1</code> compiles as <code>$FFFF</code>.</p>
+      </div>
+
+      <!-- ================================================================== -->
+      <h2>Library Words</h2>
+      <!-- ================================================================== -->
+
+      <p>Library words are written in Forth and live in <code>forth/lib/</code>.
+      Load them with <code>INCLUDE</code> at the top of your source file.
+      Some libraries depend on others &mdash; the required include order is
+      shown below.</p>
+
+      <!-- print.fs -->
+      <div class="ref-section">
+        <h3>Number Printing</h3>
+        <p class="lib-path">INCLUDE lib/print.fs</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">U.</td>
+            <td class="stack-effect">( u -- )</td>
+            <td>Print an unsigned number in decimal. Recursive digit extraction.</td>
+          </tr>
+          <tr>
+            <td class="word-name">.</td>
+            <td class="stack-effect">( n -- )</td>
+            <td>Print a signed number in decimal. Prints a leading <code>-</code> for negative values.</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- rng.fs -->
+      <div class="ref-section">
+        <h3>Random Numbers</h3>
+        <p class="lib-path">INCLUDE lib/rng.fs</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">seed</td>
+            <td class="stack-effect">( -- addr )</td>
+            <td>Variable holding the current RNG state. Initialize to any non-zero value for a different sequence.</td>
+          </tr>
+          <tr>
+            <td class="word-name">rng</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Advance the RNG. Updates <code>seed</code> using a 16-bit linear congruential generator (seed &times; 25173 + 13849).</td>
+          </tr>
+          <tr>
+            <td class="word-name">rnd</td>
+            <td class="stack-effect">( n -- 0..n-1 )</td>
+            <td>Return a random number from 0 to n&minus;1. <em>n</em> must be a power of 2. Uses the high byte of the seed (best bits in an LCG).</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- screen.fs -->
+      <div class="ref-section">
+        <h3>Screen Utilities</h3>
+        <p class="lib-path">INCLUDE lib/screen.fs</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">vsync</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Wait for the next vertical blanking interval (60 Hz). Reads PIA0 CB1 flag at <code>$FF03</code>. Essential for flicker-free animation.</td>
+          </tr>
+          <tr>
+            <td class="word-name">cls-black</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Clear the screen to solid black (SG4 block character <code>$80</code>).</td>
+          </tr>
+          <tr>
+            <td class="word-name">cls-green</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Clear the screen to green (VDG space character <code>$60</code>) and move cursor to 0,0.</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- keyboard.fs -->
+      <div class="ref-section">
+        <h3>Keyboard Matrix</h3>
+        <p class="lib-path">INCLUDE lib/keyboard.fs</p>
+
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">KEY-HELD?</td>
+            <td class="stack-effect">( col row -- flag )</td>
+            <td>Non-blocking key test. Returns non-zero if the specified key is currently pressed. Does not affect KEY debounce state.</td>
+          </tr>
+        </table>
+
+        <p>Column constants select a group of 8 keys:</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Constant</th>
+            <th style="width:80px">Value</th>
+            <th>Keys</th>
+          </tr>
+          <tr><td class="word-name">KB-C0</td><td><code>$FE</code></td><td>@ A B C D E F G</td></tr>
+          <tr><td class="word-name">KB-C1</td><td><code>$FD</code></td><td>H I J K L M N O</td></tr>
+          <tr><td class="word-name">KB-C2</td><td><code>$FB</code></td><td>P Q R S T U V W</td></tr>
+          <tr><td class="word-name">KB-C3</td><td><code>$F7</code></td><td>X Y Z UP DN LT RT SPC</td></tr>
+          <tr><td class="word-name">KB-C4</td><td><code>$EF</code></td><td>0 1 2 3 4 5 6 7</td></tr>
+          <tr><td class="word-name">KB-C5</td><td><code>$DF</code></td><td>8 9 : ; , - . /</td></tr>
+          <tr><td class="word-name">KB-C6</td><td><code>$BF</code></td><td>ENTER CLEAR BREAK ALT CTRL SHIFT F1 F2</td></tr>
+        </table>
+
+        <p>Row constants select one key within a column:</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Constant</th>
+            <th style="width:80px">Value</th>
+            <th>Row position</th>
+          </tr>
+          <tr><td class="word-name">KB-R0</td><td><code>$01</code></td><td>Row 0: @ H P X 0 8 ENTER</td></tr>
+          <tr><td class="word-name">KB-R1</td><td><code>$02</code></td><td>Row 1: A I Q Y 1 9 CLEAR</td></tr>
+          <tr><td class="word-name">KB-R2</td><td><code>$04</code></td><td>Row 2: B J R Z 2 : BREAK</td></tr>
+          <tr><td class="word-name">KB-R3</td><td><code>$08</code></td><td>Row 3: C K S UP 3 ; ALT</td></tr>
+          <tr><td class="word-name">KB-R4</td><td><code>$10</code></td><td>Row 4: D L T DN 4 , CTRL</td></tr>
+          <tr><td class="word-name">KB-R5</td><td><code>$20</code></td><td>Row 5: E M U LT 5 - SHIFT</td></tr>
+          <tr><td class="word-name">KB-R6</td><td><code>$40</code></td><td>Row 6: F N V RT 6 . F1</td></tr>
+          <tr><td class="word-name">KB-R7</td><td><code>$80</code></td><td>Row 7: G O W SPC 7 / F2</td></tr>
+        </table>
+
+        <p>Example: test if the 2 key is held:</p>
+<pre class="forth">KB-C4 KB-R2 KEY-HELD?</pre>
+      </div>
+
+      <!-- datawrite.fs -->
+      <div class="ref-section">
+        <h3>Data Table Construction</h3>
+        <p class="lib-path">INCLUDE lib/datawrite.fs</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">tp</td>
+            <td class="stack-effect">( -- addr )</td>
+            <td>Variable: data write pointer. Set this to the target address before writing.</td>
+          </tr>
+          <tr>
+            <td class="word-name">tb</td>
+            <td class="stack-effect">( byte -- )</td>
+            <td>Write one byte at <code>tp</code> and advance the pointer by 1.</td>
+          </tr>
+          <tr>
+            <td class="word-name">tw</td>
+            <td class="stack-effect">( word -- )</td>
+            <td>Write one 16-bit word (big-endian) at <code>tp</code> and advance by 2.</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- vdg.fs -->
+      <div class="ref-section">
+        <h3>VDG Display Mode Switching</h3>
+        <p class="lib-path">INCLUDE lib/vdg.fs</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">set-sam-v</td>
+            <td class="stack-effect">( v -- )</td>
+            <td>Set SAM display mode bits V0&ndash;V2 (0&ndash;7). Controls the VDG display type.</td>
+          </tr>
+          <tr>
+            <td class="word-name">set-sam-f</td>
+            <td class="stack-effect">( offset -- )</td>
+            <td>Set SAM display offset bits F0&ndash;F6 (0&ndash;127). Display start address = offset &times; 512. Default is 2 (<code>$0400</code>).</td>
+          </tr>
+          <tr>
+            <td class="word-name">set-pia</td>
+            <td class="stack-effect">( bits -- )</td>
+            <td>Set PIA1 <code>$FF22</code> bits 7&ndash;3 (A*/G, GM2, GM1, GM0, CSS). Preserves bits 2&ndash;0.</td>
+          </tr>
+          <tr>
+            <td class="word-name">reset-text</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Restore default alpha/SG4 text mode. SAM V=000, offset=2 (<code>$0400</code>), PIA bits cleared.</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- font5x7.fs -->
+      <div class="ref-section">
+        <h3>Bitmap Font</h3>
+        <p class="lib-path">INCLUDE lib/font5x7.fs</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">init-font</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Write the 5&times;7 bitmap font data to <code>$6000</code> (259 bytes, 37 glyphs). Call once at startup.</td>
+          </tr>
+          <tr>
+            <td class="word-name">glyph-addr</td>
+            <td class="stack-effect">( char -- addr )</td>
+            <td>Return the address of the 7-byte glyph for the given ASCII character. Supports space, A&ndash;Z, 0&ndash;9.</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- rg-text.fs -->
+      <div class="ref-section">
+        <h3>RG Mode Text Rendering</h3>
+        <p class="lib-path">INCLUDE lib/font5x7.fs<br>INCLUDE lib/rg-text.fs</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">cv</td>
+            <td class="stack-effect">( -- addr )</td>
+            <td>Variable: VRAM base address for text rendering. Set before calling any text rendering word.</td>
+          </tr>
+          <tr>
+            <td class="word-name">cb</td>
+            <td class="stack-effect">( -- addr )</td>
+            <td>Variable: bytes per row for the current display mode.</td>
+          </tr>
+          <tr>
+            <td class="word-name">rg-char</td>
+            <td class="stack-effect">( char cx cy -- )</td>
+            <td>Render a character at column <em>cx</em>, row <em>cy</em> in an RG mode (1 bit per pixel). Each font byte maps directly to 8 screen pixels.</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- cg-text.fs -->
+      <div class="ref-section">
+        <h3>CG Mode Text Rendering</h3>
+        <p class="lib-path">INCLUDE lib/font5x7.fs<br>INCLUDE lib/datawrite.fs<br>INCLUDE lib/rg-text.fs<br>INCLUDE lib/cg-text.fs</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">init-expand</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Build the 16-entry nibble expansion table at <code>$7CE0</code>. Call once at startup (after <code>init-font</code>).</td>
+          </tr>
+          <tr>
+            <td class="word-name">expand-hi</td>
+            <td class="stack-effect">( byte -- cg-byte )</td>
+            <td>Expand the high nibble (bits 7&ndash;4) of a font byte to a CG byte via the lookup table.</td>
+          </tr>
+          <tr>
+            <td class="word-name">expand-lo</td>
+            <td class="stack-effect">( byte -- cg-byte )</td>
+            <td>Expand bit 3 of a font byte to a CG byte (the 5th pixel column).</td>
+          </tr>
+          <tr>
+            <td class="word-name">cg-char</td>
+            <td class="stack-effect">( char cx cy -- )</td>
+            <td>Render a character at column <em>cx</em>, row <em>cy</em> in a CG mode (2 bits per pixel). Each glyph column becomes 2 CG pixels wide.</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- sg6-text.fs -->
+      <div class="ref-section">
+        <h3>SG6 Mode Text Rendering</h3>
+        <p class="lib-path">INCLUDE lib/font5x7.fs<br>INCLUDE lib/rg-text.fs<br>INCLUDE lib/sg6-text.fs</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">sg6-row</td>
+            <td class="stack-effect">( font-byte -- )</td>
+            <td>Render one row of a font glyph as 5 SG6 block characters. <code>$BF</code> for on, <code>$80</code> for off.</td>
+          </tr>
+          <tr>
+            <td class="word-name">sg6-char</td>
+            <td class="stack-effect">( char cx cy -- )</td>
+            <td>Render a character at column <em>cx</em>, row <em>cy</em> in SG6 mode. Characters are 5 cells wide &times; 7 rows tall.</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- ================================================================== -->
+      <h2>Memory Map</h2>
+      <!-- ================================================================== -->
+
+      <table class="ref-table">
+        <tr>
+          <th style="width:160px">Address</th>
+          <th>Contents</th>
+        </tr>
+        <tr>
+          <td class="word-name">$0050&ndash;$0057</td>
+          <td>Kernel variables (cursor, key state)</td>
+        </tr>
+        <tr>
+          <td class="word-name">$0400&ndash;$05FF</td>
+          <td>Video RAM &mdash; 32 columns &times; 16 rows, VDG alphanumeric mode</td>
+        </tr>
+        <tr>
+          <td class="word-name">$1000</td>
+          <td>Kernel code begins (DOCOL, DOVAR, CFA table, primitives, START)</td>
+        </tr>
+        <tr>
+          <td class="word-name">$1013&ndash;$1062</td>
+          <td>CFA table &mdash; 40 entries &times; 2 bytes</td>
+        </tr>
+        <tr>
+          <td class="word-name">$2000</td>
+          <td>Application load address (APP_BASE) &mdash; cross-compiled Forth thread</td>
+        </tr>
+        <tr>
+          <td class="word-name">$6000&ndash;$6102</td>
+          <td>Font data (if <code>init-font</code> is called) &mdash; 37 glyphs &times; 7 bytes</td>
+        </tr>
+        <tr>
+          <td class="word-name">$7CE0&ndash;$7CEF</td>
+          <td>CG expand table (if <code>init-expand</code> is called) &mdash; 16 bytes</td>
+        </tr>
+        <tr>
+          <td class="word-name">$7E00</td>
+          <td>Data stack base (U register, grows downward)</td>
+        </tr>
+        <tr>
+          <td class="word-name">$7FFE</td>
+          <td>Return stack init (S register, grows downward)</td>
+        </tr>
+      </table>
+
+      <!-- ================================================================== -->
+      <h2>ASCII &rarr; VDG Encoding</h2>
+      <!-- ================================================================== -->
+
+      <p>The CoCo's MC6847 VDG uses a 6-bit character code. <code>EMIT</code>
+      handles this conversion automatically, but if you're writing directly to
+      video RAM:</p>
+
+<pre class="forth">screen_byte = $40 OR ( ascii AND $3F )</pre>
+
+      <p>Uppercase A&ndash;Z need no conversion. Space becomes <code>$60</code>.
+      The VDG has no lowercase characters.</p>
+
+      <div style="margin-top: 3em; padding-top: 1.5em; border-top: 1px solid #ccc; font-size: 0.88em; color: #555; font-style: italic;">
+        <p style="font-size: 0.9em; color: #aaa;">Generated with <a href="https://claude.ai/" style="color: #aaa;">Claude</a> (Anthropic).</p>
+      </div>
+
+    </div>
+
+    <div class="nav">
+      <a href="index.html">&larr; Table of Contents</a>
+      <span class="spacer"></span>
+    </div>
+
+  </div>
+</body>
+</html>

@@ -13,23 +13,10 @@
 \   bit 1     = top-right element
 \   bit 0     = top-left element
 
-\ ── Random number generator ────────────────────────────────────────────
+\ ── Shared libraries ──────────────────────────────────────────────────
 
-VARIABLE seed
-
-\ LCG: seed = seed * 25173 + 13849  (full period 65536)
-\ Good multiplier gives well-distributed high byte.
-: rng   ( -- )  seed @  25173 *  13849 +  seed ! ;
-\ Power-of-2 rnd: use high byte of seed (best bits in LCG)
-: rnd   ( n -- 0..n-1 )  rng  1 -  seed C@  AND ;
-
-\ ── VSYNC synchronization ─────────────────────────────────────────────
-\ PIA0 CB1 flag ($FF03 bit 7) is set at 60 Hz by VDG vertical sync.
-\ Reading $FF02 clears the flag.
-
-: vsync  ( -- )
-  BEGIN  $FF03 C@ $80 AND  UNTIL
-  $FF02 C@ DROP ;
+INCLUDE ../../forth/lib/rng.fs
+INCLUDE ../../forth/lib/screen.fs
 
 \ ── Semigraphics-4 pixel operations ───────────────────────────────────
 
@@ -67,15 +54,6 @@ VARIABLE sg-c  \ color for sg4-set
   $FF SWAP -                    \ ( addr  AND-mask )  — clears just that bit
   OVER C@  AND                  \ ( addr  new-byte )
   SWAP C! ;
-
-\ ── Screen setup ──────────────────────────────────────────────────────
-
-: cls-black  ( -- )
-  512 0 DO  $80 $0400 I + C!  LOOP ;
-
-: cls-green  ( -- )
-  512 0 DO  $60 $0400 I + C!  LOOP
-  0 0 AT ;
 
 \ ── Title screen ──────────────────────────────────────────────────────
 
