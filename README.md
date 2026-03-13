@@ -39,6 +39,7 @@ A kernel, a compiler, a tutorial, and a growing library of programs that prove i
 | `src/kaleidoscope/` | Kaleidoscope — SG4 symmetric pattern generator |
 | `src/calculator/` | RPN calculator |
 | `docs/` | Tutorial book: *Getting Started with Bare Naked Forth* |
+| `docs/reference.html` | [Language Reference](docs/reference.html) — all words, stack effects, and memory map |
 | `COCO_RENOVATION.md` | Original vision document |
 | `coco_technical_reference.pdf` | TRS-80 CoCo technical reference |
 
