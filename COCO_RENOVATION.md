@@ -96,12 +96,48 @@ Renovating the tooling layer of a functioning vintage platform preserves authent
 
 ---
 
-## Connection to This Project
+## Project Specification: Re-Envisioned CoCo 1
 
-The PyGamer Sequencer is a useful frame. We've been doing embedded development the "modern" way on a constrained microcontroller: clean architecture, hardware/logic separation, comprehensive tests, careful memory management. The constraints produced discipline, not bad engineering.
+### Core Philosophy & Development
 
-The CoCo with renovated tooling would offer the same: real constraints that produce real discipline, but without the accidental frustrations of 1982 software. The 64K limit is interesting. The cassette interface is not.
+- **Architecture:** A high-performance hardware revision of the TRS-80 Color Computer 1.
+- **Execution:** Native 6809 assembly (no BASIC, no Forth REPL) cross-compiled via the ugufru/coco toolchain.
+- **Design Goal:** Offload all "heavy lifting" (I/O, Video, Sound) to dedicated co-processors, leaving the 6809 to act as a high-speed Real-Time Orchestrator.
 
----
+### Audio Engine: The Analog Soul
 
-*Initial notes — to be developed further*
+- **Hardware:** 4x Curtis CEM3394 "Synth-on-a-Chip" ICs.
+- **Capabilities:** 4-voice polyphonic analog synthesis.
+- **The Hybrid Path:** The original CoCo 6-bit DAC is routed directly into the External Input of a CEM3394. This allows raw digital samples (drums, speech) to be processed through a professional 4-pole resonant analog filter.
+- **Power Requirements:** Requires a stable -6.5V rail (generated via DC-DC inverter on the board) for full VCO frequency range and tuning stability.
+
+### Video Engine: The 100MHz Artist
+
+- **Hardware:** F18A MK2 (FPGA-based VDP replacement for the TMS9918A).
+- **Key Feature:** Internal 100MHz GPU (9900-style core) for hardware-accelerated blitting, sprite multiplexing, and line drawing.
+- **Capabilities:**
+  - 32 sprites per scanline (no flicker).
+  - 512-color programmable palette.
+  - Smooth hardware scrolling and dual-tile layers.
+- **Output:** Pixel-perfect HDMI/DVI digital output.
+
+### System Spine: RP2350
+
+- **Role:** Modern "Smart BIOS" and Bus Master.
+- **Direct RAM Injection:** The RP2350 halts the 6809 to inject compiled binaries from the PC toolchain directly into the 6809's memory space.
+- **Initialization:**
+  - Unlocks the F18A "enhanced mode" and uploads GPU code to VRAM.
+  - Initializes the CEM3394 control voltages (CV) via PWM or I2C DACs.
+- **I/O Gateway:**
+  - Storage: SD-card based storage (SDIO/SPI).
+  - Modern I/O: USB HID (Keyboard/Mouse), I2C, and high-speed UART for cross-development.
+
+### Memory Map (Proposed)
+
+| Address Range | Device | Function |
+|---|---|---|
+| `$0000–$BFFF` | System RAM | 48KB of Fast SRAM (Directly Injected) |
+| `$C000–$C001` | F18A VDP | Data/Register Ports (Graphics) |
+| `$C100–$C103` | CEM3394 Array | Polyphonic Voice Control |
+| `$C800–$CFFF` | RP2350 Mailbox | Storage, USB, and I2C Command Buffer |
+| `$FF00–$FFFF` | System Vector | 6809 Reset and Interrupt Vectors |
