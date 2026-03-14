@@ -8,6 +8,7 @@ INCLUDE ../../forth/lib/screen.fs
 INCLUDE ../../forth/lib/rg-pixel.fs
 INCLUDE ../../forth/lib/datawrite.fs
 INCLUDE ../../forth/lib/sprite.fs
+INCLUDE ../../forth/lib/trig.fs
 
 VARIABLE row
 VARIABLE bc
@@ -112,6 +113,35 @@ $4812 CONSTANT SPR-JOVIAN      \ Jovian sprite: 8x5, red
   SPR-SHIP 60 80 spr-erase
   SPR-JOVIAN 80 140 spr-erase ;
 
+\ ── Test 5: Angle-based lines (maser simulation) ────────────────────────
+\ Draw lines from center at every 30 degrees using angle-dx/angle-dy.
+
+VARIABLE ax  VARIABLE ay  VARIABLE fc
+
+: fire-line  ( angle color -- )
+  fc !
+  DUP 60 angle-dx 64 + ax !
+  60 angle-dy 96 + ay !
+  64 96 ax @ ay @ fc @ rg-line ;
+
+: test-angles  ( -- )
+  init-sin
+  \ Fire blue lines every 30 degrees
+  0   1 fire-line
+  30  1 fire-line
+  60  1 fire-line
+  90  1 fire-line
+  120 1 fire-line
+  150 1 fire-line
+  180 1 fire-line
+  210 1 fire-line
+  240 1 fire-line
+  270 1 fire-line
+  300 1 fire-line
+  330 1 fire-line
+  \ Red line at 45 degrees
+  45  2 fire-line ;
+
 \ ── Main ─────────────────────────────────────────────────────────────────
 
 : main  ( -- )
@@ -128,6 +158,9 @@ $4812 CONSTANT SPR-JOVIAN      \ Jovian sprite: 8x5, red
   KEY DROP
 
   test-erase
+  KEY DROP  rg-pcls
+
+  test-angles
   KEY DROP
 
   reset-text
