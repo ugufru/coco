@@ -1,75 +1,122 @@
-\ rg-test.fs — Test app for RG6 artifact-color pixel library
+\ rg-test.fs — Test app for RG6 artifact-color pixel and sprite libraries
 \
-\ Tests rg-pset, rg-hline, and rg-line with visual verification.
+\ Tests rg-pset, rg-line, and sprite draw/erase.
 \ Press any key between tests.  Run in XRoar with NTSC artifacts.
 
 INCLUDE ../../forth/lib/vdg.fs
 INCLUDE ../../forth/lib/screen.fs
 INCLUDE ../../forth/lib/rg-pixel.fs
+INCLUDE ../../forth/lib/datawrite.fs
+INCLUDE ../../forth/lib/sprite.fs
 
 VARIABLE row
 VARIABLE bc
 
-\ Draw one full-width row of artifact pixels in a given color
 : draw-row  ( y color -- )
   bc ! row !
-  128 0 DO
-    I row @ bc @ rg-pset
-  LOOP ;
+  128 0 DO  I row @ bc @ rg-pset  LOOP ;
 
-\ Draw a horizontal bar from y-start to y-end (inclusive)
 : draw-bar  ( y-start y-end color -- )
-  bc !
-  1 + SWAP
-  DO
-    I bc @ draw-row
-  LOOP ;
+  bc !  1 + SWAP
+  DO  I bc @ draw-row  LOOP ;
+
+\ ── Sprite data ──────────────────────────────────────────────────────────
+\ Stored at $5800 (well above app code, below VRAM at $3000... wait,
+\ $5800 > $3000.  Use $4800 which is in free RAM above app.)
+
+$4800 CONSTANT SPR-SHIP        \ Endever sprite: 8x7, blue
+$4812 CONSTANT SPR-JOVIAN      \ Jovian sprite: 8x5, red
+
+: init-sprites
+  \ ── Endever "V" shape (8 wide x 7 tall, blue=color 1) ──
+  \ Color 1 = 01 in bit pairs.  4 artifact pixels per byte.
+  \ Bit layout: [p0(7-6) p1(5-4) p2(3-2) p3(1-0)]
+  SPR-SHIP tp !
+  8 tb 7 tb                    \ 8 wide, 7 tall (2 bytes per row)
+  \ Row 0: __B___B_  (blue at x=2, x=5)
+  $04 tb $10 tb
+  \ Row 1: __B___B_
+  $04 tb $10 tb
+  \ Row 2: ___B_B__  (blue at x=3, x=4)
+  $01 tb $40 tb
+  \ Row 3: ___BB___
+  $01 tb $40 tb
+  \ Row 4: ____B___  (blue at x=4)
+  $00 tb $40 tb
+  \ Row 5: ___B_B__
+  $01 tb $40 tb
+  \ Row 6: __B___B_
+  $04 tb $10 tb
+
+  \ ── Jovian "<*>" shape (8 wide x 5 tall, red=color 2) ──
+  \ Color 2 = 10 in bit pairs.
+  SPR-JOVIAN tp !
+  8 tb 5 tb                    \ 8 wide, 5 tall (2 bytes per row)
+  \ Row 0: ___RR___  (red at x=3,4)
+  $02 tb $80 tb
+  \ Row 1: _R_RR_R_  (red at x=1,3,4,6)
+  $22 tb $88 tb
+  \ Row 2: RR_RR_RR  (red at x=0,1,3,4,6,7)
+  $A2 tb $8A tb
+  \ Row 3: _R_RR_R_
+  $22 tb $88 tb
+  \ Row 4: ___RR___
+  $02 tb $80 tb ;
 
 \ ── Test 1: Color bars ──────────────────────────────────────────────────
 
 : test-bars  ( -- )
-  20 29 3 draw-bar             \ white bar
-  50 59 1 draw-bar             \ blue bar
-  80 89 2 draw-bar             \ red bar
-  \ Corner pixels
-  0   0   3 rg-pset
-  127 0   3 rg-pset
-  0   191 3 rg-pset
-  127 191 3 rg-pset ;
+  20 29 3 draw-bar             \ white
+  50 59 1 draw-bar             \ blue
+  80 89 2 draw-bar ;           \ red
 
-\ ── Test 2: Lines in all directions ─────────────────────────────────────
+\ ── Test 2: Lines ────────────────────────────────────────────────────────
 
 : test-lines  ( -- )
-  \ White lines from center outward (starburst pattern)
-  64 96 127 96  3 rg-line      \ right
+  64 96 127 96  3 rg-line      \ right (white)
   64 96 0   96  3 rg-line      \ left
   64 96 64  0   3 rg-line      \ up
   64 96 64  191 3 rg-line      \ down
+  64 96 127 0   1 rg-line      \ diag (blue)
+  64 96 0   191 1 rg-line
+  64 96 0   0   1 rg-line
+  64 96 127 191 1 rg-line
+  64 96 127 80  2 rg-line      \ shallow (red)
+  64 96 0   112 2 rg-line
+  64 96 127 130 2 rg-line
+  64 96 0   62  2 rg-line ;
 
-  \ Blue diagonal lines
-  64 96 127 0   1 rg-line      \ upper-right
-  64 96 0   191 1 rg-line      \ lower-left
-  64 96 0   0   1 rg-line      \ upper-left
-  64 96 127 191 1 rg-line      \ lower-right
+\ ── Test 3: Sprites ──────────────────────────────────────────────────────
 
-  \ Red lines at shallow angles
-  64 96 127 80  2 rg-line      \ slight up-right
-  64 96 0   112 2 rg-line      \ slight down-left
-  64 96 127 130 2 rg-line      \ slight down-right
-  64 96 0   62  2 rg-line ;    \ slight up-left
+: test-sprites  ( -- )
+  \ Draw ship at a few positions
+  SPR-SHIP 20 30 spr-draw
+  SPR-SHIP 60 80 spr-draw
+  SPR-SHIP 100 50 spr-draw
 
-\ ── Test 3: Border rectangle ────────────────────────────────────────────
+  \ Draw Jovians
+  SPR-JOVIAN 40 120 spr-draw
+  SPR-JOVIAN 80 140 spr-draw
+  SPR-JOVIAN 110 100 spr-draw
 
-: test-border  ( -- )
-  0   0   127 0   3 rg-line   \ top
-  127 0   127 143 3 rg-line   \ right
-  127 143 0   143 3 rg-line   \ bottom
-  0   143 0   0   3 rg-line ; \ left
+  \ Draw a tactical border
+  0 0   127 0   3 rg-line
+  127 0 127 160 3 rg-line
+  127 160 0 160 3 rg-line
+  0 160 0   0   3 rg-line ;
+
+\ ── Test 4: Sprite erase ────────────────────────────────────────────────
+
+: test-erase  ( -- )
+  \ Erase middle ship and middle Jovian
+  SPR-SHIP 60 80 spr-erase
+  SPR-JOVIAN 80 140 spr-erase ;
 
 \ ── Main ─────────────────────────────────────────────────────────────────
 
 : main  ( -- )
   rg-init
+  init-sprites
 
   test-bars
   KEY DROP  rg-pcls
@@ -77,7 +124,10 @@ VARIABLE bc
   test-lines
   KEY DROP  rg-pcls
 
-  test-border
+  test-sprites
+  KEY DROP
+
+  test-erase
   KEY DROP
 
   reset-text
