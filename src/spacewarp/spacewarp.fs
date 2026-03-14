@@ -12,12 +12,14 @@ INCLUDE ../../forth/lib/datawrite.fs
 INCLUDE ../../forth/lib/sprite.fs
 INCLUDE ../../forth/lib/trig.fs
 INCLUDE ../../forth/lib/rng.fs
+INCLUDE ../../forth/lib/font5x7.fs
+INCLUDE ../../forth/lib/rg-text.fs
 
 \ ══════════════════════════════════════════════════════════════════════════
 \  GALAXY DATA MODEL
 \ ══════════════════════════════════════════════════════════════════════════
 \
-\ Galaxy: 8x8 = 64 quadrants, 1 byte each at GALAXY ($4000).
+\ Galaxy: 8x8 = 64 quadrants, 1 byte each at GALAXY ($5800).
 \ Packed format per byte:
 \   bit 7    = magnetic storm (1=yes)
 \   bit 6    = black hole (1=yes)
@@ -31,8 +33,8 @@ INCLUDE ../../forth/lib/rng.fs
 
 \ ── Galaxy array ─────────────────────────────────────────────────────────
 
-\ Game data starts at $4800 (above VRAM which ends at $47FF).
-$4800 CONSTANT GALAXY          \ 64 bytes: 8x8 quadrant data
+\ Game data starts at $5800 (above VRAM which ends at $57FF).
+$5800 CONSTANT GALAXY          \ 64 bytes: 8x8 quadrant data
 
 : gal-addr  ( col row -- addr )  8 * + GALAXY + ;
 : gal@  ( col row -- byte )  gal-addr C@ ;
@@ -80,20 +82,25 @@ VARIABLE pdmg-masr             \ maser damage
 \ tactical view (2-125, 2-141).
 
 \ Position arrays (2 bytes each: x then y)
-$4840 CONSTANT STAR-POS        \ 5 stars x 2 bytes = 10 bytes
-$484A CONSTANT JOV-POS         \ 3 jovians x 2 bytes = 6 bytes
-$4850 CONSTANT BASE-POS        \ 1 base x 2 bytes = 2 bytes
-$4852 CONSTANT BHOLE-POS       \ 1 black hole x 2 bytes = 2 bytes
-$4854 CONSTANT SHIP-POS        \ player ship x 2 bytes = 2 bytes
+$5840 CONSTANT STAR-POS        \ 5 stars x 2 bytes = 10 bytes
+$584A CONSTANT JOV-POS         \ 3 jovians x 2 bytes = 6 bytes
+$5850 CONSTANT BASE-POS        \ 1 base x 2 bytes = 2 bytes
+$5852 CONSTANT BHOLE-POS       \ 1 black hole x 2 bytes = 2 bytes
+$5854 CONSTANT SHIP-POS        \ player ship x 2 bytes = 2 bytes
 
 \ Jovian damage (3 bytes, one per jovian: 100=full health, 0=dead)
-$4856 CONSTANT JOV-DMG         \ 3 bytes
+$5856 CONSTANT JOV-DMG         \ 3 bytes
 
 \ Quadrant object counts (from the packed byte, cached for speed)
 VARIABLE qstars                \ star count in current quadrant
 VARIABLE qjovians              \ jovian count in current quadrant
 VARIABLE qbase                 \ base present? (0 or 1)
 VARIABLE qbhole                \ black hole present? (0 or 1)
+
+\ SOS alert state
+VARIABLE sos-active
+VARIABLE sos-col
+VARIABLE sos-row
 
 \ ── Random position within tactical view ─────────────────────────────────
 \ Returns x in 4-123, y in 4-139 (away from borders).
@@ -175,17 +182,17 @@ VARIABLE gq-tmp                \ temp for building quadrant byte
   SWAP pcol ! prow !
 
   \ Generate star positions
-  qstars @ 0 DO
+  qstars @ ?DUP IF 0 DO
     rnd-x STAR-POS I 2 * + C!
     rnd-y STAR-POS I 2 * + 1 + C!
-  LOOP
+  LOOP THEN
 
   \ Generate jovian positions
-  qjovians @ 0 DO
+  qjovians @ ?DUP IF 0 DO
     rnd-x JOV-POS I 2 * + C!
     rnd-y JOV-POS I 2 * + 1 + C!
     100 JOV-DMG I + C!         \ full health
-  LOOP
+  LOOP THEN
 
   \ Generate base position
   qbase @ IF
@@ -217,6 +224,74 @@ VARIABLE gq-tmp                \ temp for building quadrant byte
   0 gtime ! ;
 
 \ ══════════════════════════════════════════════════════════════════════════
+\  STATUS PANEL
+\ ══════════════════════════════════════════════════════════════════════════
+
+: init-text  ( -- )
+  init-font
+  rv @ cv !
+  32 cb ! ;
+
+VARIABLE tcx
+VARIABLE tcy
+: at-xy  ( cx cy -- )  tcy ! tcx ! ;
+: rg-emit  ( char -- )  tcx @ tcy @ rg-char  tcx @ 1 + tcx ! ;
+
+: rg-u.  ( u -- )  10 /MOD ?DUP IF rg-u. THEN  CHAR 0 + rg-emit ;
+
+: clear-panel  ( -- )
+  rv @ 4608 + 1536 0 FILL ;
+
+: draw-cond  ( -- )
+  qjovians @ IF
+    CHAR R rg-emit CHAR E rg-emit CHAR D rg-emit
+  ELSE
+    CHAR G rg-emit CHAR R rg-emit CHAR E rg-emit CHAR E rg-emit CHAR N rg-emit
+  THEN ;
+
+: draw-panel  ( -- )
+  clear-panel
+
+  \ Row 18: DATE nn  QUAD n n   DEFL nnn
+  0 18 at-xy
+  CHAR D rg-emit CHAR A rg-emit CHAR T rg-emit CHAR E rg-emit CHAR   rg-emit
+  gtime @ rg-u.
+
+  9 18 at-xy
+  CHAR Q rg-emit CHAR U rg-emit CHAR A rg-emit CHAR D rg-emit CHAR   rg-emit
+  pcol @ rg-u.  CHAR   rg-emit  prow @ rg-u.
+
+  20 18 at-xy
+  CHAR D rg-emit CHAR E rg-emit CHAR F rg-emit CHAR L rg-emit CHAR   rg-emit
+  pshields @ rg-u.
+
+  \ Row 19: ENRG nnn MISL nn   COND XXXXX
+  0 19 at-xy
+  CHAR E rg-emit CHAR N rg-emit CHAR R rg-emit CHAR G rg-emit CHAR   rg-emit
+  penergy @ rg-u.
+
+  10 19 at-xy
+  CHAR M rg-emit CHAR I rg-emit CHAR S rg-emit CHAR L rg-emit CHAR   rg-emit
+  pmissiles @ rg-u.
+
+  20 19 at-xy
+  CHAR C rg-emit CHAR O rg-emit CHAR N rg-emit CHAR D rg-emit CHAR   rg-emit
+  draw-cond
+
+  \ Row 20: SOS alert (conditional)
+  sos-active @ IF
+    20 20 at-xy
+    CHAR S rg-emit CHAR O rg-emit CHAR S rg-emit
+    CHAR   rg-emit CHAR   rg-emit
+    sos-col @ rg-u.  CHAR   rg-emit  sos-row @ rg-u.
+  THEN
+
+  \ Row 21: COMMAND prompt
+  20 21 at-xy
+  CHAR C rg-emit CHAR O rg-emit CHAR M rg-emit CHAR M rg-emit
+  CHAR A rg-emit CHAR N rg-emit CHAR D rg-emit ;
+
+\ ══════════════════════════════════════════════════════════════════════════
 \  TEMPORARY TEST — generate and dump galaxy to verify
 \ ══════════════════════════════════════════════════════════════════════════
 
@@ -231,8 +306,11 @@ VARIABLE gq-tmp                \ temp for building quadrant byte
 
 : main  ( -- )
   rg-init
+  init-text
   init-sin
+  init-player
   12345 seed !
+  0 sos-active !
 
   \ Draw border first (visual progress indicator)
   0   0   127 0   3 rg-line
@@ -247,18 +325,18 @@ VARIABLE gq-tmp                \ temp for building quadrant byte
   find-base-quadrant
 
   \ Draw stars
-  qstars @ 0 DO
+  qstars @ ?DUP IF 0 DO
     STAR-POS I 2 * + C@
     STAR-POS I 2 * + 1 + C@
     3 rg-pset
-  LOOP
+  LOOP THEN
 
   \ Draw jovians as red dots
-  qjovians @ 0 DO
+  qjovians @ ?DUP IF 0 DO
     JOV-POS I 2 * + C@
     JOV-POS I 2 * + 1 + C@
     2 rg-pset
-  LOOP
+  LOOP THEN
 
   \ Draw base as blue dot
   qbase @ IF
@@ -268,6 +346,7 @@ VARIABLE gq-tmp                \ temp for building quadrant byte
   \ Draw ship as white dot
   SHIP-POS C@ SHIP-POS 1 + C@ 3 rg-pset
 
+  draw-panel
   KEY DROP
   reset-text
   HALT ;
