@@ -1,6 +1,6 @@
 \ rg-pixel.fs — RG6 artifact-color pixel primitives
 \
-\ Provides: rg-init, rg-pcls, rg-pset, rg-pget, rg-hline
+\ Provides: rg-init, rg-pcls, rg-pset, rg-pget, rg-hline, rg-line
 \ Requires: kernel primitives AND, OR, C@, C!, LSHIFT, RSHIFT, FILL,
 \           *, +, -, DUP, DROP, SWAP, OVER, @, !, DO, LOOP, I
 \           vdg.fs (set-sam-v, set-sam-f, set-pia)
@@ -29,8 +29,8 @@
 \   bits 1-0 = artifact pixel 3 (rightmost)
 \
 \ Color encoding per artifact pixel (2 bits):
-\   0 (black) = 00    1 (blue)  = 10
-\   2 (red)   = 01    3 (white) = 11
+\   0 (black) = 00    1 (blue)  = 01
+\   2 (red)   = 10    3 (white) = 11
 
 VARIABLE rv                       \ VRAM base address
 
@@ -43,10 +43,12 @@ $7CD8 CONSTANT MSKTAB            \ sub-pixel (x%4) → AND mask to clear
 
 : init-tables  ( -- )
   \ Color table: index 0-3 → bit pair value
-  \   0=black(00) 1=blue(10) 2=red(01) 3=white(11)
+  \   0=black(00) 1=blue(01) 2=red(10) 3=white(11)
+  \ Note: artifact phase depends on XRoar -tv-input setting.
+  \ With cmp-br: 01=blue, 10=red/orange.
   0 COLTAB     C!
-  2 COLTAB 1 + C!
-  1 COLTAB 2 + C!
+  1 COLTAB 1 + C!
+  2 COLTAB 2 + C!
   3 COLTAB 3 + C!
   \ Shift table: sub-pixel position → left shift count
   \   x%4=0 → 6, x%4=1 → 4, x%4=2 → 2, x%4=3 → 0
@@ -131,3 +133,72 @@ VARIABLE hl-c  VARIABLE hl-y
   DO
     I hl-y @ hl-c @ rg-pset
   LOOP ;
+
+\ ── Helpers ──────────────────────────────────────────────────────────────
+
+: abs  ( n -- |n| )  DUP 0 < IF NEGATE THEN ;
+
+\ ── rg-line ( x1 y1 x2 y2 color -- ) ───────────────────────────────────
+\ Bresenham line drawing in artifact color.  Handles all octants.
+\ Uses variables to avoid deep stack manipulation.
+
+VARIABLE lx    VARIABLE ly       \ current pixel position
+VARIABLE ldx   VARIABLE ldy      \ abs(delta)
+VARIABLE lsx   VARIABLE lsy      \ step direction (-1 or +1)
+VARIABLE lerr                    \ error accumulator
+VARIABLE le2                     \ 2*error temp
+VARIABLE lc                      \ line color
+VARIABLE ltx   VARIABLE lty      \ target (endpoint) coordinates
+
+: rg-line  ( x1 y1 x2 y2 color -- )
+  lc !                         \ save color
+  \ Stack: ( x1 y1 x2 y2 )
+  lty !  ltx !                 \ save endpoint
+  \ Stack: ( x1 y1 )
+
+  \ Compute dx, sx from x1 and x2
+  SWAP                         \ ( y1 x1 )
+  ltx @ OVER -                \ ( y1 x1 dx )
+  DUP 0 < IF  -1 lsx !  NEGATE  ldx !
+  ELSE  1 lsx !  ldx !
+  THEN                         \ ( y1 x1 )
+
+  \ Compute dy, sy from y1 and y2
+  SWAP                         \ ( x1 y1 )
+  lty @ OVER -                \ ( x1 y1 dy )
+  DUP 0 < IF  -1 lsy !  NEGATE  ldy !
+  ELSE  1 lsy !  ldy !
+  THEN                         \ ( x1 y1 )
+
+  \ Set starting position
+  ly ! lx !                    \ lx = x1, ly = y1
+
+  \ Initial error = dx - dy
+  ldx @ ldy @ - lerr !
+
+  \ Main loop
+  BEGIN
+    lx @ ly @ lc @ rg-pset    \ plot current pixel
+
+    \ Done when we reach the target
+    lx @ ltx @ = ly @ lty @ = AND IF
+      1                        \ ( true ) — exit loop
+    ELSE
+      \ Compute e2 = 2 * error
+      lerr @ 2 * le2 !
+
+      \ Step x if e2 > -dy
+      le2 @ ldy @ NEGATE > IF
+        lerr @ ldy @ - lerr !
+        lx @ lsx @ + lx !
+      THEN
+
+      \ Step y if e2 < dx
+      le2 @ ldx @ < IF
+        lerr @ ldx @ + lerr !
+        ly @ lsy @ + ly !
+      THEN
+
+      0                        \ ( false ) — continue loop
+    THEN
+  UNTIL ;
