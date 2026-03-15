@@ -68,7 +68,7 @@ $7CD8 CONSTANT MSKTAB            \ sub-pixel (x%4) → AND mask to clear
 
 : rg-init  ( -- )
   init-tables
-  $5000 rv !
+  $5000 DUP rv !  $57 !        \ store VRAM base in rv AND kernel var
   6 set-sam-v                  \ V2:V1:V0 = 110 (RG6)
   rv @ 9 RSHIFT set-sam-f     \ F offset = VRAM / 512
   $F8 set-pia                  \ A*/G=1, GM2=1, GM1=1, GM0=1, CSS=1
@@ -94,18 +94,8 @@ VARIABLE ps                    \ sub-pixel index (0-3)
   2 RSHIFT + pa ! ;            \ pa = row-addr + x/4
 
 \ ── rg-pset ( x y color -- ) ─────────────────────────────────────────────
-\ Plot an artifact-color pixel.  color: 0=black, 1=blue, 2=red, 3=white.
-
-VARIABLE pc                    \ pixel color
-
-: rg-pset  ( x y color -- )
-  pc !                         \ save color
-  rg-addr                      \ sets pa, ps from x y
-  pc @ COLTAB + C@             \ ( colbits )
-  ps @ SHFTAB + C@ LSHIFT     \ ( shifted-color )
-  pa @ C@                      \ ( shifted-color byte )
-  ps @ MSKTAB + C@ AND        \ ( shifted-color masked-byte )
-  OR pa @ C! ;                 \ write new byte
+\ Now a kernel assembly primitive for speed (~45 cycles vs ~500 in Forth).
+\ Uses VAR_RGVRAM at $0057 for VRAM base address.
 
 \ ── rg-pget ( x y -- color ) ─────────────────────────────────────────────
 \ Read the raw 2-bit value at artifact pixel (x, y).

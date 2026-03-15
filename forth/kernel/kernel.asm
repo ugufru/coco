@@ -35,6 +35,7 @@ VAR_KEY_PREV    FCB     0       ; last accepted key ASCII (KEY debounce)
 VAR_KEY_SHIFT   FCB     0       ; SHIFT flag (nonzero = shift held)
 VAR_KEY_RELCNT  FCB     0       ; release debounce counter
 VAR_KEY_REPDLY  FDB     0       ; auto-repeat countdown (16-bit)
+VAR_RGVRAM      FDB     $5000   ; RG6 VRAM base address (written by rg-init)
 
 ;;; ─── Kernel ──────────────────────────────────────────────────────────────────
 
@@ -106,6 +107,7 @@ CFA_LSHIFT      FDB     CODE_LSHIFT
 CFA_RSHIFT      FDB     CODE_RSHIFT
 CFA_NEGATE      FDB     CODE_NEGATE
 CFA_QDUP        FDB     CODE_QDUP
+CFA_RGPSET      FDB     CODE_RGPSET
 
 ;;; ─── EXIT ( -- ) ─────────────────────────────────────────────────────────────
 ;;; Return from a colon definition.
@@ -870,7 +872,59 @@ QDUP_DONE
 CODE_HALT
         BRA     CODE_HALT
 
-;;; ─── START — entry point ─────────────────────────────────────────────────────
+;;; ─── RG-PSET ( x y color -- ) ──────────────────────────────────────────────
+;;; Plot one 2bpp artifact pixel in RG6 mode.
+;;; x: 0-127, y: 0-191, color: 0-3.
+;;; VRAM addr = VAR_RGVRAM + y*32 + x/4.  Sub-pixel = x AND 3.
+;;; ~45 cycles vs ~500 in ITC Forth.
+
+CODE_RGPSET
+        LDA     5,U             ; A = x (low byte of 3rd item)
+        LDB     3,U             ; B = y (low byte of 2nd item)
+        PSHS    A               ; save x on S
+        ; Y = VRAM base + y*32 + x/4
+        LDA     #32
+        MUL                     ; D = y * 32
+        ADDD    VAR_RGVRAM      ; D += VRAM base
+        TFR     D,Y             ; Y = row start
+        LDA     ,S              ; A = x
+        LSRA
+        LSRA                    ; A = x / 4
+        LEAY    A,Y             ; Y = VRAM byte address
+        ; Shift count = 6 - (x%4)*2
+        LDA     ,S+             ; A = x, pop S
+        ANDA    #$03            ; A = x % 4
+        ASLA                    ; A = (x%4)*2
+        NEGA
+        ADDA    #6              ; A = 6 - (x%4)*2
+        PSHS    A               ; save shift count
+        ; Shift color into position
+        LDA     1,U             ; A = color (0-3)
+        ANDA    #$03
+        LDB     ,S              ; B = shift count
+        BEQ     PSET_NS
+PSET_SH ASLA
+        DECB
+        BNE     PSET_SH
+PSET_NS PSHS    A               ; save shifted color
+        ; Build clear mask: ~(3 << shift)
+        LDA     #$03
+        LDB     1,S             ; B = shift count
+        BEQ     PSET_NM
+PSET_SM ASLA
+        DECB
+        BNE     PSET_SM
+PSET_NM COMA                    ; A = clear mask
+        ; Read-modify-write VRAM
+        ANDA    ,Y              ; clear old pixel
+        ORA     ,S              ; OR in new color
+        STA     ,Y              ; write back
+        LEAS    2,S             ; clean S (shifted color + shift count)
+        LEAU    6,U             ; pop 3 data stack items
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+
 ;;; Initialize stacks, clear screen, start the inner interpreter.
 ;;; The application thread is loaded separately at APP_BASE.
 
@@ -880,6 +934,7 @@ START
         ORCC    #$50            ; mask IRQ and FIRQ
         CLRA
         TFR     A,DP            ; direct page register = $00
+        STA     $FFDE           ; ALL-RAM mode: page out BASIC ROMs
 
         LDS     #$8000          ; RSP: first push lands at $7FFE
         LDU     #$7E00          ; DSP: first push lands at $7DFE
