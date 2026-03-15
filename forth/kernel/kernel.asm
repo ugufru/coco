@@ -36,6 +36,18 @@ VAR_KEY_SHIFT   FCB     0       ; SHIFT flag (nonzero = shift held)
 VAR_KEY_RELCNT  FCB     0       ; release debounce counter
 VAR_KEY_REPDLY  FDB     0       ; auto-repeat countdown (16-bit)
 VAR_RGVRAM      FDB     $5000   ; RG6 VRAM base address (written by rg-init)
+;;; Bresenham line drawing scratch (used by CODE_RGLINE)
+VAR_LINE_CX     FCB     0       ; current x
+VAR_LINE_CY     FCB     0       ; current y
+VAR_LINE_X2     FCB     0       ; target x
+VAR_LINE_Y2     FCB     0       ; target y
+VAR_LINE_SX     FCB     0       ; step x (+1 or -1)
+VAR_LINE_SY     FCB     0       ; step y (+1 or -1)
+VAR_LINE_DX     FCB     0       ; |x2-x1|
+VAR_LINE_DY     FCB     0       ; |y2-y1|
+VAR_LINE_ERR    FDB     0       ; error accumulator (signed 16-bit)
+VAR_LINE_E2     FDB     0       ; 2*error temp
+VAR_LINE_COL    FCB     0       ; line color
 
 ;;; ─── Kernel ──────────────────────────────────────────────────────────────────
 
@@ -108,6 +120,7 @@ CFA_RSHIFT      FDB     CODE_RSHIFT
 CFA_NEGATE      FDB     CODE_NEGATE
 CFA_QDUP        FDB     CODE_QDUP
 CFA_RGPSET      FDB     CODE_RGPSET
+CFA_RGLINE      FDB     CODE_RGLINE
 
 ;;; ─── EXIT ( -- ) ─────────────────────────────────────────────────────────────
 ;;; Return from a colon definition.
@@ -924,6 +937,176 @@ PSET_NM COMA                    ; A = clear mask
         LDY     ,X++            ; NEXT
         JMP     [,Y]
 
+
+;;; ─── RG-LINE ( x1 y1 x2 y2 color -- ) ─────────────────────────────────────
+;;; Bresenham line drawing with inlined pixel write.  All 8 octants.
+;;; ~150 cycles/pixel vs ~1500 in ITC Forth.
+;;; Uses fixed RAM variables VAR_LINE_* for loop state.
+
+CODE_RGLINE
+        PSHS    X               ; save IP
+        ; Load args: U+0,1=color U+2,3=y2 U+4,5=x2 U+6,7=y1 U+8,9=x1
+        LDA     1,U
+        STA     VAR_LINE_COL
+        LDA     5,U
+        STA     VAR_LINE_X2
+        LDA     3,U
+        STA     VAR_LINE_Y2
+        LDA     9,U
+        STA     VAR_LINE_CX
+        LDA     7,U
+        STA     VAR_LINE_CY
+        LEAU    10,U            ; pop 5 args
+
+        ; dx = |x2-x1|, sx = sign(x2-x1)  — 16-bit sub for correct sign
+        CLRA
+        LDB     VAR_LINE_CX
+        PSHS    D               ; push x1
+        CLRA
+        LDB     VAR_LINE_X2
+        SUBD    ,S++            ; D = x2 - x1 (signed 16-bit)
+        BPL     LNSX_P
+        COMA
+        COMB
+        ADDD    #1              ; D = |x2-x1|
+        STB     VAR_LINE_DX
+        LDA     #$FF
+        STA     VAR_LINE_SX
+        BRA     LNSX_D
+LNSX_P  STB     VAR_LINE_DX
+        LDA     #$01
+        STA     VAR_LINE_SX
+LNSX_D
+
+        ; dy = |y2-y1|, sy = sign(y2-y1)  — 16-bit sub for y > 127
+        CLRA
+        LDB     VAR_LINE_CY
+        PSHS    D               ; push y1
+        CLRA
+        LDB     VAR_LINE_Y2
+        SUBD    ,S++            ; D = y2 - y1 (signed 16-bit)
+        BPL     LNSY_P
+        COMA
+        COMB
+        ADDD    #1              ; D = |y2-y1|
+        STB     VAR_LINE_DY
+        LDA     #$FF
+        STA     VAR_LINE_SY
+        BRA     LNSY_D
+LNSY_P  STB     VAR_LINE_DY
+        LDA     #$01
+        STA     VAR_LINE_SY
+LNSY_D
+
+        ; err = dx - dy (signed 16-bit)
+        CLRA
+        LDB     VAR_LINE_DX
+        STD     VAR_LINE_ERR
+        CLRA
+        LDB     VAR_LINE_DY
+        PSHS    D
+        LDD     VAR_LINE_ERR
+        SUBD    ,S++
+        STD     VAR_LINE_ERR
+
+LN_LOOP
+        ; ── Plot pixel at (CX, CY) ──
+        LDA     VAR_LINE_CY
+        LDB     #32
+        MUL
+        ADDD    VAR_RGVRAM
+        TFR     D,Y
+        LDA     VAR_LINE_CX
+        LSRA
+        LSRA
+        LEAY    A,Y
+
+        ; shift = 6 - (cx%4)*2
+        LDA     VAR_LINE_CX
+        ANDA    #$03
+        ASLA
+        NEGA
+        ADDA    #6
+        PSHS    A               ; save shift count
+
+        ; Shift color
+        LDA     VAR_LINE_COL
+        ANDA    #$03
+        LDB     ,S
+        BEQ     LN_NS
+LN_SH   ASLA
+        DECB
+        BNE     LN_SH
+LN_NS   PSHS    A               ; save shifted color
+
+        ; Build clear mask
+        LDA     #$03
+        LDB     1,S
+        BEQ     LN_NM
+LN_SM   ASLA
+        DECB
+        BNE     LN_SM
+LN_NM   COMA
+
+        ; Read-modify-write
+        ANDA    ,Y
+        ORA     ,S
+        STA     ,Y
+        LEAS    2,S
+
+        ; ── Done check ──
+        LDA     VAR_LINE_CX
+        CMPA    VAR_LINE_X2
+        BNE     LN_STEP
+        LDA     VAR_LINE_CY
+        CMPA    VAR_LINE_Y2
+        BEQ     LN_DONE
+
+LN_STEP
+        ; e2 = 2 * err
+        LDD     VAR_LINE_ERR
+        ASLB
+        ROLA
+        STD     VAR_LINE_E2
+
+        ; if e2 > -dy: err -= dy, cx += sx
+        CLRA
+        LDB     VAR_LINE_DY
+        COMA
+        COMB
+        ADDD    #1              ; D = -dy
+        CMPD    VAR_LINE_E2
+        BGE     LN_NOSX
+        CLRA
+        LDB     VAR_LINE_DY
+        PSHS    D
+        LDD     VAR_LINE_ERR
+        SUBD    ,S++
+        STD     VAR_LINE_ERR
+        LDA     VAR_LINE_CX
+        ADDA    VAR_LINE_SX
+        STA     VAR_LINE_CX
+LN_NOSX
+
+        ; if e2 < dx: err += dx, cy += sy
+        CLRA
+        LDB     VAR_LINE_DX
+        CMPD    VAR_LINE_E2
+        BLE     LN_NOSY
+        CLRA
+        LDB     VAR_LINE_DX
+        ADDD    VAR_LINE_ERR
+        STD     VAR_LINE_ERR
+        LDA     VAR_LINE_CY
+        ADDA    VAR_LINE_SY
+        STA     VAR_LINE_CY
+LN_NOSY
+        LBRA    LN_LOOP
+
+LN_DONE
+        PULS    X
+        LDY     ,X++
+        JMP     [,Y]
 
 ;;; Initialize stacks, clear screen, start the inner interpreter.
 ;;; The application thread is loaded separately at APP_BASE.
