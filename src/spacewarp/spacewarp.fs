@@ -110,6 +110,8 @@ VARIABLE sos-row
 $6900 CONSTANT SPR-SHIP           \ Endever: blue chevron (12 bytes)
 $690C CONSTANT SPR-JOV            \ Jovian: red diamond (12 bytes)
 $6918 CONSTANT SPR-BASE           \ UP base: blue cross (12 bytes)
+$6924 CONSTANT SPR-MSL1           \ Missile frame 1: + shape (12 bytes)
+$6930 CONSTANT SPR-MSL2           \ Missile frame 2: x shape (12 bytes)
 
 : init-sprites  ( -- )
   \ Endever — blue (1) filled chevron
@@ -152,7 +154,35 @@ $6918 CONSTANT SPR-BASE           \ UP base: blue cross (12 bytes)
   $10 tb $10 tb
   $41 tb $04 tb
   $10 tb $10 tb
-  $05 tb $40 tb ;
+  $05 tb $40 tb
+
+  \ Missile frame 1 — red (2) plus +
+  \   ..2..
+  \   ..2..
+  \   22222
+  \   ..2..
+  \   ..2..
+  SPR-MSL1 tp !
+  5 tb 5 tb
+  $08 tb $00 tb
+  $08 tb $00 tb
+  $AA tb $80 tb
+  $08 tb $00 tb
+  $08 tb $00 tb
+
+  \ Missile frame 2 — red (2) cross x
+  \   2...2
+  \   .2.2.
+  \   ..2..
+  \   .2.2.
+  \   2...2
+  SPR-MSL2 tp !
+  5 tb 5 tb
+  $80 tb $80 tb
+  $22 tb $00 tb
+  $08 tb $00 tb
+  $22 tb $00 tb
+  $80 tb $80 tb ;
 
 \ ── Random position within tactical view ─────────────────────────────────
 \ Returns x in 4-123, y in 4-139 (away from borders).
@@ -273,7 +303,8 @@ VARIABLE gq-tmp                \ temp for building quadrant byte
   100 pdmg-scan !
   100 pdmg-defl !
   100 pdmg-masr !
-  0 gtime ! ;
+  0 gtime !
+  0 move-count ! ;
 
 \ ══════════════════════════════════════════════════════════════════════════
 \  STATUS PANEL
@@ -378,6 +409,18 @@ VARIABLE tcy
   CHAR C rg-emit CHAR O rg-emit CHAR M rg-emit CHAR M rg-emit
   CHAR A rg-emit CHAR N rg-emit CHAR D rg-emit ;
 
+\ Quick-update just the energy value (avoids full panel redraw)
+: update-energy  ( -- )
+  16 tcy !
+  29 tcx !  $20 rg-emit  $20 rg-emit  $20 rg-emit
+  penergy @ 32 rg-u.r ;
+
+\ Quick-update just the missiles value
+: update-missiles  ( -- )
+  15 tcy !
+  30 tcx !  $20 rg-emit  $20 rg-emit
+  pmissiles @ 32 rg-u.r ;
+
 \ ══════════════════════════════════════════════════════════════════════════
 \  TACTICAL VIEW DRAWING
 \ ══════════════════════════════════════════════════════════════════════════
@@ -439,11 +482,19 @@ VARIABLE old-sy                   \ previous ship y
 \ Bounds: x 4-123, y 4-139 (inside tactical border).
 
 VARIABLE moved                    \ flag: did ship move this frame?
-7 CONSTANT SHIP-DX                \ pixels per step (ship width)
-5 CONSTANT SHIP-DY                \ pixels per step (ship height)
+VARIABLE move-count               \ counts moves; energy charged every 4th
+VARIABLE prev-energy              \ last displayed energy (for dirty check)
+VARIABLE prev-missiles            \ last displayed missile count
+3 CONSTANT SHIP-DX                \ pixels per step
+3 CONSTANT SHIP-DY                \ pixels per step
+10 CONSTANT MASER-COST            \ energy per maser fire
+
+: use-energy  ( cost -- )
+  penergy @ SWAP - DUP 0 < IF DROP 0 THEN penergy ! ;
 
 : move-ship  ( -- )
   0 moved !
+  penergy @ 0= IF EXIT THEN
   \ Arrow keys: all on row 3 ($08), different columns
   KB-C3 KBD-SCAN $08 AND IF       \ UP: col 3, row 3
     SHIP-POS 1 + C@ SHIP-DY 4 + > IF
@@ -468,6 +519,11 @@ VARIABLE moved                    \ flag: did ship move this frame?
       SHIP-POS C@ SHIP-DX + SHIP-POS C!
       1 moved !
     THEN
+  THEN
+  moved @ IF
+    move-count @ 1 + DUP 32 = IF
+      DROP 0  1 use-energy
+    THEN move-count !
   THEN ;
 
 \ ══════════════════════════════════════════════════════════════════════════
@@ -556,6 +612,8 @@ VARIABLE hc-jy
 \ ── Fire maser ─────────────────────────────────────────────────────────
 
 : fire-maser  ( angle -- )
+  penergy @ 0= IF DROP EXIT THEN
+  MASER-COST use-energy
   \ Erase any existing beam first
   beam-timer @ IF erase-beam THEN
   \ Save ship position as beam origin
@@ -570,18 +628,116 @@ VARIABLE hc-jy
   1 rg-line
   BEAM-FRAMES beam-timer !
   \ Check for Jovian hits
-  check-hits ;
+  check-hits
+  \ Redraw ship (beam may have overwritten it)
+  draw-ship ;
 
 : tick-beam  ( -- )
   beam-timer @ IF
     beam-timer @ 1 - beam-timer !
-    beam-timer @ 0= IF erase-beam THEN
+    beam-timer @ 0= IF erase-beam draw-ship THEN
   THEN ;
+
+\ ── Triton missiles (command 6) ─────────────────────────────────────────
+\ Animated projectile: alternates + and x sprites as it flies.
+\ One-hit kill on Jovian contact.  Limited supply (pmissiles).
+
+VARIABLE msl-x                   \ current missile x (signed, *128 fixed-point)
+VARIABLE msl-y                   \ current missile y (signed, *128 fixed-point)
+VARIABLE msl-dx                  \ x step per frame (*128)
+VARIABLE msl-dy                  \ y step per frame (*128)
+VARIABLE msl-px                  \ previous screen x (for erase)
+VARIABLE msl-py                  \ previous screen y (for erase)
+VARIABLE msl-frame               \ animation frame counter
+VARIABLE msl-active              \ nonzero = missile in flight
+100 CONSTANT MSL-SPEED           \ pixels per frame
+5 CONSTANT MSL-COST              \ energy per missile
+
+: msl-spr  ( -- addr )
+  msl-frame @ 1 AND IF SPR-MSL2 ELSE SPR-MSL1 THEN ;
+
+: msl-scrx  ( -- x )  msl-x @ 7 RSHIFT ;
+: msl-scry  ( -- y )  msl-y @ 7 RSHIFT ;
+
+: msl-erase  ( -- )
+  msl-spr msl-px @ 2 - msl-py @ 2 - spr-erase-box ;
+
+: msl-draw  ( -- )
+  msl-spr msl-scrx 2 - msl-scry 2 - spr-draw ;
+
+: msl-oob?  ( -- flag )
+  msl-scrx 3 < IF 1 EXIT THEN
+  msl-scrx 124 > IF 1 EXIT THEN
+  msl-scry 3 < IF 1 EXIT THEN
+  msl-scry 140 > IF 1 EXIT THEN
+  0 ;
+
+\ Check if missile hit a Jovian (within 4px)
+VARIABLE msl-hi                  \ hit check index
+VARIABLE msl-got                 \ hit flag
+: msl-hit?  ( -- flag )
+  0 msl-got !
+  qjovians @ ?DUP IF 0 DO
+    msl-got @ 0= IF
+      I msl-hi !
+      JOV-DMG msl-hi @ + C@ IF
+        JOV-POS msl-hi @ 2 * + C@ msl-scrx - abs 4 <
+        JOV-POS msl-hi @ 2 * + 1 + C@ msl-scry - abs 4 < AND IF
+          \ Kill Jovian
+          0 JOV-DMG msl-hi @ + C!
+          SPR-JOV
+          JOV-POS msl-hi @ 2 * + C@ 3 -
+          JOV-POS msl-hi @ 2 * + 1 + C@ 2 -
+          spr-erase-box
+          1 msl-got !
+        THEN
+      THEN
+    THEN
+  LOOP THEN
+  msl-got @ ;
+
+VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
+
+: tick-missile  ( -- )
+  msl-active @ 0= IF EXIT THEN
+  \ Advance position
+  msl-dx @ msl-x @ + msl-x !
+  msl-dy @ msl-y @ + msl-y !
+  msl-frame @ 1 + msl-frame !
+  \ Check bounds
+  msl-oob? IF
+    msl-erase  0 msl-active !
+    draw-border
+    EXIT
+  THEN
+  \ Check Jovian hit
+  msl-hit? IF
+    msl-erase  0 msl-active !
+    draw-ship
+    EXIT
+  THEN
+  1 msl-dirty ! ;
+
+: fire-missile  ( angle -- )
+  pmissiles @ 0= IF DROP EXIT THEN
+  msl-active @ IF DROP EXIT THEN
+  MSL-COST use-energy
+  pmissiles @ 1 - pmissiles !
+  \ Start outside ship sprite (offset 8px along firing angle)
+  DUP 8 angle-dx SHIP-POS C@ + 7 LSHIFT msl-x !
+  DUP 8 angle-dy SHIP-POS 1 + C@ + 7 LSHIFT msl-y !
+  \ Compute dx/dy from angle
+  DUP MSL-SPEED angle-dx msl-dx !
+  MSL-SPEED angle-dy msl-dy !
+  0 msl-frame !
+  1 msl-active !  1 msl-dirty !
+  msl-scrx msl-px !  msl-scry msl-py ! ;
 
 \ ── Command dispatch ───────────────────────────────────────────────────
 
 : exec-command  ( -- )
   cmd-num @ 5 = IF cmd-val @ fire-maser THEN
+  cmd-num @ 6 = IF cmd-val @ fire-missile THEN
   0 cmd-state !
   draw-cmd-prompt ;
 
@@ -677,19 +833,44 @@ VARIABLE prev-key                 \ last key seen by KEY?
   draw-panel
   0 cmd-state !  0 prev-key !
   0 beam-timer !
+  0 msl-active !  0 msl-dirty !
+  100 prev-energy !
+  10 prev-missiles !
 
   \ Game loop
   BEGIN
     save-ship-pos
     move-ship
     tick-beam
+    tick-missile
     process-key
+    VSYNC
     moved @ IF
-      VSYNC                       \ sync to blank before redraw
       erase-ship
       draw-ship
     THEN
-    VSYNC
+    msl-dirty @ IF
+      msl-erase
+      msl-scrx msl-px !  msl-scry msl-py !
+      msl-draw
+      0 msl-dirty !
+    THEN
+    penergy @ prev-energy @ <> IF
+      penergy @ prev-energy !
+      update-energy
+    THEN
+    pmissiles @ prev-missiles @ <> IF
+      pmissiles @ prev-missiles !
+      update-missiles
+    THEN
+    penergy @ 0= IF
+      \ Ship destroyed — freeze display
+      0 17 at-xy
+      CHAR D rg-emit CHAR E rg-emit CHAR S rg-emit CHAR T rg-emit
+      CHAR R rg-emit CHAR O rg-emit CHAR Y rg-emit CHAR E rg-emit
+      CHAR D rg-emit
+      BEGIN AGAIN
+    THEN
   AGAIN ;
 
 main

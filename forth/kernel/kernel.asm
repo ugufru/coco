@@ -48,6 +48,19 @@ VAR_LINE_DY     FCB     0       ; |y2-y1|
 VAR_LINE_ERR    FDB     0       ; error accumulator (signed 16-bit)
 VAR_LINE_E2     FDB     0       ; 2*error temp
 VAR_LINE_COL    FCB     0       ; line color
+;;; Sprite drawing scratch (used by CODE_SPRDRAW / CODE_SPERASEBOX)
+VAR_SPR_SA      FDB     0       ; sprite data base (byte 2+)
+VAR_SPR_SX      FCB     0       ; screen X origin
+VAR_SPR_SY      FCB     0       ; screen Y origin
+VAR_SPR_W       FCB     0       ; sprite width (pixels)
+VAR_SPR_H       FCB     0       ; sprite height (rows)
+VAR_SPR_BPR     FCB     0       ; bytes per row = ceil(width/4)
+VAR_SPR_ROW     FCB     0       ; current row counter
+VAR_SPR_COL     FCB     0       ; current pixel column
+VAR_SPR_VROW    FDB     0       ; VRAM row base (precomputed)
+VAR_SPR_SRC     FDB     0       ; current sprite data pointer
+VAR_SPR_DBYTE   FCB     0       ; current data byte
+VAR_SPR_SHIFT   FCB     0       ; pixel shift within byte
 
 ;;; ─── Kernel ──────────────────────────────────────────────────────────────────
 
@@ -121,6 +134,8 @@ CFA_NEGATE      FDB     CODE_NEGATE
 CFA_QDUP        FDB     CODE_QDUP
 CFA_RGPSET      FDB     CODE_RGPSET
 CFA_RGLINE      FDB     CODE_RGLINE
+CFA_SPRDRAW     FDB     CODE_SPRDRAW
+CFA_SPERASEBOX  FDB     CODE_SPERASEBOX
 
 ;;; ─── EXIT ( -- ) ─────────────────────────────────────────────────────────────
 ;;; Return from a colon definition.
@@ -1107,6 +1122,202 @@ LN_DONE
         PULS    X
         LDY     ,X++
         JMP     [,Y]
+
+;;; ─── SPR-DRAW ( addr x y -- ) ─────────────────────────────────────────────
+;;; Draw sprite at (x,y).  Color 0 pixels are transparent (skipped).
+;;; Sprite format: byte 0 = width, byte 1 = height, byte 2+ = row data
+;;; (2 bits/pixel, 4 pixels/byte, bits 7-6 = leftmost).
+;;; ~60 cycles/pixel vs ~700 in ITC Forth.
+
+CODE_SPRDRAW
+        PSHS    X               ; save IP
+        ; Pop args: U+0,1=y  U+2,3=x  U+4,5=addr
+        LDA     3,U             ; A = x (low byte)
+        STA     VAR_SPR_SX
+        LDA     1,U             ; A = y (low byte)
+        STA     VAR_SPR_SY
+        LDY     4,U             ; Y = sprite addr
+        LEAU    6,U             ; pop 3 args
+        ; Read sprite header
+        LDA     ,Y              ; width
+        STA     VAR_SPR_W
+        LDA     1,Y             ; height
+        STA     VAR_SPR_H
+        LEAY    2,Y             ; Y = sprite data start
+        STY     VAR_SPR_SA
+        ; Compute bytes per row = (width+3)/4
+        LDA     VAR_SPR_W
+        ADDA    #3
+        LSRA
+        LSRA
+        STA     VAR_SPR_BPR
+        ; Row loop
+        CLR     VAR_SPR_ROW
+SD_ROW
+        ; Compute VRAM row base = RGVRAM + (sy+row)*32
+        LDA     VAR_SPR_SY
+        ADDA    VAR_SPR_ROW
+        LDB     #32
+        MUL                     ; D = (sy+row)*32
+        ADDD    VAR_RGVRAM
+        STD     VAR_SPR_VROW
+        ; Compute sprite data pointer = SA + row*BPR
+        LDA     VAR_SPR_ROW
+        LDB     VAR_SPR_BPR
+        MUL                     ; D = row*BPR
+        ADDD    VAR_SPR_SA
+        STD     VAR_SPR_SRC
+        ; Column loop
+        CLR     VAR_SPR_COL
+SD_COL
+        ; Load sprite data byte: src[col/4]
+        LDA     VAR_SPR_COL
+        LSRA
+        LSRA                    ; A = col/4
+        LDY     VAR_SPR_SRC
+        LDA     A,Y             ; A = data byte
+        ; Extract 2-bit pixel: shift = 6 - (col%4)*2
+        LDB     VAR_SPR_COL
+        ANDB    #$03
+        ASLB                    ; B = (col%4)*2
+        NEGB
+        ADDB    #6              ; B = shift count
+        STB     VAR_SPR_SHIFT
+        ; Shift data byte right by shift count to get color in bits 1-0
+        TSTB
+        BEQ     SD_NOSR
+SD_SR   LSRA
+        DECB
+        BNE     SD_SR
+SD_NOSR ANDA    #$03            ; A = pixel color (0-3)
+        BEQ     SD_SKIP         ; transparent — skip
+        ; Write pixel to VRAM
+        PSHS    A               ; save color
+        ; VRAM byte addr = VROW + (sx+col)/4
+        LDA     VAR_SPR_SX
+        ADDA    VAR_SPR_COL     ; A = sx+col
+        PSHS    A               ; save screen x
+        LSRA
+        LSRA                    ; A = (sx+col)/4
+        LDY     VAR_SPR_VROW
+        LEAY    A,Y             ; Y = VRAM byte address
+        ; Shift count for screen pixel = 6 - ((sx+col)%4)*2
+        LDA     ,S+             ; A = screen x, pop
+        ANDA    #$03
+        ASLA
+        NEGA
+        ADDA    #6              ; A = shift count
+        ; Shift color into position
+        LDB     ,S              ; B = color (from stack)
+        TSTA
+        BEQ     SD_NCS
+SD_CSH  ASLB
+        DECA
+        BNE     SD_CSH
+SD_NCS  STB     ,S              ; save shifted color back on S
+        ; Build clear mask: ~(3 << shift)
+        LDA     VAR_SPR_SX
+        ADDA    VAR_SPR_COL
+        ANDA    #$03
+        ASLA
+        NEGA
+        ADDA    #6              ; A = shift count again
+        LDB     #$03
+        TSTA
+        BEQ     SD_NMS
+SD_MSH  ASLB
+        DECA
+        BNE     SD_MSH
+SD_NMS  COMB                    ; B = clear mask
+        ; Read-modify-write
+        ANDB    ,Y              ; clear old pixel
+        ORB     ,S+             ; OR in new color, pop shifted color
+        STB     ,Y              ; write back
+SD_SKIP
+        INC     VAR_SPR_COL
+        LDA     VAR_SPR_COL
+        CMPA    VAR_SPR_W
+        BNE     SD_COL
+        ; Next row
+        INC     VAR_SPR_ROW
+        LDA     VAR_SPR_ROW
+        CMPA    VAR_SPR_H
+        LBNE    SD_ROW
+        ; Done
+        PULS    X
+        LDY     ,X++
+        JMP     [,Y]
+
+
+;;; ─── SPR-ERASE-BOX ( addr x y -- ) ───────────────────────────────────────
+;;; Erase sprite bounding box to black (color 0).  Fast: no sprite data reads.
+;;; ~35 cycles/pixel.
+
+CODE_SPERASEBOX
+        PSHS    X               ; save IP
+        ; Pop args: U+0,1=y  U+2,3=x  U+4,5=addr
+        LDA     3,U             ; A = x (low byte)
+        STA     VAR_SPR_SX
+        LDA     1,U             ; A = y (low byte)
+        STA     VAR_SPR_SY
+        LDY     4,U             ; Y = sprite addr
+        LEAU    6,U             ; pop 3 args
+        ; Read sprite header
+        LDA     ,Y              ; width
+        STA     VAR_SPR_W
+        LDA     1,Y             ; height
+        STA     VAR_SPR_H
+        ; Row loop
+        CLR     VAR_SPR_ROW
+SE_ROW
+        ; Compute VRAM row base = RGVRAM + (sy+row)*32
+        LDA     VAR_SPR_SY
+        ADDA    VAR_SPR_ROW
+        LDB     #32
+        MUL
+        ADDD    VAR_RGVRAM
+        STD     VAR_SPR_VROW
+        ; Column loop
+        CLR     VAR_SPR_COL
+SE_COL
+        ; VRAM byte addr = VROW + (sx+col)/4
+        LDA     VAR_SPR_SX
+        ADDA    VAR_SPR_COL     ; A = sx+col
+        PSHS    A               ; save screen x
+        LSRA
+        LSRA                    ; A = (sx+col)/4
+        LDY     VAR_SPR_VROW
+        LEAY    A,Y             ; Y = VRAM byte address
+        ; Clear mask = ~(3 << (6 - ((sx+col)%4)*2))
+        LDA     ,S+             ; A = screen x, pop
+        ANDA    #$03
+        ASLA
+        NEGA
+        ADDA    #6              ; A = shift count
+        LDB     #$03
+        TSTA
+        BEQ     SE_NMS
+SE_MSH  ASLB
+        DECA
+        BNE     SE_MSH
+SE_NMS  COMB                    ; B = clear mask
+        ANDB    ,Y              ; clear pixel
+        STB     ,Y              ; write back
+        ; Next column
+        INC     VAR_SPR_COL
+        LDA     VAR_SPR_COL
+        CMPA    VAR_SPR_W
+        BNE     SE_COL
+        ; Next row
+        INC     VAR_SPR_ROW
+        LDA     VAR_SPR_ROW
+        CMPA    VAR_SPR_H
+        LBNE    SE_ROW
+        ; Done
+        PULS    X
+        LDY     ,X++
+        JMP     [,Y]
+
 
 ;;; Initialize stacks, clear screen, start the inner interpreter.
 ;;; The application thread is loaded separately at APP_BASE.
