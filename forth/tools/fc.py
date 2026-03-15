@@ -13,6 +13,7 @@ so the compiler stays in sync with the kernel automatically.
 
 Supported Forth syntax:
     : NAME ... ;    colon definition
+    CODE NAME ... ;CODE   inline assembly (native 6809 machine code)
     NUMBER          integer literal  (e.g. 72, 0x48)
     CHAR X          character literal (ASCII value of X)
     WORD            reference to a defined word or kernel primitive
@@ -23,7 +24,9 @@ Supported Forth syntax:
 import argparse
 import re
 import struct
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 APP_BASE = 0x2000   # default application load address
@@ -81,6 +84,8 @@ def kernel_words(symbols):
         '?dup':     'CFA_QDUP',
         'rg-pset':  'CFA_RGPSET',
         'rg-line':  'CFA_RGLINE',
+        'spr-draw':      'CFA_SPRDRAW',
+        'spr-erase-box': 'CFA_SPERASEBOX',
     }
     result = {}
     for forth_name, sym_name in names.items():
@@ -95,27 +100,87 @@ def kernel_words(symbols):
 def tokenize(source, base_dir=None):
     """Strip comments, resolve INCLUDE directives, and split into tokens.
 
+    Processes source line-by-line to capture CODE...;CODE blocks as raw
+    assembly text.  CODE blocks emit sentinel tokens:
+        __CODE__  name  <raw-asm-text>  __ENDCODE__
+
     INCLUDE <filename> splices the named file's tokens at the point of the
     directive.  The filename is resolved relative to base_dir (the directory
     of the including file).  Nested INCLUDEs are handled recursively.
     """
-    from pathlib import Path as _Path
-    source = re.sub(r'\\[^\n]*', '', source)          # line comments
-    source = re.sub(r'\(.*?\)', '', source, flags=re.DOTALL)  # block comments
-    raw = source.split()
-
     result = []
-    i = 0
-    while i < len(raw):
-        if raw[i].upper() == 'INCLUDE':
+    in_code_block = False
+    code_name = None
+    code_lines = []
+    in_block_comment = False
+
+    for line in source.split('\n'):
+        # Handle block comments that span multiple lines
+        if in_block_comment:
+            close = line.find(')')
+            if close < 0:
+                continue  # entire line inside block comment
+            line = line[close + 1:]
+            in_block_comment = False
+
+        if in_code_block:
+            stripped = line.strip()
+            if stripped.upper() == ';CODE' or stripped.upper().startswith(';CODE '):
+                result.extend(['__CODE__', code_name, '\n'.join(code_lines), '__ENDCODE__'])
+                in_code_block = False
+                code_name = None
+                code_lines = []
+            else:
+                code_lines.append(line)
+            continue
+
+        # Strip line comment (everything after \)
+        backslash = line.find('\\')
+        if backslash >= 0:
+            line = line[:backslash]
+
+        # Strip block comments, handling multiple per line and unclosed
+        while True:
+            open_paren = line.find('(')
+            if open_paren < 0:
+                break
+            close_paren = line.find(')', open_paren + 1)
+            if close_paren < 0:
+                line = line[:open_paren]
+                in_block_comment = True
+                break
+            line = line[:open_paren] + ' ' + line[close_paren + 1:]
+
+        tokens_on_line = line.split()
+        if not tokens_on_line:
+            continue
+
+        # Check for CODE block start
+        if tokens_on_line[0].upper() == 'CODE':
+            if len(tokens_on_line) < 2:
+                raise SyntaxError("CODE requires a word name")
+            code_name = tokens_on_line[1]
+            code_lines = []
+            in_code_block = True
+            continue
+
+        # Process normal tokens
+        i = 0
+        while i < len(tokens_on_line):
+            tok = tokens_on_line[i]
+            if tok.upper() == 'INCLUDE':
+                i += 1
+                filename = tokens_on_line[i]
+                filepath = (Path(base_dir) / filename) if base_dir else Path(filename)
+                included = tokenize(filepath.read_text(), base_dir=filepath.parent)
+                result.extend(included)
+            else:
+                result.append(tok)
             i += 1
-            filename = raw[i]
-            filepath = (_Path(base_dir) / filename) if base_dir else _Path(filename)
-            included = tokenize(filepath.read_text(), base_dir=filepath.parent)
-            result.extend(included)
-        else:
-            result.append(raw[i])
-        i += 1
+
+    if in_code_block:
+        raise SyntaxError(f"Unterminated CODE block: {code_name!r}")
+
     return result
 
 
@@ -124,9 +189,10 @@ def tokenize(source, base_dir=None):
 def parse(tokens):
     """
     Walk the token stream and return:
-        definitions  — OrderedDict of name → [items]
-        variables    — list of variable names (in declaration order)
-        main_thread  — [items]  (top-level calls, after all definitions)
+        definitions      — OrderedDict of name → [items]
+        variables        — list of variable names (in declaration order)
+        main_thread      — [items]  (top-level calls, after all definitions)
+        code_definitions — OrderedDict of name → raw asm text
 
     Each item is one of:
         ('lit',       int_value)
@@ -135,9 +201,10 @@ def parse(tokens):
         ('do',)                   — 2 bytes; emits CFA_DO
         ('loop_back', name_str)   — 4 bytes; emits CFA_LOOP + signed offset to label
     """
-    definitions = {}   # preserves insertion order (Python 3.7+)
-    variables   = []   # variable names in declaration order
-    main_thread = []
+    definitions      = {}   # preserves insertion order (Python 3.7+)
+    code_definitions = {}   # name → raw asm text
+    variables        = []   # variable names in declaration order
+    main_thread      = []
 
     current_def = None
     current_items = None
@@ -152,9 +219,23 @@ def parse(tokens):
     while i < len(tokens):
         tok = tokens[i]
 
-        if tok == ':':
+        if tok == '__CODE__':
+            name = tokens[i + 1].lower()
+            asm_text = tokens[i + 2]
+            # i+3 is __ENDCODE__
+            if name in definitions:
+                raise SyntaxError(f"CODE word {name!r} collides with colon definition")
+            if name in code_definitions:
+                raise SyntaxError(f"Duplicate CODE word: {name!r}")
+            code_definitions[name] = asm_text
+            i += 4
+            continue
+
+        elif tok == ':':
             i += 1
             name = tokens[i].lower()
+            if name in code_definitions:
+                raise SyntaxError(f"Colon definition {name!r} collides with CODE word")
             current_def = name
             current_items = []
             do_stack = []
@@ -272,7 +353,94 @@ def parse(tokens):
     if current_def is not None:
         raise SyntaxError(f"Unterminated definition: {current_def!r}")
 
-    return definitions, variables, main_thread
+    return definitions, variables, main_thread, code_definitions
+
+
+# ── CODE word assembly ────────────────────────────────────────────────────────
+
+# NEXT sequence for the 6809 ITC kernel (inlined at end of CODE words)
+NEXT_ASM = """\
+        LDY     ,X++
+        JMP     [,Y]"""
+
+
+def preprocess_asm(name, asm_text):
+    """Prepare a CODE word's assembly text for lwasm.
+
+    - Prepend a global label so @-local labels scope correctly
+    - Expand ;NEXT into the two-instruction NEXT sequence
+    """
+    safe = re.sub(r'[^a-z0-9]', '_', name)
+    label = f'__code_{safe}'
+    lines = [label]
+    for line in asm_text.split('\n'):
+        if re.match(r'^\s*;NEXT\b', line):
+            lines.append(NEXT_ASM)
+        else:
+            lines.append(line)
+    lines.append(f'{label}__END')
+    return label, '\n'.join(lines)
+
+
+def assemble_code_words(code_defs, symbols):
+    """Assemble all CODE words into machine code via lwasm.
+
+    Returns an ordered dict of name → bytes (raw machine code for each word).
+    """
+    if not code_defs:
+        return {}
+
+    # Build assembly source with kernel symbol EQUs
+    asm_parts = ['        PRAGMA  6809', '        ORG     $0000', '']
+    for sym_name, addr in sorted(symbols.items()):
+        asm_parts.append(f'{sym_name:20s} EQU     ${addr:04X}')
+    asm_parts.append('')
+
+    labels = {}  # name → (start_label, end_label)
+    for name, asm_text in code_defs.items():
+        start_label, processed = preprocess_asm(name, asm_text)
+        end_label = f'{start_label}__END'
+        labels[name] = (start_label, end_label)
+        asm_parts.append(processed)
+        asm_parts.append('')
+
+    asm_source = '\n'.join(asm_parts)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        asm_file = Path(tmpdir) / 'code_words.asm'
+        bin_file = Path(tmpdir) / 'code_words.bin'
+        map_file = Path(tmpdir) / 'code_words.map'
+        asm_file.write_text(asm_source)
+
+        result = subprocess.run(
+            ['lwasm', '--format=raw', f'--output={bin_file}',
+             f'--map={map_file}', str(asm_file)],
+            capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"lwasm failed assembling CODE words:\n{result.stderr}\n"
+                f"--- assembly source ---\n{asm_source}")
+
+        raw_bin = bin_file.read_bytes()
+        map_text = map_file.read_text()
+
+        # Parse map file to get label addresses
+        map_syms = {}
+        for line in map_text.split('\n'):
+            m = re.match(r'Symbol:\s+(\w+)\s+\S+\s+=\s+([0-9A-Fa-f]+)', line)
+            if m:
+                map_syms[m.group(1)] = int(m.group(2), 16)
+
+        code_bytes = {}
+        for name, (start_label, end_label) in labels.items():
+            if start_label not in map_syms or end_label not in map_syms:
+                raise RuntimeError(f"Could not find labels for CODE word {name!r} in map")
+            start = map_syms[start_label]
+            end = map_syms[end_label]
+            code_bytes[name] = raw_bin[start:end]
+
+    return code_bytes
 
 
 # ── Compiler ──────────────────────────────────────────────────────────────────
@@ -291,14 +459,16 @@ def item_size(item):
     return 2                             # word reference: CFA address
 
 
-def compile_forth(definitions, variables, main_thread, symbols, app_base):
+def compile_forth(definitions, variables, main_thread, code_definitions,
+                  symbols, app_base):
     """
     Two-pass compiler.
 
     Layout in the output binary:
-        [app_base]                          main thread
-        [app_base + main_size]              word definitions (DOCOL … EXIT)
-        [app_base + main_size + defs_size]  variable cells (DOVAR + 2-byte data)
+        [app_base]          main thread
+        [+ main_size]       colon definitions (DOCOL + body + EXIT each)
+        [+ defs_size]       CODE definitions  (FDB self+2 + machine_code each)
+        [+ code_size]       variable cells    (DOVAR + 2-byte data each)
 
     Returns a bytearray to be loaded at app_base.
     """
@@ -312,11 +482,10 @@ def compile_forth(definitions, variables, main_thread, symbols, app_base):
     CFA_BRANCH   = symbols['CFA_BRANCH']
     kwords       = kernel_words(symbols)
 
-    # ── Pass 1: calculate addresses ───────────────────────────────────────────
-    # label_map records the address of each ('label', name) marker.
-    # scan() must be used instead of sum(item_size) so that 0-size labels
-    # are recorded at the correct position before DO is emitted.
+    # Assemble CODE words to get their sizes
+    code_bytes = assemble_code_words(code_definitions, symbols)
 
+    # ── Pass 1: calculate addresses ───────────────────────────────────────────
     label_map = {}
 
     def scan(items, start):
@@ -335,6 +504,11 @@ def compile_forth(definitions, variables, main_thread, symbols, app_base):
         cursor += 2                                      # DOCOL (the CFA cell)
         cursor = scan(items, cursor)
         cursor += 2                                      # CFA_EXIT
+
+    # CODE definitions: CFA cell (2 bytes) + machine code
+    for name in code_definitions:
+        word_cfa[name] = cursor
+        cursor += 2 + len(code_bytes[name])
 
     var_cfa = {}    # name → address of the variable's CFA cell in the output
     for name in variables:
@@ -393,12 +567,17 @@ def compile_forth(definitions, variables, main_thread, symbols, app_base):
     for item in main_thread:
         resolve(item)
 
-    # Word definitions
+    # Colon definitions
     for name, items in definitions.items():
         emit_word(DOCOL)        # CFA cell
         for item in items:
             resolve(item)
         emit_word(CFA_EXIT)
+
+    # CODE definitions
+    for name in code_definitions:
+        emit_word(word_cfa[name] + 2)   # CFA cell points to machine code
+        buf.extend(code_bytes[name])    # raw machine code
 
     # Variable definitions
     for name in variables:
@@ -478,8 +657,8 @@ def main():
     src_path             = Path(args.source)
     source               = src_path.read_text()
     tokens               = tokenize(source, base_dir=src_path.parent)
-    defs, variables, main = parse(tokens)
-    code                 = compile_forth(defs, variables, main, symbols, app_base)
+    defs, variables, main, code_defs = parse(tokens)
+    code                 = compile_forth(defs, variables, main, code_defs, symbols, app_base)
 
     if args.kernel_bin:
         # Combine kernel + app into one DECB binary.
@@ -494,6 +673,8 @@ def main():
 
     if defs:
         print(f"  words: {', '.join(defs)}")
+    if code_defs:
+        print(f"  CODE:  {', '.join(code_defs)}")
     if variables:
         print(f"  vars:  {', '.join(variables)}")
 
