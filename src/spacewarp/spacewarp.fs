@@ -12,8 +12,9 @@ INCLUDE ../../forth/lib/datawrite.fs
 INCLUDE ../../forth/lib/sprite.fs
 INCLUDE ../../forth/lib/trig.fs
 INCLUDE ../../forth/lib/rng.fs
-INCLUDE ../../forth/lib/font5x7.fs
+INCLUDE ../../forth/lib/font-art.fs
 INCLUDE ../../forth/lib/rg-text.fs
+INCLUDE ../../forth/lib/keyboard.fs
 
 \ ══════════════════════════════════════════════════════════════════════════
 \  GALAXY DATA MODEL
@@ -101,6 +102,57 @@ VARIABLE qbhole                \ black hole present? (0 or 1)
 VARIABLE sos-active
 VARIABLE sos-col
 VARIABLE sos-row
+
+\ ── Sprite data ──────────────────────────────────────────────────────────
+\ 7x5 pixel sprites in 2bpp artifact-color format.
+\ Built at init time using datawrite helpers (tb).
+
+$5900 CONSTANT SPR-SHIP           \ Endever: blue chevron (12 bytes)
+$590C CONSTANT SPR-JOV            \ Jovian: red diamond (12 bytes)
+$5918 CONSTANT SPR-BASE           \ UP base: blue cross (12 bytes)
+
+: init-sprites  ( -- )
+  \ Endever — blue (1) filled chevron
+  \   ...1...
+  \   ..1.1..
+  \   .11.11.
+  \   1111111
+  \   1111111
+  SPR-SHIP tp !
+  7 tb 5 tb
+  $01 tb $00 tb
+  $04 tb $40 tb
+  $14 tb $50 tb
+  $55 tb $54 tb
+  $55 tb $54 tb
+
+  \ Jovian — red (2) diamond
+  \   ...2...
+  \   ..2.2..
+  \   .2.2.2.
+  \   ..2.2..
+  \   ...2...
+  SPR-JOV tp !
+  7 tb 5 tb
+  $02 tb $00 tb
+  $08 tb $80 tb
+  $22 tb $20 tb
+  $08 tb $80 tb
+  $02 tb $00 tb
+
+  \ Base — blue (1) cross/ring
+  \   ..111..
+  \   .1...1.
+  \   1..1..1
+  \   .1...1.
+  \   ..111..
+  SPR-BASE tp !
+  7 tb 5 tb
+  $05 tb $40 tb
+  $10 tb $10 tb
+  $41 tb $04 tb
+  $10 tb $10 tb
+  $05 tb $40 tb ;
 
 \ ── Random position within tactical view ─────────────────────────────────
 \ Returns x in 4-123, y in 4-139 (away from borders).
@@ -227,10 +279,20 @@ VARIABLE gq-tmp                \ temp for building quadrant byte
 \  STATUS PANEL
 \ ══════════════════════════════════════════════════════════════════════════
 
+\ Override rg-char for 8-row glyphs with 10-pixel row spacing
+: rg-char  ( char cx cy -- )
+  10 * cb @ * SWAP + cv @ +      \ dest = vram + cy*10*bpr + cx
+  SWAP glyph-addr SWAP           \ ( glyph dest )
+  8 0 DO
+    OVER I + C@
+    OVER I cb @ * + C!
+  LOOP DROP DROP ;
+
 : init-text  ( -- )
   init-font
   rv @ cv !
-  32 cb ! ;
+  32 cb !
+  $F8 set-pia ;          \ CSS=1: buff/white for NTSC artifacts
 
 VARIABLE tcx
 VARIABLE tcy
@@ -239,60 +301,309 @@ VARIABLE tcy
 
 : rg-u.  ( u -- )  10 /MOD ?DUP IF rg-u. THEN  CHAR 0 + rg-emit ;
 
+\ Count decimal digits of u (minimum 1)
+: #digits  ( u -- n )
+  DUP 100 < IF
+    10 < IF 1 ELSE 2 THEN
+  ELSE
+    DROP 3
+  THEN ;
+
+\ Print u right-justified so last digit ends at end-col - 1
+: rg-u.r  ( u end-col -- )  OVER #digits - tcx !  rg-u. ;
+
 : clear-panel  ( -- )
   rv @ 4608 + 1536 0 FILL ;
 
-: draw-cond  ( -- )
+\ Panel text rows: cy=15 (pixel 150), 16 (160), 17 (170), 18 (180)
+
+: draw-cond  ( end-col -- )
   qjovians @ IF
+    3 - tcx !
     CHAR R rg-emit CHAR E rg-emit CHAR D rg-emit
   ELSE
+    5 - tcx !
     CHAR G rg-emit CHAR R rg-emit CHAR E rg-emit CHAR E rg-emit CHAR N rg-emit
   THEN ;
 
 : draw-panel  ( -- )
   clear-panel
 
-  \ Row 18: DATE nn  QUAD n n   DEFL nnn
-  0 18 at-xy
-  CHAR D rg-emit CHAR A rg-emit CHAR T rg-emit CHAR E rg-emit CHAR   rg-emit
-  gtime @ rg-u.
+  \ Left labels col 0, left values right-align to col 14
+  \ Right labels col 17, right values right-align to col 32
 
-  9 18 at-xy
-  CHAR Q rg-emit CHAR U rg-emit CHAR A rg-emit CHAR D rg-emit CHAR   rg-emit
-  pcol @ rg-u.  CHAR   rg-emit  prow @ rg-u.
+  \ Row 15: STARDATE      n  MISSILES      nn
+  0 15 at-xy
+  CHAR S rg-emit CHAR T rg-emit CHAR A rg-emit CHAR R rg-emit
+  CHAR D rg-emit CHAR A rg-emit CHAR T rg-emit CHAR E rg-emit
+  gtime @ 14 rg-u.r
 
-  20 18 at-xy
-  CHAR D rg-emit CHAR E rg-emit CHAR F rg-emit CHAR L rg-emit CHAR   rg-emit
-  pshields @ rg-u.
+  17 15 at-xy
+  CHAR M rg-emit CHAR I rg-emit CHAR S rg-emit CHAR S rg-emit
+  CHAR I rg-emit CHAR L rg-emit CHAR E rg-emit CHAR S rg-emit
+  pmissiles @ 32 rg-u.r
 
-  \ Row 19: ENRG nnn MISL nn   COND XXXXX
-  0 19 at-xy
-  CHAR E rg-emit CHAR N rg-emit CHAR R rg-emit CHAR G rg-emit CHAR   rg-emit
-  penergy @ rg-u.
+  \ Row 16: QUADRANT    n n  ENERGY       nnn
+  0 16 at-xy
+  CHAR Q rg-emit CHAR U rg-emit CHAR A rg-emit CHAR D rg-emit
+  CHAR R rg-emit CHAR A rg-emit CHAR N rg-emit CHAR T rg-emit
+  11 16 at-xy  pcol @ rg-u.  CHAR , rg-emit  prow @ rg-u.
 
-  10 19 at-xy
-  CHAR M rg-emit CHAR I rg-emit CHAR S rg-emit CHAR L rg-emit CHAR   rg-emit
-  pmissiles @ rg-u.
+  17 16 at-xy
+  CHAR E rg-emit CHAR N rg-emit CHAR E rg-emit CHAR R rg-emit
+  CHAR G rg-emit CHAR Y rg-emit
+  penergy @ 32 rg-u.r
 
-  20 19 at-xy
-  CHAR C rg-emit CHAR O rg-emit CHAR N rg-emit CHAR D rg-emit CHAR   rg-emit
-  draw-cond
-
-  \ Row 20: SOS alert (conditional)
+  \ Row 17: COND/SOS left, SHIELDS right
   sos-active @ IF
-    20 20 at-xy
+    0 17 at-xy
     CHAR S rg-emit CHAR O rg-emit CHAR S rg-emit
-    CHAR   rg-emit CHAR   rg-emit
-    sos-col @ rg-u.  CHAR   rg-emit  sos-row @ rg-u.
+    CHAR - rg-emit CHAR B rg-emit CHAR A rg-emit
+    CHAR S rg-emit CHAR E rg-emit
+    11 17 at-xy
+    sos-col @ rg-u.  CHAR , rg-emit  sos-row @ rg-u.
+  ELSE
+    0 17 at-xy
+    CHAR C rg-emit CHAR O rg-emit CHAR N rg-emit CHAR D rg-emit
+    14 draw-cond
   THEN
 
-  \ Row 21: COMMAND prompt
-  20 21 at-xy
+  17 17 at-xy
+  CHAR S rg-emit CHAR H rg-emit CHAR I rg-emit CHAR E rg-emit
+  CHAR L rg-emit CHAR D rg-emit CHAR S rg-emit
+  pshields @ 32 rg-u.r
+
+  \ Row 18: COMMAND prompt
+  17 18 at-xy
   CHAR C rg-emit CHAR O rg-emit CHAR M rg-emit CHAR M rg-emit
   CHAR A rg-emit CHAR N rg-emit CHAR D rg-emit ;
 
 \ ══════════════════════════════════════════════════════════════════════════
-\  TEMPORARY TEST — generate and dump galaxy to verify
+\  TACTICAL VIEW DRAWING
+\ ══════════════════════════════════════════════════════════════════════════
+
+: draw-border  ( -- )
+  0   0   127 0   3 rg-line
+  127 0   127 143 3 rg-line
+  127 143 0   143 3 rg-line
+  0   143 0   0   3 rg-line ;
+
+: draw-stars  ( -- )
+  qstars @ ?DUP IF 0 DO
+    STAR-POS I 2 * + C@
+    STAR-POS I 2 * + 1 + C@
+    3 rnd 1 + rg-pset
+  LOOP THEN ;
+
+VARIABLE dj-i
+: draw-jovians  ( -- )
+  qjovians @ ?DUP IF 0 DO
+    I dj-i !
+    SPR-JOV
+    JOV-POS dj-i @ 2 * + C@ 3 -
+    JOV-POS dj-i @ 2 * + 1 + C@ 2 -
+    spr-draw
+  LOOP THEN ;
+
+: draw-base  ( -- )
+  qbase @ IF
+    SPR-BASE
+    BASE-POS C@ 3 - BASE-POS 1 + C@ 2 -
+    spr-draw
+  THEN ;
+
+VARIABLE old-sx                   \ previous ship x
+VARIABLE old-sy                   \ previous ship y
+
+: save-ship-pos  ( -- )
+  SHIP-POS C@ old-sx !  SHIP-POS 1 + C@ old-sy ! ;
+
+: draw-ship  ( -- )
+  SPR-SHIP
+  SHIP-POS C@ 3 - SHIP-POS 1 + C@ 2 -
+  spr-draw ;
+
+: erase-ship  ( -- )
+  SPR-SHIP
+  old-sx @ 3 - old-sy @ 2 -
+  spr-erase-box ;
+
+: draw-quadrant  ( -- )
+  draw-border draw-stars draw-jovians draw-base draw-ship ;
+
+\ ══════════════════════════════════════════════════════════════════════════
+\  SHIP MOVEMENT (arrow keys via direct matrix scan)
+\ ══════════════════════════════════════════════════════════════════════════
+
+\ Scan arrow keys (all on column 3) and move ship.
+\ Bounds: x 4-123, y 4-139 (inside tactical border).
+
+VARIABLE moved                    \ flag: did ship move this frame?
+7 CONSTANT SHIP-DX                \ pixels per step (ship width)
+5 CONSTANT SHIP-DY                \ pixels per step (ship height)
+
+: move-ship  ( -- )
+  0 moved !
+  \ Arrow keys: all on row 3 ($08), different columns
+  KB-C3 KBD-SCAN $08 AND IF       \ UP: col 3, row 3
+    SHIP-POS 1 + C@ SHIP-DY 4 + > IF
+      SHIP-POS 1 + C@ SHIP-DY - SHIP-POS 1 + C!
+      1 moved !
+    THEN
+  THEN
+  KB-C4 KBD-SCAN $08 AND IF       \ DN: col 4, row 3
+    SHIP-POS 1 + C@ 139 SHIP-DY - < IF
+      SHIP-POS 1 + C@ SHIP-DY + SHIP-POS 1 + C!
+      1 moved !
+    THEN
+  THEN
+  KB-C5 KBD-SCAN $08 AND IF       \ LT: col 5, row 3
+    SHIP-POS C@ SHIP-DX 4 + > IF
+      SHIP-POS C@ SHIP-DX - SHIP-POS C!
+      1 moved !
+    THEN
+  THEN
+  KB-C6 KBD-SCAN $08 AND IF       \ RT: col 6, row 3
+    SHIP-POS C@ 123 SHIP-DX - < IF
+      SHIP-POS C@ SHIP-DX + SHIP-POS C!
+      1 moved !
+    THEN
+  THEN ;
+
+\ ══════════════════════════════════════════════════════════════════════════
+\  COMMAND INPUT SYSTEM
+\ ══════════════════════════════════════════════════════════════════════════
+\ State machine: 0=idle (waiting for command key 1-7),
+\                1=collecting digits for parameter.
+\ Arrow keys continue working during input via move-ship.
+
+VARIABLE cmd-state                \ 0=idle, 1=collecting
+VARIABLE cmd-num                  \ active command (1-7)
+VARIABLE cmd-val                  \ accumulated parameter value
+VARIABLE cmd-digits               \ number of digits entered
+
+: clear-cmd-area  ( -- )
+  17 18 at-xy  15 0 DO  $20 rg-emit  LOOP ;
+
+: draw-cmd-prompt  ( -- )
+  clear-cmd-area
+  17 18 at-xy
+  CHAR C rg-emit CHAR O rg-emit CHAR M rg-emit CHAR M rg-emit
+  CHAR A rg-emit CHAR N rg-emit CHAR D rg-emit ;
+
+\ ── Maser fire (command 5) ──────────────────────────────────────────────
+\ Draw a blue beam from ship at the given angle across the tactical view.
+\ Beam persists for BEAM-FRAMES then auto-erases.
+
+VARIABLE beam-x1                  \ beam start (ship pos at fire time)
+VARIABLE beam-y1
+VARIABLE beam-x2                  \ beam endpoint (clamped)
+VARIABLE beam-y2
+VARIABLE beam-timer               \ frames remaining until erase (0=none)
+12 CONSTANT BEAM-FRAMES
+
+: clamp-beam  ( -- )
+  beam-x2 @ 1 < IF 1 beam-x2 ! THEN
+  beam-x2 @ 126 > IF 126 beam-x2 ! THEN
+  beam-y2 @ 1 < IF 1 beam-y2 ! THEN
+  beam-y2 @ 142 > IF 142 beam-y2 ! THEN ;
+
+: erase-beam  ( -- )
+  beam-x1 @ beam-y1 @
+  beam-x2 @ beam-y2 @
+  0 rg-line ;                     \ redraw in black
+
+: fire-maser  ( angle -- )
+  \ Erase any existing beam first
+  beam-timer @ IF erase-beam THEN
+  \ Save ship position as beam origin
+  SHIP-POS C@ beam-x1 !  SHIP-POS 1 + C@ beam-y1 !
+  \ Calculate and clamp endpoint
+  DUP 140 angle-dx beam-x1 @ + beam-x2 !
+  140 angle-dy beam-y1 @ + beam-y2 !
+  clamp-beam
+  \ Draw blue beam and start timer
+  beam-x1 @ beam-y1 @
+  beam-x2 @ beam-y2 @
+  1 rg-line
+  BEAM-FRAMES beam-timer ! ;
+
+: tick-beam  ( -- )
+  beam-timer @ IF
+    beam-timer @ 1 - beam-timer !
+    beam-timer @ 0= IF erase-beam THEN
+  THEN ;
+
+\ ── Command dispatch ───────────────────────────────────────────────────
+
+: exec-command  ( -- )
+  cmd-num @ 5 = IF cmd-val @ fire-maser THEN
+  0 cmd-state !
+  draw-cmd-prompt ;
+
+: cmd-start  ( cmd -- )
+  cmd-num !
+  \ Commands 1, 3: immediate (no parameter)
+  cmd-num @ 1 = IF exec-command EXIT THEN
+  cmd-num @ 3 = IF exec-command EXIT THEN
+  \ Others: clear area once, show "N? ", start digit collection
+  1 cmd-state !
+  0 cmd-val !  0 cmd-digits !
+  clear-cmd-area
+  17 18 at-xy
+  cmd-num @ CHAR 0 + rg-emit
+  CHAR ? rg-emit ;
+
+: cmd-add-digit  ( digit -- )
+  cmd-digits @ 3 < IF
+    DUP cmd-val @ 10 * + cmd-val !
+    cmd-digits @ 1 + cmd-digits !
+    \ Position cursor explicitly: col 18 + digit count, row 18
+    cmd-digits @ 18 + 18 at-xy
+    CHAR 0 + rg-emit
+  ELSE
+    DROP
+  THEN ;
+
+\ Handle key during digit collection
+: process-cmd-input  ( key -- )
+  DUP $30 < IF
+    $0D = IF exec-command THEN
+  ELSE
+    DUP $3A < IF
+      $30 - cmd-add-digit
+    ELSE
+      DROP
+    THEN
+  THEN ;
+
+\ Handle key when idle
+: process-idle  ( key -- )
+  DUP $31 < IF DROP
+  ELSE
+    DUP $38 < IF
+      $30 - cmd-start
+    ELSE
+      DROP
+    THEN
+  THEN ;
+
+\ Poll keyboard and dispatch (debounce: only fire on key change)
+VARIABLE prev-key                 \ last key seen by KEY?
+
+: process-key  ( -- )
+  KEY?
+  DUP prev-key @ = IF
+    DROP                          \ same or still zero — ignore
+  ELSE
+    DUP prev-key !
+    ?DUP IF
+      cmd-state @ IF process-cmd-input ELSE process-idle THEN
+    THEN
+  THEN ;
+
+\ ══════════════════════════════════════════════════════════════════════════
+\  GAME LOOP
 \ ══════════════════════════════════════════════════════════════════════════
 
 \ Find first quadrant with a base and expand it
@@ -308,47 +619,33 @@ VARIABLE tcy
   rg-init
   init-text
   init-sin
+  init-sprites
   init-player
   12345 seed !
   0 sos-active !
 
-  \ Draw border first (visual progress indicator)
-  0   0   127 0   3 rg-line
-  127 0   127 143 3 rg-line
-  127 143 0   143 3 rg-line
-  0   143 0   0   3 rg-line
-
-  \ Generate galaxy at level 1 (small, fast test)
+  \ Generate galaxy and enter starting quadrant
   1 gen-galaxy
-
-  \ Enter starting quadrant (first one with a base)
   find-base-quadrant
 
-  \ Draw stars
-  qstars @ ?DUP IF 0 DO
-    STAR-POS I 2 * + C@
-    STAR-POS I 2 * + 1 + C@
-    3 rg-pset
-  LOOP THEN
-
-  \ Draw jovians as red dots
-  qjovians @ ?DUP IF 0 DO
-    JOV-POS I 2 * + C@
-    JOV-POS I 2 * + 1 + C@
-    2 rg-pset
-  LOOP THEN
-
-  \ Draw base as blue dot
-  qbase @ IF
-    BASE-POS C@ BASE-POS 1 + C@ 1 rg-pset
-  THEN
-
-  \ Draw ship as white dot
-  SHIP-POS C@ SHIP-POS 1 + C@ 3 rg-pset
-
+  \ Draw initial tactical view and status panel
+  draw-quadrant
   draw-panel
-  KEY DROP
-  reset-text
-  HALT ;
+  0 cmd-state !  0 prev-key !
+  0 beam-timer !
+
+  \ Game loop
+  BEGIN
+    save-ship-pos
+    move-ship
+    tick-beam
+    process-key
+    moved @ IF
+      VSYNC                       \ sync to blank before redraw
+      erase-ship
+      draw-ship
+    THEN
+    VSYNC
+  AGAIN ;
 
 main
