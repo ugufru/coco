@@ -34,8 +34,8 @@ INCLUDE ../../forth/lib/keyboard.fs
 
 \ ── Galaxy array ─────────────────────────────────────────────────────────
 
-\ Game data starts at $5800 (above VRAM which ends at $57FF).
-$5800 CONSTANT GALAXY          \ 64 bytes: 8x8 quadrant data
+\ Game data starts at $6800 (above VRAM which ends at $67FF).
+$6800 CONSTANT GALAXY          \ 64 bytes: 8x8 quadrant data
 
 : gal-addr  ( col row -- addr )  8 * + GALAXY + ;
 : gal@  ( col row -- byte )  gal-addr C@ ;
@@ -83,14 +83,14 @@ VARIABLE pdmg-masr             \ maser damage
 \ tactical view (2-125, 2-141).
 
 \ Position arrays (2 bytes each: x then y)
-$5840 CONSTANT STAR-POS        \ 5 stars x 2 bytes = 10 bytes
-$584A CONSTANT JOV-POS         \ 3 jovians x 2 bytes = 6 bytes
-$5850 CONSTANT BASE-POS        \ 1 base x 2 bytes = 2 bytes
-$5852 CONSTANT BHOLE-POS       \ 1 black hole x 2 bytes = 2 bytes
-$5854 CONSTANT SHIP-POS        \ player ship x 2 bytes = 2 bytes
+$6840 CONSTANT STAR-POS        \ 5 stars x 2 bytes = 10 bytes
+$684A CONSTANT JOV-POS         \ 3 jovians x 2 bytes = 6 bytes
+$6850 CONSTANT BASE-POS        \ 1 base x 2 bytes = 2 bytes
+$6852 CONSTANT BHOLE-POS       \ 1 black hole x 2 bytes = 2 bytes
+$6854 CONSTANT SHIP-POS        \ player ship x 2 bytes = 2 bytes
 
 \ Jovian damage (3 bytes, one per jovian: 100=full health, 0=dead)
-$5856 CONSTANT JOV-DMG         \ 3 bytes
+$6856 CONSTANT JOV-DMG         \ 3 bytes
 
 \ Quadrant object counts (from the packed byte, cached for speed)
 VARIABLE qstars                \ star count in current quadrant
@@ -107,9 +107,9 @@ VARIABLE sos-row
 \ 7x5 pixel sprites in 2bpp artifact-color format.
 \ Built at init time using datawrite helpers (tb).
 
-$5900 CONSTANT SPR-SHIP           \ Endever: blue chevron (12 bytes)
-$590C CONSTANT SPR-JOV            \ Jovian: red diamond (12 bytes)
-$5918 CONSTANT SPR-BASE           \ UP base: blue cross (12 bytes)
+$6900 CONSTANT SPR-SHIP           \ Endever: blue chevron (12 bytes)
+$690C CONSTANT SPR-JOV            \ Jovian: red diamond (12 bytes)
+$6918 CONSTANT SPR-BASE           \ UP base: blue cross (12 bytes)
 
 : init-sprites  ( -- )
   \ Endever — blue (1) filled chevron
@@ -513,6 +513,48 @@ VARIABLE beam-timer               \ frames remaining until erase (0=none)
   beam-x2 @ beam-y2 @
   0 rg-line ;                     \ redraw in black
 
+\ ── Maser hit detection ────────────────────────────────────────────────
+\ Cross-product distance: if |dx*(jy-y1) - dy*(jx-x1)| < threshold,
+\ the Jovian is near the beam path.
+
+VARIABLE hc-i                     \ hit check loop index
+VARIABLE hc-jx
+VARIABLE hc-jy
+560 CONSTANT HIT-THRESH           \ ~4 pixel hit radius for 140px beam
+30 CONSTANT MASER-DMG             \ damage per hit
+
+: check-hit  ( -- )
+  JOV-DMG hc-i @ + C@ IF
+    JOV-POS hc-i @ 2 * + C@ hc-jx !
+    JOV-POS hc-i @ 2 * + 1 + C@ hc-jy !
+    \ Cross product: dx*(jy-y1) - dy*(jx-x1)
+    beam-x2 @ beam-x1 @ -
+    hc-jy @ beam-y1 @ - *
+    beam-y2 @ beam-y1 @ -
+    hc-jx @ beam-x1 @ - *
+    -
+    abs HIT-THRESH < IF
+      \ Hit! Reduce health
+      JOV-DMG hc-i @ + C@
+      MASER-DMG - DUP 0 < IF DROP 0 THEN
+      JOV-DMG hc-i @ + C!
+      \ If dead, erase sprite
+      JOV-DMG hc-i @ + C@ 0= IF
+        SPR-JOV
+        hc-jx @ 3 - hc-jy @ 2 -
+        spr-erase-box
+      THEN
+    THEN
+  THEN ;
+
+: check-hits  ( -- )
+  qjovians @ ?DUP IF 0 DO
+    I hc-i !
+    check-hit
+  LOOP THEN ;
+
+\ ── Fire maser ─────────────────────────────────────────────────────────
+
 : fire-maser  ( angle -- )
   \ Erase any existing beam first
   beam-timer @ IF erase-beam THEN
@@ -526,7 +568,9 @@ VARIABLE beam-timer               \ frames remaining until erase (0=none)
   beam-x1 @ beam-y1 @
   beam-x2 @ beam-y2 @
   1 rg-line
-  BEAM-FRAMES beam-timer ! ;
+  BEAM-FRAMES beam-timer !
+  \ Check for Jovian hits
+  check-hits ;
 
 : tick-beam  ( -- )
   beam-timer @ IF

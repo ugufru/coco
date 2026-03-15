@@ -23,13 +23,13 @@ VARIABLE fp
 : glyph-addr  ( char -- addr )
   DUP $20 < IF DROP $20 THEN
   DUP $5A > IF DROP $20 THEN
-  $20 - 8 * $6000 + ;
+  $20 - 8 * $7000 + ;
 
 \ Helper: write 8 blank bytes (unused glyph slot)
 : f0  ( -- )  $00 $00 $00 $00 $00 $00 $00 $00 f8 ;
 
 : init-font
-  $6000 fp !
+  $7000 fp !
 
   \ ── $20: Space ───  ...  ...  ...  ...  ...  ...  ...  ...
   f0
