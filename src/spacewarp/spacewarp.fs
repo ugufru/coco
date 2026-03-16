@@ -16,6 +16,75 @@ INCLUDE ../../forth/lib/font-art.fs
 INCLUDE ../../forth/lib/rg-text.fs
 INCLUDE ../../forth/lib/keyboard.fs
 
+\ ── Bulk pixel plotter (assembly) ───────────────────────────────────────
+\ plot-dots ( addr count color -- )
+\ Plots count pixels from (x,y) byte pairs at addr, all in one color.
+\ Used for storm stars and event horizon spiral.
+
+CODE plot-dots
+        PSHS    X               ; save IP
+        LDA     1,U             ; A = color
+        ANDA    #$03
+        STA     VAR_LINE_COL    ; stash color (reuse line scratch)
+        LDD     2,U             ; D = count
+        STB     VAR_SPR_ROW     ; stash count (reuse sprite scratch)
+        LDX     4,U             ; X = addr
+        LEAU    6,U             ; pop 3 args
+        ; Loop over count (x,y) pairs
+        LDA     VAR_SPR_ROW
+        BEQ     @done
+@loop   PSHS    A               ; save remaining count
+        ; Load x, y from buffer
+        LDA     ,X              ; A = x
+        LDB     1,X             ; B = y
+        PSHS    X               ; save buffer pointer
+        ; Compute VRAM addr: Y = RGVRAM + y*32 + x/4
+        PSHS    A               ; save x
+        LDA     #32
+        MUL                     ; D = y * 32
+        ADDD    VAR_RGVRAM
+        TFR     D,Y             ; Y = row base
+        LDA     ,S              ; A = x
+        LSRA
+        LSRA                    ; A = x/4
+        LEAY    A,Y             ; Y = VRAM byte
+        ; Shift = 6 - (x%4)*2
+        LDA     ,S+             ; A = x, pop
+        ANDA    #$03
+        ASLA
+        NEGA
+        ADDA    #6              ; A = shift count
+        PSHS    A               ; save shift
+        ; Shift color into position
+        LDA     VAR_LINE_COL
+        LDB     ,S
+        BEQ     @ns
+@sh     ASLA
+        DECB
+        BNE     @sh
+@ns     PSHS    A               ; save shifted color
+        ; Build clear mask
+        LDA     #$03
+        LDB     1,S             ; shift count
+        BEQ     @nm
+@sm     ASLA
+        DECB
+        BNE     @sm
+@nm     COMA
+        ANDA    ,Y              ; clear old pixel
+        ORA     ,S              ; OR in new color
+        STA     ,Y              ; write back
+        LEAS    2,S             ; clean shift+color
+        ; Advance
+        PULS    X               ; restore buffer pointer
+        LEAX    2,X             ; next (x,y) pair
+        PULS    A               ; restore count
+        DECA
+        BNE     @loop
+@done   PULS    X               ; restore IP
+        ;NEXT
+;CODE
+
 \ ══════════════════════════════════════════════════════════════════════════
 \  GALAXY DATA MODEL
 \ ══════════════════════════════════════════════════════════════════════════
@@ -102,6 +171,12 @@ VARIABLE qbhole                \ black hole present? (0 or 1)
 VARIABLE sos-active
 VARIABLE sos-col
 VARIABLE sos-row
+
+\ Docking state
+VARIABLE docked                    \ 1 = currently docked at base
+
+\ Death cause (for game-over message)
+VARIABLE death-cause               \ 0=energy/star, 1=black hole
 
 \ ── Sprite data ──────────────────────────────────────────────────────────
 \ 7x5 pixel sprites in 2bpp artifact-color format.
@@ -310,20 +385,19 @@ VARIABLE gq-tmp                \ temp for building quadrant byte
 \  STATUS PANEL
 \ ══════════════════════════════════════════════════════════════════════════
 
-\ Override rg-char for 8-row glyphs with 10-pixel row spacing
-: rg-char  ( char cx cy -- )
-  10 * cb @ * SWAP + cv @ +      \ dest = vram + cy*10*bpr + cx
-  SWAP glyph-addr SWAP           \ ( glyph dest )
-  8 0 DO
-    OVER I + C@
-    OVER I cb @ * + C!
-  LOOP DROP DROP ;
-
+\ rg-char is a kernel primitive.  Configure for artifact font:
+\ 8-byte glyphs at $7000, 8 rows to copy, 32 bpr, 10-pixel row height.
 : init-text  ( -- )
   init-font
-  rv @ cv !
-  32 cb !
-  $F8 set-pia ;          \ CSS=1: buff/white for NTSC artifacts
+  rv @ cv !  32 cb !
+  rv @ $57 !                    \ kernel VRAM base
+  $7000 $75 !                   \ font base
+  $20 $77 C!                    \ min char (space)
+  8 $78 C!                      \ bytes per glyph
+  8 $79 C!                      \ rows to copy
+  32 $7A C!                     \ bytes per VRAM row
+  10 $7B C!                     \ row height for cy
+  $F8 set-pia ;                 \ CSS=1: buff/white for NTSC artifacts
 
 VARIABLE tcx
 VARIABLE tcy
@@ -349,12 +423,18 @@ VARIABLE tcy
 \ Panel text rows: cy=15 (pixel 150), 16 (160), 17 (170), 18 (180)
 
 : draw-cond  ( end-col -- )
-  qjovians @ IF
-    3 - tcx !
-    CHAR R rg-emit CHAR E rg-emit CHAR D rg-emit
+  docked @ IF
+    6 - tcx !
+    CHAR D rg-emit CHAR O rg-emit CHAR C rg-emit
+    CHAR K rg-emit CHAR E rg-emit CHAR D rg-emit
   ELSE
-    5 - tcx !
-    CHAR G rg-emit CHAR R rg-emit CHAR E rg-emit CHAR E rg-emit CHAR N rg-emit
+    qjovians @ IF
+      3 - tcx !
+      CHAR R rg-emit CHAR E rg-emit CHAR D rg-emit
+    ELSE
+      5 - tcx !
+      CHAR G rg-emit CHAR R rg-emit CHAR E rg-emit CHAR E rg-emit CHAR N rg-emit
+    THEN
   THEN ;
 
 : draw-panel  ( -- )
@@ -471,8 +551,164 @@ VARIABLE old-sy                   \ previous ship y
   old-sx @ 3 - old-sy @ 2 -
   spr-erase-box ;
 
+\ ── Background save/restore for flicker-free ship movement ────────────
+\ Save 3 bytes × 5 rows of VRAM under the ship sprite bounding box.
+\ Restore to erase the ship without a black flash.
+$68D0 CONSTANT SHIP-BG              \ 15-byte save buffer
+
+CODE bg-save   \ ( x y -- )  save 3×5 VRAM bytes to SHIP-BG
+        PSHS    X
+        LDA     1,U             ; A = y
+        LDB     #32
+        MUL                     ; D = y * 32
+        ADDD    VAR_RGVRAM      ; D = row base
+        TFR     D,Y             ; Y = row base
+        LDA     3,U             ; A = x
+        LSRA
+        LSRA                    ; A = x / 4
+        LEAY    A,Y             ; Y = first byte to save
+        LEAU    4,U             ; pop 2 args
+        LDX     #$68D0          ; X = buffer
+        LDB     #5
+@row    LDA     ,Y
+        STA     ,X+
+        LDA     1,Y
+        STA     ,X+
+        LDA     2,Y
+        STA     ,X+
+        LEAY    32,Y            ; next VRAM row
+        DECB
+        BNE     @row
+        PULS    X
+        ;NEXT
+;CODE
+
+CODE bg-restore  \ ( x y -- )  restore 3×5 VRAM bytes from SHIP-BG
+        PSHS    X
+        LDA     1,U             ; A = y
+        LDB     #32
+        MUL
+        ADDD    VAR_RGVRAM
+        TFR     D,Y
+        LDA     3,U
+        LSRA
+        LSRA
+        LEAY    A,Y
+        LEAU    4,U
+        LDX     #$68D0
+        LDB     #5
+@row    LDA     ,X+
+        STA     ,Y
+        LDA     ,X+
+        STA     1,Y
+        LDA     ,X+
+        STA     2,Y
+        LEAY    32,Y
+        DECB
+        BNE     @row
+        PULS    X
+        ;NEXT
+;CODE
+
+: save-ship-bg  ( -- )
+  SHIP-POS C@ 3 - SHIP-POS 1 + C@ 2 - bg-save ;
+
+: restore-ship-bg  ( -- )
+  old-sx @ 3 - old-sy @ 2 - bg-restore ;
+
+\ ── Magnetic storm: fake stars + event horizon ─────────────────────────
+\ In storm quadrants, scatter noise dots across the tactical view.
+\ Black hole gravity well (30px Manhattan) is kept clear, and its
+\ boundary is outlined so the player can detect it through the static.
+
+: in-grav-well?  ( x y -- flag )
+  qbhole @ 0= IF DROP DROP 0 EXIT THEN
+  BHOLE-POS 1 + C@ - abs
+  SWAP BHOLE-POS C@ - abs + 30 < ;
+
+\ Storm star positions saved at quadrant entry for redraw.
+\ Max 25 fake stars (5 real × 5 fake). 3 bytes each: x, y, color.
+$6860 CONSTANT FSTAR-POS          \ 25 × 3 = 75 bytes
+VARIABLE fstar-count
+
+VARIABLE fs-tmp
+
+: gen-storm-stars  ( -- )
+  0 fstar-count !
+  pcol @ prow @ gal@ q-storm? 0= IF EXIT THEN
+  qstars @ 3 * ?DUP IF 0 DO
+    rnd-x rnd-y                  \ ( x y )
+    OVER OVER in-grav-well? IF
+      DROP DROP
+    ELSE
+      fstar-count @ 3 * FSTAR-POS + fs-tmp !
+      3 rnd 1 + fs-tmp @ 2 + C!  \ color
+      fs-tmp @ 1 + C!             \ y
+      fs-tmp @ C!                  \ x
+      fstar-count @ 1 + fstar-count !
+    THEN
+  LOOP THEN ;
+
+: draw-storm-stars  ( -- )
+  fstar-count @ ?DUP IF 0 DO
+    FSTAR-POS I 3 * + C@         \ x
+    FSTAR-POS I 3 * + 1 + C@    \ y
+    FSTAR-POS I 3 * + 2 + C@    \ color
+    rg-pset
+  LOOP THEN ;
+
+\ Spiral dot positions precomputed at quadrant entry.
+\ 4 arms × 8 dots = 32 dots max. 2 bytes each (x, y).
+$6890 CONSTANT SPIRAL-POS         \ 32 × 2 = 64 bytes
+VARIABLE spiral-count
+
+VARIABLE sp-r
+VARIABLE sp-r2
+
+: gen-spiral-arm  ( start-angle -- )
+  20 sp-r2 !                     \ radius*2 = 20 → 10px start
+  8 0 DO
+    sp-r2 @ 1 RSHIFT sp-r !
+    DUP sp-r @ angle-dx BHOLE-POS C@ +
+    OVER sp-r @ angle-dy BHOLE-POS 1 + C@ +
+    \ Bounds check — skip out-of-range dots ( angle x y )
+    DUP 2 < OVER 141 > OR IF
+      DROP DROP
+    ELSE
+      SWAP DUP 2 < OVER 125 > OR IF
+        DROP DROP
+      ELSE
+        SWAP                       \ ( angle x y )
+        spiral-count @ 2 * SPIRAL-POS + fs-tmp !
+        fs-tmp @ 1 + C!           \ store y
+        fs-tmp @ C!               \ store x
+        spiral-count @ 1 + spiral-count !
+      THEN
+    THEN
+    20 +
+    DUP 360 > IF 360 - THEN
+    sp-r2 @ 2 - sp-r2 !
+  LOOP DROP ;
+
+: gen-event-horizon  ( -- )
+  0 spiral-count !
+  qbhole @ 0= IF EXIT THEN
+  pcol @ prow @ gal@ q-storm? 0= IF EXIT THEN
+  0 gen-spiral-arm
+  90 gen-spiral-arm
+  180 gen-spiral-arm
+  270 gen-spiral-arm ;
+
+: draw-event-horizon  ( -- )
+  spiral-count @ IF
+    SPIRAL-POS spiral-count @ 1 plot-dots
+  THEN ;
+
 : draw-quadrant  ( -- )
-  draw-border draw-stars draw-jovians draw-base draw-ship ;
+  gen-storm-stars gen-event-horizon
+  draw-border draw-stars draw-storm-stars draw-event-horizon
+  draw-jovians draw-base
+  save-ship-bg draw-ship ;
 
 \ ══════════════════════════════════════════════════════════════════════════
 \  SHIP MOVEMENT (arrow keys via direct matrix scan)
@@ -485,6 +721,7 @@ VARIABLE moved                    \ flag: did ship move this frame?
 VARIABLE move-count               \ counts moves; energy charged every 4th
 VARIABLE prev-energy              \ last displayed energy (for dirty check)
 VARIABLE prev-missiles            \ last displayed missile count
+VARIABLE prev-docked              \ last displayed dock state
 3 CONSTANT SHIP-DX                \ pixels per step
 3 CONSTANT SHIP-DY                \ pixels per step
 10 CONSTANT MASER-COST            \ energy per maser fire
@@ -524,6 +761,139 @@ VARIABLE prev-missiles            \ last displayed missile count
     move-count @ 1 + DUP 32 = IF
       DROP 0  1 use-energy
     THEN move-count !
+  THEN ;
+
+\ ── Collision detection (called after move-ship AND gravity-well) ──────
+
+: check-collisions  ( -- )
+  moved @ 0= IF EXIT THEN
+  \ Star collision: within 3px = destroyed
+  qstars @ ?DUP IF 0 DO
+    SHIP-POS C@ STAR-POS I 2 * + C@ - abs 3 <
+    SHIP-POS 1 + C@ STAR-POS I 2 * + 1 + C@ - abs 3 < AND IF
+      0 penergy !
+    THEN
+  LOOP THEN
+  \ Black hole collision: within 3px = vanish instantly
+  qbhole @ IF
+    SHIP-POS C@ BHOLE-POS C@ - abs 3 <
+    SHIP-POS 1 + C@ BHOLE-POS 1 + C@ - abs 3 < AND IF
+      1 death-cause !
+      0 penergy !
+    THEN
+  THEN ;
+
+\ ══════════════════════════════════════════════════════════════════════════
+\  BLACK HOLE GRAVITY WELL
+\ ══════════════════════════════════════════════════════════════════════════
+\ Within 30px Manhattan distance, pull ship toward black hole center.
+\ Tiered pull rate: edge=every 2 frames, mid=every frame, close=2px/frame.
+\ Ship thrust is 3px/frame, so edge is escapable, core is not.
+
+VARIABLE grav-pull
+VARIABLE grav-tick
+
+: gravity-well  ( -- )
+  qbhole @ 0= IF EXIT THEN
+  grav-tick @ 1 + grav-tick !
+  SHIP-POS C@ BHOLE-POS C@ - abs
+  SHIP-POS 1 + C@ BHOLE-POS 1 + C@ - abs +
+  DUP 30 > IF DROP EXIT THEN
+  DUP 20 > IF                  \ 20-30: gentle drift, every 4 frames
+    DROP grav-tick @ 3 AND IF EXIT THEN 1
+  ELSE DUP 10 > IF             \ 10-20: moderate, every 2 frames
+    DROP grav-tick @ 1 AND IF EXIT THEN 1
+  ELSE 6 > IF                  \ 6-10: every frame
+    1
+  ELSE                          \ <6: inescapable, 2px/frame
+    2
+  THEN THEN THEN
+  grav-pull !
+  1 moved !
+  \ Pull X toward black hole
+  SHIP-POS C@ BHOLE-POS C@ < IF
+    SHIP-POS C@ grav-pull @ + SHIP-POS C!
+  THEN
+  SHIP-POS C@ BHOLE-POS C@ > IF
+    SHIP-POS C@ grav-pull @ - SHIP-POS C!
+  THEN
+  \ Pull Y toward black hole
+  SHIP-POS 1 + C@ BHOLE-POS 1 + C@ < IF
+    SHIP-POS 1 + C@ grav-pull @ + SHIP-POS 1 + C!
+  THEN
+  SHIP-POS 1 + C@ BHOLE-POS 1 + C@ > IF
+    SHIP-POS 1 + C@ grav-pull @ - SHIP-POS 1 + C!
+  THEN ;
+
+\ ── Star gravity (weaker, smaller) ──────────────────────────────────────
+\ 10px radius. Close (<5): pull every 2 frames. Far (5-10): every 4.
+
+VARIABLE sg-i                      \ star gravity loop index
+VARIABLE sg-sx                     \ star x cache
+VARIABLE sg-sy                     \ star y cache
+
+: star-pull  ( -- )
+  1 moved !
+  SHIP-POS C@ sg-sx @ < IF  SHIP-POS C@ 1 + SHIP-POS C!  THEN
+  SHIP-POS C@ sg-sx @ > IF  SHIP-POS C@ 1 - SHIP-POS C!  THEN
+  SHIP-POS 1 + C@ sg-sy @ < IF  SHIP-POS 1 + C@ 1 + SHIP-POS 1 + C!  THEN
+  SHIP-POS 1 + C@ sg-sy @ > IF  SHIP-POS 1 + C@ 1 - SHIP-POS 1 + C!  THEN ;
+
+: star-gravity  ( -- )
+  qstars @ ?DUP IF 0 DO
+    I sg-i !
+    STAR-POS sg-i @ 2 * + C@ sg-sx !
+    STAR-POS sg-i @ 2 * + 1 + C@ sg-sy !
+    SHIP-POS C@ sg-sx @ - abs
+    SHIP-POS 1 + C@ sg-sy @ - abs +
+    DUP 10 > IF
+      DROP
+    ELSE
+      5 < IF
+        grav-tick @ 1 AND 0= IF star-pull THEN
+      ELSE
+        grav-tick @ 3 AND 0= IF star-pull THEN
+      THEN
+    THEN
+  LOOP THEN ;
+
+\ ══════════════════════════════════════════════════════════════════════════
+\  DOCKING
+\ ══════════════════════════════════════════════════════════════════════════
+\ Dock when ship overlaps a base (within 4px on each axis).
+\ Restores energy, missiles, and all ship systems.
+
+: do-dock  ( -- )
+  1 docked !
+  100 penergy !  10 pmissiles !
+  100 pdmg-ion !  100 pdmg-warp !
+  100 pdmg-scan !  100 pdmg-defl !  100 pdmg-masr ! ;
+
+: do-undock  ( -- )  0 docked ! ;
+
+: check-dock  ( -- )
+  qbase @ 0= IF EXIT THEN
+  SHIP-POS C@ BASE-POS C@ - abs 4 <
+  SHIP-POS 1 + C@ BASE-POS 1 + C@ - abs 4 < AND IF
+    docked @ 0= IF do-dock THEN
+  ELSE
+    docked @ IF do-undock THEN
+  THEN ;
+
+\ Redraw condition area (left half of row 17)
+: update-cond  ( -- )
+  0 17 at-xy  14 0 DO $20 rg-emit LOOP
+  sos-active @ IF
+    0 17 at-xy
+    CHAR S rg-emit CHAR O rg-emit CHAR S rg-emit
+    CHAR - rg-emit CHAR B rg-emit CHAR A rg-emit
+    CHAR S rg-emit CHAR E rg-emit
+    11 17 at-xy
+    sos-col @ rg-u.  CHAR , rg-emit  sos-row @ rg-u.
+  ELSE
+    0 17 at-xy
+    CHAR C rg-emit CHAR O rg-emit CHAR N rg-emit CHAR D rg-emit
+    14 draw-cond
   THEN ;
 
 \ ══════════════════════════════════════════════════════════════════════════
@@ -834,6 +1204,7 @@ VARIABLE prev-key                 \ last key seen by KEY?
   0 cmd-state !  0 prev-key !
   0 beam-timer !
   0 msl-active !  0 msl-dirty !
+  0 docked !  0 prev-docked !  0 death-cause !
   100 prev-energy !
   10 prev-missiles !
 
@@ -841,12 +1212,17 @@ VARIABLE prev-key                 \ last key seen by KEY?
   BEGIN
     save-ship-pos
     move-ship
+    gravity-well
+    star-gravity
+    check-collisions
+    check-dock
     tick-beam
     tick-missile
     process-key
     VSYNC
     moved @ IF
-      erase-ship
+      restore-ship-bg
+      save-ship-bg
       draw-ship
     THEN
     msl-dirty @ IF
@@ -863,12 +1239,25 @@ VARIABLE prev-key                 \ last key seen by KEY?
       pmissiles @ prev-missiles !
       update-missiles
     THEN
+    docked @ prev-docked @ <> IF
+      docked @ prev-docked !
+      update-cond
+    THEN
     penergy @ 0= IF
-      \ Ship destroyed — freeze display
-      0 17 at-xy
-      CHAR D rg-emit CHAR E rg-emit CHAR S rg-emit CHAR T rg-emit
-      CHAR R rg-emit CHAR O rg-emit CHAR Y rg-emit CHAR E rg-emit
-      CHAR D rg-emit
+      death-cause @ IF
+        \ Black hole — ship vanishes cleanly
+        restore-ship-bg
+        0 17 at-xy
+        CHAR B rg-emit CHAR L rg-emit CHAR A rg-emit CHAR C rg-emit
+        CHAR K rg-emit  $20 rg-emit
+        CHAR H rg-emit CHAR O rg-emit CHAR L rg-emit CHAR E rg-emit
+      ELSE
+        \ Energy depleted or star collision
+        0 17 at-xy
+        CHAR D rg-emit CHAR E rg-emit CHAR S rg-emit CHAR T rg-emit
+        CHAR R rg-emit CHAR O rg-emit CHAR Y rg-emit CHAR E rg-emit
+        CHAR D rg-emit
+      THEN
       BEGIN AGAIN
     THEN
   AGAIN ;

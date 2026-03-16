@@ -94,8 +94,48 @@ VARIABLE ps                    \ sub-pixel index (0-3)
   2 RSHIFT + pa ! ;            \ pa = row-addr + x/4
 
 \ ── rg-pset ( x y color -- ) ─────────────────────────────────────────────
-\ Now a kernel assembly primitive for speed (~45 cycles vs ~500 in Forth).
-\ Uses VAR_RGVRAM at $0057 for VRAM base address.
+\ Plot one 2bpp artifact pixel.  ~45 cycles vs ~500 in ITC Forth.
+
+CODE rg-pset
+        LDA     5,U             ; A = x (low byte of 3rd item)
+        LDB     3,U             ; B = y (low byte of 2nd item)
+        PSHS    A               ; save x on S
+        LDA     #32
+        MUL                     ; D = y * 32
+        ADDD    VAR_RGVRAM      ; D += VRAM base
+        TFR     D,Y             ; Y = row start
+        LDA     ,S              ; A = x
+        LSRA
+        LSRA                    ; A = x / 4
+        LEAY    A,Y             ; Y = VRAM byte address
+        LDA     ,S+             ; A = x, pop S
+        ANDA    #$03            ; A = x % 4
+        ASLA                    ; A = (x%4)*2
+        NEGA
+        ADDA    #6              ; A = 6 - (x%4)*2
+        PSHS    A               ; save shift count
+        LDA     1,U             ; A = color (0-3)
+        ANDA    #$03
+        LDB     ,S              ; B = shift count
+        BEQ     @ns
+@sh     ASLA
+        DECB
+        BNE     @sh
+@ns     PSHS    A               ; save shifted color
+        LDA     #$03
+        LDB     1,S             ; B = shift count
+        BEQ     @nm
+@sm     ASLA
+        DECB
+        BNE     @sm
+@nm     COMA                    ; A = clear mask
+        ANDA    ,Y              ; clear old pixel
+        ORA     ,S              ; OR in new color
+        STA     ,Y              ; write back
+        LEAS    2,S             ; clean S
+        LEAU    6,U             ; pop 3 data stack items
+        ;NEXT
+;CODE
 
 \ ── rg-pget ( x y -- color ) ─────────────────────────────────────────────
 \ Read the raw 2-bit value at artifact pixel (x, y).
@@ -129,5 +169,153 @@ VARIABLE hl-c  VARIABLE hl-y
 : abs  ( n -- |n| )  DUP 0 < IF NEGATE THEN ;
 
 \ ── rg-line ( x1 y1 x2 y2 color -- ) ───────────────────────────────────
-\ Now a kernel assembly primitive with inlined Bresenham + pixel write.
+\ Bresenham line drawing with inlined pixel write.  All 8 octants.
 \ ~150 cycles/pixel vs ~1500 in ITC Forth.
+
+CODE rg-line
+        PSHS    X               ; save IP
+        ; Load args: U+0,1=color U+2,3=y2 U+4,5=x2 U+6,7=y1 U+8,9=x1
+        LDA     1,U
+        STA     VAR_LINE_COL
+        LDA     5,U
+        STA     VAR_LINE_X2
+        LDA     3,U
+        STA     VAR_LINE_Y2
+        LDA     9,U
+        STA     VAR_LINE_CX
+        LDA     7,U
+        STA     VAR_LINE_CY
+        LEAU    10,U            ; pop 5 args
+        ; dx = |x2-x1|, sx = sign(x2-x1)
+        CLRA
+        LDB     VAR_LINE_CX
+        PSHS    D
+        CLRA
+        LDB     VAR_LINE_X2
+        SUBD    ,S++
+        BPL     @sx_p
+        COMA
+        COMB
+        ADDD    #1
+        STB     VAR_LINE_DX
+        LDA     #$FF
+        STA     VAR_LINE_SX
+        BRA     @sx_d
+@sx_p   STB     VAR_LINE_DX
+        LDA     #$01
+        STA     VAR_LINE_SX
+@sx_d
+        ; dy = |y2-y1|, sy = sign(y2-y1)
+        CLRA
+        LDB     VAR_LINE_CY
+        PSHS    D
+        CLRA
+        LDB     VAR_LINE_Y2
+        SUBD    ,S++
+        BPL     @sy_p
+        COMA
+        COMB
+        ADDD    #1
+        STB     VAR_LINE_DY
+        LDA     #$FF
+        STA     VAR_LINE_SY
+        BRA     @sy_d
+@sy_p   STB     VAR_LINE_DY
+        LDA     #$01
+        STA     VAR_LINE_SY
+@sy_d
+        ; err = dx - dy (signed 16-bit)
+        CLRA
+        LDB     VAR_LINE_DX
+        STD     VAR_LINE_ERR
+        CLRA
+        LDB     VAR_LINE_DY
+        PSHS    D
+        LDD     VAR_LINE_ERR
+        SUBD    ,S++
+        STD     VAR_LINE_ERR
+@loop
+        ; Plot pixel at (CX, CY)
+        LDA     VAR_LINE_CY
+        LDB     #32
+        MUL
+        ADDD    VAR_RGVRAM
+        TFR     D,Y
+        LDA     VAR_LINE_CX
+        LSRA
+        LSRA
+        LEAY    A,Y
+        LDA     VAR_LINE_CX
+        ANDA    #$03
+        ASLA
+        NEGA
+        ADDA    #6
+        PSHS    A
+        LDA     VAR_LINE_COL
+        ANDA    #$03
+        LDB     ,S
+        BEQ     @ns
+@sh     ASLA
+        DECB
+        BNE     @sh
+@ns     PSHS    A
+        LDA     #$03
+        LDB     1,S
+        BEQ     @nm
+@sm     ASLA
+        DECB
+        BNE     @sm
+@nm     COMA
+        ANDA    ,Y
+        ORA     ,S
+        STA     ,Y
+        LEAS    2,S
+        ; Done check
+        LDA     VAR_LINE_CX
+        CMPA    VAR_LINE_X2
+        BNE     @step
+        LDA     VAR_LINE_CY
+        CMPA    VAR_LINE_Y2
+        BEQ     @done
+@step
+        ; e2 = 2 * err
+        LDD     VAR_LINE_ERR
+        ASLB
+        ROLA
+        STD     VAR_LINE_E2
+        ; if e2 > -dy: err -= dy, cx += sx
+        CLRA
+        LDB     VAR_LINE_DY
+        COMA
+        COMB
+        ADDD    #1
+        CMPD    VAR_LINE_E2
+        BGE     @nosx
+        CLRA
+        LDB     VAR_LINE_DY
+        PSHS    D
+        LDD     VAR_LINE_ERR
+        SUBD    ,S++
+        STD     VAR_LINE_ERR
+        LDA     VAR_LINE_CX
+        ADDA    VAR_LINE_SX
+        STA     VAR_LINE_CX
+@nosx
+        ; if e2 < dx: err += dx, cy += sy
+        CLRA
+        LDB     VAR_LINE_DX
+        CMPD    VAR_LINE_E2
+        BLE     @nosy
+        CLRA
+        LDB     VAR_LINE_DX
+        ADDD    VAR_LINE_ERR
+        STD     VAR_LINE_ERR
+        LDA     VAR_LINE_CY
+        ADDA    VAR_LINE_SY
+        STA     VAR_LINE_CY
+@nosy
+        LBRA    @loop
+@done
+        PULS    X
+        ;NEXT
+;CODE

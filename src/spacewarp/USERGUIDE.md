@@ -279,10 +279,19 @@ Black holes are invisible. They occupy a position in the quadrant but nothing
 appears on the tactical display. You discover them when:
 
 - A maser beam or triton missile disappears into empty space
-- You fly into one (instant destruction of the Endever)
+- You feel your ship being pulled off course by an unseen force
+- You fly into one (instant destruction — the Endever vanishes without a trace)
 
-Once you've detected a black hole by observing a blocked shot, remember its
-approximate position.
+Black holes have a powerful gravity well that extends 30 pixels in all
+directions. As you approach, the pull grows stronger. At the outer edge you
+can fight free with ion engines; closer in, escape becomes impossible. If you
+notice your ship drifting for no reason, reverse course immediately.
+
+Stars also exert a weaker gravitational pull within 10 pixels. Flying too
+close to a star destroys the Endever on contact.
+
+Once you've detected a black hole by observing a blocked shot or a
+gravitational pull, remember its approximate position.
 
 ### Magnetic Storms
 

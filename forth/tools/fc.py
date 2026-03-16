@@ -82,10 +82,6 @@ def kernel_words(symbols):
         'rshift':   'CFA_RSHIFT',
         'negate':   'CFA_NEGATE',
         '?dup':     'CFA_QDUP',
-        'rg-pset':  'CFA_RGPSET',
-        'rg-line':  'CFA_RGLINE',
-        'spr-draw':      'CFA_SPRDRAW',
-        'spr-erase-box': 'CFA_SPERASEBOX',
     }
     result = {}
     for forth_name, sym_name in names.items():
