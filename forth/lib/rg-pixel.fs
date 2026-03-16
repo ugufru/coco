@@ -68,7 +68,7 @@ $7CD8 CONSTANT MSKTAB            \ sub-pixel (x%4) → AND mask to clear
 
 : rg-init  ( -- )
   init-tables
-  $5000 DUP rv !  $57 !        \ store VRAM base in rv AND kernel var
+  $5200 DUP rv !  $57 !        \ store VRAM base in rv AND kernel var
   6 set-sam-v                  \ V2:V1:V0 = 110 (RG6)
   rv @ 9 RSHIFT set-sam-f     \ F offset = VRAM / 512
   $F8 set-pia                  \ A*/G=1, GM2=1, GM1=1, GM0=1, CSS=1

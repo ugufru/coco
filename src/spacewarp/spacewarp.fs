@@ -103,8 +103,8 @@ CODE plot-dots
 
 \ ── Galaxy array ─────────────────────────────────────────────────────────
 
-\ Game data starts at $6800 (above VRAM which ends at $67FF).
-$6800 CONSTANT GALAXY          \ 64 bytes: 8x8 quadrant data
+\ Game data starts at $6A00 (above VRAM which ends at $69FF).
+$6A00 CONSTANT GALAXY          \ 64 bytes: 8x8 quadrant data
 
 : gal-addr  ( col row -- addr )  8 * + GALAXY + ;
 : gal@  ( col row -- byte )  gal-addr C@ ;
@@ -152,14 +152,14 @@ VARIABLE pdmg-masr             \ maser damage
 \ tactical view (2-125, 2-141).
 
 \ Position arrays (2 bytes each: x then y)
-$6840 CONSTANT STAR-POS        \ 5 stars x 2 bytes = 10 bytes
-$684A CONSTANT JOV-POS         \ 3 jovians x 2 bytes = 6 bytes
-$6850 CONSTANT BASE-POS        \ 1 base x 2 bytes = 2 bytes
-$6852 CONSTANT BHOLE-POS       \ 1 black hole x 2 bytes = 2 bytes
-$6854 CONSTANT SHIP-POS        \ player ship x 2 bytes = 2 bytes
+$6A40 CONSTANT STAR-POS        \ 5 stars x 2 bytes = 10 bytes
+$6A4A CONSTANT JOV-POS         \ 3 jovians x 2 bytes = 6 bytes
+$6A50 CONSTANT BASE-POS        \ 1 base x 2 bytes = 2 bytes
+$6A52 CONSTANT BHOLE-POS       \ 1 black hole x 2 bytes = 2 bytes
+$6A54 CONSTANT SHIP-POS        \ player ship x 2 bytes = 2 bytes
 
 \ Jovian damage (3 bytes, one per jovian: 100=full health, 0=dead)
-$6856 CONSTANT JOV-DMG         \ 3 bytes
+$6A56 CONSTANT JOV-DMG         \ 3 bytes
 
 \ Quadrant object counts (from the packed byte, cached for speed)
 VARIABLE qstars                \ star count in current quadrant
@@ -182,11 +182,11 @@ VARIABLE death-cause               \ 0=energy/star, 1=black hole
 \ 7x5 pixel sprites in 2bpp artifact-color format.
 \ Built at init time using datawrite helpers (tb).
 
-$6900 CONSTANT SPR-SHIP           \ Endever: blue chevron (12 bytes)
-$690C CONSTANT SPR-JOV            \ Jovian: red diamond (12 bytes)
-$6918 CONSTANT SPR-BASE           \ UP base: blue cross (12 bytes)
-$6924 CONSTANT SPR-MSL1           \ Missile frame 1: + shape (12 bytes)
-$6930 CONSTANT SPR-MSL2           \ Missile frame 2: x shape (12 bytes)
+$6B00 CONSTANT SPR-SHIP           \ Endever: blue chevron (12 bytes)
+$6B0C CONSTANT SPR-JOV            \ Jovian: red diamond (12 bytes)
+$6B18 CONSTANT SPR-BASE           \ UP base: blue cross (12 bytes)
+$6B24 CONSTANT SPR-MSL1           \ Missile frame 1: + shape (12 bytes)
+$6B30 CONSTANT SPR-MSL2           \ Missile frame 2: x shape (12 bytes)
 
 : init-sprites  ( -- )
   \ Endever — blue (1) filled chevron
@@ -554,9 +554,9 @@ VARIABLE old-sy                   \ previous ship y
 \ ── Background save/restore for flicker-free ship movement ────────────
 \ Save 3 bytes × 5 rows of VRAM under the ship sprite bounding box.
 \ Restore to erase the ship without a black flash.
-$68D0 CONSTANT SHIP-BG              \ 15-byte save buffer
+$6AD0 CONSTANT SHIP-BG              \ 15-byte save buffer
 
-CODE bg-save   \ ( x y -- )  save 3×5 VRAM bytes to SHIP-BG
+CODE bg-save   \ ( buf x y -- )  save 3×5 VRAM bytes to buf
         PSHS    X
         LDA     1,U             ; A = y
         LDB     #32
@@ -567,8 +567,8 @@ CODE bg-save   \ ( x y -- )  save 3×5 VRAM bytes to SHIP-BG
         LSRA
         LSRA                    ; A = x / 4
         LEAY    A,Y             ; Y = first byte to save
-        LEAU    4,U             ; pop 2 args
-        LDX     #$68D0          ; X = buffer
+        LDX     4,U             ; X = buffer address
+        LEAU    6,U             ; pop 3 args
         LDB     #5
 @row    LDA     ,Y
         STA     ,X+
@@ -583,7 +583,7 @@ CODE bg-save   \ ( x y -- )  save 3×5 VRAM bytes to SHIP-BG
         ;NEXT
 ;CODE
 
-CODE bg-restore  \ ( x y -- )  restore 3×5 VRAM bytes from SHIP-BG
+CODE bg-restore  \ ( buf x y -- )  restore 3×5 VRAM bytes from buf
         PSHS    X
         LDA     1,U             ; A = y
         LDB     #32
@@ -594,8 +594,8 @@ CODE bg-restore  \ ( x y -- )  restore 3×5 VRAM bytes from SHIP-BG
         LSRA
         LSRA
         LEAY    A,Y
-        LEAU    4,U
-        LDX     #$68D0
+        LDX     4,U
+        LEAU    6,U
         LDB     #5
 @row    LDA     ,X+
         STA     ,Y
@@ -611,10 +611,19 @@ CODE bg-restore  \ ( x y -- )  restore 3×5 VRAM bytes from SHIP-BG
 ;CODE
 
 : save-ship-bg  ( -- )
-  SHIP-POS C@ 3 - SHIP-POS 1 + C@ 2 - bg-save ;
+  SHIP-BG SHIP-POS C@ 3 - SHIP-POS 1 + C@ 2 - bg-save ;
 
 : restore-ship-bg  ( -- )
-  old-sx @ 3 - old-sy @ 2 - bg-restore ;
+  SHIP-BG old-sx @ 3 - old-sy @ 2 - bg-restore ;
+
+\ Missile background buffer
+$6AE0 CONSTANT MSL-BG
+
+: save-msl-bg  ( -- )
+  MSL-BG msl-scrx 2 - msl-scry 2 - bg-save ;
+
+: restore-msl-bg  ( -- )
+  MSL-BG msl-px @ 2 - msl-py @ 2 - bg-restore ;
 
 \ ── Magnetic storm: fake stars + event horizon ─────────────────────────
 \ In storm quadrants, scatter noise dots across the tactical view.
@@ -628,7 +637,7 @@ CODE bg-restore  \ ( x y -- )  restore 3×5 VRAM bytes from SHIP-BG
 
 \ Storm star positions saved at quadrant entry for redraw.
 \ Max 25 fake stars (5 real × 5 fake). 3 bytes each: x, y, color.
-$6860 CONSTANT FSTAR-POS          \ 25 × 3 = 75 bytes
+$6A60 CONSTANT FSTAR-POS          \ 25 × 3 = 75 bytes
 VARIABLE fstar-count
 
 VARIABLE fs-tmp
@@ -659,7 +668,7 @@ VARIABLE fs-tmp
 
 \ Spiral dot positions precomputed at quadrant entry.
 \ 4 arms × 8 dots = 32 dots max. 2 bytes each (x, y).
-$6890 CONSTANT SPIRAL-POS         \ 32 × 2 = 64 bytes
+$6A90 CONSTANT SPIRAL-POS         \ 32 × 2 = 64 bytes
 VARIABLE spiral-count
 
 VARIABLE sp-r
@@ -1029,10 +1038,10 @@ VARIABLE msl-active              \ nonzero = missile in flight
 : msl-scrx  ( -- x )  msl-x @ 7 RSHIFT ;
 : msl-scry  ( -- y )  msl-y @ 7 RSHIFT ;
 
-: msl-erase  ( -- )
-  msl-spr msl-px @ 2 - msl-py @ 2 - spr-erase-box ;
+: msl-erase  ( -- )  restore-msl-bg ;
 
 : msl-draw  ( -- )
+  save-msl-bg
   msl-spr msl-scrx 2 - msl-scry 2 - spr-draw ;
 
 : msl-oob?  ( -- flag )
@@ -1101,7 +1110,8 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
   MSL-SPEED angle-dy msl-dy !
   0 msl-frame !
   1 msl-active !  1 msl-dirty !
-  msl-scrx msl-px !  msl-scry msl-py ! ;
+  msl-scrx msl-px !  msl-scry msl-py !
+  save-msl-bg ;
 
 \ ── Command dispatch ───────────────────────────────────────────────────
 
@@ -1185,17 +1195,79 @@ VARIABLE prev-key                 \ last key seen by KEY?
     THEN
   LOOP ;
 
+\ ── Title screen + level select ────────────────────────────────────────
+
+: title-screen  ( -- )
+  rg-pcls
+  \ SPACE WARP centered on row 5
+  11 5 at-xy
+  CHAR S rg-emit CHAR P rg-emit CHAR A rg-emit CHAR C rg-emit CHAR E rg-emit
+  $20 rg-emit
+  CHAR W rg-emit CHAR A rg-emit CHAR R rg-emit CHAR P rg-emit
+  \ LEVEL 1-9 on row 9
+  11 9 at-xy
+  CHAR L rg-emit CHAR E rg-emit CHAR V rg-emit CHAR E rg-emit CHAR L rg-emit
+  $20 rg-emit
+  CHAR 1 rg-emit CHAR - rg-emit CHAR 9 rg-emit
+  \ Read level key (1-9)
+  BEGIN KEY DUP CHAR 1 < OVER CHAR 9 > OR IF DROP 0 ELSE 1 THEN UNTIL
+  CHAR 0 - glevel ! ;
+
+\ ── Mission briefing ──────────────────────────────────────────────────
+
+: briefing  ( -- )
+  rg-pcls
+  \ FROM UP COMMAND
+  2 2 at-xy
+  CHAR F rg-emit CHAR R rg-emit CHAR O rg-emit CHAR M rg-emit
+  $20 rg-emit
+  CHAR U rg-emit CHAR P rg-emit $20 rg-emit
+  CHAR C rg-emit CHAR O rg-emit CHAR M rg-emit CHAR M rg-emit
+  CHAR A rg-emit CHAR N rg-emit CHAR D rg-emit
+  \ DESTROY
+  2 5 at-xy
+  CHAR D rg-emit CHAR E rg-emit CHAR S rg-emit CHAR T rg-emit
+  CHAR R rg-emit CHAR O rg-emit CHAR Y rg-emit $20 rg-emit
+  gjovians @ rg-u.
+  \ JOVIAN SHIPS
+  2 7 at-xy
+  CHAR J rg-emit CHAR O rg-emit CHAR V rg-emit CHAR I rg-emit
+  CHAR A rg-emit CHAR N rg-emit $20 rg-emit
+  CHAR S rg-emit CHAR H rg-emit CHAR I rg-emit CHAR P rg-emit CHAR S rg-emit
+  \ PROTECT
+  2 9 at-xy
+  CHAR P rg-emit CHAR R rg-emit CHAR O rg-emit CHAR T rg-emit
+  CHAR E rg-emit CHAR C rg-emit CHAR T rg-emit $20 rg-emit
+  gbases @ rg-u.
+  $20 rg-emit
+  CHAR B rg-emit CHAR A rg-emit CHAR S rg-emit CHAR E rg-emit CHAR S rg-emit
+  \ GOOD LUCK
+  14 13 at-xy
+  CHAR G rg-emit CHAR O rg-emit CHAR O rg-emit CHAR D rg-emit
+  $20 rg-emit
+  CHAR L rg-emit CHAR U rg-emit CHAR C rg-emit CHAR K rg-emit
+  KEY DROP ;
+
 : main  ( -- )
   rg-init
   init-text
   init-sin
-  init-sprites
-  init-player
   12345 seed !
   0 sos-active !
 
-  \ Generate galaxy and enter starting quadrant
-  1 gen-galaxy
+  \ Title + level select
+  title-screen
+
+  \ Generate galaxy with selected level
+  glevel @ gen-galaxy
+
+  \ Mission briefing
+  briefing
+  rg-pcls
+
+  \ Initialize game state
+  init-sprites
+  init-player
   find-base-quadrant
 
   \ Draw initial tactical view and status panel
