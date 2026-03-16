@@ -81,10 +81,10 @@ Stars use random artifact patterns (blue, red, white) for a colorful starfield.
 ### RG6 Hardware Setup
 
 ```
-VRAM base:  $0E00 (SAM F offset = 7)
-VRAM size:  6144 bytes ($0E00-$27FF)
+VRAM base:  $4000 (SAM F offset = 32)
+VRAM size:  6144 bytes ($4000-$57FF)
 SAM V bits: 110 (V=6)
-PIA $FF22:  $F0 (A*/G=1, GM2=1, GM1=1, GM0=1, CSS=0)
+PIA $FF22:  $F8 (A*/G=1, GM2=1, GM1=1, GM0=1, CSS=1)
 Bytes/row:  32
 ```
 
@@ -282,3 +282,22 @@ issues:
 - **`src/rg-test/rg-test.fs`** — test app for prototyping RG6 artifact graphics
   before building the full game. Exercises pixel plot, line drawing, sprites,
   and text rendering. Visual verification via XRoar with NTSC artifact display.
+
+## Memory Map
+
+ROMs are paged out at boot (`STA $FFDE`), giving full 64K RAM.
+
+```
+$0050–$007F   Kernel scratch variables (direct page)
+$0400–$05FF   VDG text VRAM (32x16 alpha mode, used by title/briefing)
+$1000–$1FFF   Kernel code + primitives + CFA table
+$2000–$3FFF   Application code part 1 (8K, before VRAM hole)
+$4000–$57FF   RG6 VRAM (6144 bytes, hole in app binary)
+$5800–$73FF   Application code part 2 (continues after VRAM)
+$7400–$75D8   Font data (font-art.fs, artifact-safe 8-byte glyphs)
+$7600–$7774   Game data (galaxy, positions, sprites, AI state, bg saves)
+$7C00–$7CEF   Lookup tables (sine, pixel color/shift/mask, CG expand)
+$7E00         Data stack base (U register, grows downward)
+$8000         Return stack init (S register, grows downward)
+$FF00–$FFFF   I/O (PIA, SAM, VDG registers)
+```

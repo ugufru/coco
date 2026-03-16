@@ -35,7 +35,7 @@ VAR_KEY_PREV    FCB     0       ; last accepted key ASCII (KEY debounce)
 VAR_KEY_SHIFT   FCB     0       ; SHIFT flag (nonzero = shift held)
 VAR_KEY_RELCNT  FCB     0       ; release debounce counter
 VAR_KEY_REPDLY  FDB     0       ; auto-repeat countdown (16-bit)
-VAR_RGVRAM      FDB     $5000   ; RG6 VRAM base address (written by rg-init)
+VAR_RGVRAM      FDB     $4000   ; RG6 VRAM base address (written by rg-init)
 ;;; Bresenham line drawing scratch (used by rg-line CODE word in rg-pixel.fs)
 VAR_LINE_CX     FCB     0       ; current x
 VAR_LINE_CY     FCB     0       ; current y
@@ -62,7 +62,7 @@ VAR_SPR_SRC     FDB     0       ; current sprite data pointer
 VAR_SPR_DBYTE   FCB     0       ; current data byte
 VAR_SPR_SHIFT   FCB     0       ; pixel shift within byte
 ;;; RG-CHAR text rendering config (used by rg-char CODE word in rg-text.fs)
-VAR_RGFONT      FDB     $7000   ; font table base address
+VAR_RGFONT      FDB     $7400   ; font table base address
 VAR_RGCHARMIN   FCB     $20     ; minimum ASCII code (chars below → this)
 VAR_RGGLYPHSZ   FCB     8       ; bytes per glyph
 VAR_RGNROWS     FCB     8       ; rows to copy per glyph

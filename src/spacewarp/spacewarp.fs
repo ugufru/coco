@@ -89,7 +89,7 @@ CODE plot-dots
 \  GALAXY DATA MODEL
 \ ══════════════════════════════════════════════════════════════════════════
 \
-\ Galaxy: 8x8 = 64 quadrants, 1 byte each at GALAXY ($5800).
+\ Galaxy: 8x8 = 64 quadrants, 1 byte each at GALAXY ($7600).
 \ Packed format per byte:
 \   bit 7    = magnetic storm (1=yes)
 \   bit 6    = black hole (1=yes)
@@ -103,8 +103,8 @@ CODE plot-dots
 
 \ ── Galaxy array ─────────────────────────────────────────────────────────
 
-\ Game data starts at $6A00 (above VRAM which ends at $69FF).
-$6A00 CONSTANT GALAXY          \ 64 bytes: 8x8 quadrant data
+\ Game data starts at $7600 (above font which ends at $75D8).
+$7600 CONSTANT GALAXY          \ 64 bytes: 8x8 quadrant data
 
 : gal-addr  ( col row -- addr )  8 * + GALAXY + ;
 : gal@  ( col row -- byte )  gal-addr C@ ;
@@ -152,14 +152,14 @@ VARIABLE pdmg-masr             \ maser damage
 \ tactical view (2-125, 2-141).
 
 \ Position arrays (2 bytes each: x then y)
-$6A40 CONSTANT STAR-POS        \ 5 stars x 2 bytes = 10 bytes
-$6A4A CONSTANT JOV-POS         \ 3 jovians x 2 bytes = 6 bytes
-$6A50 CONSTANT BASE-POS        \ 1 base x 2 bytes = 2 bytes
-$6A52 CONSTANT BHOLE-POS       \ 1 black hole x 2 bytes = 2 bytes
-$6A54 CONSTANT SHIP-POS        \ player ship x 2 bytes = 2 bytes
+$7640 CONSTANT STAR-POS        \ 5 stars x 2 bytes = 10 bytes
+$764A CONSTANT JOV-POS         \ 3 jovians x 2 bytes = 6 bytes
+$7650 CONSTANT BASE-POS        \ 1 base x 2 bytes = 2 bytes
+$7652 CONSTANT BHOLE-POS       \ 1 black hole x 2 bytes = 2 bytes
+$7654 CONSTANT SHIP-POS        \ player ship x 2 bytes = 2 bytes
 
 \ Jovian damage (3 bytes, one per jovian: 100=full health, 0=dead)
-$6A56 CONSTANT JOV-DMG         \ 3 bytes
+$7656 CONSTANT JOV-DMG         \ 3 bytes
 
 \ Quadrant object counts (from the packed byte, cached for speed)
 VARIABLE qstars                \ star count in current quadrant
@@ -182,11 +182,24 @@ VARIABLE death-cause               \ 0=energy/star, 1=black hole
 \ 7x5 pixel sprites in 2bpp artifact-color format.
 \ Built at init time using datawrite helpers (tb).
 
-$6B00 CONSTANT SPR-SHIP           \ Endever: blue chevron (12 bytes)
-$6B0C CONSTANT SPR-JOV            \ Jovian: red diamond (12 bytes)
-$6B18 CONSTANT SPR-BASE           \ UP base: blue cross (12 bytes)
-$6B24 CONSTANT SPR-MSL1           \ Missile frame 1: + shape (12 bytes)
-$6B30 CONSTANT SPR-MSL2           \ Missile frame 2: x shape (12 bytes)
+$7700 CONSTANT SPR-SHIP           \ Endever: blue chevron (12 bytes)
+$770C CONSTANT SPR-JOV            \ Jovian: red diamond (12 bytes)
+$7718 CONSTANT SPR-BASE           \ UP base: blue cross (12 bytes)
+$7724 CONSTANT SPR-MSL1           \ Missile frame 1: + shape (12 bytes)
+$7730 CONSTANT SPR-MSL2           \ Missile frame 2: x shape (12 bytes)
+
+\ ── Jovian AI data structures ────────────────────────────────────────────
+$773C CONSTANT JOV-STATE        \ 3 bytes: 0=attack, 1=flee, 2=idle
+$773F CONSTANT JOV-TICK         \ 3 bytes: per-Jovian frame counter
+$7742 CONSTANT JOV-BG0          \ 15 bytes: bg save buffer Jovian 0
+$7751 CONSTANT JOV-BG1          \ 15 bytes: bg save buffer Jovian 1
+$7760 CONSTANT JOV-BG2          \ 15 bytes: bg save buffer Jovian 2
+$776F CONSTANT JOV-OLDX         \ 3 bytes: previous x per Jovian
+$7772 CONSTANT JOV-OLDY         \ 3 bytes: previous y per Jovian
+
+: jov-bg  ( i -- addr )
+  DUP 0= IF DROP JOV-BG0 EXIT THEN
+  1 = IF JOV-BG1 ELSE JOV-BG2 THEN ;
 
 : init-sprites  ( -- )
   \ Endever — blue (1) filled chevron
@@ -391,7 +404,7 @@ VARIABLE gq-tmp                \ temp for building quadrant byte
   init-font
   rv @ cv !  32 cb !
   rv @ $57 !                    \ kernel VRAM base
-  $7000 $75 !                   \ font base
+  $7400 $75 !                   \ font base
   $20 $77 C!                    \ min char (space)
   8 $78 C!                      \ bytes per glyph
   8 $79 C!                      \ rows to copy
@@ -554,7 +567,7 @@ VARIABLE old-sy                   \ previous ship y
 \ ── Background save/restore for flicker-free ship movement ────────────
 \ Save 3 bytes × 5 rows of VRAM under the ship sprite bounding box.
 \ Restore to erase the ship without a black flash.
-$6AD0 CONSTANT SHIP-BG              \ 15-byte save buffer
+$76D0 CONSTANT SHIP-BG              \ 15-byte save buffer
 
 CODE bg-save   \ ( buf x y -- )  save 3×5 VRAM bytes to buf
         PSHS    X
@@ -617,13 +630,160 @@ CODE bg-restore  \ ( buf x y -- )  restore 3×5 VRAM bytes from buf
   SHIP-BG old-sx @ 3 - old-sy @ 2 - bg-restore ;
 
 \ Missile background buffer
-$6AE0 CONSTANT MSL-BG
+$76E0 CONSTANT MSL-BG
 
 : save-msl-bg  ( -- )
   MSL-BG msl-scrx 2 - msl-scry 2 - bg-save ;
 
 : restore-msl-bg  ( -- )
   MSL-BG msl-px @ 2 - msl-py @ 2 - bg-restore ;
+
+\ ── Flicker-free Jovian background save/restore ─────────────────────────
+\ Same pattern as ship: save VRAM under sprite, restore before move.
+
+VARIABLE jbg-i
+
+: save-jov-bgs  ( -- )
+  qjovians @ ?DUP IF 0 DO
+    I jbg-i !
+    JOV-DMG jbg-i @ + C@ IF
+      jbg-i @ jov-bg
+      JOV-POS jbg-i @ 2 * + C@ 3 -
+      JOV-POS jbg-i @ 2 * + 1 + C@ 2 -
+      bg-save
+    THEN
+  LOOP THEN ;
+
+: restore-jov-bgs  ( -- )
+  qjovians @ ?DUP IF 0 DO
+    I jbg-i !
+    JOV-DMG jbg-i @ + C@ IF
+      jbg-i @ jov-bg
+      JOV-OLDX jbg-i @ + C@ 3 -
+      JOV-OLDY jbg-i @ + C@ 2 -
+      bg-restore
+    THEN
+  LOOP THEN ;
+
+: save-jov-oldpos  ( -- )
+  qjovians @ ?DUP IF 0 DO
+    I jbg-i !
+    JOV-POS jbg-i @ 2 * + C@ JOV-OLDX jbg-i @ + C!
+    JOV-POS jbg-i @ 2 * + 1 + C@ JOV-OLDY jbg-i @ + C!
+  LOOP THEN ;
+
+: draw-jovians-live  ( -- )
+  qjovians @ ?DUP IF 0 DO
+    I jbg-i !
+    JOV-DMG jbg-i @ + C@ IF
+      SPR-JOV
+      JOV-POS jbg-i @ 2 * + C@ 3 -
+      JOV-POS jbg-i @ 2 * + 1 + C@ 2 -
+      spr-draw
+    THEN
+  LOOP THEN ;
+
+: init-jovian-ai  ( -- )
+  qjovians @ ?DUP IF 0 DO
+    I jbg-i !
+    0 JOV-STATE jbg-i @ + C!
+    0 JOV-TICK jbg-i @ + C!
+    JOV-POS jbg-i @ 2 * + C@ JOV-OLDX jbg-i @ + C!
+    JOV-POS jbg-i @ 2 * + 1 + C@ JOV-OLDY jbg-i @ + C!
+  LOOP THEN ;
+
+VARIABLE jov-moved               \ flag: did any Jovian move this frame?
+
+\ ── Jovian AI movement ──────────────────────────────────────────────────
+\ Chase player at 1px per N frames (N scales with difficulty).
+\ Obstacle avoidance: stars (6px), black holes (15px), bases (5px).
+\ Reuses sg-sx/sg-sy (star gravity scratch) and hc-jx/hc-jy (hit scratch).
+
+VARIABLE jtk-nx                   \ proposed new x
+VARIABLE jtk-ny                   \ proposed new y
+
+\ Movement speed: frames between moves (lower = faster)
+: jov-speed  ( -- n )
+  10 glevel @ - DUP 2 < IF DROP 2 THEN ;
+
+\ Sign: -1, 0, or 1  (reuses existing abs)
+: sign  ( n -- s )  DUP 0= IF ELSE 0 < IF -1 ELSE 1 THEN THEN ;
+
+\ Manhattan distance from (hc-jx, hc-jy) to (x, y) byte pair at addr
+: jov-dist  ( addr -- d )
+  DUP C@ hc-jx @ - abs
+  SWAP 1 + C@ hc-jy @ - abs + ;
+
+\ Check if (hc-jx, hc-jy) is blocked by any obstacle
+VARIABLE jblk
+: jov-blocked?  ( -- flag )
+  0 jblk !
+  qstars @ ?DUP IF 0 DO
+    jblk @ 0= IF
+      STAR-POS I 2 * + jov-dist 6 < IF 1 jblk ! THEN
+    THEN
+  LOOP THEN
+  jblk @ 0= IF
+    qbhole @ IF BHOLE-POS jov-dist 15 < IF 1 jblk ! THEN THEN
+  THEN
+  jblk @ 0= IF
+    qbase @ IF BASE-POS jov-dist 5 < IF 1 jblk ! THEN THEN
+  THEN
+  jblk @ ;
+
+\ Try to move one Jovian toward the player (index in jbg-i)
+: move-one-jovian  ( -- )
+  \ Get current position into sg-sx, sg-sy (reuse star gravity scratch)
+  JOV-POS jbg-i @ 2 * + C@ sg-sx !
+  JOV-POS jbg-i @ 2 * + 1 + C@ sg-sy !
+  \ Compute proposed position: cur + sign(player - cur), clamped
+  SHIP-POS C@ sg-sx @ - sign sg-sx @ +
+  DUP 4 < IF DROP sg-sx @ THEN
+  DUP 123 > IF DROP sg-sx @ THEN
+  jtk-nx !
+  SHIP-POS 1 + C@ sg-sy @ - sign sg-sy @ +
+  DUP 4 < IF DROP sg-sy @ THEN
+  DUP 139 > IF DROP sg-sy @ THEN
+  jtk-ny !
+  \ Check if blocked (both axes)
+  jtk-nx @ hc-jx !  jtk-ny @ hc-jy !
+  jov-blocked? IF
+    \ Try x only
+    jtk-nx @ hc-jx !  sg-sy @ hc-jy !
+    jov-blocked? IF
+      \ Try y only
+      sg-sx @ hc-jx !  jtk-ny @ hc-jy !
+      jov-blocked? IF
+        \ both blocked, stay put
+        sg-sx @ jtk-nx !  sg-sy @ jtk-ny !
+      ELSE
+        sg-sx @ jtk-nx !             \ keep old x
+      THEN
+    ELSE
+      sg-sy @ jtk-ny !               \ keep old y
+    THEN
+  THEN
+  \ Apply move if position changed
+  jtk-nx @ sg-sx @ <>
+  jtk-ny @ sg-sy @ <> OR IF
+    jtk-nx @ JOV-POS jbg-i @ 2 * + C!
+    jtk-ny @ JOV-POS jbg-i @ 2 * + 1 + C!
+    1 jov-moved !
+  THEN ;
+
+\ Tick all living Jovians
+: tick-jovians  ( -- )
+  qjovians @ ?DUP IF 0 DO
+    I jbg-i !
+    JOV-DMG jbg-i @ + C@ IF
+      JOV-TICK jbg-i @ + C@ 1 + DUP jov-speed < IF
+        JOV-TICK jbg-i @ + C!
+      ELSE
+        DROP 0 JOV-TICK jbg-i @ + C!
+        move-one-jovian
+      THEN
+    THEN
+  LOOP THEN ;
 
 \ ── Magnetic storm: fake stars + event horizon ─────────────────────────
 \ In storm quadrants, scatter noise dots across the tactical view.
@@ -637,7 +797,7 @@ $6AE0 CONSTANT MSL-BG
 
 \ Storm star positions saved at quadrant entry for redraw.
 \ Max 25 fake stars (5 real × 5 fake). 3 bytes each: x, y, color.
-$6A60 CONSTANT FSTAR-POS          \ 25 × 3 = 75 bytes
+$7660 CONSTANT FSTAR-POS          \ 25 × 3 = 75 bytes
 VARIABLE fstar-count
 
 VARIABLE fs-tmp
@@ -668,7 +828,7 @@ VARIABLE fs-tmp
 
 \ Spiral dot positions precomputed at quadrant entry.
 \ 4 arms × 8 dots = 32 dots max. 2 bytes each (x, y).
-$6A90 CONSTANT SPIRAL-POS         \ 32 × 2 = 64 bytes
+$7690 CONSTANT SPIRAL-POS         \ 32 × 2 = 64 bytes
 VARIABLE spiral-count
 
 VARIABLE sp-r
@@ -716,7 +876,10 @@ VARIABLE sp-r2
 : draw-quadrant  ( -- )
   gen-storm-stars gen-event-horizon
   draw-border draw-stars draw-storm-stars draw-event-horizon
-  draw-jovians draw-base
+  draw-base
+  init-jovian-ai
+  save-jov-bgs save-jov-oldpos
+  draw-jovians-live
   save-ship-bg draw-ship ;
 
 \ ══════════════════════════════════════════════════════════════════════════
@@ -738,32 +901,49 @@ VARIABLE prev-docked              \ last displayed dock state
 : use-energy  ( cost -- )
   penergy @ SWAP - DUP 0 < IF DROP 0 THEN penergy ! ;
 
+\ Check if ship overlaps base (within 5px both axes)
+: ship-on-base?  ( -- flag )
+  qbase @ 0= IF 0 EXIT THEN
+  SHIP-POS C@ BASE-POS C@ - abs 5 <
+  SHIP-POS 1 + C@ BASE-POS 1 + C@ - abs 5 < AND ;
+
+VARIABLE was-near-base
+
 : move-ship  ( -- )
   0 moved !
   penergy @ 0= IF EXIT THEN
+  ship-on-base? was-near-base !    \ already near? allow escape
   \ Arrow keys: all on row 3 ($08), different columns
   KB-C3 KBD-SCAN $08 AND IF       \ UP: col 3, row 3
     SHIP-POS 1 + C@ SHIP-DY 4 + > IF
       SHIP-POS 1 + C@ SHIP-DY - SHIP-POS 1 + C!
-      1 moved !
+      ship-on-base? was-near-base @ 0= AND IF
+        SHIP-POS 1 + C@ SHIP-DY + SHIP-POS 1 + C!
+      ELSE 1 moved ! THEN
     THEN
   THEN
   KB-C4 KBD-SCAN $08 AND IF       \ DN: col 4, row 3
     SHIP-POS 1 + C@ 139 SHIP-DY - < IF
       SHIP-POS 1 + C@ SHIP-DY + SHIP-POS 1 + C!
-      1 moved !
+      ship-on-base? was-near-base @ 0= AND IF
+        SHIP-POS 1 + C@ SHIP-DY - SHIP-POS 1 + C!
+      ELSE 1 moved ! THEN
     THEN
   THEN
   KB-C5 KBD-SCAN $08 AND IF       \ LT: col 5, row 3
     SHIP-POS C@ SHIP-DX 4 + > IF
       SHIP-POS C@ SHIP-DX - SHIP-POS C!
-      1 moved !
+      ship-on-base? was-near-base @ 0= AND IF
+        SHIP-POS C@ SHIP-DX + SHIP-POS C!
+      ELSE 1 moved ! THEN
     THEN
   THEN
   KB-C6 KBD-SCAN $08 AND IF       \ RT: col 6, row 3
     SHIP-POS C@ 123 SHIP-DX - < IF
       SHIP-POS C@ SHIP-DX + SHIP-POS C!
-      1 moved !
+      ship-on-base? was-near-base @ 0= AND IF
+        SHIP-POS C@ SHIP-DX - SHIP-POS C!
+      ELSE 1 moved ! THEN
     THEN
   THEN
   moved @ IF
@@ -874,16 +1054,37 @@ VARIABLE sg-sy                     \ star y cache
 
 : do-dock  ( -- )
   1 docked !
-  100 penergy !  10 pmissiles !
+  10 pmissiles !
   100 pdmg-ion !  100 pdmg-warp !
   100 pdmg-scan !  100 pdmg-defl !  100 pdmg-masr ! ;
 
 : do-undock  ( -- )  0 docked ! ;
 
+\ Gradual energy recharge while docked.
+\ Inverse log curve: fast when empty, slows every 20%.
+VARIABLE dock-tick
+
+: tick-dock  ( -- )
+  docked @ 0= IF EXIT THEN
+  penergy @ 100 = IF EXIT THEN
+  dock-tick @ 1 + dock-tick !
+  penergy @ 20 < IF                    \ 0-19%: +1 every frame
+    penergy @ 1 + penergy !
+  ELSE penergy @ 40 < IF               \ 20-39%: +1 every 2 frames
+    dock-tick @ 1 AND 0= IF penergy @ 1 + penergy ! THEN
+  ELSE penergy @ 60 < IF               \ 40-59%: +1 every 4 frames
+    dock-tick @ 3 AND 0= IF penergy @ 1 + penergy ! THEN
+  ELSE penergy @ 80 < IF               \ 60-79%: +1 every 8 frames
+    dock-tick @ 7 AND 0= IF penergy @ 1 + penergy ! THEN
+  ELSE                                  \ 80-99%: +1 every 16 frames
+    dock-tick @ 15 AND 0= IF penergy @ 1 + penergy ! THEN
+  THEN THEN THEN THEN
+  penergy @ 100 > IF 100 penergy ! THEN ;
+
 : check-dock  ( -- )
   qbase @ 0= IF EXIT THEN
-  SHIP-POS C@ BASE-POS C@ - abs 4 <
-  SHIP-POS 1 + C@ BASE-POS 1 + C@ - abs 4 < AND IF
+  SHIP-POS C@ BASE-POS C@ - abs 8 <
+  SHIP-POS 1 + C@ BASE-POS 1 + C@ - abs 8 < AND IF
     docked @ 0= IF do-dock THEN
   ELSE
     docked @ IF do-undock THEN
@@ -1277,6 +1478,7 @@ VARIABLE prev-key                 \ last key seen by KEY?
   0 beam-timer !
   0 msl-active !  0 msl-dirty !
   0 docked !  0 prev-docked !  0 death-cause !
+  0 jov-moved !
   100 prev-energy !
   10 prev-missiles !
 
@@ -1288,14 +1490,21 @@ VARIABLE prev-key                 \ last key seen by KEY?
     star-gravity
     check-collisions
     check-dock
+    tick-dock
     tick-beam
     tick-missile
+    tick-jovians
     process-key
     VSYNC
-    moved @ IF
+    moved @ jov-moved @ OR IF
       restore-ship-bg
+      restore-jov-bgs
+      jov-moved @ IF save-jov-oldpos THEN
+      save-jov-bgs
+      draw-jovians-live
       save-ship-bg
       draw-ship
+      0 jov-moved !
     THEN
     msl-dirty @ IF
       msl-erase

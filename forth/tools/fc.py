@@ -456,7 +456,7 @@ def item_size(item):
 
 
 def compile_forth(definitions, variables, main_thread, code_definitions,
-                  symbols, app_base):
+                  symbols, app_base, hole_start=None, hole_end=None):
     """
     Two-pass compiler.
 
@@ -465,6 +465,10 @@ def compile_forth(definitions, variables, main_thread, code_definitions,
         [+ main_size]       colon definitions (DOCOL + body + EXIT each)
         [+ defs_size]       CODE definitions  (FDB self+2 + machine_code each)
         [+ code_size]       variable cells    (DOVAR + 2-byte data each)
+
+    If hole_start/hole_end are set, the compiler skips over that address range
+    (e.g. for VRAM).  No word will be placed inside the hole; the DECB output
+    is split into two load records around it.
 
     Returns a bytearray to be loaded at app_base.
     """
@@ -481,6 +485,12 @@ def compile_forth(definitions, variables, main_thread, code_definitions,
     # Assemble CODE words to get their sizes
     code_bytes = assemble_code_words(code_definitions, symbols)
 
+    def skip_hole(addr):
+        """If addr falls inside the reserved hole, jump past it."""
+        if hole_start is not None and addr >= hole_start and addr < hole_end:
+            return hole_end
+        return addr
+
     # ── Pass 1: calculate addresses ───────────────────────────────────────────
     label_map = {}
 
@@ -494,8 +504,18 @@ def compile_forth(definitions, variables, main_thread, code_definitions,
 
     cursor = scan(main_thread, app_base)
 
+    def would_cross_hole(addr, size):
+        """True if a block at addr..addr+size would overlap the hole."""
+        if hole_start is None:
+            return False
+        return addr < hole_start and addr + size > hole_start
+
     word_cfa = {}   # name → address of the word's CFA cell in the output
     for name, items in definitions.items():
+        cursor = skip_hole(cursor)
+        def_size = 2 + sum(item_size(it) for it in items) + 2
+        if would_cross_hole(cursor, def_size):
+            cursor = hole_end
         word_cfa[name] = cursor
         cursor += 2                                      # DOCOL (the CFA cell)
         cursor = scan(items, cursor)
@@ -503,11 +523,18 @@ def compile_forth(definitions, variables, main_thread, code_definitions,
 
     # CODE definitions: CFA cell (2 bytes) + machine code
     for name in code_definitions:
+        cursor = skip_hole(cursor)
+        cw_size = 2 + len(code_bytes[name])
+        if would_cross_hole(cursor, cw_size):
+            cursor = hole_end
         word_cfa[name] = cursor
-        cursor += 2 + len(code_bytes[name])
+        cursor += cw_size
 
     var_cfa = {}    # name → address of the variable's CFA cell in the output
     for name in variables:
+        cursor = skip_hole(cursor)
+        if would_cross_hole(cursor, 4):
+            cursor = hole_end
         var_cfa[name] = cursor
         cursor += 2                                      # DOVAR (the CFA cell)
         cursor += 2                                      # data cell (16-bit, init 0)
@@ -518,6 +545,12 @@ def compile_forth(definitions, variables, main_thread, code_definitions,
 
     def emit_word(val):
         buf.extend(struct.pack('>H', val & 0xFFFF))
+
+    def pad_to(addr):
+        """Pad buffer so next byte lands at addr (handles hole gaps)."""
+        current = app_base + len(buf)
+        if addr > current:
+            buf.extend(bytes(addr - current))
 
     def resolve(item):
         kind = item[0]
@@ -565,6 +598,7 @@ def compile_forth(definitions, variables, main_thread, code_definitions,
 
     # Colon definitions
     for name, items in definitions.items():
+        pad_to(word_cfa[name])
         emit_word(DOCOL)        # CFA cell
         for item in items:
             resolve(item)
@@ -572,11 +606,13 @@ def compile_forth(definitions, variables, main_thread, code_definitions,
 
     # CODE definitions
     for name in code_definitions:
+        pad_to(word_cfa[name])
         emit_word(word_cfa[name] + 2)   # CFA cell points to machine code
         buf.extend(code_bytes[name])    # raw machine code
 
     # Variable definitions
     for name in variables:
+        pad_to(var_cfa[name])
         emit_word(DOVAR)        # CFA cell
         emit_word(0)            # data cell, initialized to 0
 
@@ -644,25 +680,48 @@ def main():
                         help='output binary (default: <source>.bin)')
     parser.add_argument('--base',           default='0x2000',
                         help='application load address (default: 0x2000)')
+    parser.add_argument('--hole',           default=None,
+                        help='reserved address hole, e.g. 0x4000,6144 (start,size)')
     args = parser.parse_args()
 
     app_base = int(args.base, 16)
     out_file = args.output or str(Path(args.source).with_suffix('.bin'))
+
+    hole_start = hole_end = None
+    if args.hole:
+        parts = args.hole.split(',')
+        hole_start = int(parts[0], 0)
+        hole_size  = int(parts[1], 0)
+        hole_end   = hole_start + hole_size
 
     symbols              = load_symbols(args.kernel)
     src_path             = Path(args.source)
     source               = src_path.read_text()
     tokens               = tokenize(source, base_dir=src_path.parent)
     defs, variables, main, code_defs = parse(tokens)
-    code                 = compile_forth(defs, variables, main, code_defs, symbols, app_base)
+    code                 = compile_forth(defs, variables, main, code_defs, symbols, app_base,
+                                         hole_start=hole_start, hole_end=hole_end)
 
     if args.kernel_bin:
         # Combine kernel + app into one DECB binary.
         # BASIC loads both blocks in a single CLOADM, then executes at START.
         kernel_records, exec_addr = read_decb(args.kernel_bin)
-        app_records = [(app_base, bytes(code))]
+        if hole_start is not None and hole_start > app_base:
+            # Split app around hole: two DECB records, skip the hole
+            hole_off = hole_start - app_base
+            hole_sz  = hole_end - hole_start
+            part1 = bytes(code[:hole_off])
+            part2 = bytes(code[hole_off + hole_sz:])
+            app_records = [(app_base, part1)]
+            if part2:
+                app_records.append((hole_end, part2))
+            code_size = len(part1) + len(part2)
+        else:
+            app_records = [(app_base, bytes(code))]
+            code_size = len(code)
         write_decb(kernel_records + app_records, exec_addr, out_file)
-        print(f"combined → {out_file}  (kernel + {len(code)} byte app at ${app_base:04X}, exec ${exec_addr:04X})")
+        hole_msg = f", hole ${hole_start:04X}-${hole_end-1:04X}" if hole_start else ""
+        print(f"combined → {out_file}  (kernel + {code_size} byte app at ${app_base:04X}{hole_msg}, exec ${exec_addr:04X})")
     else:
         write_decb([(app_base, bytes(code))], exec_addr=0x0000, out_file=out_file)
         print(f"compiled {len(code)} bytes → {out_file}  (load ${app_base:04X})")
