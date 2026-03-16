@@ -105,7 +105,10 @@ automatically.
 ```
 source text
     │
-    ├─ tokenize()       strip comments, split on whitespace
+    ├─ tokenize()       line-by-line processing:
+    │                     strip comments (\ and parentheses)
+    │                     capture CODE...;CODE blocks as raw asm text
+    │                     resolve INCLUDE directives recursively
     │
     ├─ parse()          walk tokens → IR
     │                     ('lit', 72)            integer or CHAR literal
@@ -116,18 +119,26 @@ source text
     │                     ('0branch', offset)      IF / UNTIL branch
     │                     ('branch', offset)       ELSE / AGAIN branch
     │                   VARIABLE declarations collected separately
+    │                   CODE definitions collected as raw asm text
+    │
+    ├─ assemble_code_words()   (only if CODE words exist)
+    │                     preprocess: expand ;NEXT, add global labels
+    │                     assemble all CODE words via lwasm
+    │                     extract each word's machine code bytes
     │
     └─ compile_forth()  two passes
             │
             ├─ Pass 1   calculate addresses
             │             main thread starts at APP_BASE ($2000)
             │             colon definitions follow
+            │             CODE definitions follow (CFA + machine code each)
             │             variable CFA+data cells follow those
             │
             └─ Pass 2   emit binary
                           literals    → CFA_LIT + 16-bit value
                           word refs   → 2-byte CFA address
                           definitions → DOCOL + body + CFA_EXIT
+                          CODE words  → FDB self+2 + raw machine code
                           variables   → DOVAR + 2-byte data cell (init 0)
                           DO/LOOP     → CFA_DO + label / CFA_LOOP + back-offset
                           IF/ELSE/THEN → CFA_0BRANCH/CFA_BRANCH + forward offset
@@ -145,16 +156,75 @@ BASIC's `LOADM` loads it and the kernel's `START` routine jumps to `APP_BASE`.
 | Feature | Status |
 |---|---|
 | Colon definitions (`: NAME ... ;`) | done |
+| `CODE NAME ... ;CODE` (inline assembly) | done |
 | `VARIABLE NAME` | done |
+| `N CONSTANT NAME` | done |
 | `CHAR X` | done |
-| Integer literals | done |
+| Integer literals (decimal, `0x` hex, `$` hex) | done |
 | `DO … LOOP` with `I` | done |
 | `IF … THEN`, `IF … ELSE … THEN` | done |
 | `BEGIN … AGAIN`, `BEGIN … UNTIL` | done |
+| `INCLUDE filename` | done |
 | Runtime dictionary | not applicable (cross-compiler) |
-| `CONSTANT` | not yet |
 | String literals (`S"`, `."`) | not yet |
 | Interactive REPL | not applicable (cross-compiler) |
+
+---
+
+## Inline assembly: CODE words
+
+CODE words let `.fs` library files define native 6809 routines inline. The
+caller can't tell whether a word is threaded Forth or machine code — it's just
+a CFA address in the thread. This keeps the kernel lean and lets apps/libraries
+optimize their own hot paths.
+
+### Syntax
+
+```forth
+CODE fast-fill  ( addr count byte -- )
+    PSHS X
+    LDB  1,U
+    LDY  2,U
+    BEQ  @done
+    LDX  4,U
+@loop
+    STB  ,X+
+    LEAY -1,Y
+    BNE  @loop
+@done
+    LEAU 6,U
+    PULS X
+    ;NEXT
+;CODE
+```
+
+- `CODE name` opens an assembly block (must be the first token on its line)
+- `;CODE` on its own line closes the block
+- `;NEXT` expands to `LDY ,X++ / JMP [,Y]` (the kernel's NEXT sequence)
+- Local labels use lwasm's `@` prefix — they scope correctly per word
+- Assembly follows standard lwasm 6809 syntax
+- All kernel symbols from the `.map` file are available as EQUs
+
+### How it works (ITC mechanics)
+
+A CODE word in the binary looks like:
+
+```
+addr+0:  FDB  addr+2       (CFA cell — points to machine code)
+addr+2:  <machine code>    (ends with NEXT sequence)
+```
+
+When the threaded interpreter hits this word, NEXT does `LDY ,X++ / JMP [,Y]`
+— loads the CFA address, jumps through it to the machine code. Identical to
+how kernel primitives work, just located in the app binary instead of the
+kernel.
+
+### Register conventions
+
+CODE words must preserve `X` (IP) and `U` (DSP) across their execution, or
+update them deliberately (e.g., `LEAU 2,U` to pop the data stack). `S` is
+the return stack, `Y` and `D` are scratch. End every CODE word with `;NEXT`
+to return control to the threaded interpreter.
 
 ---
 

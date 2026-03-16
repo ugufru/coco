@@ -13,6 +13,11 @@ words that must be in machine code because they directly manipulate registers
 or hardware. Everything else is written in Forth and cross-compiled by
 [`fc.py`](../tools/README.md).
 
+Performance-critical routines that don't need to live in the kernel can be
+written as `CODE` words directly in `.fs` library files using inline 6809
+assembly. See [`fc.py` documentation](../tools/README.md#inline-assembly-code-words)
+for syntax and details.
+
 There is no interactive REPL, no on-device compiler, no dictionary on the
 CoCo. The host machine compiles; the CoCo executes.
 

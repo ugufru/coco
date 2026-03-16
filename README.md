@@ -101,6 +101,8 @@ All 13 tutorial chapters complete with working example programs.
 | IF, ELSE, THEN | done |
 | BEGIN, AGAIN, UNTIL | done |
 | Constants (CONSTANT) | done |
+| INCLUDE | done |
+| CODE ... ;CODE (inline 6809 assembly) | done |
 
 ---
 
