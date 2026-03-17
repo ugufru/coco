@@ -795,6 +795,7 @@ VARIABLE jbeam-y1
 VARIABLE jbeam-x2                 \ Jovian beam endpoint (clamped)
 VARIABLE jbeam-y2
 VARIABLE jbeam-timer              \ frames remaining (0=none)
+VARIABLE jbeam-drawn              \ 1 = beam pixels currently on screen
 VARIABLE jbeam-cool               \ frames until next fire allowed
 8 CONSTANT JBEAM-FRAMES           \ how long Jovian beam stays on screen
 5 CONSTANT JBEAM-DMG              \ energy damage to player per hit
@@ -810,10 +811,11 @@ VARIABLE jbeam-cool               \ frames until next fire allowed
   jbeam-y2 @ 1 < IF 1 jbeam-y2 ! THEN
   jbeam-y2 @ 142 > IF 142 jbeam-y2 ! THEN ;
 
+: draw-jbeam  ( -- )
+  jbeam-x1 @ jbeam-y1 @ jbeam-x2 @ jbeam-y2 @ 2 rg-line ;
+
 : erase-jbeam  ( -- )
-  jbeam-x1 @ jbeam-y1 @
-  jbeam-x2 @ jbeam-y2 @
-  0 rg-line ;
+  jbeam-x1 @ jbeam-y1 @ jbeam-x2 @ jbeam-y2 @ 0 rg-line ;
 
 \ Check if player ship is near the Jovian beam line (same cross-product method)
 : jbeam-hit?  ( -- flag )
@@ -850,24 +852,19 @@ VARIABLE pj-result
   SHIP-POS 1 + C@ jbeam-y1 @ - 4 *  \ dy * 4
   jbeam-y1 @ + jbeam-y2 !
   clamp-jbeam
-  \ Draw red beam
-  jbeam-x1 @ jbeam-y1 @
-  jbeam-x2 @ jbeam-y2 @
-  2 rg-line
+  \ Start timer (render phase draws the beam)
   JBEAM-FRAMES jbeam-timer !
   \ Check if player was hit
-  jbeam-hit? IF
-    penergy @ JBEAM-DMG - DUP 0 < IF DROP 0 THEN penergy !
-  THEN
+  draw-jbeam  jbeam-hit?  erase-jbeam
+  IF penergy @ JBEAM-DMG - DUP 0 < IF DROP 0 THEN penergy ! THEN
   \ Reset cooldown
   jbeam-cooldown jbeam-cool ! ;
 
 \ Tick: count down beam display, count down cooldown, maybe fire
 : tick-jbeam  ( -- )
-  \ Decay existing beam
+  \ Decay existing beam (render phase handles draw/erase)
   jbeam-timer @ IF
     jbeam-timer @ 1 - jbeam-timer !
-    jbeam-timer @ 0= IF erase-jbeam draw-ship THEN
   THEN
   \ Cooldown toward next shot
   jbeam-cool @ ?DUP IF
@@ -1230,6 +1227,7 @@ VARIABLE beam-y1
 VARIABLE beam-x2                  \ beam endpoint (clamped)
 VARIABLE beam-y2
 VARIABLE beam-timer               \ frames remaining until erase (0=none)
+VARIABLE beam-drawn               \ 1 = beam pixels currently on screen
 12 CONSTANT BEAM-FRAMES
 
 : clamp-beam  ( -- )
@@ -1296,20 +1294,17 @@ VARIABLE hc-jy
   DUP 140 angle-dx beam-x1 @ + beam-x2 !
   140 angle-dy beam-y1 @ + beam-y2 !
   clamp-beam
-  \ Draw blue beam and start timer
-  beam-x1 @ beam-y1 @
-  beam-x2 @ beam-y2 @
-  1 rg-line
+  \ Start timer (render phase draws the beam)
   BEAM-FRAMES beam-timer !
-  \ Check for Jovian hits
-  check-hits
-  \ Redraw ship (beam may have overwritten it)
-  draw-ship ;
+  \ Draw beam immediately for hit detection, then erase
+  draw-beam  check-hits  erase-beam ;
+
+: draw-beam  ( -- )
+  beam-x1 @ beam-y1 @ beam-x2 @ beam-y2 @ 1 rg-line ;
 
 : tick-beam  ( -- )
   beam-timer @ IF
     beam-timer @ 1 - beam-timer !
-    beam-timer @ 0= IF erase-beam draw-ship THEN
   THEN ;
 
 \ ── Triton missiles (command 6) ─────────────────────────────────────────
@@ -1569,8 +1564,8 @@ VARIABLE prev-key                 \ last key seen by KEY?
   draw-quadrant
   draw-panel
   0 cmd-state !  0 prev-key !
-  0 beam-timer !
-  0 jbeam-timer !  jbeam-cooldown jbeam-cool !
+  0 beam-timer !  0 beam-drawn !
+  0 jbeam-timer !  0 jbeam-drawn !  jbeam-cooldown jbeam-cool !
   0 msl-active !  0 msl-dirty !
   0 docked !  0 prev-docked !  0 death-cause !
   0 jov-moved !
@@ -1592,6 +1587,9 @@ VARIABLE prev-key                 \ last key seen by KEY?
     tick-jbeam
     process-key
     VSYNC
+    \ Erase any drawn beams so bg-save stays clean
+    beam-drawn @ IF erase-beam 0 beam-drawn ! THEN
+    jbeam-drawn @ IF erase-jbeam 0 jbeam-drawn ! THEN
     moved @ jov-moved @ OR IF
       restore-ship-bg
       restore-jov-bgs
@@ -1602,6 +1600,9 @@ VARIABLE prev-key                 \ last key seen by KEY?
       draw-ship
       0 jov-moved !
     THEN
+    \ Redraw active beams on top of everything
+    beam-timer @ IF draw-beam 1 beam-drawn ! THEN
+    jbeam-timer @ IF draw-jbeam 1 jbeam-drawn ! THEN
     msl-dirty @ IF
       msl-erase
       msl-scrx msl-px !  msl-scry msl-py !
