@@ -14,7 +14,7 @@ tetris.bin: tetris.fs $(KERNEL_MAP) $(KERNEL_BIN)
 	    --output    tetris.bin
 
 run: tetris.bin
-	xroar -machine coco2bus $(XROAR_ROMS) -kbd-translate -run tetris.bin
+	xroar -machine coco2bus -ram 64 $(XROAR_ROMS) -kbd-translate -run tetris.bin
 
 kernel:
 	$(MAKE) -C $(KERNEL_DIR)

@@ -14,7 +14,7 @@ kaleidoscope.bin: kaleidoscope.fs $(KERNEL_MAP) $(KERNEL_BIN)
 	    --output    kaleidoscope.bin
 
 run: kaleidoscope.bin
-	xroar -machine coco2bus $(XROAR_ROMS) -kbd-translate -run kaleidoscope.bin
+	xroar -machine coco2bus -ram 64 $(XROAR_ROMS) -kbd-translate -run kaleidoscope.bin
 
 kernel:
 	$(MAKE) -C $(KERNEL_DIR)

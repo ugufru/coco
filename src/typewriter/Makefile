@@ -14,7 +14,7 @@ typewriter.bin: typewriter.fs $(KERNEL_MAP) $(KERNEL_BIN)
 	    --output    typewriter.bin
 
 run: typewriter.bin
-	xroar -machine coco2bus $(XROAR_ROMS) -kbd-translate -run typewriter.bin
+	xroar -machine coco2bus -ram 64 $(XROAR_ROMS) -kbd-translate -run typewriter.bin
 
 kernel:
 	$(MAKE) -C $(KERNEL_DIR)

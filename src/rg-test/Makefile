@@ -14,7 +14,7 @@ rg-test.bin: rg-test.fs $(KERNEL_MAP) $(KERNEL_BIN)
 	    --output    rg-test.bin
 
 run: rg-test.bin
-	xroar -machine coco2bus $(XROAR_ROMS) -tv-input cmp-br -kbd-translate -run rg-test.bin
+	xroar -machine coco2bus -ram 64 $(XROAR_ROMS) -tv-input cmp-br -kbd-translate -run rg-test.bin
 
 kernel:
 	$(MAKE) -C $(KERNEL_DIR)

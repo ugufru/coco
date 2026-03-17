@@ -14,7 +14,7 @@ rain.bin: rain.fs $(KERNEL_MAP) $(KERNEL_BIN)
 	    --output    rain.bin
 
 run: rain.bin
-	xroar -machine coco2bus $(XROAR_ROMS) -kbd-translate -run rain.bin
+	xroar -machine coco2bus -ram 64 $(XROAR_ROMS) -kbd-translate -run rain.bin
 
 kernel:
 	$(MAKE) -C $(KERNEL_DIR)
