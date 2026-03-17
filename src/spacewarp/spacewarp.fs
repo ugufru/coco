@@ -785,6 +785,77 @@ VARIABLE jblk
     THEN
   LOOP THEN ;
 
+\ ── Jovian gravity (black holes + stars pull/kill Jovians) ────────────
+\ Applies every frame after tick-jovians.  Uses sg-sx/sg-sy as scratch.
+\ Reuses grav-tick from player gravity for frame timing.
+
+\ Pull one Jovian (index in jbg-i) toward (sg-sx, sg-sy) by 1px
+: jov-pull  ( -- )
+  JOV-POS jbg-i @ 2 * + C@ sg-sx @ < IF
+    JOV-POS jbg-i @ 2 * + C@ 1 + JOV-POS jbg-i @ 2 * + C!
+    1 jov-moved !
+  THEN
+  JOV-POS jbg-i @ 2 * + C@ sg-sx @ > IF
+    JOV-POS jbg-i @ 2 * + C@ 1 - JOV-POS jbg-i @ 2 * + C!
+    1 jov-moved !
+  THEN
+  JOV-POS jbg-i @ 2 * + 1 + C@ sg-sy @ < IF
+    JOV-POS jbg-i @ 2 * + 1 + C@ 1 + JOV-POS jbg-i @ 2 * + 1 + C!
+    1 jov-moved !
+  THEN
+  JOV-POS jbg-i @ 2 * + 1 + C@ sg-sy @ > IF
+    JOV-POS jbg-i @ 2 * + 1 + C@ 1 - JOV-POS jbg-i @ 2 * + 1 + C!
+    1 jov-moved !
+  THEN ;
+
+\ Kill Jovian (index in jbg-i) — restore bg, zero health
+: jov-kill  ( -- )
+  JOV-DMG jbg-i @ + C@ IF
+    jbg-i @ jov-bg
+    JOV-POS jbg-i @ 2 * + C@ 3 -
+    JOV-POS jbg-i @ 2 * + 1 + C@ 2 -
+    bg-restore
+    0 JOV-DMG jbg-i @ + C!
+  THEN ;
+
+: jov-gravity  ( -- )
+  qjovians @ ?DUP 0= IF EXIT THEN
+  0 DO
+    I jbg-i !
+    JOV-DMG jbg-i @ + C@ IF
+      \ Black hole gravity
+      qbhole @ IF
+        BHOLE-POS C@ sg-sx !  BHOLE-POS 1 + C@ sg-sy !
+        JOV-POS jbg-i @ 2 * + C@ sg-sx @ - abs
+        JOV-POS jbg-i @ 2 * + 1 + C@ sg-sy @ - abs +
+        DUP 3 < IF                   \ contact: kill
+          DROP jov-kill
+        ELSE DUP 20 > IF             \ outside well
+          DROP
+        ELSE 10 > IF                  \ 10-20: pull every 2 frames
+          grav-tick @ 1 AND 0= IF jov-pull THEN
+        ELSE                          \ <10: pull every frame
+          jov-pull
+        THEN THEN THEN
+      THEN
+      \ Star gravity (only if still alive)
+      JOV-DMG jbg-i @ + C@ IF
+        qstars @ ?DUP IF 0 DO
+          STAR-POS I 2 * + C@ sg-sx !
+          STAR-POS I 2 * + 1 + C@ sg-sy !
+          JOV-POS jbg-i @ 2 * + C@ sg-sx @ - abs
+          JOV-POS jbg-i @ 2 * + 1 + C@ sg-sy @ - abs +
+          DUP 3 < IF                 \ contact: kill
+            DROP jov-kill
+          ELSE 8 > IF                \ outside range
+          ELSE                        \ 3-8: pull every 4 frames
+            grav-tick @ 3 AND 0= IF jov-pull THEN
+          THEN THEN
+        LOOP THEN
+      THEN
+    THEN
+  LOOP ;
+
 \ ── Jovian beam fire ──────────────────────────────────────────────────
 \ One red beam at a time, from a random living Jovian toward the player.
 \ Fire cooldown scales with difficulty: 90 frames (level 1) to 18 (level 9).
@@ -1584,6 +1655,7 @@ VARIABLE prev-key                 \ last key seen by KEY?
     tick-beam
     tick-missile
     tick-jovians
+    jov-gravity
     tick-jbeam
     process-key
     VSYNC
