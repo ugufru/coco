@@ -927,7 +927,7 @@ VARIABLE pj-result
   \ Start timer (render phase draws the beam)
   JBEAM-FRAMES jbeam-timer !
   \ Check if player was hit
-  draw-jbeam  jbeam-hit?  erase-jbeam
+  jbeam-hit?              \ math-only, no drawing needed
   IF
     \ Energy damage
     penergy @ JBEAM-DMG - DUP 0 < IF DROP 0 THEN penergy !
@@ -1386,8 +1386,7 @@ VARIABLE hc-jy
   clamp-beam
   \ Start timer (render phase draws the beam)
   BEAM-FRAMES beam-timer !
-  \ Draw beam immediately for hit detection, then erase
-  draw-beam  check-hits  erase-beam ;
+  check-hits ;
 
 : draw-beam  ( -- )
   beam-x1 @ beam-y1 @ beam-x2 @ beam-y2 @ 1 rg-line ;
