@@ -1230,9 +1230,7 @@ VARIABLE sg-sy                     \ star y cache
 
 : do-dock  ( -- )
   1 docked !
-  10 pmissiles !
-  100 pdmg-ion !  100 pdmg-warp !
-  100 pdmg-scan !  100 pdmg-defl !  100 pdmg-masr ! ;
+  10 pmissiles ! ;
 
 : do-undock  ( -- )  0 docked ! ;
 
@@ -1255,7 +1253,13 @@ VARIABLE dock-tick
   ELSE                                  \ 80-99%: +1 every 16 frames
     dock-tick @ 15 AND 0= IF penergy @ 1 + penergy ! THEN
   THEN THEN THEN THEN
-  penergy @ 100 > IF 100 penergy ! THEN ;
+  penergy @ 100 > IF 100 penergy ! THEN
+  \ Repair systems: +2 per frame each (0→100 in ~50 frames = 0.8s)
+  pdmg-ion  @ 100 < IF pdmg-ion  @ 2 + 100 < IF pdmg-ion  @ 2 + ELSE 100 THEN pdmg-ion  ! THEN
+  pdmg-warp @ 100 < IF pdmg-warp @ 2 + 100 < IF pdmg-warp @ 2 + ELSE 100 THEN pdmg-warp ! THEN
+  pdmg-scan @ 100 < IF pdmg-scan @ 2 + 100 < IF pdmg-scan @ 2 + ELSE 100 THEN pdmg-scan ! THEN
+  pdmg-defl @ 100 < IF pdmg-defl @ 2 + 100 < IF pdmg-defl @ 2 + ELSE 100 THEN pdmg-defl ! THEN
+  pdmg-masr @ 100 < IF pdmg-masr @ 2 + 100 < IF pdmg-masr @ 2 + ELSE 100 THEN pdmg-masr ! THEN ;
 
 : check-dock  ( -- )
   qbase @ 0= IF EXIT THEN
