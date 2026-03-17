@@ -191,11 +191,11 @@ $7730 CONSTANT SPR-MSL2           \ Missile frame 2: x shape (12 bytes)
 \ ── Jovian AI data structures ────────────────────────────────────────────
 $773C CONSTANT JOV-STATE        \ 3 bytes: 0=attack, 1=flee, 2=idle
 $773F CONSTANT JOV-TICK         \ 3 bytes: per-Jovian frame counter
-$7742 CONSTANT JOV-BG0          \ 15 bytes: bg save buffer Jovian 0
-$7751 CONSTANT JOV-BG1          \ 15 bytes: bg save buffer Jovian 1
-$7760 CONSTANT JOV-BG2          \ 15 bytes: bg save buffer Jovian 2
-$776F CONSTANT JOV-OLDX         \ 3 bytes: previous x per Jovian
-$7772 CONSTANT JOV-OLDY         \ 3 bytes: previous y per Jovian
+$7742 CONSTANT JOV-BG0          \ 20 bytes: bg save buffer Jovian 0
+$7756 CONSTANT JOV-BG1          \ 20 bytes: bg save buffer Jovian 1
+$776A CONSTANT JOV-BG2          \ 20 bytes: bg save buffer Jovian 2
+$777E CONSTANT JOV-OLDX         \ 3 bytes: previous x per Jovian
+$7781 CONSTANT JOV-OLDY         \ 3 bytes: previous y per Jovian
 
 : jov-bg  ( i -- addr )
   DUP 0= IF DROP JOV-BG0 EXIT THEN
@@ -565,11 +565,11 @@ VARIABLE old-sy                   \ previous ship y
   spr-erase-box ;
 
 \ ── Background save/restore for flicker-free ship movement ────────────
-\ Save 3 bytes × 5 rows of VRAM under the ship sprite bounding box.
-\ Restore to erase the ship without a black flash.
-$76D0 CONSTANT SHIP-BG              \ 15-byte save buffer
+\ Save 4 bytes × 5 rows of VRAM under the sprite bounding box.
+\ Restore to erase without a black flash.
+$76D0 CONSTANT SHIP-BG              \ 20-byte save buffer
 
-CODE bg-save   \ ( buf x y -- )  save 3×5 VRAM bytes to buf
+CODE bg-save   \ ( buf x y -- )  save 4×5 VRAM bytes to buf
         PSHS    X
         LDA     1,U             ; A = y
         LDB     #32
@@ -589,6 +589,8 @@ CODE bg-save   \ ( buf x y -- )  save 3×5 VRAM bytes to buf
         STA     ,X+
         LDA     2,Y
         STA     ,X+
+        LDA     3,Y
+        STA     ,X+
         LEAY    32,Y            ; next VRAM row
         DECB
         BNE     @row
@@ -596,7 +598,7 @@ CODE bg-save   \ ( buf x y -- )  save 3×5 VRAM bytes to buf
         ;NEXT
 ;CODE
 
-CODE bg-restore  \ ( buf x y -- )  restore 3×5 VRAM bytes from buf
+CODE bg-restore  \ ( buf x y -- )  restore 4×5 VRAM bytes from buf
         PSHS    X
         LDA     1,U             ; A = y
         LDB     #32
@@ -616,6 +618,8 @@ CODE bg-restore  \ ( buf x y -- )  restore 3×5 VRAM bytes from buf
         STA     1,Y
         LDA     ,X+
         STA     2,Y
+        LDA     ,X+
+        STA     3,Y
         LEAY    32,Y
         DECB
         BNE     @row
@@ -630,7 +634,7 @@ CODE bg-restore  \ ( buf x y -- )  restore 3×5 VRAM bytes from buf
   SHIP-BG old-sx @ 3 - old-sy @ 2 - bg-restore ;
 
 \ Missile background buffer
-$76E0 CONSTANT MSL-BG
+$76E4 CONSTANT MSL-BG                \ 20-byte save buffer
 
 : save-msl-bg  ( -- )
   MSL-BG msl-scrx 2 - msl-scry 2 - bg-save ;
