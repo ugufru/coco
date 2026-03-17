@@ -707,13 +707,13 @@ def main():
         # BASIC loads both blocks in a single CLOADM, then executes bootstrap.
         kernel_records, exec_addr = read_decb(args.kernel_bin)
 
-        # Remap kernel records at $8000+ to staging address ($1000).
+        # Remap kernel records at $E000+ to staging address ($1000).
         # The bootstrap code copies them to their final location at runtime.
         KERNEL_STAGE_ADDR = 0x1000
         staged_records = []
         stage_cursor = KERNEL_STAGE_ADDR
         for addr, payload in kernel_records:
-            if addr >= 0x8000:
+            if addr >= 0xE000:
                 staged_records.append((stage_cursor, payload))
                 stage_cursor += len(payload)
             else:

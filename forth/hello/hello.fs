@@ -51,7 +51,7 @@
 ;
 
 : CR
-  13 EMIT
+  10 EMIT
 ;
 
 : HELLO

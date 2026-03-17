@@ -15,19 +15,27 @@
 ;;;
 ;;; ─── Memory layout ────────────────────────────────────────────────────────
 ;;;
-;;; The kernel lives at $8000 in the CoCo's upper 32K, which is normally
-;;; occupied by BASIC ROMs.  The SAM's all-RAM mode ($FFDF) pages out the
-;;; ROMs so that RAM is readable/writable across the full 64K space
-;;; ($0000–$FEFF; $FF00–$FFFF is always I/O).
+;;; The kernel lives at $E000, in the CoCo's ROM 2 region.  The SAM's
+;;; all-RAM mode ($FFDF) pages out ROMs so that the full 64K address
+;;; space ($0000–$FEFF) is readable/writable RAM.
 ;;;
 ;;; Because BASIC's CLOADM runs before all-RAM mode is enabled, it cannot
-;;; load bytes directly to $8000 (still ROM at that point).  The solution:
+;;; load bytes directly to $E000 (still ROM at that point).  The solution:
 ;;;
-;;;   1. lwasm assembles the kernel at ORG $8000 (final addresses).
-;;;   2. fc.py remaps the $8000 DECB record to $1000 (staging address).
+;;;   1. lwasm assembles the kernel at ORG $E000 (final addresses).
+;;;   2. fc.py remaps the $E000 DECB record to $1000 (staging address).
 ;;;   3. CLOADM loads the staged kernel to $1000 in low RAM.
-;;;   4. A bootstrap at $0E00 enables all-RAM mode, copies $1000→$8000,
+;;;   4. A bootstrap at $0E00 enables all-RAM mode, copies $1000→$E000,
 ;;;      then JMPs to START.
+;;;
+;;;   $0050         Kernel variables (44 bytes)
+;;;   $0600–$1FFF   RG6 VRAM (6144 bytes, set by rg-init after boot)
+;;;   $2000–$DDFF   Application code (contiguous, ~47K)
+;;;   $DE00         Data stack base (U, grows down)
+;;;   $E000         Return stack init (S, grows down from $DFFF)
+;;;   $E000–$E4xx   Kernel code (~1.1K)
+;;;   $E4xx–$FEFF   Static data / kernel growth (~7K)
+;;;   $FF00–$FFFF   I/O + hardware vectors (always mapped)
 ;;;
 ;;; DECB record layout (combined binary):
 ;;;
@@ -35,9 +43,8 @@
 ;;;   ------  ---------  -------
 ;;;   1       $0050      Kernel variables (44 bytes)
 ;;;   2       $0E00      Bootstrap (~25 bytes)
-;;;   3       $1000      Staged kernel (~1.1K, remapped from $8000)
-;;;   4       $2000      App part 1 (before VRAM hole)
-;;;   5       $5800      App part 2 (after VRAM hole, if --hole used)
+;;;   3       $1000      Staged kernel (~1.1K, remapped from $E000)
+;;;   4       $2000      Application (contiguous)
 ;;;   Exec    $0E00      Bootstrap entry point
 ;;;
 ;;; ─── SAM all-RAM mode ─────────────────────────────────────────────────────
@@ -88,7 +95,7 @@ VAR_KEY_PREV    FCB     0       ; last accepted key ASCII (KEY debounce)
 VAR_KEY_SHIFT   FCB     0       ; SHIFT flag (nonzero = shift held)
 VAR_KEY_RELCNT  FCB     0       ; release debounce counter
 VAR_KEY_REPDLY  FDB     0       ; auto-repeat countdown (16-bit)
-VAR_RGVRAM      FDB     $4000   ; RG6 VRAM base address (written by rg-init)
+VAR_RGVRAM      FDB     $0600   ; RG6 VRAM base address (written by rg-init)
 ;;; Bresenham line drawing scratch (used by rg-line CODE word in rg-pixel.fs)
 VAR_LINE_CX     FCB     0       ; current x
 VAR_LINE_CY     FCB     0       ; current y
@@ -143,7 +150,7 @@ BOOTSTRAP
         ORCC    #$50            ; mask IRQ/FIRQ
         STA     $FFDF           ; all-RAM mode: $FFDF sets SAM TY bit
         LDX     #$1000          ; source: staged kernel
-        LDY     #$8000          ; dest: final location
+        LDY     #$E000          ; dest: final location
 BOOT_LP LDD     ,X++
         STD     ,Y++
         CMPY    #KERN_END
@@ -152,7 +159,7 @@ BOOT_LP LDD     ,X++
 
 ;;; ─── Kernel ──────────────────────────────────────────────────────────────────
 
-        ORG     $8000
+        ORG     $E000
 
 ;;; DOCOL — enter a colon definition
 ;;;   Called via JMP [,Y] where Y = address of the word's CFA.
@@ -1005,8 +1012,8 @@ START
         CLRA
         TFR     A,DP            ; direct page register = $00
 
-        LDS     #$8000          ; RSP: first push lands at $7FFE (below kernel)
-        LDU     #$7E00          ; DSP: first push lands at $7DFE
+        LDS     #$E000          ; RSP: first push lands at $DFFE (below kernel)
+        LDU     #$DE00          ; DSP: first push lands at $DDFE
 
         ; ── PIA0 init (bare-metal keyboard scan) ─────────────────────────────
         ; The 6821 PIA shares each data address between the Data Direction

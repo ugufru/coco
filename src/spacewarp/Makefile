@@ -11,7 +11,6 @@ spacewarp.bin: spacewarp.fs $(KERNEL_MAP) $(KERNEL_BIN)
 	$(FC) spacewarp.fs \
 	    --kernel    $(KERNEL_MAP) \
 	    --kernel-bin $(KERNEL_BIN) \
-	    --hole      0x4000,6144 \
 	    --output    spacewarp.bin
 
 run: spacewarp.bin

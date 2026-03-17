@@ -19,7 +19,8 @@
 \ x ranges 0-127, y ranges 0-191.  Each artifact pixel is a 2-bit pair
 \ in VRAM.  Color parameter: 0=black, 1=blue, 2=red, 3=white.
 \
-\ VRAM base: $4000 (SAM F offset 32).  Sits in a hole in the app binary.
+\ VRAM base: $0600 (SAM F offset 3).  Below the app, overlaps dead
+\ bootstrap/staged kernel area — harmless after boot.
 \
 \ Byte layout (8 real pixels = 4 artifact pixels per byte):
 \   bits 7-6 = artifact pixel 0 (leftmost)
@@ -67,7 +68,7 @@ $7CD8 CONSTANT MSKTAB            \ sub-pixel (x%4) → AND mask to clear
 
 : rg-init  ( -- )
   init-tables
-  $4000 DUP rv !  $57 !        \ store VRAM base in rv AND kernel var
+  $0600 DUP rv !  $57 !        \ store VRAM base in rv AND kernel var
   6 set-sam-v                  \ V2:V1:V0 = 110 (RG6)
   rv @ 9 RSHIFT set-sam-f     \ F offset = VRAM / 512
   $F8 set-pia                  \ A*/G=1, GM2=1, GM1=1, GM0=1, CSS=1
