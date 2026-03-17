@@ -1726,7 +1726,12 @@ VARIABLE prev-key                 \ last key seen by KEY?
         CHAR R rg-emit CHAR O rg-emit CHAR Y rg-emit CHAR E rg-emit
         CHAR D rg-emit
       THEN
-      BEGIN AGAIN
+      \ AGAIN? prompt — any key restarts
+      0 18 at-xy
+      CHAR A rg-emit CHAR G rg-emit CHAR A rg-emit CHAR I rg-emit
+      CHAR N rg-emit CHAR ? rg-emit
+      KEY DROP
+      main EXIT
     THEN
   AGAIN ;
 
