@@ -217,7 +217,7 @@ $0600–$1FFF   RG6 VRAM (6144 bytes, set by rg-init after boot)
               ├ $0E00  bootstrap (dead after boot, overwritten by VRAM)
               └ $1000  staged kernel (dead after boot, overwritten by VRAM)
 $2000–$7FFF   application code (contiguous, ~24K loadable via CLOADM)
-$8000–$DDFF   runtime data (available after all-RAM, NOT CLOADM-loadable)
+$8000–$DDFF   runtime RAM (24K — variables, tables, buffers; NOT CLOADM-loadable)
 $DE00         data stack base (U, grows downward)
 $E000–$E012   DOCOL, DOVAR entry points (final location)
 $E013–$E060   CFA table (39 entries × 2 bytes)
@@ -241,7 +241,7 @@ runtime (after the bootstrap enables all-RAM) but cannot hold loaded code.
 |---|---|---|
 | VRAM | 6K | RG6 display (`$0600–$1FFF`, set by rg-init) |
 | App (loadable) | ~24K | Forth thread + CODE words (`$2000–$7FFF`) |
-| Runtime data | ~24K | writable after all-RAM, not CLOADM-loadable (`$8000–$DDFF`) |
+| Runtime RAM | 24K | variables, tables, buffers (`$8000–$DDFF`; not CLOADM-loadable) |
 | Data stack | 512B | grows down from `$DE00` |
 | Return stack | 512B | grows down from `$E000` (below kernel) |
 | Kernel code | ~1.1K | primitives, CFA table, keyboard matrix, startup (`$E000–$E471`) |

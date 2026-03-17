@@ -31,7 +31,7 @@
 ;;;   $0050         Kernel variables (44 bytes)
 ;;;   $0600–$1FFF   RG6 VRAM (6144 bytes, set by rg-init after boot)
 ;;;   $2000–$7FFF   Application code (contiguous, ~24K via CLOADM)
-;;;   $8000–$DDFF   Runtime data (writable after all-RAM, not CLOADM-loadable)
+;;;   $8000–$DDFF   Runtime RAM (24K — variables, tables, buffers; not CLOADM-loadable)
 ;;;   $DE00         Data stack base (U, grows down)
 ;;;   $E000         Return stack init (S, grows down from $DFFF)
 ;;;   $E000–$E4xx   Kernel code (~1.1K)

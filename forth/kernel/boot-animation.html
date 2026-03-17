@@ -282,7 +282,7 @@
       <!-- Runtime data ($8000-$DDFF) — available after all-RAM -->
       <div class="region" id="runtime"
            style="top:512px; height:376px; background:#1a2a1a; color:#4a6a4a; border-top:1px dashed #444;">
-        <div class="label">Runtime data<br><span style="font-size:10px">$8000-$DDFF (~24K, not CLOADM-loadable)</span></div>
+        <div class="label">Runtime RAM<br><span style="font-size:10px">$8000-$DDFF (24K — variables, tables, buffers)</span><br><span style="font-size:9px; color:#555;">writable after all-RAM, not CLOADM-loadable</span></div>
       </div>
 
       <!-- Stacks ($DE00-$DFFF) -->
