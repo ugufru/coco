@@ -1410,11 +1410,9 @@ VARIABLE hc-jy
       JOV-DMG hc-i @ + C@
       maser-dmg - DUP 0 < IF DROP 0 THEN
       JOV-DMG hc-i @ + C!
-      \ If dead, restore background and explode
+      \ If dead, erase sprite and explode
       JOV-DMG hc-i @ + C@ 0= IF
-        hc-i @ jov-bg
-        hc-jx @ 3 - hc-jy @ 2 -
-        bg-restore
+        SPR-JOV hc-jx @ 3 - hc-jy @ 2 - spr-erase-box
         hc-jx @ hc-jy @ explode-jovian
       THEN
     THEN
@@ -1496,12 +1494,12 @@ VARIABLE msl-got                 \ hit flag
       JOV-DMG msl-hi @ + C@ IF
         JOV-POS msl-hi @ 2 * + C@ msl-scrx - abs 4 <
         JOV-POS msl-hi @ 2 * + 1 + C@ msl-scry - abs 4 < AND IF
-          \ Kill Jovian — restore background and explode
+          \ Kill Jovian — erase sprite and explode
           0 JOV-DMG msl-hi @ + C!
-          msl-hi @ jov-bg
+          SPR-JOV
           JOV-POS msl-hi @ 2 * + C@ 3 -
           JOV-POS msl-hi @ 2 * + 1 + C@ 2 -
-          bg-restore
+          spr-erase-box
           JOV-POS msl-hi @ 2 * + C@
           JOV-POS msl-hi @ 2 * + 1 + C@
           explode-jovian
