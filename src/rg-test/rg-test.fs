@@ -110,8 +110,8 @@ $4812 CONSTANT SPR-JOVIAN      \ Jovian sprite: 8x5, red
 
 : test-erase  ( -- )
   \ Erase middle ship and middle Jovian
-  SPR-SHIP 60 80 spr-erase
-  SPR-JOVIAN 80 140 spr-erase ;
+  SPR-SHIP 60 80 spr-erase-box
+  SPR-JOVIAN 80 140 spr-erase-box ;
 
 \ ── Test 5: Angle-based lines (maser simulation) ────────────────────────
 \ Draw lines from center at every 30 degrees using angle-dx/angle-dy.
