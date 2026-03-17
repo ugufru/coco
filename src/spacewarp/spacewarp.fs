@@ -1785,15 +1785,16 @@ VARIABLE prev-key                 \ last key seen by KEY?
       draw-ship
       0 jov-moved !
     THEN
-    \ Redraw active beams on top of everything
-    beam-timer @ IF draw-beam 1 beam-drawn ! THEN
-    jbeam-timer @ IF draw-jbeam 1 jbeam-drawn ! THEN
+    \ Missile render (between beam erase and beam redraw)
     msl-dirty @ IF
       msl-erase
       msl-scrx msl-px !  msl-scry msl-py !
       msl-draw
       0 msl-dirty !
     THEN
+    \ Redraw active beams on top of everything (last layer)
+    beam-timer @ IF draw-beam 1 beam-drawn ! THEN
+    jbeam-timer @ IF draw-jbeam 1 jbeam-drawn ! THEN
     penergy @ prev-energy @ <> IF
       penergy @ prev-energy !
       update-energy
