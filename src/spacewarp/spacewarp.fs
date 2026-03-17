@@ -785,6 +785,99 @@ VARIABLE jblk
     THEN
   LOOP THEN ;
 
+\ ── Jovian beam fire ──────────────────────────────────────────────────
+\ One red beam at a time, from a random living Jovian toward the player.
+\ Fire cooldown scales with difficulty: 90 frames (level 1) to 18 (level 9).
+\ Uses dedicated variables (separate from player maser beam).
+
+VARIABLE jbeam-x1                 \ Jovian beam start
+VARIABLE jbeam-y1
+VARIABLE jbeam-x2                 \ Jovian beam endpoint (clamped)
+VARIABLE jbeam-y2
+VARIABLE jbeam-timer              \ frames remaining (0=none)
+VARIABLE jbeam-cool               \ frames until next fire allowed
+8 CONSTANT JBEAM-FRAMES           \ how long Jovian beam stays on screen
+15 CONSTANT JBEAM-DMG             \ energy damage to player per hit
+
+\ Fire cooldown: 90 - (level * 8), min 18 frames
+: jbeam-cooldown  ( -- n )
+  90 glevel @ 8 * - DUP 18 < IF DROP 18 THEN ;
+
+: clamp-jbeam  ( -- )
+  jbeam-x2 @ 1 < IF 1 jbeam-x2 ! THEN
+  jbeam-x2 @ 126 > IF 126 jbeam-x2 ! THEN
+  jbeam-y2 @ 1 < IF 1 jbeam-y2 ! THEN
+  jbeam-y2 @ 142 > IF 142 jbeam-y2 ! THEN ;
+
+: erase-jbeam  ( -- )
+  jbeam-x1 @ jbeam-y1 @
+  jbeam-x2 @ jbeam-y2 @
+  0 rg-line ;
+
+\ Check if player ship is near the Jovian beam line (same cross-product method)
+: jbeam-hit?  ( -- flag )
+  jbeam-x2 @ jbeam-x1 @ -
+  SHIP-POS 1 + C@ jbeam-y1 @ - *
+  jbeam-y2 @ jbeam-y1 @ -
+  SHIP-POS C@ jbeam-x1 @ - *
+  -
+  abs HIT-THRESH < ;
+
+\ Pick a random living Jovian index, or -1 if none alive
+VARIABLE pj-result
+: pick-jovian  ( -- i|-1 )
+  -1 pj-result !
+  qjovians @ ?DUP 0= IF -1 EXIT THEN
+  rnd                             \ random starting index
+  qjovians @ 0 DO
+    DUP JOV-DMG + C@ IF           \ alive?
+      pj-result @ 0 < IF DUP pj-result ! THEN  \ take first alive
+    THEN
+    1 + DUP qjovians @ < 0= IF DROP 0 THEN  \ wrap
+  LOOP DROP
+  pj-result @ ;
+
+\ Fire a red beam from Jovian i toward the player
+: fire-jbeam  ( i -- )
+  \ Get Jovian position as beam origin
+  DUP 2 * JOV-POS + C@ jbeam-x1 !
+  2 * JOV-POS + 1 + C@ jbeam-y1 !
+  \ Compute angle from Jovian to player (approximate using dx/dy signs + magnitude)
+  \ Simple approach: extend line from Jovian through player by 140px
+  SHIP-POS C@ jbeam-x1 @ - 4 *     \ dx * 4 (amplify for line extension)
+  jbeam-x1 @ + jbeam-x2 !
+  SHIP-POS 1 + C@ jbeam-y1 @ - 4 *  \ dy * 4
+  jbeam-y1 @ + jbeam-y2 !
+  clamp-jbeam
+  \ Draw red beam
+  jbeam-x1 @ jbeam-y1 @
+  jbeam-x2 @ jbeam-y2 @
+  2 rg-line
+  JBEAM-FRAMES jbeam-timer !
+  \ Check if player was hit
+  jbeam-hit? IF
+    penergy @ JBEAM-DMG - DUP 0 < IF DROP 0 THEN penergy !
+  THEN
+  \ Reset cooldown
+  jbeam-cooldown jbeam-cool ! ;
+
+\ Tick: count down beam display, count down cooldown, maybe fire
+: tick-jbeam  ( -- )
+  \ Decay existing beam
+  jbeam-timer @ IF
+    jbeam-timer @ 1 - jbeam-timer !
+    jbeam-timer @ 0= IF erase-jbeam draw-ship THEN
+  THEN
+  \ Cooldown toward next shot
+  jbeam-cool @ ?DUP IF
+    1 - jbeam-cool !
+  ELSE
+    \ Cooldown expired — fire if any Jovians alive and not docked
+    docked @ 0= IF
+      pick-jovian DUP 0 < IF DROP ELSE fire-jbeam THEN
+    THEN
+  THEN ;
+
 \ ── Magnetic storm: fake stars + event horizon ─────────────────────────
 \ In storm quadrants, scatter noise dots across the tactical view.
 \ Black hole gravity well (30px Manhattan) is kept clear, and its
@@ -1476,6 +1569,7 @@ VARIABLE prev-key                 \ last key seen by KEY?
   draw-panel
   0 cmd-state !  0 prev-key !
   0 beam-timer !
+  0 jbeam-timer !  jbeam-cooldown jbeam-cool !
   0 msl-active !  0 msl-dirty !
   0 docked !  0 prev-docked !  0 death-cause !
   0 jov-moved !
@@ -1494,6 +1588,7 @@ VARIABLE prev-key                 \ last key seen by KEY?
     tick-beam
     tick-missile
     tick-jovians
+    tick-jbeam
     process-key
     VSYNC
     moved @ jov-moved @ OR IF
