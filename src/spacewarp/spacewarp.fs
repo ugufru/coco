@@ -870,37 +870,39 @@ VARIABLE expl-cx                      \ explosion center x
 VARIABLE expl-cy                      \ explosion center y
 VARIABLE expl-count                   \ number of dots
 
+VARIABLE expl-rad                     \ explosion radius
+
 \ Generate random dot within radius, clamped to tactical view
-: expl-dot  ( radius -- x y )
-  DUP 2 * rnd OVER -                \ random offset -radius..+radius
+: expl-dot  ( i -- )   \ fills EXPLBUF entry i
+  2 * EXPLBUF +                      \ ( buf-addr )
+  expl-rad @ 2 * 1 + rnd expl-rad @ -
   expl-cx @ + DUP 1 < IF DROP 1 THEN DUP 126 > IF DROP 126 THEN
-  SWAP
-  DUP 2 * rnd OVER -
-  expl-cy @ + DUP 1 < IF DROP 1 THEN DUP 142 > IF DROP 142 THEN ;
+  OVER C!                            \ store x
+  expl-rad @ 2 * 1 + rnd expl-rad @ -
+  expl-cy @ + DUP 1 < IF DROP 1 THEN DUP 142 > IF DROP 142 THEN
+  SWAP 1 + C! ;                      \ store y
 
 \ Fill explosion buffer with random dots
 : gen-explosion  ( cx cy radius count -- )
-  expl-count !
-  SWAP expl-cy !  expl-cx !
-  expl-count @ 0 DO
-    DUP expl-dot                     \ ( radius x y )
-    EXPLBUF I 2 * + 1 + C!          \ store y
-    EXPLBUF I 2 * + C!              \ store x
-  LOOP DROP ;
+  expl-count !  expl-rad !
+  expl-cy !  expl-cx !
+  expl-count @ 0 DO  I expl-dot  LOOP ;
 
 \ Animate: draw white, hold, draw red, hold, erase
-: show-explosion  ( -- )
+\ hold-frames controls how long each phase lasts
+: show-explosion  ( hold-frames -- )
   EXPLBUF expl-count @ 3 plot-dots    \ white burst
-  VSYNC VSYNC VSYNC VSYNC
+  DUP 0 DO VSYNC LOOP
   EXPLBUF expl-count @ 2 plot-dots    \ red fade
-  VSYNC VSYNC VSYNC VSYNC
-  EXPLBUF expl-count @ 0 plot-dots ;  \ erase to black
+  0 DO VSYNC LOOP
+  EXPLBUF expl-count @ 0 plot-dots    \ erase to black
+  draw-stars ;                        \ restore any stars damaged by erase
 
 \ Convenience words for each explosion size
-: explode-jovian  ( x y -- )  4 12 gen-explosion show-explosion ;
-: explode-ship    ( x y -- )  8 20 gen-explosion show-explosion ;
-: explode-base    ( x y -- )  12 30 gen-explosion show-explosion ;
-: explode-destruct ( x y -- )  20 40 gen-explosion show-explosion ;
+: explode-jovian  ( x y -- )   6 20 gen-explosion   3 show-explosion ;
+: explode-ship    ( x y -- )   12 30 gen-explosion   5 show-explosion ;
+: explode-base    ( x y -- )   16 35 gen-explosion   8 show-explosion ;
+: explode-destruct ( x y -- )  24 40 gen-explosion  12 show-explosion ;
 
 \ ── Jovian beam fire ──────────────────────────────────────────────────
 \ One red beam at a time, from a random living Jovian toward the player.
