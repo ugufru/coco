@@ -812,15 +812,17 @@ VARIABLE jblk
     1 jov-moved !
   THEN ;
 
-\ Kill Jovian (index in jbg-i) — restore bg, zero health
+\ Kill Jovian (index in jbg-i) — erase sprite, zero health, explode
+\ Uses spr-erase-box (not bg-restore) because gravity may have moved
+\ the Jovian since the last bg-save, making the saved bg stale.
 : jov-kill  ( -- )
   JOV-DMG jbg-i @ + C@ IF
     JOV-POS jbg-i @ 2 * + C@
     JOV-POS jbg-i @ 2 * + 1 + C@
-    jbg-i @ jov-bg
+    SPR-JOV
     JOV-POS jbg-i @ 2 * + C@ 3 -
     JOV-POS jbg-i @ 2 * + 1 + C@ 2 -
-    bg-restore
+    spr-erase-box
     0 JOV-DMG jbg-i @ + C!
     explode-jovian
   THEN ;
