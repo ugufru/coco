@@ -870,6 +870,7 @@ VARIABLE jbeam-drawn              \ 1 = beam pixels currently on screen
 VARIABLE jbeam-cool               \ frames until next fire allowed
 8 CONSTANT JBEAM-FRAMES           \ how long Jovian beam stays on screen
 5 CONSTANT JBEAM-DMG              \ energy damage to player per hit
+20 CONSTANT JBEAM-SYS-DMG         \ system damage per hit (out of 100)
 
 \ Fire cooldown: 150 - (level * 14), min 24 frames
 \ Level 1: ~136 frames (2.3s), Level 5: ~80 frames (1.3s), Level 9: ~24 frames (0.4s)
@@ -927,7 +928,18 @@ VARIABLE pj-result
   JBEAM-FRAMES jbeam-timer !
   \ Check if player was hit
   draw-jbeam  jbeam-hit?  erase-jbeam
-  IF penergy @ JBEAM-DMG - DUP 0 < IF DROP 0 THEN penergy ! THEN
+  IF
+    \ Energy damage
+    penergy @ JBEAM-DMG - DUP 0 < IF DROP 0 THEN penergy !
+    \ System damage: pick random system (0-4), reduce its level
+    5 rnd DUP 0= IF DROP pdmg-ion
+    ELSE DUP 1 = IF DROP pdmg-warp
+    ELSE DUP 2 = IF DROP pdmg-scan
+    ELSE DUP 3 = IF DROP pdmg-defl
+    ELSE DROP pdmg-masr
+    THEN THEN THEN THEN
+    DUP @ JBEAM-SYS-DMG - DUP 0 < IF DROP 0 THEN SWAP !
+  THEN
   \ Reset cooldown
   jbeam-cooldown jbeam-cool ! ;
 
@@ -1056,8 +1068,10 @@ VARIABLE move-count               \ counts moves; energy charged every 4th
 VARIABLE prev-energy              \ last displayed energy (for dirty check)
 VARIABLE prev-missiles            \ last displayed missile count
 VARIABLE prev-docked              \ last displayed dock state
-3 CONSTANT SHIP-DX                \ pixels per step
-3 CONSTANT SHIP-DY                \ pixels per step
+\ Ship speed: 3px at 100% ion engines, 1px at 1-33%, 2px at 34-66%
+: ship-dx  ( -- n )
+  pdmg-ion @ DUP 67 > IF DROP 3 ELSE 34 > IF 2 ELSE 1 THEN THEN ;
+: ship-dy  ( -- n )  ship-dx ;
 10 CONSTANT MASER-COST            \ energy per maser fire
 
 : use-energy  ( cost -- )
@@ -1320,7 +1334,8 @@ VARIABLE hc-i                     \ hit check loop index
 VARIABLE hc-jx
 VARIABLE hc-jy
 560 CONSTANT HIT-THRESH           \ ~4 pixel hit radius for 140px beam
-30 CONSTANT MASER-DMG             \ damage per hit
+\ Maser damage scales with system health: 30 at 100%, 3 at 10%
+: maser-dmg  ( -- n )  pdmg-masr @ 30 * 100 /MOD SWAP DROP ;
 
 : check-hit  ( -- )
   JOV-DMG hc-i @ + C@ IF
@@ -1335,7 +1350,7 @@ VARIABLE hc-jy
     abs HIT-THRESH < IF
       \ Hit! Reduce health
       JOV-DMG hc-i @ + C@
-      MASER-DMG - DUP 0 < IF DROP 0 THEN
+      maser-dmg - DUP 0 < IF DROP 0 THEN
       JOV-DMG hc-i @ + C!
       \ If dead, restore background under sprite
       JOV-DMG hc-i @ + C@ 0= IF
