@@ -148,13 +148,13 @@ processors where Forth fits naturally without compromise.
 
 ## Boot sequence
 
-The kernel is assembled at `$8000` but BASIC's `CLOADM` can't write there
+The kernel is assembled at `$E000` but BASIC's `CLOADM` can't write there
 (ROM is mapped at `$8000–$FEFF`).  A bootstrap solves this:
 
-1. `fc.py` remaps the kernel DECB record from `$8000` to `$1000` (staging).
-2. `CLOADM` loads five records into low RAM.
+1. `fc.py` remaps the kernel DECB record from `$E000` to `$1000` (staging).
+2. `CLOADM` loads four records into low RAM (`$0000–$7FFF`).
 3. The bootstrap at `$0E00` enables all-RAM mode (`STA $FFDF`) and copies
-   `$1000` → `$8000`.
+   `$1000` → `$E000`.
 4. `JMP START` enters the kernel at its final location.
 
 **[Open the interactive boot animation](boot-animation.html)** for a visual
@@ -166,10 +166,12 @@ step-by-step walkthrough.
 |---|---|---|---|
 | 1 | `$0050` | 44 B | Kernel variables |
 | 2 | `$0E00` | ~25 B | Bootstrap |
-| 3 | `$1000` | ~1.1K | Staged kernel (remapped from `$8000`) |
-| 4 | `$2000` | 8K | App part 1 (before VRAM hole) |
-| 5 | `$5800` | ~6K | App part 2 (after VRAM hole) |
+| 3 | `$1000` | ~1.1K | Staged kernel (remapped from `$E000`) |
+| 4 | `$2000` | ~14K | Application (contiguous) |
 | Exec | `$0E00` | — | Bootstrap entry point |
+
+All DECB records must target the lower 32K (`$0000–$7FFF`) because CLOADM
+runs with ROM still mapped at `$8000–$FEFF`.
 
 ### SAM all-RAM mode
 
@@ -210,41 +212,40 @@ $0075  VAR_RG*          text rendering config (7 bytes, used by rg-char CODE wor
 ```
 $0000–$004F   direct page (reserved)
 $0050–$007B   kernel scratch variables (see above)
-$0400–$05FF   VDG text VRAM (32×16, Alpha mode only)
-$0E00–$0E18   bootstrap (copies staged kernel, enables all-RAM)
-$1000–$1471   staged kernel (DECB load addr; copied to $8000 at boot)
-$2000–$3FFF   application code part 1 (8K, before VRAM hole)
-$4000–$57FF   RG6 VRAM (6144 bytes, hole in app binary)
-$5800–$73FF   application code part 2 (continues after hole)
-$7400–$75D8   font data (font-art.fs, ~472 bytes)
-$7600–$7774   game data: galaxy, sprites, AI (Space Warp)
-$7C00–$7CEF   sine table + pixel lookup tables
-$7E00         data stack base (U, grows downward)
-$8000–$8012   DOCOL, DOVAR entry points (final location)
-$8013–$8060   CFA table (39 entries × 2 bytes)
-$8061–$8432   primitive machine code + MATRIX2ASCII table
-$8433–$8471   START: hardware init + app entry
-$8472         KERN_END (end of bootstrap copy range)
-$8472–$FEFF   free RAM (available for future kernel growth / static data)
+$0400–$05FF   VDG text VRAM (32×16, boot only)
+$0600–$1FFF   RG6 VRAM (6144 bytes, set by rg-init after boot)
+              ├ $0E00  bootstrap (dead after boot, overwritten by VRAM)
+              └ $1000  staged kernel (dead after boot, overwritten by VRAM)
+$2000–$7FFF   application code (contiguous, ~24K loadable via CLOADM)
+$8000–$DDFF   runtime data (available after all-RAM, NOT CLOADM-loadable)
+$DE00         data stack base (U, grows downward)
+$E000–$E012   DOCOL, DOVAR entry points (final location)
+$E013–$E060   CFA table (39 entries × 2 bytes)
+$E061–$E432   primitive machine code + MATRIX2ASCII table
+$E433–$E471   START: hardware init + app entry
+$E472         KERN_END (end of bootstrap copy range)
+$E472–$FEFF   free RAM for kernel growth / static data (~7K)
 $FF00–$FFFF   I/O registers + hardware vectors (always mapped, never RAM)
 ```
 
 All-RAM mode is enabled at boot (`STA $FFDF`), giving full 64K RAM from
 `$0000–$FEFF`.  `$FF00–$FFFF` is always I/O regardless of mode.
 
+**CLOADM constraint:** BASIC runs with ROM at `$8000–$FEFF`, so CLOADM can
+only load data to the lower 32K.  The `$8000–$DDFF` region is writable at
+runtime (after the bootstrap enables all-RAM) but cannot hold loaded code.
+
 ### Memory budget
 
 | Region | Size | Contents |
 |---|---|---|
-| Kernel code | ~1.1K | primitives, CFA table, keyboard matrix, startup (`$8000–$8471`) |
-| Kernel growth | ~31K | free RAM above kernel (`$8472–$FEFF`) |
-| App space | ~15K | Forth thread + CODE words (`$2000–$3FFF` + `$5800–$73FF`) |
-| VRAM | 6K | RG6 display (`$4000–$57FF`, hole in app binary) |
-| Font data | ~472B | artifact-safe glyphs (`$7400–$75D8`) |
-| Game data | ~384B | galaxy, sprites, AI (`$7600–$7774`) |
-| Tables | ~240B | sine, pixel LUTs (`$7C00–$7CEF`) |
-| Data stack | 512B | grows down from `$7E00` |
-| Return stack | 512B | grows down from `$8000` (below kernel) |
+| VRAM | 6K | RG6 display (`$0600–$1FFF`, set by rg-init) |
+| App (loadable) | ~24K | Forth thread + CODE words (`$2000–$7FFF`) |
+| Runtime data | ~24K | writable after all-RAM, not CLOADM-loadable (`$8000–$DDFF`) |
+| Data stack | 512B | grows down from `$DE00` |
+| Return stack | 512B | grows down from `$E000` (below kernel) |
+| Kernel code | ~1.1K | primitives, CFA table, keyboard matrix, startup (`$E000–$E471`) |
+| Post-kernel | ~7K | free for kernel growth / static data (`$E472–$FEFF`) |
 
 ---
 

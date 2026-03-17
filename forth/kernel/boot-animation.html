@@ -227,7 +227,7 @@
 <body>
 
 <h1>CoCo Kernel Boot Sequence</h1>
-<div class="subtitle">How the Forth kernel gets from a DECB binary to running code at $E000</div>
+<div class="subtitle">How the Forth kernel gets from a DECB binary to running code at $E000. CLOADM can only load to the lower 32K.</div>
 
 <div class="container">
 
@@ -240,6 +240,7 @@
     <div class="addr-label" style="top: 56px;">$0E00</div>
     <div class="addr-label" style="top: 64px;">$1000</div>
     <div class="addr-label" style="top: 128px;">$2000</div>
+    <div class="addr-label" style="top: 512px;">$8000</div>
     <div class="addr-label" style="top: 888px;">$DE00</div>
     <div class="addr-label" style="top: 896px;">$E000</div>
     <div class="addr-label" style="top: 1020px;">$FF00</div>
@@ -272,10 +273,16 @@
         <div class="label" style="font-size:10px">Staged kernel</div>
       </div>
 
-      <!-- App ($2000-$DDFF) — contiguous -->
+      <!-- App loadable ($2000-$7FFF) — loaded by CLOADM -->
       <div class="region" id="app"
-           style="top:128px; height:760px; background:var(--app); color:var(--app-text);">
-        <div class="label">Application<br><span style="font-size:10px">$2000-$DDFF (contiguous, ~47K)</span></div>
+           style="top:128px; height:384px; background:var(--app); color:var(--app-text);">
+        <div class="label">Application (loadable)<br><span style="font-size:10px">$2000-$7FFF (~24K via CLOADM)</span></div>
+      </div>
+
+      <!-- Runtime data ($8000-$DDFF) — available after all-RAM -->
+      <div class="region" id="runtime"
+           style="top:512px; height:376px; background:#1a2a1a; color:#4a6a4a; border-top:1px dashed #444;">
+        <div class="label">Runtime data<br><span style="font-size:10px">$8000-$DDFF (~24K, not CLOADM-loadable)</span></div>
       </div>
 
       <!-- Stacks ($DE00-$DFFF) -->
@@ -335,15 +342,17 @@
       <div class="step-title">CLOADM loads DECB records</div>
       <div class="step-body">
         XRoar auto-types <code>CLOADM</code>. BASIC reads four DECB data
-        blocks into low RAM:
+        blocks into the lower 32K (the only RAM visible while ROM
+        occupies <code>$8000+</code>):
         variables at <code>$0050</code>,
         bootstrap at <code>$0E00</code>,
         staged kernel at <code>$1000</code>,
-        and the application at <code>$2000</code> (contiguous, no hole).
+        and the application at <code>$2000</code>.
         <br><br>
         The kernel was assembled at <code>$E000</code> but
         <code>fc.py</code> remapped it to <code>$1000</code> so BASIC
-        can load it (ROM is still at <code>$E000</code>).
+        can load it. App code is limited to ~24K (<code>$2000-$7FFF</code>)
+        by this CLOADM constraint.
       </div>
     </div>
     <div class="step-box" id="step2">
@@ -356,6 +365,8 @@
         <code class="asm">STA $FFDF</code> &mdash; set SAM TY bit: all-RAM mode<br>
         <br>
         ROM disappears. <code>$8000-$FEFF</code> is now writable RAM.
+        The <code>$8000-$DDFF</code> region becomes available for
+        runtime data (but was never loaded by CLOADM).
       </div>
     </div>
     <div class="step-box" id="step3">
@@ -415,7 +426,7 @@
 const steps = [
   // Step 0: power on
   () => {},
-  // Step 1: CLOADM loads records
+  // Step 1: CLOADM loads records (lower 32K only)
   () => {
     show('vars');
     show('bootstrap');
@@ -424,9 +435,10 @@ const steps = [
     for (const id of ['rec1','rec2','rec3','rec4'])
       document.getElementById(id).classList.add('loaded');
   },
-  // Step 2: bootstrap enables all-RAM — ROM disappears
+  // Step 2: bootstrap enables all-RAM — ROM disappears, upper RAM appears
   () => {
     hide('rom');
+    show('runtime');
     document.getElementById('rec-exec').classList.add('loaded');
   },
   // Step 3: copy $1000 → $E000
@@ -458,6 +470,7 @@ const undos = [
   },
   () => {
     show('rom');
+    hide('runtime');
     document.getElementById('rec-exec').classList.remove('loaded');
   },
   () => {
