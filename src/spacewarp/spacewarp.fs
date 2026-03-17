@@ -812,20 +812,31 @@ VARIABLE jblk
     1 jov-moved !
   THEN ;
 
+\ After any kill + explosion, do a full sprite refresh.
+\ The explosion and spr-erase-box corrupt bg-save buffers, so we must:
+\ 1. Redraw stars (fix black spots from erase/explosion)
+\ 2. Re-save all bg buffers from clean VRAM
+\ 3. Redraw all living sprites
+: refresh-after-kill  ( -- )
+  draw-stars
+  save-jov-oldpos
+  save-jov-bgs
+  draw-jovians-live
+  save-ship-bg
+  draw-ship ;
+
 \ Kill Jovian (index in jbg-i) — erase sprite, zero health, explode
-\ Uses spr-erase-box (not bg-restore) because gravity may have moved
-\ the Jovian since the last bg-save, making the saved bg stale.
 : jov-kill  ( -- )
   JOV-DMG jbg-i @ + C@ IF
-    JOV-POS jbg-i @ 2 * + C@
-    JOV-POS jbg-i @ 2 * + 1 + C@
     SPR-JOV
     JOV-POS jbg-i @ 2 * + C@ 3 -
     JOV-POS jbg-i @ 2 * + 1 + C@ 2 -
     spr-erase-box
     0 JOV-DMG jbg-i @ + C!
+    JOV-POS jbg-i @ 2 * + C@
+    JOV-POS jbg-i @ 2 * + 1 + C@
     explode-jovian
-    1 jov-moved !
+    refresh-after-kill
   THEN ;
 
 : jov-gravity  ( -- )
@@ -1411,11 +1422,11 @@ VARIABLE hc-jy
       JOV-DMG hc-i @ + C@
       maser-dmg - DUP 0 < IF DROP 0 THEN
       JOV-DMG hc-i @ + C!
-      \ If dead, erase sprite, explode, trigger sprite refresh
+      \ If dead, erase sprite, explode, full refresh
       JOV-DMG hc-i @ + C@ 0= IF
         SPR-JOV hc-jx @ 3 - hc-jy @ 2 - spr-erase-box
         hc-jx @ hc-jy @ explode-jovian
-        1 jov-moved !
+        refresh-after-kill
       THEN
     THEN
   THEN ;
@@ -1496,7 +1507,7 @@ VARIABLE msl-got                 \ hit flag
       JOV-DMG msl-hi @ + C@ IF
         JOV-POS msl-hi @ 2 * + C@ msl-scrx - abs 4 <
         JOV-POS msl-hi @ 2 * + 1 + C@ msl-scry - abs 4 < AND IF
-          \ Kill Jovian — erase sprite, explode, trigger sprite refresh
+          \ Kill Jovian — erase sprite, explode, full refresh
           0 JOV-DMG msl-hi @ + C!
           SPR-JOV
           JOV-POS msl-hi @ 2 * + C@ 3 -
@@ -1505,7 +1516,7 @@ VARIABLE msl-got                 \ hit flag
           JOV-POS msl-hi @ 2 * + C@
           JOV-POS msl-hi @ 2 * + 1 + C@
           explode-jovian
-          1 jov-moved !
+          refresh-after-kill
           1 msl-got !
         THEN
       THEN
