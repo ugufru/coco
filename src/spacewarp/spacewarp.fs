@@ -1546,7 +1546,46 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
 
 \ ── Command dispatch ───────────────────────────────────────────────────
 
+\ ── Hyperdrive (command 2) ─────────────────────────────────────────────
+\ Enter 2-digit destination: tens=col, ones=row.  e.g. 35 = col 3, row 5.
+\ Energy cost = 5 * Manhattan distance.  Damaged warp drive may mis-jump.
+
+: warp-cost  ( col row -- cost )
+  prow @ - abs SWAP pcol @ - abs + 5 * ;
+
+: do-warp  ( -- )
+  cmd-val @ 10 /MOD                  \ ( row col )
+  \ Validate coordinates
+  OVER 8 < OVER 8 < AND 0= IF DROP DROP EXIT THEN
+  \ Check if already there
+  OVER pcol @ = OVER prow @ = AND IF DROP DROP EXIT THEN
+  \ Calculate and pay energy cost
+  OVER OVER warp-cost
+  DUP penergy @ > IF DROP DROP DROP EXIT THEN   \ not enough energy
+  use-energy
+  \ Damaged warp: random chance of mis-jump (land in adjacent quadrant)
+  pdmg-warp @ 50 < IF
+    8 rnd 4 < IF                     \ 50% chance at <50% health
+      SWAP 1 + 7 AND SWAP            \ shift col by 1
+    THEN
+  THEN
+  \ Clear beams and missile
+  beam-drawn @ IF erase-beam 0 beam-drawn ! THEN
+  jbeam-drawn @ IF erase-jbeam 0 jbeam-drawn ! THEN
+  0 beam-timer !  0 jbeam-timer !
+  msl-active @ IF msl-erase 0 msl-active ! THEN
+  \ Expand new quadrant and redraw
+  rg-pcls
+  SWAP expand-quadrant
+  draw-quadrant
+  draw-panel
+  0 docked !  0 prev-docked !
+  0 jov-moved !
+  jbeam-cooldown jbeam-cool !
+  0 msl-dirty ! ;
+
 : exec-command  ( -- )
+  cmd-num @ 2 = IF do-warp THEN
   cmd-num @ 5 = IF cmd-val @ fire-maser THEN
   cmd-num @ 6 = IF cmd-val @ fire-missile THEN
   0 cmd-state !
