@@ -797,11 +797,12 @@ VARIABLE jbeam-y2
 VARIABLE jbeam-timer              \ frames remaining (0=none)
 VARIABLE jbeam-cool               \ frames until next fire allowed
 8 CONSTANT JBEAM-FRAMES           \ how long Jovian beam stays on screen
-15 CONSTANT JBEAM-DMG             \ energy damage to player per hit
+5 CONSTANT JBEAM-DMG              \ energy damage to player per hit
 
-\ Fire cooldown: 90 - (level * 8), min 18 frames
+\ Fire cooldown: 150 - (level * 14), min 24 frames
+\ Level 1: ~136 frames (2.3s), Level 5: ~80 frames (1.3s), Level 9: ~24 frames (0.4s)
 : jbeam-cooldown  ( -- n )
-  90 glevel @ 8 * - DUP 18 < IF DROP 18 THEN ;
+  150 glevel @ 14 * - DUP 24 < IF DROP 24 THEN ;
 
 : clamp-jbeam  ( -- )
   jbeam-x2 @ 1 < IF 1 jbeam-x2 ! THEN
