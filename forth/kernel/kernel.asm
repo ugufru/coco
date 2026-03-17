@@ -1,19 +1,72 @@
 ;;; forth/kernel/kernel.asm
 ;;;
-;;; CoCo Forth Executor Kernel — Hello World prototype
+;;; CoCo Forth Executor Kernel
 ;;; Assembled with lwasm (lwtools)
 ;;;
-;;; Register convention:
+;;; ─── Overview ──────────────────────────────────────────────────────────────
+;;;
+;;; A minimal ITC (Indirect Threaded Code) Forth executor for the TRS-80
+;;; Color Computer.  The kernel provides DOCOL/DOVAR inner interpreters,
+;;; a CFA table of primitive words, and a START routine that initialises
+;;; hardware and jumps to the application thread at APP_BASE ($2000).
+;;;
+;;; The application is cross-compiled by fc.py, which reads the kernel's
+;;; .map file to resolve CFA addresses automatically.
+;;;
+;;; ─── Memory layout ────────────────────────────────────────────────────────
+;;;
+;;; The kernel lives at $8000 in the CoCo's upper 32K, which is normally
+;;; occupied by BASIC ROMs.  The SAM's all-RAM mode ($FFDF) pages out the
+;;; ROMs so that RAM is readable/writable across the full 64K space
+;;; ($0000–$FEFF; $FF00–$FFFF is always I/O).
+;;;
+;;; Because BASIC's CLOADM runs before all-RAM mode is enabled, it cannot
+;;; load bytes directly to $8000 (still ROM at that point).  The solution:
+;;;
+;;;   1. lwasm assembles the kernel at ORG $8000 (final addresses).
+;;;   2. fc.py remaps the $8000 DECB record to $1000 (staging address).
+;;;   3. CLOADM loads the staged kernel to $1000 in low RAM.
+;;;   4. A bootstrap at $0E00 enables all-RAM mode, copies $1000→$8000,
+;;;      then JMPs to START.
+;;;
+;;; DECB record layout (combined binary):
+;;;
+;;;   Record  DECB addr  Content
+;;;   ------  ---------  -------
+;;;   1       $0050      Kernel variables (44 bytes)
+;;;   2       $0E00      Bootstrap (~25 bytes)
+;;;   3       $1000      Staged kernel (~1.1K, remapped from $8000)
+;;;   4       $2000      App part 1 (before VRAM hole)
+;;;   5       $5800      App part 2 (after VRAM hole, if --hole used)
+;;;   Exec    $0E00      Bootstrap entry point
+;;;
+;;; ─── SAM all-RAM mode ─────────────────────────────────────────────────────
+;;;
+;;; The MC6883/SN74LS783 SAM uses address-decoded write-only registers at
+;;; $FFC0–$FFDF.  Each pair is clear/set: even address clears the bit,
+;;; odd address sets it.  The TY (map type) bit is the last pair:
+;;;
+;;;   STA $FFDE  →  TY=0  (normal: ROM at $8000–$FEFF)
+;;;   STA $FFDF  →  TY=1  (all-RAM: RAM at $8000–$FEFF)
+;;;
+;;; The written data is irrelevant — only the address matters.
+;;; Requires 64K×1 DRAM chips (4164).  XRoar: use -ram 64.
+;;;
+;;; ─── Register convention ──────────────────────────────────────────────────
+;;;
 ;;;   X  IP  (instruction pointer into the thread)
 ;;;   U  DSP (data stack pointer, grows downward)
 ;;;   S  RSP (return stack pointer, grows downward)
 ;;;   Y  scratch (NEXT and primitives)
 ;;;   D  scratch accumulator (A = high byte, B = low byte)
 ;;;
-;;; Threading model: Indirect Threaded Code (ITC)
-;;;   - Each word has a Code Field Address (CFA): a 2-byte pointer to machine code
-;;;   - The thread is a sequence of CFA addresses
-;;;   - NEXT fetches the next CFA address, jumps through it
+;;; ─── Threading model ──────────────────────────────────────────────────────
+;;;
+;;; Indirect Threaded Code (ITC):
+;;;   - Each word has a Code Field Address (CFA): a 2-byte pointer to
+;;;     machine code.
+;;;   - The thread is a sequence of CFA addresses.
+;;;   - NEXT fetches the next CFA, jumps through it.
 ;;;
 ;;; NEXT (inlined at end of every primitive):
 ;;;     LDY  ,X++    ; fetch CFA address from thread, advance IP by 2
@@ -69,9 +122,37 @@ VAR_RGNROWS     FCB     8       ; rows to copy per glyph
 VAR_RGBPR       FCB     32      ; bytes per VRAM row
 VAR_RGROWH      FCB     10      ; row height for cy positioning (pixels)
 
+;;; ─── Bootstrap ──────────────────────────────────────────────────────────────
+;;; DECB exec address points here.  Runs once at load time, then never again.
+;;;
+;;; Sequence:
+;;;   1. Mask interrupts (no IRQ/FIRQ during setup).
+;;;   2. Enable all-RAM mode via SAM TY bit ($FFDF sets, $FFDE clears).
+;;;      After this, $8000–$FEFF is writable RAM; BASIC ROMs are gone.
+;;;   3. Word-copy the staged kernel from $1000 to $8000.
+;;;      The copy uses LDD/STD (2 bytes per iteration) with BLO, which
+;;;      handles odd kernel sizes safely (copies one extra byte at most).
+;;;   4. JMP START to initialise hardware and enter the Forth application.
+;;;
+;;; The bootstrap itself sits at $0E00, safely below the staged kernel
+;;; at $1000 and the application at $2000.
+
+        ORG     $0E00
+
+BOOTSTRAP
+        ORCC    #$50            ; mask IRQ/FIRQ
+        STA     $FFDF           ; all-RAM mode: $FFDF sets SAM TY bit
+        LDX     #$1000          ; source: staged kernel
+        LDY     #$8000          ; dest: final location
+BOOT_LP LDD     ,X++
+        STD     ,Y++
+        CMPY    #KERN_END
+        BLO     BOOT_LP
+        JMP     START
+
 ;;; ─── Kernel ──────────────────────────────────────────────────────────────────
 
-        ORG     $1000
+        ORG     $8000
 
 ;;; DOCOL — enter a colon definition
 ;;;   Called via JMP [,Y] where Y = address of the word's CFA.
@@ -904,18 +985,27 @@ QDUP_DONE
 CODE_HALT
         BRA     CODE_HALT
 
-;;; Initialize stacks, clear screen, start the inner interpreter.
-;;; The application thread is loaded separately at APP_BASE.
+;;; ─── START ─────────────────────────────────────────────────────────────────
+;;; Hardware initialisation and application entry.
+;;; Called by BOOTSTRAP after the kernel has been copied to $8000.
+;;; At this point all-RAM mode is active and interrupts are masked.
+;;;
+;;; Sets up:
+;;;   - Direct page register ($00)
+;;;   - Return stack at $8000 (grows down into $7FFE, below kernel)
+;;;   - Data stack at $7E00 (grows down)
+;;;   - PIA0 for bare-metal keyboard scanning
+;;;   - Text screen cleared to VDG spaces
+;;;   - Cursor position zeroed
+;;; Then enters the Forth application thread at APP_BASE via NEXT.
 
 APP_BASE EQU    $2000           ; application binary loaded here
 
 START
-        ORCC    #$50            ; mask IRQ and FIRQ
         CLRA
         TFR     A,DP            ; direct page register = $00
-        STA     $FFDE           ; ALL-RAM mode: page out BASIC ROMs
 
-        LDS     #$8000          ; RSP: first push lands at $7FFE
+        LDS     #$8000          ; RSP: first push lands at $7FFE (below kernel)
         LDU     #$7E00          ; DSP: first push lands at $7DFE
 
         ; ── PIA0 init (bare-metal keyboard scan) ─────────────────────────────
@@ -954,4 +1044,6 @@ CLR_LP  STB     ,X+
         LDY     ,X++
         JMP     [,Y]
 
-        END     START
+KERN_END                        ; end marker — bootstrap copies $8000..KERN_END-1
+
+        END     BOOTSTRAP       ; DECB exec address = BOOTSTRAP ($0E00)

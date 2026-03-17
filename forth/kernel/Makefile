@@ -19,7 +19,7 @@ $(BUILD):
 	mkdir -p $(BUILD)
 
 run: $(BUILD)/combined.bin
-	xroar -machine coco2bus \
+	xroar -machine coco2bus -ram 64 \
 	    -bas ~/.xroar/roms/bas12.rom \
 	    -extbas ~/.xroar/roms/extbas11.rom \
 	    -run $(BUILD)/combined.bin

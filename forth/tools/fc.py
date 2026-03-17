@@ -704,8 +704,25 @@ def main():
 
     if args.kernel_bin:
         # Combine kernel + app into one DECB binary.
-        # BASIC loads both blocks in a single CLOADM, then executes at START.
+        # BASIC loads both blocks in a single CLOADM, then executes bootstrap.
         kernel_records, exec_addr = read_decb(args.kernel_bin)
+
+        # Remap kernel records at $8000+ to staging address ($1000).
+        # The bootstrap code copies them to their final location at runtime.
+        KERNEL_STAGE_ADDR = 0x1000
+        staged_records = []
+        stage_cursor = KERNEL_STAGE_ADDR
+        for addr, payload in kernel_records:
+            if addr >= 0x8000:
+                staged_records.append((stage_cursor, payload))
+                stage_cursor += len(payload)
+            else:
+                staged_records.append((addr, payload))
+        kernel_records = staged_records
+
+        if stage_cursor > app_base:
+            sys.exit(f"fc.py: staged kernel ends at ${stage_cursor:04X}, "
+                     f"overlaps app base ${app_base:04X}")
         if hole_start is not None and hole_start > app_base:
             # Split app around hole: two DECB records, skip the hole
             hole_off = hole_start - app_base
