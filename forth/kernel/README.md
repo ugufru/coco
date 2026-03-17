@@ -146,9 +146,49 @@ processors where Forth fits naturally without compromise.
 
 ---
 
+## Boot sequence
+
+The kernel is assembled at `$8000` but BASIC's `CLOADM` can't write there
+(ROM is mapped at `$8000–$FEFF`).  A bootstrap solves this:
+
+1. `fc.py` remaps the kernel DECB record from `$8000` to `$1000` (staging).
+2. `CLOADM` loads five records into low RAM.
+3. The bootstrap at `$0E00` enables all-RAM mode (`STA $FFDF`) and copies
+   `$1000` → `$8000`.
+4. `JMP START` enters the kernel at its final location.
+
+**[Open the interactive boot animation](boot-animation.html)** for a visual
+step-by-step walkthrough.
+
+### DECB record layout
+
+| Record | Addr | Size | Content |
+|---|---|---|---|
+| 1 | `$0050` | 44 B | Kernel variables |
+| 2 | `$0E00` | ~25 B | Bootstrap |
+| 3 | `$1000` | ~1.1K | Staged kernel (remapped from `$8000`) |
+| 4 | `$2000` | 8K | App part 1 (before VRAM hole) |
+| 5 | `$5800` | ~6K | App part 2 (after VRAM hole) |
+| Exec | `$0E00` | — | Bootstrap entry point |
+
+### SAM all-RAM mode
+
+The MC6883 SAM uses address-decoded write-only register pairs
+(even = clear, odd = set):
+
+| Write to | Effect |
+|---|---|
+| `$FFDE` | TY=0 — normal (ROM at `$8000–$FEFF`) |
+| `$FFDF` | TY=1 — all-RAM (`$8000–$FEFF` = writable RAM) |
+
+The data written is irrelevant — only the address matters.
+Requires 64K×1 DRAM (4164 chips).  XRoar: use `-ram 64`.
+
+---
+
 ## Memory map
 
-### Kernel RAM ($0050–$007B)
+### Kernel variables ($0050–$007B)
 
 Scratch variables in low RAM, accessed via extended addressing. Zero ROM cost.
 
@@ -171,11 +211,8 @@ $0075  VAR_RG*          text rendering config (7 bytes, used by rg-char CODE wor
 $0000–$004F   direct page (reserved)
 $0050–$007B   kernel scratch variables (see above)
 $0400–$05FF   VDG text VRAM (32×16, Alpha mode only)
-$1000–$1012   DOCOL, DOVAR, entry points
-$1013–$1060   CFA table (39 entries × 2 bytes)
-$1061–$1432   primitive machine code + MATRIX2ASCII table
-$1433         START (DECB exec address)
-$1433–$1FFF   startup code + unused (~2.9K free for new primitives)
+$0E00–$0E18   bootstrap (copies staged kernel, enables all-RAM)
+$1000–$1471   staged kernel (DECB load addr; copied to $8000 at boot)
 $2000–$3FFF   application code part 1 (8K, before VRAM hole)
 $4000–$57FF   RG6 VRAM (6144 bytes, hole in app binary)
 $5800–$73FF   application code part 2 (continues after hole)
@@ -183,24 +220,31 @@ $7400–$75D8   font data (font-art.fs, ~472 bytes)
 $7600–$7774   game data: galaxy, sprites, AI (Space Warp)
 $7C00–$7CEF   sine table + pixel lookup tables
 $7E00         data stack base (U, grows downward)
-$8000         return stack init (S, grows down from $7FFF)
+$8000–$8012   DOCOL, DOVAR entry points (final location)
+$8013–$8060   CFA table (39 entries × 2 bytes)
+$8061–$8432   primitive machine code + MATRIX2ASCII table
+$8433–$8471   START: hardware init + app entry
+$8472         KERN_END (end of bootstrap copy range)
+$8472–$FEFF   free RAM (available for future kernel growth / static data)
+$FF00–$FFFF   I/O registers + hardware vectors (always mapped, never RAM)
 ```
 
-ROM is paged out at boot (`STA $FFDE`) giving full 64K RAM.
+All-RAM mode is enabled at boot (`STA $FFDF`), giving full 64K RAM from
+`$0000–$FEFF`.  `$FF00–$FFFF` is always I/O regardless of mode.
 
 ### Memory budget
 
 | Region | Size | Contents |
 |---|---|---|
-| Kernel ROM | ~1.1K | primitives, CFA table, keyboard matrix, startup |
-| Kernel free | ~2.9K | room for new primitives ($1433–$1FFF) |
-| App space | ~15K | Forth thread + CODE words ($2000–$3FFF + $5800–$73FF) |
-| VRAM | 6K | RG6 display ($4000–$57FF, hole in app binary) |
-| Font data | ~472B | artifact-safe glyphs ($7400–$75D8) |
-| Game data | ~384B | galaxy, sprites, AI ($7600–$7774) |
-| Tables | ~240B | sine, pixel LUTs ($7C00–$7CEF) |
-| Data stack | 512B | grows down from $7E00 |
-| Return stack | 512B | grows down from $8000 |
+| Kernel code | ~1.1K | primitives, CFA table, keyboard matrix, startup (`$8000–$8471`) |
+| Kernel growth | ~31K | free RAM above kernel (`$8472–$FEFF`) |
+| App space | ~15K | Forth thread + CODE words (`$2000–$3FFF` + `$5800–$73FF`) |
+| VRAM | 6K | RG6 display (`$4000–$57FF`, hole in app binary) |
+| Font data | ~472B | artifact-safe glyphs (`$7400–$75D8`) |
+| Game data | ~384B | galaxy, sprites, AI (`$7600–$7774`) |
+| Tables | ~240B | sine, pixel LUTs (`$7C00–$7CEF`) |
+| Data stack | 512B | grows down from `$7E00` |
+| Return stack | 512B | grows down from `$8000` (below kernel) |
 
 ---
 
@@ -234,11 +278,14 @@ python3 ../tools/fc.py myapp.fs \
     --kernel     build/kernel.map \
     --kernel-bin build/kernel.bin \
     --output     myapp.bin
-xroar -machine coco2bus \
+xroar -machine coco2bus -ram 64 \
     -bas ~/.xroar/roms/bas12.rom \
     -extbas ~/.xroar/roms/extbas11.rom \
     -run myapp.bin
 ```
+
+The `-ram 64` flag is required — the kernel uses all-RAM mode to run from
+`$8000`.
 
 ## Testing with XRoar
 

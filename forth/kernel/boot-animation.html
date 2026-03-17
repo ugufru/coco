@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CoCo Kernel Boot Sequence</title>
+<style>
+  :root {
+    --bg: #111;
+    --panel: #1a1a2e;
+    --border: #333;
+    --text: #ccc;
+    --dim: #666;
+    --rom: #4a2040;
+    --rom-text: #d48cb8;
+    --io: #2a2a40;
+    --io-text: #8888cc;
+    --ram-empty: #1a2a1a;
+    --kernel-staged: #2d4a1a;
+    --kernel-final: #1a6a2a;
+    --kernel-text: #6f6;
+    --bootstrap: #4a3a1a;
+    --bootstrap-text: #da3;
+    --vars: #1a3a4a;
+    --vars-text: #5be;
+    --app1: #1a1a4a;
+    --app1-text: #88f;
+    --app2: #2a1a4a;
+    --app2-text: #a8f;
+    --vram: #4a1a1a;
+    --vram-text: #f66;
+    --data: #3a2a1a;
+    --data-text: #da5;
+    --copy-arrow: #6f6;
+    --highlight: #ff0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+    font-size: 13px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  h1 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #eee;
+  }
+  .subtitle {
+    font-size: 12px;
+    color: var(--dim);
+    margin-bottom: 20px;
+  }
+  .container {
+    display: flex;
+    gap: 32px;
+    align-items: flex-start;
+  }
+
+  /* ── Memory map column ──────────────────────────────── */
+  .memmap {
+    position: relative;
+    width: 220px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    /* Total height represents $0000-$FFFF. 1px = 64 bytes */
+    height: 1024px;
+    background: var(--ram-empty);
+    flex-shrink: 0;
+  }
+  .region {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 500;
+    opacity: 0;
+    transition: opacity 0.6s ease, background-color 0.6s ease;
+    overflow: hidden;
+    z-index: 1;
+  }
+  .region.visible { opacity: 1; }
+  .region .label {
+    text-align: center;
+    line-height: 1.2;
+    padding: 2px 4px;
+    white-space: nowrap;
+  }
+
+  /* Address labels along left edge */
+  .addr-label {
+    position: absolute;
+    left: -54px;
+    font-size: 10px;
+    color: var(--dim);
+    transform: translateY(-50%);
+    z-index: 2;
+  }
+
+  .memmap-wrap {
+    position: relative;
+    padding-left: 56px;
+  }
+
+  /* ── Copy arrow overlay ──────────────────────────────── */
+  .copy-arrow {
+    position: absolute;
+    left: 226px;
+    width: 60px;
+    z-index: 5;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  .copy-arrow.visible { opacity: 1; }
+  .copy-arrow svg { width: 60px; overflow: visible; }
+
+  /* ── Narrative panel ──────────────────────────────────── */
+  .narrative {
+    width: 380px;
+    flex-shrink: 0;
+  }
+  .step-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin-bottom: 12px;
+    opacity: 0.25;
+    transition: opacity 0.4s ease, border-color 0.4s ease;
+  }
+  .step-box.active {
+    opacity: 1;
+    border-color: #555;
+  }
+  .step-box.done {
+    opacity: 0.45;
+  }
+  .step-num {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--dim);
+    margin-bottom: 6px;
+  }
+  .step-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #eee;
+    margin-bottom: 6px;
+  }
+  .step-body {
+    font-size: 12px;
+    line-height: 1.5;
+    color: #aaa;
+  }
+  .step-body code {
+    background: #222;
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: #ddd;
+    font-size: 11px;
+  }
+  .asm {
+    color: var(--kernel-text);
+  }
+
+  /* ── Controls ───────────────────────────────────────── */
+  .controls {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+    align-items: center;
+  }
+  button {
+    background: #2a2a3e;
+    color: #ccc;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 8px 20px;
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  button:hover { background: #3a3a5e; }
+  button:disabled { opacity: 0.3; cursor: default; }
+  .step-indicator {
+    color: var(--dim);
+    font-size: 12px;
+    min-width: 80px;
+    text-align: center;
+  }
+
+  /* ── DECB table ─────────────────────────────────────── */
+  .decb-table {
+    margin-top: 20px;
+    width: 100%;
+    max-width: 660px;
+  }
+  .decb-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+  .decb-table th {
+    text-align: left;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border);
+    color: var(--dim);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 10px;
+  }
+  .decb-table td {
+    padding: 4px 8px;
+    border-bottom: 1px solid #222;
+    color: #888;
+    transition: color 0.4s;
+  }
+  .decb-table tr.loaded td {
+    color: #ccc;
+  }
+  .decb-table tr.loading td {
+    color: #fff;
+  }
+</style>
+</head>
+<body>
+
+<h1>CoCo Kernel Boot Sequence</h1>
+<div class="subtitle">How the Forth kernel gets from a DECB binary to running code at $8000</div>
+
+<div class="container">
+
+  <!-- Memory map -->
+  <div class="memmap-wrap">
+    <!-- Address labels -->
+    <div class="addr-label" style="top: 0px;">$0000</div>
+    <div class="addr-label" style="top: 5px;">$0050</div>
+    <div class="addr-label" style="top: 56px;">$0E00</div>
+    <div class="addr-label" style="top: 64px;">$1000</div>
+    <div class="addr-label" style="top: 128px;">$2000</div>
+    <div class="addr-label" style="top: 256px;">$4000</div>
+    <div class="addr-label" style="top: 352px;">$5800</div>
+    <div class="addr-label" style="top: 464px;">$7400</div>
+    <div class="addr-label" style="top: 496px;">$7E00</div>
+    <div class="addr-label" style="top: 512px;">$8000</div>
+    <div class="addr-label" style="top: 896px;">$FF00</div>
+    <div class="addr-label" style="top: 1020px;">$FFFF</div>
+
+    <div class="memmap">
+      <!-- ROM region ($8000-$FEFF) — shown at power-on -->
+      <div class="region visible" id="rom"
+           style="top:512px; height:384px; background:var(--rom); color:var(--rom-text);">
+        <div class="label">BASIC ROM<br><span style="font-size:10px">$8000-$FEFF</span></div>
+      </div>
+
+      <!-- I/O ($FF00-$FFFF) — always present -->
+      <div class="region visible" id="io"
+           style="top:896px; height:128px; background:var(--io); color:var(--io-text);">
+        <div class="label">I/O + Vectors<br><span style="font-size:10px">$FF00-$FFFF</span></div>
+      </div>
+
+      <!-- Variables ($0050) -->
+      <div class="region" id="vars"
+           style="top:5px; height:4px; background:var(--vars); color:var(--vars-text);">
+      </div>
+
+      <!-- Bootstrap ($0E00) -->
+      <div class="region" id="bootstrap"
+           style="top:56px; height:3px; background:var(--bootstrap); color:var(--bootstrap-text);">
+      </div>
+
+      <!-- Staged kernel ($1000) -->
+      <div class="region" id="staged"
+           style="top:64px; height:18px; background:var(--kernel-staged); color:var(--kernel-text);">
+        <div class="label" style="font-size:10px">Staged kernel</div>
+      </div>
+
+      <!-- App part 1 ($2000-$3FFF) -->
+      <div class="region" id="app1"
+           style="top:128px; height:128px; background:var(--app1); color:var(--app1-text);">
+        <div class="label">App part 1<br><span style="font-size:10px">$2000-$3FFF</span></div>
+      </div>
+
+      <!-- VRAM ($4000-$57FF) — always present as reserved -->
+      <div class="region visible" id="vram"
+           style="top:256px; height:96px; background:var(--vram); color:var(--vram-text);">
+        <div class="label">VRAM<br><span style="font-size:10px">$4000-$57FF</span></div>
+      </div>
+
+      <!-- App part 2 ($5800-$6FF7) -->
+      <div class="region" id="app2"
+           style="top:352px; height:96px; background:var(--app2); color:var(--app2-text);">
+        <div class="label">App part 2<br><span style="font-size:10px">$5800+</span></div>
+      </div>
+
+      <!-- Data / font / tables ($7400-$7DFF) -->
+      <div class="region" id="tables"
+           style="top:464px; height:40px; background:var(--data); color:var(--data-text);">
+        <div class="label" style="font-size:10px">Font + Tables + Stack</div>
+      </div>
+
+      <!-- Kernel final ($8000) — appears after copy -->
+      <div class="region" id="kernel-final"
+           style="top:512px; height:18px; background:var(--kernel-final); color:var(--kernel-text); z-index:2;">
+        <div class="label" style="font-size:10px">Kernel (final)</div>
+      </div>
+
+      <!-- "RAM" label for cleared ROM area -->
+      <div class="region" id="ram-upper"
+           style="top:530px; height:366px; background:var(--ram-empty); color:#3a5a3a; z-index:0;">
+        <div class="label">RAM (free)<br><span style="font-size:10px">$8472-$FEFF</span></div>
+      </div>
+    </div>
+
+    <!-- Copy arrow (SVG) -->
+    <div class="copy-arrow" id="copy-arrow" style="top: 64px;">
+      <svg viewBox="0 0 60 460" height="460">
+        <defs>
+          <marker id="arrowhead" markerWidth="8" markerHeight="6"
+                  refX="8" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="var(--copy-arrow)"/>
+          </marker>
+        </defs>
+        <path d="M 5,0 C 40,0 40,448 5,448"
+              fill="none" stroke="var(--copy-arrow)" stroke-width="2"
+              stroke-dasharray="6,4" marker-end="url(#arrowhead)"
+              id="copy-path"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Narrative -->
+  <div class="narrative">
+    <div class="step-box active" id="step0">
+      <div class="step-num">Power On</div>
+      <div class="step-title">ROM occupies upper 32K</div>
+      <div class="step-body">
+        At power-on, the SAM maps BASIC ROM to <code>$8000-$FEFF</code>.
+        The lower 32K is RAM. BASIC starts and waits for commands.
+        <code>$FF00-$FFFF</code> is always I/O (PIA, SAM, vectors).
+      </div>
+    </div>
+    <div class="step-box" id="step1">
+      <div class="step-num">Step 1</div>
+      <div class="step-title">CLOADM loads DECB records</div>
+      <div class="step-body">
+        XRoar auto-types <code>CLOADM</code>. BASIC reads five DECB data
+        blocks into low RAM:
+        variables at <code>$0050</code>,
+        bootstrap at <code>$0E00</code>,
+        staged kernel at <code>$1000</code>,
+        app at <code>$2000</code> and <code>$5800</code>.
+        <br><br>
+        The kernel was assembled at <code>$8000</code> but
+        <code>fc.py</code> remapped it to <code>$1000</code> so BASIC
+        can load it (ROM is still at <code>$8000</code>).
+      </div>
+    </div>
+    <div class="step-box" id="step2">
+      <div class="step-num">Step 2</div>
+      <div class="step-title">Bootstrap enables all-RAM</div>
+      <div class="step-body">
+        CLOADM jumps to the exec address <code>$0E00</code> (bootstrap).
+        <br><br>
+        <code class="asm">ORCC #$50</code> &mdash; mask interrupts<br>
+        <code class="asm">STA $FFDF</code> &mdash; set SAM TY bit: all-RAM mode<br>
+        <br>
+        ROM disappears. <code>$8000-$FEFF</code> is now writable RAM.
+      </div>
+    </div>
+    <div class="step-box" id="step3">
+      <div class="step-num">Step 3</div>
+      <div class="step-title">Copy $1000 &rarr; $8000</div>
+      <div class="step-body">
+        The bootstrap copies the staged kernel to its final location:
+        <br><br>
+        <code class="asm">LDX #$1000</code> &mdash; source<br>
+        <code class="asm">LDY #$8000</code> &mdash; destination<br>
+        <code class="asm">LDD ,X++ / STD ,Y++</code> &mdash; word copy loop<br>
+        <code class="asm">CMPY #KERN_END / BLO</code><br>
+        <br>
+        ~1.1K copied in ~570 iterations.
+      </div>
+    </div>
+    <div class="step-box" id="step4">
+      <div class="step-num">Step 4</div>
+      <div class="step-title">JMP START &mdash; kernel runs</div>
+      <div class="step-body">
+        <code class="asm">JMP START</code> ($8433) &mdash;
+        the kernel initialises PIA, clears the screen, sets up stacks
+        (<code>S=$8000</code>, <code>U=$7E00</code>), and enters the
+        Forth application thread at <code>$2000</code> via NEXT.
+        <br><br>
+        The staged copy at <code>$1000</code> is now dead weight &mdash;
+        free to be reclaimed if needed.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="controls">
+  <button id="btn-prev" disabled>&larr; Prev</button>
+  <div class="step-indicator" id="indicator">0 / 4</div>
+  <button id="btn-next">Next &rarr;</button>
+  <button id="btn-auto" style="margin-left:12px">&#9654; Auto</button>
+</div>
+
+<div class="decb-table">
+  <table>
+    <tr>
+      <th>Record</th><th>DECB addr</th><th>Size</th><th>Content</th>
+    </tr>
+    <tr id="rec1"><td>1</td><td>$0050</td><td>44 B</td><td>Kernel variables</td></tr>
+    <tr id="rec2"><td>2</td><td>$0E00</td><td>~25 B</td><td>Bootstrap</td></tr>
+    <tr id="rec3"><td>3</td><td>$1000</td><td>~1.1K</td><td>Staged kernel (remapped from $8000)</td></tr>
+    <tr id="rec4"><td>4</td><td>$2000</td><td>8K</td><td>App part 1 (before VRAM hole)</td></tr>
+    <tr id="rec5"><td>5</td><td>$5800</td><td>~6K</td><td>App part 2 (after VRAM hole)</td></tr>
+    <tr id="rec-exec"><td>Exec</td><td>$0E00</td><td>&mdash;</td><td>Bootstrap entry point</td></tr>
+  </table>
+</div>
+
+<script>
+const steps = [
+  // Step 0: power on (initial state)
+  () => {},
+  // Step 1: CLOADM loads records
+  () => {
+    show('vars');
+    show('bootstrap');
+    show('staged');
+    show('app1');
+    show('app2');
+    show('tables');
+    // highlight DECB rows
+    for (const id of ['rec1','rec2','rec3','rec4','rec5']) {
+      document.getElementById(id).classList.add('loaded');
+    }
+  },
+  // Step 2: bootstrap enables all-RAM — ROM disappears
+  () => {
+    hide('rom');
+    document.getElementById('rec-exec').classList.add('loaded');
+  },
+  // Step 3: copy $1000 → $8000
+  () => {
+    document.getElementById('copy-arrow').classList.add('visible');
+    show('kernel-final');
+    show('ram-upper');
+    // dim the staged kernel
+    const staged = document.getElementById('staged');
+    staged.style.opacity = '0.35';
+  },
+  // Step 4: JMP START — kernel runs
+  () => {
+    document.getElementById('copy-arrow').classList.remove('visible');
+    // brighten kernel-final
+    const kf = document.getElementById('kernel-final');
+    kf.style.boxShadow = '0 0 12px rgba(100,255,100,0.3)';
+    // dim bootstrap
+    const bs = document.getElementById('bootstrap');
+    bs.style.opacity = '0.35';
+  }
+];
+
+// ── Undo functions (for going backwards) ──
+const undos = [
+  () => {},
+  () => {
+    hide('vars'); hide('bootstrap'); hide('staged');
+    hide('app1'); hide('app2'); hide('tables');
+    for (const id of ['rec1','rec2','rec3','rec4','rec5']) {
+      document.getElementById(id).classList.remove('loaded');
+    }
+  },
+  () => {
+    show('rom');
+    document.getElementById('rec-exec').classList.remove('loaded');
+  },
+  () => {
+    document.getElementById('copy-arrow').classList.remove('visible');
+    hide('kernel-final'); hide('ram-upper');
+    document.getElementById('staged').style.opacity = '';
+  },
+  () => {
+    document.getElementById('kernel-final').style.boxShadow = '';
+    document.getElementById('bootstrap').style.opacity = '';
+  }
+];
+
+function show(id) { document.getElementById(id).classList.add('visible'); }
+function hide(id) { document.getElementById(id).classList.remove('visible'); }
+
+let current = 0;
+const total = steps.length - 1;
+
+function updateUI() {
+  document.getElementById('indicator').textContent = `${current} / ${total}`;
+  document.getElementById('btn-prev').disabled = current === 0;
+  document.getElementById('btn-next').disabled = current === total;
+  // Step box highlighting
+  for (let i = 0; i <= total; i++) {
+    const box = document.getElementById('step' + i);
+    box.classList.remove('active', 'done');
+    if (i === current) box.classList.add('active');
+    else if (i < current) box.classList.add('done');
+  }
+}
+
+function goTo(n) {
+  if (n > current) {
+    while (current < n) { current++; steps[current](); }
+  } else if (n < current) {
+    while (current > n) { undos[current](); current--; }
+  }
+  updateUI();
+}
+
+document.getElementById('btn-next').onclick = () => {
+  if (current < total) goTo(current + 1);
+};
+document.getElementById('btn-prev').onclick = () => {
+  if (current > 0) goTo(current - 1);
+};
+
+let autoTimer = null;
+document.getElementById('btn-auto').onclick = function() {
+  if (autoTimer) {
+    clearInterval(autoTimer);
+    autoTimer = null;
+    this.textContent = '\u25B6 Auto';
+    return;
+  }
+  if (current === total) goTo(0);
+  this.textContent = '\u23F8 Pause';
+  autoTimer = setInterval(() => {
+    if (current < total) {
+      goTo(current + 1);
+    } else {
+      clearInterval(autoTimer);
+      autoTimer = null;
+      document.getElementById('btn-auto').textContent = '\u25B6 Auto';
+    }
+  }, 2000);
+};
+
+// Keyboard navigation
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight' || e.key === ' ') {
+    e.preventDefault();
+    if (current < total) goTo(current + 1);
+  } else if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    if (current > 0) goTo(current - 1);
+  }
+});
+
+updateUI();
+</script>
+
+</body>
+</html>
