@@ -811,11 +811,14 @@ VARIABLE jblk
 \ Kill Jovian (index in jbg-i) — restore bg, zero health
 : jov-kill  ( -- )
   JOV-DMG jbg-i @ + C@ IF
+    JOV-POS jbg-i @ 2 * + C@
+    JOV-POS jbg-i @ 2 * + 1 + C@
     jbg-i @ jov-bg
     JOV-POS jbg-i @ 2 * + C@ 3 -
     JOV-POS jbg-i @ 2 * + 1 + C@ 2 -
     bg-restore
     0 JOV-DMG jbg-i @ + C!
+    explode-jovian
   THEN ;
 
 : jov-gravity  ( -- )
@@ -855,6 +858,49 @@ VARIABLE jblk
       THEN
     THEN
   LOOP ;
+
+\ ── Explosion effects ────────────────────────────────────────────────
+\ Scatter random colored dots in a radius, hold, erase.  Uses a buffer
+\ at $7D00 for up to 40 (x,y) pairs = 80 bytes.  Clamped to screen.
+\ Sizes: Jovian=4px/12dots, Endever=8px/20dots, Base=12px/30dots,
+\ Self-destruct=20px/40dots.
+
+$7D00 CONSTANT EXPLBUF               \ explosion dot buffer (x,y pairs)
+VARIABLE expl-cx                      \ explosion center x
+VARIABLE expl-cy                      \ explosion center y
+VARIABLE expl-count                   \ number of dots
+
+\ Generate random dot within radius, clamped to tactical view
+: expl-dot  ( radius -- x y )
+  DUP 2 * rnd OVER -                \ random offset -radius..+radius
+  expl-cx @ + DUP 1 < IF DROP 1 THEN DUP 126 > IF DROP 126 THEN
+  SWAP
+  DUP 2 * rnd OVER -
+  expl-cy @ + DUP 1 < IF DROP 1 THEN DUP 142 > IF DROP 142 THEN ;
+
+\ Fill explosion buffer with random dots
+: gen-explosion  ( cx cy radius count -- )
+  expl-count !
+  SWAP expl-cy !  expl-cx !
+  expl-count @ 0 DO
+    DUP expl-dot                     \ ( radius x y )
+    EXPLBUF I 2 * + 1 + C!          \ store y
+    EXPLBUF I 2 * + C!              \ store x
+  LOOP DROP ;
+
+\ Animate: draw white, hold, draw red, hold, erase
+: show-explosion  ( -- )
+  EXPLBUF expl-count @ 3 plot-dots    \ white burst
+  VSYNC VSYNC VSYNC VSYNC
+  EXPLBUF expl-count @ 2 plot-dots    \ red fade
+  VSYNC VSYNC VSYNC VSYNC
+  EXPLBUF expl-count @ 0 plot-dots ;  \ erase to black
+
+\ Convenience words for each explosion size
+: explode-jovian  ( x y -- )  4 12 gen-explosion show-explosion ;
+: explode-ship    ( x y -- )  8 20 gen-explosion show-explosion ;
+: explode-base    ( x y -- )  12 30 gen-explosion show-explosion ;
+: explode-destruct ( x y -- )  20 40 gen-explosion show-explosion ;
 
 \ ── Jovian beam fire ──────────────────────────────────────────────────
 \ One red beam at a time, from a random living Jovian toward the player.
@@ -1356,11 +1402,12 @@ VARIABLE hc-jy
       JOV-DMG hc-i @ + C@
       maser-dmg - DUP 0 < IF DROP 0 THEN
       JOV-DMG hc-i @ + C!
-      \ If dead, restore background under sprite
+      \ If dead, restore background and explode
       JOV-DMG hc-i @ + C@ 0= IF
         hc-i @ jov-bg
         hc-jx @ 3 - hc-jy @ 2 -
         bg-restore
+        hc-jx @ hc-jy @ explode-jovian
       THEN
     THEN
   THEN ;
@@ -1441,12 +1488,15 @@ VARIABLE msl-got                 \ hit flag
       JOV-DMG msl-hi @ + C@ IF
         JOV-POS msl-hi @ 2 * + C@ msl-scrx - abs 4 <
         JOV-POS msl-hi @ 2 * + 1 + C@ msl-scry - abs 4 < AND IF
-          \ Kill Jovian — restore background under sprite
+          \ Kill Jovian — restore background and explode
           0 JOV-DMG msl-hi @ + C!
           msl-hi @ jov-bg
           JOV-POS msl-hi @ 2 * + C@ 3 -
           JOV-POS msl-hi @ 2 * + 1 + C@ 2 -
           bg-restore
+          JOV-POS msl-hi @ 2 * + C@
+          JOV-POS msl-hi @ 2 * + 1 + C@
+          explode-jovian
           1 msl-got !
         THEN
       THEN
@@ -1712,15 +1762,19 @@ VARIABLE prev-key                 \ last key seen by KEY?
       update-cond
     THEN
     penergy @ 0= IF
+      SHIP-POS C@ SHIP-POS 1 + C@
       death-cause @ IF
-        \ Black hole — ship vanishes cleanly
+        \ Black hole — ship vanishes, no explosion
         restore-ship-bg
+        DROP DROP
         0 17 at-xy
         CHAR B rg-emit CHAR L rg-emit CHAR A rg-emit CHAR C rg-emit
         CHAR K rg-emit  $20 rg-emit
         CHAR H rg-emit CHAR O rg-emit CHAR L rg-emit CHAR E rg-emit
       ELSE
-        \ Energy depleted or star collision
+        \ Energy depleted or star collision — ship explodes
+        restore-ship-bg
+        explode-ship
         0 17 at-xy
         CHAR D rg-emit CHAR E rg-emit CHAR S rg-emit CHAR T rg-emit
         CHAR R rg-emit CHAR O rg-emit CHAR Y rg-emit CHAR E rg-emit
