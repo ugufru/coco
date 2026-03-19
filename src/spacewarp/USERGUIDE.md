@@ -74,7 +74,7 @@ ENERGY  68%  MISSILES  5    CONDITION GREEN
 | Line from ship | Blue | Maser beam |  |
 | Ball | Blue | Triton missile | * |
 | Line from enemy | Red | Jovian weapons fire |  |
-| Burst pattern | Red | Explosion |  |
+| Expanding ring | White→Red→Blue | Explosion |  |
 
 Black holes are invisible. You only discover them when a weapon shot vanishes
 into empty space, or when you fly into one (which destroys you instantly).
@@ -118,8 +118,12 @@ Press any key to return to the tactical view.
 Press **2**, then enter a two-digit destination: column (0-7) then row (0-7).
 The Endever warps instantly to the new quadrant, arriving at a random position.
 
-Hyperdrive consumes energy proportional to distance traveled. If hyperdrive
-is heavily damaged, the warp may fail or send you to the wrong quadrant.
+Hyperdrive consumes energy based on distance (Manhattan distance × 2, max 10
+energy per jump). If hyperdrive is heavily damaged, the warp may fail or send
+you to the wrong quadrant.
+
+You always arrive at a safe position — the ship will never spawn inside an
+inescapable gravity well.
 
 ### 3 — Long Range Scan
 
@@ -185,10 +189,14 @@ Press **5**, then enter a firing angle from 0 to 360 degrees:
 - **180** — fire to the left
 - **270** — fire downward
 
-The maser beam appears as a visible blue line streaking from the Endever
-across the tactical view. If it hits a Jovian ship, damage is dealt based on
-distance (closer = more damage) and your shield level (higher shields = weaker
-masers).
+The maser beam appears as a visible blue bolt streaking from the Endever
+across the tactical view. The bolt travels along its path and stops at the
+first obstacle — a Jovian, a star, or any other object in the way. **Masers
+cannot fire through obstacles.** If a star is between you and a Jovian, you
+need a clear line of sight.
+
+If the bolt hits a Jovian ship, damage is dealt based on distance (closer =
+more damage) and your shield level (higher shields = weaker masers).
 
 Masers do not destroy in one hit — it typically takes 2-4 shots depending on
 range and shields. Masers consume ship energy with each shot.
@@ -201,10 +209,10 @@ Press **6**, then enter a firing angle from 0 to 360 degrees (same compass as
 masers).
 
 Triton missiles are your heavy weapon: **one hit, one kill** at any range. The
-missile is a red energy ball that moves from the Endever to the target.
+missile is a blue energy ball that moves from the Endever to the target.
 
 But they're scarce. You start with 10 and can only get more by docking at a
-base. Triton missiles are blocked by stars and black holes — if the flight
+base. Triton missiles are blocked by stars and other obstacles — if the flight
 path intersects an obstacle, the missile detonates harmlessly.
 
 Use them when you can't afford to miss, or when a target is too far for
@@ -212,16 +220,23 @@ effective maser fire.
 
 ### 7 — Self-Destruct
 
-Press **7**. You will be asked to confirm with the code **123** followed by
-ENTER. 
+Press **7**, then enter the code **123** and press ENTER.
 
-Self-destruct destroys the Endever and every Jovian ship in the current
-quadrant. This is a last resort — useful only when you're surrounded and
-doomed, and taking the enemy with you is better than letting them survive to
-attack more bases.
+A countdown begins: **5… 4… 3… 2… 1…** displayed in the command area. The
+countdown runs in real time — **the game continues** during the countdown.
+You can move, fire, dodge enemy beams. Each count lasts about half a second.
 
-The game ends after self-destruct. Your score reflects whatever you
-accomplished before triggering it.
+**To abort**, type **7123** during the countdown. The display shows **ABORT**
+and the self-destruct is cancelled.
+
+If the countdown reaches zero, the Endever detonates in a massive explosion.
+Any Jovian within range takes 200 damage — enough to destroy even a
+full-health ship. Proximity-killed Jovians chain-explode in sequence.
+
+This is a last resort — useful when you're surrounded and doomed, and taking
+the enemy with you is better than letting them survive to attack more bases.
+
+The game ends after self-destruct.
 
 ### Arrow Keys — Ion Engines
 
@@ -278,7 +293,7 @@ quadrant has a base, nearby Jovians will attempt to move into that quadrant.
 Black holes are invisible. They occupy a position in the quadrant but nothing
 appears on the tactical display. You discover them when:
 
-- A maser beam or triton missile disappears into empty space
+- A maser beam or triton missile stops short, hitting something invisible
 - You feel your ship being pulled off course by an unseen force
 - You fly into one (instant destruction — the Endever vanishes without a trace)
 

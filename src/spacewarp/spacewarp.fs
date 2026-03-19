@@ -15,6 +15,9 @@ INCLUDE ../../forth/lib/rng.fs
 INCLUDE ../../forth/lib/font-art.fs
 INCLUDE ../../forth/lib/rg-text.fs
 INCLUDE ../../forth/lib/keyboard.fs
+INCLUDE ../../forth/lib/beam.fs
+
+: min  ( a b -- smaller )  OVER OVER > IF SWAP THEN DROP ;
 
 \ ── Bulk pixel plotter (assembly) ───────────────────────────────────────
 \ plot-dots ( addr count color -- )
@@ -377,8 +380,28 @@ VARIABLE gq-tmp                \ temp for building quadrant byte
   THEN
 
   \ Place ship at center
-  64 SHIP-POS C!
-  72 SHIP-POS 1 + C! ;
+  64 SHIP-POS C!  72 SHIP-POS 1 + C! ;
+
+VARIABLE ss-safe
+
+\ Relocate ship if too close to stars or black hole
+: safe-spawn  ( -- )
+  16 0 DO
+    1 ss-safe !
+    qstars @ ?DUP IF 0 DO
+      SHIP-POS C@ STAR-POS I 2 * + C@ - abs
+      SHIP-POS 1 + C@ STAR-POS I 2 * + 1 + C@ - abs +
+      35 < IF 0 ss-safe ! THEN
+    LOOP THEN
+    qbhole @ IF
+      SHIP-POS C@ BHOLE-POS C@ - abs
+      SHIP-POS 1 + C@ BHOLE-POS 1 + C@ - abs +
+      35 < IF 0 ss-safe ! THEN
+    THEN
+    ss-safe @ 0= IF
+      rnd-x SHIP-POS C!  rnd-y SHIP-POS 1 + C!
+    THEN
+  LOOP ;
 
 \ ── init-player ( -- ) ───────────────────────────────────────────────────
 
@@ -438,15 +461,14 @@ VARIABLE tcy
 : draw-cond  ( end-col -- )
   docked @ IF
     6 - tcx !
-    CHAR D rg-emit CHAR O rg-emit CHAR C rg-emit
-    CHAR K rg-emit CHAR E rg-emit CHAR D rg-emit
+    S" DOCKED" rg-type
   ELSE
     qjovians @ IF
       3 - tcx !
-      CHAR R rg-emit CHAR E rg-emit CHAR D rg-emit
+      S" RED" rg-type
     ELSE
       5 - tcx !
-      CHAR G rg-emit CHAR R rg-emit CHAR E rg-emit CHAR E rg-emit CHAR N rg-emit
+      S" GREEN" rg-type
     THEN
   THEN ;
 
@@ -458,49 +480,41 @@ VARIABLE tcy
 
   \ Row 15: STARDATE      n  MISSILES      nn
   0 15 at-xy
-  CHAR S rg-emit CHAR T rg-emit CHAR A rg-emit CHAR R rg-emit
-  CHAR D rg-emit CHAR A rg-emit CHAR T rg-emit CHAR E rg-emit
+  S" STARDATE" rg-type
   gtime @ 14 rg-u.r
 
   17 15 at-xy
-  CHAR M rg-emit CHAR I rg-emit CHAR S rg-emit CHAR S rg-emit
-  CHAR I rg-emit CHAR L rg-emit CHAR E rg-emit CHAR S rg-emit
+  S" MISSILES" rg-type
   pmissiles @ 32 rg-u.r
 
   \ Row 16: QUADRANT    n n  ENERGY       nnn
   0 16 at-xy
-  CHAR Q rg-emit CHAR U rg-emit CHAR A rg-emit CHAR D rg-emit
-  CHAR R rg-emit CHAR A rg-emit CHAR N rg-emit CHAR T rg-emit
+  S" QUADRANT" rg-type
   11 16 at-xy  pcol @ rg-u.  CHAR , rg-emit  prow @ rg-u.
 
   17 16 at-xy
-  CHAR E rg-emit CHAR N rg-emit CHAR E rg-emit CHAR R rg-emit
-  CHAR G rg-emit CHAR Y rg-emit
+  S" ENERGY" rg-type
   penergy @ 32 rg-u.r
 
   \ Row 17: COND/SOS left, SHIELDS right
   sos-active @ IF
     0 17 at-xy
-    CHAR S rg-emit CHAR O rg-emit CHAR S rg-emit
-    CHAR - rg-emit CHAR B rg-emit CHAR A rg-emit
-    CHAR S rg-emit CHAR E rg-emit
+    S" SOS-BASE" rg-type
     11 17 at-xy
     sos-col @ rg-u.  CHAR , rg-emit  sos-row @ rg-u.
   ELSE
     0 17 at-xy
-    CHAR C rg-emit CHAR O rg-emit CHAR N rg-emit CHAR D rg-emit
+    S" COND" rg-type
     14 draw-cond
   THEN
 
   17 17 at-xy
-  CHAR S rg-emit CHAR H rg-emit CHAR I rg-emit CHAR E rg-emit
-  CHAR L rg-emit CHAR D rg-emit CHAR S rg-emit
+  S" SHIELDS" rg-type
   pshields @ 32 rg-u.r
 
   \ Row 18: COMMAND prompt
   17 18 at-xy
-  CHAR C rg-emit CHAR O rg-emit CHAR M rg-emit CHAR M rg-emit
-  CHAR A rg-emit CHAR N rg-emit CHAR D rg-emit ;
+  S" COMMAND" rg-type ;
 
 \ Quick-update just the energy value (avoids full panel redraw)
 : update-energy  ( -- )
@@ -701,8 +715,9 @@ VARIABLE jov-moved               \ flag: did any Jovian move this frame?
 \ ── Jovian AI movement ──────────────────────────────────────────────────
 \ Chase player at 1px per N frames (N scales with difficulty).
 \ Obstacle avoidance: stars (6px), black holes (15px), bases (5px).
-\ Reuses sg-sx/sg-sy (star gravity scratch) and hc-jx/hc-jy (hit scratch).
 
+VARIABLE hc-jx                    \ scratch: candidate x for obstacle check
+VARIABLE hc-jy                    \ scratch: candidate y for obstacle check
 VARIABLE jtk-nx                   \ proposed new x
 VARIABLE jtk-ny                   \ proposed new y
 
@@ -813,12 +828,19 @@ VARIABLE jblk
   THEN ;
 
 \ After any kill + explosion, do a full sprite refresh.
-\ The explosion and spr-erase-box corrupt bg-save buffers, so we must:
-\ 1. Redraw stars (fix black spots from erase/explosion)
-\ 2. Re-save all bg buffers from clean VRAM
-\ 3. Redraw all living sprites
+\ Kills corrupt bg-save buffers (beam pixels, explosion debris), so we must:
+\ 1. Erase ship at old AND current pos (restore-ship-bg already wrote stale
+\    pixels at old-sx/old-sy earlier this frame — must clear both)
+\ 2. Redraw stars (fix black spots from erase/explosion)
+\ 3. Re-save all bg buffers from clean VRAM
+\ 4. Redraw all living sprites
+: clear-tactical  ( -- )
+  rv @ 4608 0 FILL ;              \ clear rows 0-143 (144 * 32 bytes)
+
 : refresh-after-kill  ( -- )
-  draw-stars
+  clear-tactical
+  draw-border draw-stars draw-storm-stars draw-event-horizon
+  draw-base
   save-jov-oldpos
   save-jov-bgs
   draw-jovians-live
@@ -826,6 +848,8 @@ VARIABLE jblk
   draw-ship ;
 
 \ Kill Jovian (index in jbg-i) — erase sprite, zero health, explode
+VARIABLE check-win                \ flag: a kill happened, check win/lose
+
 : jov-kill  ( -- )
   JOV-DMG jbg-i @ + C@ IF
     SPR-JOV
@@ -833,9 +857,11 @@ VARIABLE jblk
     JOV-POS jbg-i @ 2 * + 1 + C@ 2 -
     spr-erase-box
     0 JOV-DMG jbg-i @ + C!
+    1 check-win !
     JOV-POS jbg-i @ 2 * + C@
     JOV-POS jbg-i @ 2 * + 1 + C@
     explode-jovian
+    proximity-damage
     refresh-after-kill
   THEN ;
 
@@ -878,63 +904,149 @@ VARIABLE jblk
   LOOP ;
 
 \ ── Explosion effects ────────────────────────────────────────────────
-\ Scatter random colored dots in a radius, hold, erase.  Uses a buffer
-\ at $7D00 for up to 40 (x,y) pairs = 80 bytes.  Clamped to screen.
-\ Sizes: Jovian=4px/12dots, Endever=8px/20dots, Base=12px/30dots,
-\ Self-destruct=20px/40dots.
+\ Animated expanding ring explosion.  Each frame generates dots along
+\ a ring at increasing radius, cycling white→red→fade.  Uses a buffer
+\ at $7D00 for up to 32 (x,y) pairs = 64 bytes.  Clamped to screen.
+\ Game loop pauses during the explosion (synchronous).
 
 $7D00 CONSTANT EXPLBUF               \ explosion dot buffer (x,y pairs)
 VARIABLE expl-cx                      \ explosion center x
 VARIABLE expl-cy                      \ explosion center y
-VARIABLE expl-count                   \ number of dots
+VARIABLE expl-rad                     \ start radius
+VARIABLE expl-nframes                 \ total animation frames
+VARIABLE expl-currad                  \ current frame radius
+VARIABLE expl-radstep                 \ radius increment per frame
+VARIABLE expl-dots                    \ dots per frame
+VARIABLE expl-dmgrad                  \ proximity damage radius
+VARIABLE expl-dmgamt                  \ proximity damage amount
 
-VARIABLE expl-rad                     \ explosion radius
+\ Scratch vars for ring-dot
+VARIABLE rd-rad
+VARIABLE rd-ang
+VARIABLE expl-total                   \ total accumulated dots so far
 
-\ Generate random dot within radius, clamped to tactical view
-: expl-dot  ( i -- )   \ fills EXPLBUF entry i
-  2 * EXPLBUF +                      \ ( buf-addr )
-  expl-rad @ 2 * 1 + rnd expl-rad @ -
-  expl-cx @ + DUP 1 < IF DROP 1 THEN DUP 126 > IF DROP 126 THEN
-  OVER C!                            \ store x
-  expl-rad @ 2 * 1 + rnd expl-rad @ -
-  expl-cy @ + DUP 1 < IF DROP 1 THEN DUP 142 > IF DROP 142 THEN
-  SWAP 1 + C! ;                      \ store y
+\ Generate one ring dot: random angle, jittered radius from center
+\ Buffer index offset by expl-total so dots accumulate across frames
+: ring-dot  ( i radius -- )
+  8 rnd 4 - +  DUP 1 < IF DROP 1 THEN  rd-rad !
+  64 rnd 6 *  rd-ang !
+  expl-total @ + 2 * EXPLBUF +        \ buf-addr (offset by accumulated)
+  rd-ang @ rd-rad @ angle-dx expl-cx @ +
+  DUP 1 < IF DROP 1 THEN  DUP 126 > IF DROP 126 THEN
+  OVER C!                             \ store x
+  rd-ang @ rd-rad @ angle-dy expl-cy @ +
+  DUP 1 < IF DROP 1 THEN  DUP 142 > IF DROP 142 THEN
+  SWAP 1 + C! ;                       \ store y
 
-\ Fill explosion buffer with random dots
-: gen-explosion  ( cx cy radius count -- )
-  expl-count !  expl-rad !
-  expl-cy !  expl-cx !
-  expl-count @ 0 DO  I expl-dot  LOOP ;
+\ Fill explosion buffer with ring dots at given radius
+: gen-ring  ( radius -- )
+  expl-dots @ 0 DO  I OVER ring-dot  LOOP  DROP ;
 
-\ Animate: draw white, hold, draw red, hold, erase
-\ hold-frames controls how long each phase lasts
-: show-explosion  ( hold-frames -- )
-  EXPLBUF expl-count @ 3 plot-dots    \ white burst
-  DUP 0 DO VSYNC LOOP
-  EXPLBUF expl-count @ 2 plot-dots    \ red fade
-  0 DO VSYNC LOOP
-  EXPLBUF expl-count @ 0 plot-dots    \ erase to black
-  draw-stars ;                        \ restore any stars damaged by erase
+\ Color schedule: 30% white, 30% red, 25% blue, 15% erase-only
+: expl-color  ( frame -- color )
+  10 *  DUP expl-nframes @ 3 * < IF DROP 3 EXIT THEN
+         DUP expl-nframes @ 6 * < IF DROP 2 EXIT THEN
+             expl-nframes @ 8 * < IF       1 EXIT THEN
+  0 ;
 
-\ Convenience words for each explosion size
-: explode-jovian  ( x y -- )   6 20 gen-explosion   3 show-explosion ;
-: explode-ship    ( x y -- )   12 30 gen-explosion   5 show-explosion ;
-: explode-base    ( x y -- )   16 35 gen-explosion   8 show-explosion ;
-: explode-destruct ( x y -- )  24 40 gen-explosion  12 show-explosion ;
+\ Animated expanding ring explosion
+\ Dots ACCUMULATE across frames — no per-frame erase.  Each frame adds
+\ a new ring at a larger radius.  White rings stay white, red rings stay
+\ red, building an expanding cloud.  Final erase wipes everything.
+VARIABLE expl-clr                     \ current frame color
+
+: animate-explosion  ( -- )
+  0 expl-total !
+  expl-nframes @ 0 DO
+    VSYNC
+    \ Compute current radius: startR + step*i
+    expl-rad @ expl-radstep @ I * +  expl-currad !
+    \ Get color for this frame
+    I expl-color expl-clr !
+    expl-clr @ IF
+      \ Generate ring dots at buffer offset and draw them
+      expl-currad @ gen-ring
+      EXPLBUF expl-total @ 2 * + expl-dots @ expl-clr @ plot-dots
+      expl-dots @ expl-total @ + expl-total !
+    THEN
+  LOOP
+  \ Hold the full explosion briefly before erasing
+  VSYNC VSYNC
+  \ Erase ALL accumulated dots + star restore
+  EXPLBUF expl-total @ 0 plot-dots
+  draw-stars ;
+
+\ Setup explosion parameters and run animation
+: setup-explosion  ( cx cy startR endR dots nframes dmgR dmgAmt -- )
+  expl-dmgamt !  expl-dmgrad !
+  \ Stack: cx cy startR endR dots nframes
+  expl-nframes !  expl-dots !
+  \ Stack: cx cy startR endR
+  \ Compute radius step: (endR - startR) / nframes
+  OVER -  expl-nframes @ /MOD SWAP DROP  expl-radstep !
+  expl-rad !
+  expl-cy !  expl-cx ! ;
+
+\ Convenience words for each explosion type
+: explode-jovian   ( x y -- )   2 12 20  6 12 30 setup-explosion animate-explosion ;
+: explode-ship     ( x y -- )   3 22 28 10  0  0 setup-explosion animate-explosion ;
+: explode-base     ( x y -- )   4 26 32 12 20 50 setup-explosion animate-explosion ;
+: explode-destruct ( x y -- )   8 68 48 20 60 200 setup-explosion animate-explosion ;
+
+\ ── Proximity damage ────────────────────────────────────────────────
+\ After explosion, check Manhattan distance from center to all living
+\ Jovians and ship.  Proximity-killed Jovians chain-explode (no further
+\ chain from those secondary explosions).
+VARIABLE pd-i
+VARIABLE pd-kills                     \ bitmask of Jovians killed (max 3)
+
+: proximity-damage  ( -- )
+  expl-dmgrad @ 0= IF EXIT THEN
+  0 pd-kills !
+  \ Check each living Jovian
+  qjovians @ ?DUP IF 0 DO
+    I pd-i !
+    JOV-DMG pd-i @ + C@ IF
+      JOV-POS pd-i @ 2 * + C@ expl-cx @ - abs
+      JOV-POS pd-i @ 2 * + 1 + C@ expl-cy @ - abs +
+      expl-dmgrad @ < IF
+        JOV-DMG pd-i @ + C@
+        expl-dmgamt @ -
+        DUP 0 < IF DROP 0 THEN
+        DUP JOV-DMG pd-i @ + C!
+        0= IF  1 pd-i @ LSHIFT pd-kills @ OR pd-kills !  THEN
+      THEN
+    THEN
+  LOOP THEN
+  \ Check ship
+  SHIP-POS C@ expl-cx @ - abs
+  SHIP-POS 1 + C@ expl-cy @ - abs +
+  expl-dmgrad @ < IF
+    penergy @ expl-dmgamt @ 1 RSHIFT - DUP 0 < IF DROP 0 THEN penergy !
+  THEN
+  \ Chain-explode any proximity-killed Jovians (no further chain)
+  pd-kills @ IF
+    qjovians @ ?DUP IF 0 DO
+      1 I LSHIFT pd-kills @ AND IF
+        SPR-JOV
+        JOV-POS I 2 * + C@ 3 -
+        JOV-POS I 2 * + 1 + C@ 2 -
+        spr-erase-box
+        JOV-POS I 2 * + C@
+        JOV-POS I 2 * + 1 + C@
+        explode-jovian
+      THEN
+    LOOP THEN
+    refresh-after-kill
+  THEN ;
 
 \ ── Jovian beam fire ──────────────────────────────────────────────────
 \ One red beam at a time, from a random living Jovian toward the player.
 \ Fire cooldown scales with difficulty: 90 frames (level 1) to 18 (level 9).
-\ Uses dedicated variables (separate from player maser beam).
+\ Uses pixel-save path buffer (JBEAM-PATH) with animated bolt.
 
-VARIABLE jbeam-x1                 \ Jovian beam start
-VARIABLE jbeam-y1
-VARIABLE jbeam-x2                 \ Jovian beam endpoint (clamped)
-VARIABLE jbeam-y2
-VARIABLE jbeam-timer              \ frames remaining (0=none)
-VARIABLE jbeam-drawn              \ 1 = beam pixels currently on screen
 VARIABLE jbeam-cool               \ frames until next fire allowed
-8 CONSTANT JBEAM-FRAMES           \ how long Jovian beam stays on screen
+VARIABLE jbeam-hit-ship            \ 1 = bolt will hit player ship
 5 CONSTANT JBEAM-DMG              \ energy damage to player per hit
 20 CONSTANT JBEAM-SYS-DMG         \ system damage per hit (out of 100)
 
@@ -944,25 +1056,33 @@ VARIABLE jbeam-cool               \ frames until next fire allowed
   150 glevel @ 14 * - DUP 24 < IF DROP 24 THEN ;
 
 : clamp-jbeam  ( -- )
+  jbeam-x1 @ 2 < IF 2 jbeam-x1 ! THEN
+  jbeam-x1 @ 125 > IF 125 jbeam-x1 ! THEN
+  jbeam-y1 @ 2 < IF 2 jbeam-y1 ! THEN
+  jbeam-y1 @ 141 > IF 141 jbeam-y1 ! THEN
   jbeam-x2 @ 1 < IF 1 jbeam-x2 ! THEN
   jbeam-x2 @ 126 > IF 126 jbeam-x2 ! THEN
   jbeam-y2 @ 1 < IF 1 jbeam-y2 ! THEN
   jbeam-y2 @ 142 > IF 142 jbeam-y2 ! THEN ;
 
-: draw-jbeam  ( -- )
-  jbeam-x1 @ jbeam-y1 @ jbeam-x2 @ jbeam-y2 @ 2 rg-line ;
+\ Check if player ship bbox overlaps any pixel in the Jovian beam path
+\ Ship sprite is 7x5 centered at SHIP-POS: x±3, y±2
+VARIABLE jbhit-flag
 
-: erase-jbeam  ( -- )
-  jbeam-x1 @ jbeam-y1 @ jbeam-x2 @ jbeam-y2 @ 0 rg-line ;
-
-\ Check if player ship is near the Jovian beam line (same cross-product method)
-: jbeam-hit?  ( -- flag )
-  jbeam-x2 @ jbeam-x1 @ -
-  SHIP-POS 1 + C@ jbeam-y1 @ - *
-  jbeam-y2 @ jbeam-y1 @ -
-  SHIP-POS C@ jbeam-x1 @ - *
-  -
-  abs HIT-THRESH < ;
+: jbeam-ship-hit?  ( -- flag )
+  0 jbhit-flag !
+  jbeam-total @ ?DUP 0= IF 0 EXIT THEN
+  0 DO
+    jbhit-flag @ 0= IF
+      JBEAM-PATH I 3 * + C@
+      SHIP-POS C@ - abs 4 < IF
+        JBEAM-PATH I 3 * + 1 + C@
+        SHIP-POS 1 + C@ - abs 3 < IF
+          1 jbhit-flag !
+        THEN
+      THEN
+    THEN
+  LOOP jbhit-flag @ ;
 
 \ Pick a random living Jovian index, or -1 if none alive
 VARIABLE pj-result
@@ -980,42 +1100,98 @@ VARIABLE pj-result
 
 \ Fire a red beam from Jovian i toward the player
 : fire-jbeam  ( i -- )
-  \ Get Jovian position as beam origin
+  \ Cancel any active Jovian beam first
+  cancel-jbeam
+  \ Get Jovian position
   DUP 2 * JOV-POS + C@ jbeam-x1 !
   2 * JOV-POS + 1 + C@ jbeam-y1 !
-  \ Compute angle from Jovian to player (approximate using dx/dy signs + magnitude)
-  \ Simple approach: extend line from Jovian through player by 140px
-  SHIP-POS C@ jbeam-x1 @ - 4 *     \ dx * 4 (amplify for line extension)
-  jbeam-x1 @ + jbeam-x2 !
-  SHIP-POS 1 + C@ jbeam-y1 @ - 4 *  \ dy * 4
-  jbeam-y1 @ + jbeam-y2 !
+  \ Direction from Jovian to player (dx, dy scaled ×4)
+  SHIP-POS C@ jbeam-x1 @ - 4 *
+  SHIP-POS 1 + C@ jbeam-y1 @ - 4 *
+  \ Endpoint: Jovian pos + direction
+  OVER jbeam-x1 @ + jbeam-x2 !
+  DUP  jbeam-y1 @ + jbeam-y2 !
+  \ Offset origin 5px along direction (use sign of dx/dy)
+  SWAP DUP 0= IF DROP ELSE 0 < IF -5 ELSE 5 THEN jbeam-x1 @ + jbeam-x1 ! THEN
+  DUP 0= IF DROP ELSE 0 < IF -5 ELSE 5 THEN jbeam-y1 @ + jbeam-y1 ! THEN
   clamp-jbeam
-  \ Start timer (render phase draws the beam)
-  JBEAM-FRAMES jbeam-timer !
-  \ Check if player was hit
-  jbeam-hit?              \ math-only, no drawing needed
-  IF
-    \ Energy damage
-    penergy @ JBEAM-DMG - DUP 0 < IF DROP 0 THEN penergy !
-    \ System damage: pick random system (0-4), reduce its level
-    5 rnd DUP 0= IF DROP pdmg-ion
-    ELSE DUP 1 = IF DROP pdmg-warp
-    ELSE DUP 2 = IF DROP pdmg-scan
-    ELSE DUP 3 = IF DROP pdmg-defl
-    ELSE DROP pdmg-masr
-    THEN THEN THEN THEN
-    DUP @ JBEAM-SYS-DMG - DUP 0 < IF DROP 0 THEN SWAP !
-  THEN
+  \ Trace path into buffer
+  jbeam-x1 @ jbeam-y1 @ jbeam-x2 @ jbeam-y2 @ JBEAM-PATH beam-trace
+  jbeam-total !
+  \ Truncate at first non-black pixel (star, sprite, border)
+  JBEAM-PATH jbeam-total @ beam-find-obstacle jbeam-total !
+  \ Check if beam passes through player ship
+  jbeam-ship-hit? jbeam-hit-ship !
+  \ Start bolt animation
+  0 jbeam-head !  0 jbeam-tail !
   \ Reset cooldown
   jbeam-cooldown jbeam-cool ! ;
 
-\ Tick: count down beam display, count down cooldown, maybe fire
-: tick-jbeam  ( -- )
-  \ Decay existing beam (render phase handles draw/erase)
-  jbeam-timer @ IF
-    jbeam-timer @ 1 - jbeam-timer !
+\ Jovian beam tick: erase tail
+: tick-jbeam-erase  ( -- )
+  jbeam-total @ 0= IF EXIT THEN
+  jbeam-head @ jbeam-total @ < IF
+    \ Head still advancing — erase to keep bolt at BOLT-LEN
+    jbeam-head @ BOLT-LEN - jbeam-tail @ > IF
+      JBEAM-PATH jbeam-tail @
+      jbeam-head @ BOLT-LEN - jbeam-tail @ - BOLT-SPEED min
+      0 beam-draw-slice
+      jbeam-tail @ jbeam-head @ BOLT-LEN - jbeam-tail @ - BOLT-SPEED min +
+      jbeam-tail !
+    THEN
+  ELSE
+    \ Head reached end — drain remaining visible bolt
+    jbeam-tail @ jbeam-head @ < IF
+      JBEAM-PATH jbeam-tail @
+      jbeam-head @ jbeam-tail @ - BOLT-SPEED min
+      0 beam-draw-slice
+      jbeam-tail @ jbeam-head @ jbeam-tail @ - BOLT-SPEED min +
+      jbeam-tail !
+    THEN
+  THEN ;
+
+\ Jovian beam tick: draw head
+: tick-jbeam-draw  ( -- )
+  jbeam-total @ 0= IF EXIT THEN
+  jbeam-head @ jbeam-total @ < IF
+    JBEAM-PATH jbeam-head @
+    jbeam-total @ jbeam-head @ - BOLT-SPEED min
+    2 beam-draw-slice                \ color 2 = red
+    jbeam-head @ jbeam-total @ jbeam-head @ - BOLT-SPEED min +
+    jbeam-head !
   THEN
-  \ Cooldown toward next shot
+  \ If tail caught up to head, beam is done
+  jbeam-tail @ jbeam-head @ < 0= IF
+    jbeam-head @ jbeam-total @ < 0= IF
+      0 jbeam-total !
+    THEN
+  THEN ;
+
+\ Apply Jovian beam damage when bolt reaches end
+\ Shields reduce incoming damage: absorbed = shields * 2/3.
+\ damage_taken = base * (300 - shields*2) / 300, minimum 1.
+: apply-jbeam-hit  ( -- )
+  jbeam-hit-ship @ 0= IF EXIT THEN
+  jbeam-head @ jbeam-total @ < IF EXIT THEN  \ not there yet
+  \ Energy damage scaled by shields
+  JBEAM-DMG 300 pshields @ 2 * - * 300 /MOD SWAP DROP
+  DUP 1 < IF DROP 1 THEN
+  penergy @ SWAP - DUP 0 < IF DROP 0 THEN penergy !
+  \ System damage scaled by shields
+  JBEAM-SYS-DMG 300 pshields @ 2 * - * 300 /MOD SWAP DROP
+  DUP 1 < IF DROP 1 THEN
+  \ Pick random system (0-4), reduce its level
+  5 rnd DUP 0= IF DROP pdmg-ion
+  ELSE DUP 1 = IF DROP pdmg-warp
+  ELSE DUP 2 = IF DROP pdmg-scan
+  ELSE DUP 3 = IF DROP pdmg-defl
+  ELSE DROP pdmg-masr
+  THEN THEN THEN THEN
+  SWAP NEGATE OVER @ + DUP 0 < IF DROP 0 THEN SWAP !
+  0 jbeam-hit-ship ! ;
+
+\ Tick: cooldown toward next shot, maybe fire
+: tick-jbeam  ( -- )
   jbeam-cool @ ?DUP IF
     1 - jbeam-cool !
   ELSE
@@ -1341,14 +1517,12 @@ VARIABLE dock-tick
   0 17 at-xy  14 0 DO $20 rg-emit LOOP
   sos-active @ IF
     0 17 at-xy
-    CHAR S rg-emit CHAR O rg-emit CHAR S rg-emit
-    CHAR - rg-emit CHAR B rg-emit CHAR A rg-emit
-    CHAR S rg-emit CHAR E rg-emit
+    S" SOS-BASE" rg-type
     11 17 at-xy
     sos-col @ rg-u.  CHAR , rg-emit  sos-row @ rg-u.
   ELSE
     0 17 at-xy
-    CHAR C rg-emit CHAR O rg-emit CHAR N rg-emit CHAR D rg-emit
+    S" COND" rg-type
     14 draw-cond
   THEN ;
 
@@ -1370,97 +1544,235 @@ VARIABLE cmd-digits               \ number of digits entered
 : draw-cmd-prompt  ( -- )
   clear-cmd-area
   17 18 at-xy
-  CHAR C rg-emit CHAR O rg-emit CHAR M rg-emit CHAR M rg-emit
-  CHAR A rg-emit CHAR N rg-emit CHAR D rg-emit ;
+  S" COMMAND" rg-type ;
 
-\ ── Maser fire (command 5) ──────────────────────────────────────────────
-\ Draw a blue beam from ship at the given angle across the tactical view.
-\ Beam persists for BEAM-FRAMES then auto-erases.
+\ ══════════════════════════════════════════════════════════════════════════
+\  BEAM SYSTEM — Pixel-save/restore for artifact-free rendering
+\ ══════════════════════════════════════════════════════════════════════════
+\
+\ Beams save what's underneath pixel-by-pixel and erase by restoring.
+\ Animation: a fixed-length "bolt" travels from ship to target.
+\ Layer 2: always drawn last, always erased first.
 
-VARIABLE beam-x1                  \ beam start (ship pos at fire time)
-VARIABLE beam-y1
-VARIABLE beam-x2                  \ beam endpoint (clamped)
-VARIABLE beam-y2
-VARIABLE beam-timer               \ frames remaining until erase (0=none)
-VARIABLE beam-drawn               \ 1 = beam pixels currently on screen
-12 CONSTANT BEAM-FRAMES
+\ ── Path buffers (in free RAM $7800+) ──────────────────────────────────
+\ 3 bytes per pixel × 200 max pixels = 600 bytes each
+
+$7800 CONSTANT BEAM-PATH           \ player maser path buffer (600 bytes)
+$7A58 CONSTANT JBEAM-PATH          \ Jovian beam path buffer (600 bytes)
+
+\ ── Beam state variables ───────────────────────────────────────────────
+\ Per-beam: total pixel count, head index, tail index, hit info
+
+VARIABLE beam-total                \ total pixels in maser path (0=inactive)
+VARIABLE beam-head                 \ next pixel to draw (head of bolt)
+VARIABLE beam-tail                 \ next pixel to erase (tail of bolt)
+VARIABLE beam-hit-idx              \ Jovian index hit (-1=none)
+VARIABLE beam-x1                   \ beam start x (for endpoint calc)
+VARIABLE beam-y1                   \ beam start y
+VARIABLE beam-x2                   \ beam endpoint x (clamped)
+VARIABLE beam-y2                   \ beam endpoint y (clamped)
+
+VARIABLE jbeam-total               \ total pixels in Jovian beam path
+VARIABLE jbeam-head
+VARIABLE jbeam-tail
+VARIABLE jbeam-x1
+VARIABLE jbeam-y1
+VARIABLE jbeam-x2
+VARIABLE jbeam-y2
+
+20 CONSTANT BOLT-LEN               \ visible bolt length in pixels
+20 CONSTANT BOLT-SPEED             \ pixels advanced per frame
+
+\ ── Maser damage ──────────────────────────────────────────────────────
+\ Scales with maser system health: 30 at 100%, 3 at 10%.
+\ Shields reduce output: loss = shields * 2/3 (50% shields = 1/3 loss,
+\ 100% shields = 2/3 loss).  Formula: base * (300 - shields*2) / 300.
+: maser-dmg  ( -- n )
+  pdmg-masr @ 30 * 100 /MOD SWAP DROP
+  300 pshields @ 2 * - * 300 /MOD SWAP DROP
+  DUP 1 < IF DROP 1 THEN ;
+
+\ ── Bbox hit detection (during beam-trace) ────────────────────────────
+\ After tracing, walk the path buffer and check each pixel against
+\ live Jovian bounding boxes (7×5 sprite: x±3, y±2).
+
+VARIABLE hc-i                      \ hit-check loop variable
+
+VARIABLE bchk-buf                  \ path buffer base for hit check
+VARIABLE bchk-px                   \ pixel index being checked
+VARIABLE bchk-hitpx                \ pixel index where hit was found
+
+: beam-check-one-jov  ( jov-idx -- )
+  hc-i !
+  JOV-DMG hc-i @ + C@ 0= IF EXIT THEN  \ dead, skip
+  beam-hit-idx @ 0 < 0= IF EXIT THEN    \ already found a hit
+  \ Check bbox: |px - jx| <= 3 AND |py - jy| <= 2
+  bchk-buf @ bchk-px @ 3 * + C@
+  JOV-POS hc-i @ 2 * + C@ - abs 4 < IF
+    bchk-buf @ bchk-px @ 3 * + 1 + C@
+    JOV-POS hc-i @ 2 * + 1 + C@ - abs 3 < IF
+      hc-i @ beam-hit-idx !
+      bchk-px @ bchk-hitpx !      \ record pixel index of hit
+    THEN
+  THEN ;
+
+: beam-check-path-hits  ( buf count -- hit-idx | -1 )
+  -1 beam-hit-idx !
+  -1 bchk-hitpx !
+  ?DUP 0= IF DROP -1 EXIT THEN
+  SWAP bchk-buf !                  \ save buf base
+  0 DO
+    beam-hit-idx @ 0 < IF         \ only check until first hit
+      I bchk-px !
+      qjovians @ ?DUP IF 0 DO
+        I beam-check-one-jov
+      LOOP THEN
+    THEN
+  LOOP
+  beam-hit-idx @ ;
+
+\ ── Clamp beam coordinates to tactical view ──────────────────────────
+
+\ Scan path buffer for first non-black pixel (obstacle)
+\ Returns index of first obstacle, or count if path is clear
+VARIABLE bfo-hit
+VARIABLE bfo-found
+
+: beam-find-obstacle  ( buf count -- index )
+  DUP bfo-hit !  0 bfo-found !
+  0 DO
+    bfo-found @ 0= IF
+      DUP I 3 * + 2 + C@ IF
+        I bfo-hit !  1 bfo-found !
+      THEN
+    THEN
+  LOOP DROP  bfo-hit @ ;
 
 : clamp-beam  ( -- )
+  beam-x1 @ 2 < IF 2 beam-x1 ! THEN
+  beam-x1 @ 125 > IF 125 beam-x1 ! THEN
+  beam-y1 @ 2 < IF 2 beam-y1 ! THEN
+  beam-y1 @ 141 > IF 141 beam-y1 ! THEN
   beam-x2 @ 1 < IF 1 beam-x2 ! THEN
   beam-x2 @ 126 > IF 126 beam-x2 ! THEN
   beam-y2 @ 1 < IF 1 beam-y2 ! THEN
   beam-y2 @ 142 > IF 142 beam-y2 ! THEN ;
 
-: erase-beam  ( -- )
-  beam-x1 @ beam-y1 @
-  beam-x2 @ beam-y2 @
-  0 rg-line ;                     \ redraw in black
+\ ── Cancel a beam (erase any visible pixels) ──────────────────────────
 
-\ ── Maser hit detection ────────────────────────────────────────────────
-\ Cross-product distance: if |dx*(jy-y1) - dy*(jx-x1)| < threshold,
-\ the Jovian is near the beam path.
+: cancel-beam  ( -- )
+  beam-total @ 0= IF EXIT THEN
+  \ Restore any currently visible bolt pixels
+  beam-tail @ beam-head @ < IF
+    BEAM-PATH beam-tail @ beam-head @ beam-tail @ - 0 beam-draw-slice
+  THEN
+  0 beam-total ! ;
 
-VARIABLE hc-i                     \ hit check loop index
-VARIABLE hc-jx
-VARIABLE hc-jy
-560 CONSTANT HIT-THRESH           \ ~4 pixel hit radius for 140px beam
-\ Maser damage scales with system health: 30 at 100%, 3 at 10%
-: maser-dmg  ( -- n )  pdmg-masr @ 30 * 100 /MOD SWAP DROP ;
-
-: check-hit  ( -- )
-  JOV-DMG hc-i @ + C@ IF
-    JOV-POS hc-i @ 2 * + C@ hc-jx !
-    JOV-POS hc-i @ 2 * + 1 + C@ hc-jy !
-    \ Cross product: dx*(jy-y1) - dy*(jx-x1)
-    beam-x2 @ beam-x1 @ -
-    hc-jy @ beam-y1 @ - *
-    beam-y2 @ beam-y1 @ -
-    hc-jx @ beam-x1 @ - *
-    -
-    abs HIT-THRESH < IF
-      \ Hit! Reduce health
-      JOV-DMG hc-i @ + C@
-      maser-dmg - DUP 0 < IF DROP 0 THEN
-      JOV-DMG hc-i @ + C!
-      \ If dead, erase sprite, explode, full refresh
-      JOV-DMG hc-i @ + C@ 0= IF
-        SPR-JOV hc-jx @ 3 - hc-jy @ 2 - spr-erase-box
-        hc-jx @ hc-jy @ explode-jovian
-        refresh-after-kill
-      THEN
-    THEN
-  THEN ;
-
-: check-hits  ( -- )
-  qjovians @ ?DUP IF 0 DO
-    I hc-i !
-    check-hit
-  LOOP THEN ;
+: cancel-jbeam  ( -- )
+  jbeam-total @ 0= IF EXIT THEN
+  jbeam-tail @ jbeam-head @ < IF
+    JBEAM-PATH jbeam-tail @ jbeam-head @ jbeam-tail @ - 0 beam-draw-slice
+  THEN
+  0 jbeam-total ! ;
 
 \ ── Fire maser ─────────────────────────────────────────────────────────
+\ Trace path, detect hits, start bolt animation.
 
 : fire-maser  ( angle -- )
   penergy @ 0= IF DROP EXIT THEN
   MASER-COST use-energy
-  \ Erase any existing beam first
-  beam-timer @ IF erase-beam THEN
-  \ Save ship position as beam origin
-  SHIP-POS C@ beam-x1 !  SHIP-POS 1 + C@ beam-y1 !
+  \ Cancel any active beam first
+  cancel-beam
+  \ Beam origin: offset 5px from ship center along firing angle
+  \ so the beam path doesn't overlap the 7x5 ship sprite
+  DUP 5 angle-dx SHIP-POS C@ + beam-x1 !
+  DUP 5 angle-dy SHIP-POS 1 + C@ + beam-y1 !
   \ Calculate and clamp endpoint
-  DUP 140 angle-dx beam-x1 @ + beam-x2 !
-  140 angle-dy beam-y1 @ + beam-y2 !
+  DUP 140 angle-dx SHIP-POS C@ + beam-x2 !
+  140 angle-dy SHIP-POS 1 + C@ + beam-y2 !
   clamp-beam
-  \ Start timer (render phase draws the beam)
-  BEAM-FRAMES beam-timer !
-  check-hits ;
+  \ Trace path into buffer (saves underlying pixels)
+  beam-x1 @ beam-y1 @ beam-x2 @ beam-y2 @ BEAM-PATH beam-trace
+  beam-total !
+  \ Truncate at first non-black pixel (star, sprite, border)
+  BEAM-PATH beam-total @ beam-find-obstacle beam-total !
+  \ Check for Jovian hits along the path
+  BEAM-PATH beam-total @ beam-check-path-hits
+  DUP 0 < 0= IF
+    \ Hit found — truncate beam at hit pixel
+    beam-hit-idx !
+    bchk-hitpx @ 1 + beam-total !   \ truncate path at hit point
+  ELSE
+    DROP  -1 beam-hit-idx !
+  THEN
+  \ Start bolt animation
+  0 beam-head !  0 beam-tail ! ;
 
-: draw-beam  ( -- )
-  beam-x1 @ beam-y1 @ beam-x2 @ beam-y2 @ 1 rg-line ;
+\ ── Beam tick: advance bolt animation ─────────────────────────────────
 
-: tick-beam  ( -- )
-  beam-timer @ IF
-    beam-timer @ 1 - beam-timer !
+: tick-beam-erase  ( -- )
+  beam-total @ 0= IF EXIT THEN
+  beam-head @ beam-total @ < IF
+    \ Head still advancing — erase to keep bolt at BOLT-LEN
+    beam-head @ BOLT-LEN - beam-tail @ > IF
+      BEAM-PATH beam-tail @
+      beam-head @ BOLT-LEN - beam-tail @ - BOLT-SPEED min
+      0 beam-draw-slice
+      beam-tail @ beam-head @ BOLT-LEN - beam-tail @ - BOLT-SPEED min +
+      beam-tail !
+    THEN
+  ELSE
+    \ Head reached end — drain remaining visible bolt
+    beam-tail @ beam-head @ < IF
+      BEAM-PATH beam-tail @
+      beam-head @ beam-tail @ - BOLT-SPEED min
+      0 beam-draw-slice
+      beam-tail @ beam-head @ beam-tail @ - BOLT-SPEED min +
+      beam-tail !
+    THEN
   THEN ;
+
+: tick-beam-draw  ( -- )
+  beam-total @ 0= IF EXIT THEN
+  \ Draw head pixels (new bolt front)
+  beam-head @ beam-total @ < IF
+    BEAM-PATH beam-head @
+    beam-total @ beam-head @ - BOLT-SPEED min
+    1 beam-draw-slice                \ color 1 = blue
+    beam-head @ beam-total @ beam-head @ - BOLT-SPEED min +
+    beam-head !
+  THEN
+  \ If tail caught up to head, beam is done
+  beam-tail @ beam-head @ < 0= IF
+    beam-head @ beam-total @ < 0= IF
+      0 beam-total !                 \ beam fully erased
+    THEN
+  THEN ;
+
+\ ── Apply maser hit (deferred until bolt reaches target) ──────────────
+
+: apply-beam-hit  ( -- )
+  beam-hit-idx @ 0 < IF EXIT THEN
+  \ Only apply when head has reached the end (target)
+  beam-head @ beam-total @ < IF EXIT THEN
+  \ Apply damage
+  JOV-DMG beam-hit-idx @ + C@
+  maser-dmg - DUP 0 < IF DROP 0 THEN
+  JOV-DMG beam-hit-idx @ + C!
+  \ If dead, cancel beams, explode, refresh
+  JOV-DMG beam-hit-idx @ + C@ 0= IF
+    cancel-beam cancel-jbeam
+    SPR-JOV
+    JOV-POS beam-hit-idx @ 2 * + C@ 3 -
+    JOV-POS beam-hit-idx @ 2 * + 1 + C@ 2 -
+    spr-erase-box
+    JOV-POS beam-hit-idx @ 2 * + C@
+    JOV-POS beam-hit-idx @ 2 * + 1 + C@
+    explode-jovian
+    proximity-damage
+    refresh-after-kill
+  THEN
+  -1 beam-hit-idx ! ;
 
 \ ── Triton missiles (command 6) ─────────────────────────────────────────
 \ Animated projectile: alternates + and x sprites as it flies.
@@ -1516,6 +1828,7 @@ VARIABLE msl-got                 \ hit flag
           JOV-POS msl-hi @ 2 * + C@
           JOV-POS msl-hi @ 2 * + 1 + C@
           explode-jovian
+          proximity-damage
           refresh-after-kill
           1 msl-got !
         THEN
@@ -1569,14 +1882,14 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
 \ Energy cost = 5 * Manhattan distance.  Damaged warp drive may mis-jump.
 
 : warp-cost  ( col row -- cost )
-  prow @ - abs SWAP pcol @ - abs + 5 * ;
+  prow @ - abs SWAP pcol @ - abs + DUP + DUP 10 > IF DROP 10 THEN ;
 
 : do-warp  ( -- )
   cmd-val @ 10 /MOD                  \ ( row col )
   \ Validate coordinates
   OVER 8 < OVER 8 < AND 0= IF DROP DROP EXIT THEN
   \ Check if already there
-  OVER pcol @ = OVER prow @ = AND IF DROP DROP EXIT THEN
+  DUP pcol @ = OVER prow @ = AND IF DROP DROP EXIT THEN
   \ Calculate and pay energy cost
   OVER OVER warp-cost
   DUP penergy @ > IF DROP DROP DROP EXIT THEN   \ not enough energy
@@ -1588,13 +1901,12 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
     THEN
   THEN
   \ Clear beams and missile
-  beam-drawn @ IF erase-beam 0 beam-drawn ! THEN
-  jbeam-drawn @ IF erase-jbeam 0 jbeam-drawn ! THEN
-  0 beam-timer !  0 jbeam-timer !
+  cancel-jbeam cancel-beam
   msl-active @ IF msl-erase 0 msl-active ! THEN
   \ Expand new quadrant and redraw
   rg-pcls
   SWAP expand-quadrant
+  safe-spawn
   draw-quadrant
   draw-panel
   0 docked !  0 prev-docked !
@@ -1602,10 +1914,151 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
   jbeam-cooldown jbeam-cool !
   0 msl-dirty ! ;
 
+\ ── Self-destruct (command 7, code 123) ──────────────────────────────
+\ State-driven countdown that runs inside the game loop.
+\ sd-active: 0=off, 5/4/3/2/1=current count.  sd-timer counts down
+\ 60 frames (~1 sec) per step.  Typing 7123 again cancels.
+
+VARIABLE sd-active                    \ 0=off, 5..1=countdown
+VARIABLE sd-timer                     \ frames left in current count
+VARIABLE sd-cancel                    \ cancel sequence progress (0-3)
+
+\ Show current countdown digit in command area
+: sd-show  ( -- )
+  clear-cmd-area  17 18 at-xy
+  sd-active @ CHAR 0 + rg-emit ;
+
+\ Abort: clear countdown, show ABORT
+: sd-abort  ( -- )
+  0 sd-active !
+  clear-cmd-area  17 18 at-xy
+  S" ABORT" rg-type ;
+
+\ Detonate: explode ship with proximity damage
+: sd-detonate  ( -- )
+  0 sd-active !
+  cancel-jbeam cancel-beam
+  msl-active @ IF msl-erase 0 msl-active ! THEN
+  restore-ship-bg
+  SHIP-POS C@ SHIP-POS 1 + C@
+  explode-destruct
+  proximity-damage
+  2 death-cause !
+  0 penergy ! ;
+
+\ Check one key against cancel sequence 7-1-2-3
+\ Wrong key resets progress
+: sd-check-key  ( char -- )
+  sd-cancel @ 0 = IF DUP CHAR 7 = IF DROP 1 sd-cancel ! EXIT THEN THEN
+  sd-cancel @ 1 = IF DUP CHAR 1 = IF DROP 2 sd-cancel ! EXIT THEN THEN
+  sd-cancel @ 2 = IF DUP CHAR 2 = IF DROP 3 sd-cancel ! EXIT THEN THEN
+  sd-cancel @ 3 = IF     CHAR 3 = IF   sd-abort         EXIT THEN THEN
+  DROP 0 sd-cancel ! ;
+
+\ Called each game loop frame when sd-active > 0
+: tick-destruct  ( -- )
+  sd-active @ 0= IF EXIT THEN
+  sd-timer @ 1 - DUP sd-timer !
+  0= IF
+    \ Timer expired — advance countdown
+    sd-active @ 1 = IF sd-detonate EXIT THEN
+    sd-active @ 1 - sd-active !
+    30 sd-timer !
+    sd-show
+  THEN ;
+
+\ Start self-destruct countdown
+: do-destruct  ( -- )
+  cmd-val @ 123 <> IF EXIT THEN
+  \ If already counting down, treat as cancel attempt
+  sd-active @ IF sd-abort EXIT THEN
+  5 sd-active !  30 sd-timer !  0 sd-cancel !
+  sd-show ;
+
+\ ── Damage report (command 1) ─────────────────────────────────────────
+\ Count remaining Jovians: scan galaxy + adjust for current quadrant kills.
+\ Count remaining bases: scan galaxy.
+
+: count-jovians  ( -- n )
+  0  64 0 DO GALAXY I + C@ q-jovians + LOOP
+  \ Adjust for current quadrant: subtract packed count, add living count
+  pcol @ prow @ gal@ q-jovians -
+  qjovians @ ?DUP IF 0 DO
+    JOV-DMG I + C@ IF 1 + THEN
+  LOOP THEN + ;
+
+: count-bases  ( -- n )
+  0  64 0 DO GALAXY I + C@ q-base? IF 1 + THEN LOOP ;
+
+: do-damage-report  ( -- )
+  clear-tactical
+  \ Header: Jovians and bases remaining
+  2 2 at-xy  count-jovians rg-u.
+  S"  JOVIANS LEFT" rg-type
+  2 4 at-xy  count-bases rg-u.
+  S"  BASES LEFT" rg-type
+  \ DAMAGE heading
+  2 7 at-xy  S" DAMAGE" rg-type
+  \ Five systems with percentages
+  2 9 at-xy   S" ION ENGINES" rg-type     pdmg-ion @ 28 rg-u.r
+  2 10 at-xy  S" HYPERDRIVE" rg-type      pdmg-warp @ 28 rg-u.r
+  2 11 at-xy  S" SCANNERS" rg-type        pdmg-scan @ 28 rg-u.r
+  2 12 at-xy  S" DEFLECTORS" rg-type      pdmg-defl @ 28 rg-u.r
+  2 13 at-xy  S" MASERS" rg-type          pdmg-masr @ 28 rg-u.r
+  \ Wait for key, then restore tactical view
+  KEY DROP
+  clear-tactical
+  draw-quadrant ;
+
+\ ── Long range scan (command 3) ───────────────────────────────────────
+\ Display 8x8 galaxy map showing Jovians, bases, storms, player position.
+\ Cell format: B=base, 1-3=jovians, M=storm, E=player quadrant.
+\ Each cell is 3 chars wide, row labels at col 1, col headers at col 4.
+
+VARIABLE sg-row                   \ scan grid: outer loop row
+
+: do-scan  ( -- )
+  clear-tactical
+  4 1 at-xy  S" LONG RANGE SCAN" rg-type
+  \ Column headers: row 3, starting col 4
+  8 0 DO
+    I 3 * 5 + 3 at-xy  I CHAR 0 + rg-emit
+  LOOP
+  \ Galaxy grid: rows 4-11
+  8 0 DO    \ row
+    I sg-row !
+    1 I 4 + at-xy  I CHAR 0 + rg-emit    \ row label
+    8 0 DO  \ col
+      I 3 * 4 + sg-row @ 4 + at-xy
+      \ Check if this is the player's quadrant
+      I pcol @ =  sg-row @ prow @ =  AND IF
+        CHAR E rg-emit
+      ELSE
+        I sg-row @ gal@ DUP q-storm? IF
+          DROP CHAR M rg-emit
+        ELSE
+          DUP q-base? IF CHAR B rg-emit THEN
+          q-jovians DUP IF CHAR 0 + rg-emit ELSE DROP THEN
+        THEN
+      THEN
+    LOOP
+  LOOP
+  KEY DROP
+  clear-tactical
+  draw-quadrant ;
+
 : exec-command  ( -- )
+  cmd-num @ 1 = IF do-damage-report THEN
   cmd-num @ 2 = IF do-warp THEN
+  cmd-num @ 3 = IF do-scan THEN
+  cmd-num @ 4 = IF
+    cmd-val @ DUP 100 > IF DROP 100 THEN
+    DUP pdmg-defl @ > IF DROP pdmg-defl @ THEN pshields !
+    draw-panel
+  THEN
   cmd-num @ 5 = IF cmd-val @ fire-maser THEN
   cmd-num @ 6 = IF cmd-val @ fire-missile THEN
+  cmd-num @ 7 = IF do-destruct THEN
   0 cmd-state !
   draw-cmd-prompt ;
 
@@ -1666,6 +2119,7 @@ VARIABLE prev-key                 \ last key seen by KEY?
   ELSE
     DUP prev-key !
     ?DUP IF
+      DUP sd-active @ IF sd-check-key ELSE DROP THEN
       cmd-state @ IF process-cmd-input ELSE process-idle THEN
     THEN
   THEN ;
@@ -1680,6 +2134,7 @@ VARIABLE prev-key                 \ last key seen by KEY?
     GALAXY I + C@ q-base? IF
       I 8 /MOD                 \ ( col row )
       expand-quadrant
+      safe-spawn
     THEN
   LOOP ;
 
@@ -1689,14 +2144,10 @@ VARIABLE prev-key                 \ last key seen by KEY?
   rg-pcls
   \ SPACE WARP centered on row 5
   11 5 at-xy
-  CHAR S rg-emit CHAR P rg-emit CHAR A rg-emit CHAR C rg-emit CHAR E rg-emit
-  $20 rg-emit
-  CHAR W rg-emit CHAR A rg-emit CHAR R rg-emit CHAR P rg-emit
+  S" SPACE WARP" rg-type
   \ LEVEL 1-9 on row 9
   11 9 at-xy
-  CHAR L rg-emit CHAR E rg-emit CHAR V rg-emit CHAR E rg-emit CHAR L rg-emit
-  $20 rg-emit
-  CHAR 1 rg-emit CHAR - rg-emit CHAR 9 rg-emit
+  S" LEVEL 1-9" rg-type
   \ Read level key (1-9)
   BEGIN KEY DUP CHAR 1 < OVER CHAR 9 > OR IF DROP 0 ELSE 1 THEN UNTIL
   CHAR 0 - glevel ! ;
@@ -1707,33 +2158,22 @@ VARIABLE prev-key                 \ last key seen by KEY?
   rg-pcls
   \ FROM UP COMMAND
   2 2 at-xy
-  CHAR F rg-emit CHAR R rg-emit CHAR O rg-emit CHAR M rg-emit
-  $20 rg-emit
-  CHAR U rg-emit CHAR P rg-emit $20 rg-emit
-  CHAR C rg-emit CHAR O rg-emit CHAR M rg-emit CHAR M rg-emit
-  CHAR A rg-emit CHAR N rg-emit CHAR D rg-emit
+  S" FROM UP COMMAND" rg-type
   \ DESTROY
   2 5 at-xy
-  CHAR D rg-emit CHAR E rg-emit CHAR S rg-emit CHAR T rg-emit
-  CHAR R rg-emit CHAR O rg-emit CHAR Y rg-emit $20 rg-emit
+  S" DESTROY " rg-type
   gjovians @ rg-u.
   \ JOVIAN SHIPS
   2 7 at-xy
-  CHAR J rg-emit CHAR O rg-emit CHAR V rg-emit CHAR I rg-emit
-  CHAR A rg-emit CHAR N rg-emit $20 rg-emit
-  CHAR S rg-emit CHAR H rg-emit CHAR I rg-emit CHAR P rg-emit CHAR S rg-emit
+  S" JOVIAN SHIPS" rg-type
   \ PROTECT
   2 9 at-xy
-  CHAR P rg-emit CHAR R rg-emit CHAR O rg-emit CHAR T rg-emit
-  CHAR E rg-emit CHAR C rg-emit CHAR T rg-emit $20 rg-emit
+  S" PROTECT " rg-type
   gbases @ rg-u.
-  $20 rg-emit
-  CHAR B rg-emit CHAR A rg-emit CHAR S rg-emit CHAR E rg-emit CHAR S rg-emit
+  S"  BASES" rg-type
   \ GOOD LUCK
   14 13 at-xy
-  CHAR G rg-emit CHAR O rg-emit CHAR O rg-emit CHAR D rg-emit
-  $20 rg-emit
-  CHAR L rg-emit CHAR U rg-emit CHAR C rg-emit CHAR K rg-emit
+  S" GOOD LUCK" rg-type
   KEY DROP ;
 
 : main  ( -- )
@@ -1762,11 +2202,13 @@ VARIABLE prev-key                 \ last key seen by KEY?
   draw-quadrant
   draw-panel
   0 cmd-state !  0 prev-key !
-  0 beam-timer !  0 beam-drawn !
-  0 jbeam-timer !  0 jbeam-drawn !  jbeam-cooldown jbeam-cool !
+  0 beam-total !  -1 beam-hit-idx !
+  0 jbeam-total !  0 jbeam-hit-ship !  jbeam-cooldown jbeam-cool !
   0 msl-active !  0 msl-dirty !
   0 docked !  0 prev-docked !  0 death-cause !
+  0 sd-active !
   0 jov-moved !
+  0 check-win !
   100 prev-energy !
   10 prev-missiles !
 
@@ -1779,36 +2221,58 @@ VARIABLE prev-key                 \ last key seen by KEY?
     check-collisions
     check-dock
     tick-dock
-    tick-beam
     tick-missile
     tick-jovians
     jov-gravity
     tick-jbeam
+    tick-destruct
     process-key
     VSYNC
-    \ Erase any drawn beams so bg-save stays clean
-    beam-drawn @ IF erase-beam 0 beam-drawn ! THEN
-    jbeam-drawn @ IF erase-jbeam 0 jbeam-drawn ! THEN
-    moved @ jov-moved @ OR IF
+
+    \ ── LAYER 2: Erase beam tails (restore saved pixels) ──
+    \ Erase Jovian beam first (drawn last = erased first)
+    tick-jbeam-erase
+    tick-beam-erase
+    \ Force sprite refresh when beams active (beam restore may
+    \ write stale sprite data if ship/Jovians moved since trace)
+    beam-total @ jbeam-total @ OR IF 1 moved ! THEN
+
+    \ ── LAYER 1: Sprite bg-save/restore cycle ──
+    moved @ jov-moved @ OR msl-dirty @ OR IF
+      \ 1. Erase missile at old position
+      msl-active @ IF
+        SPR-MSL1 msl-px @ 2 - msl-py @ 2 - spr-erase-box
+      THEN
+      \ 2. Restore ship and Jovian backgrounds
       restore-ship-bg
       restore-jov-bgs
+      \ 3. Redraw stars (fix any black spots from erases)
+      draw-stars
+      \ 4. Save and draw Jovians at current positions
       jov-moved @ IF save-jov-oldpos THEN
       save-jov-bgs
       draw-jovians-live
+      \ 5. Draw missile at new position
+      msl-dirty @ IF
+        msl-scrx msl-px !  msl-scry msl-py !
+        0 msl-dirty !
+      THEN
+      msl-active @ IF
+        msl-spr msl-scrx 2 - msl-scry 2 - spr-draw
+      THEN
+      \ 6. Save and draw ship (on top of everything)
       save-ship-bg
       draw-ship
       0 jov-moved !
     THEN
-    \ Missile render (between beam erase and beam redraw)
-    msl-dirty @ IF
-      msl-erase
-      msl-scrx msl-px !  msl-scry msl-py !
-      msl-draw
-      0 msl-dirty !
-    THEN
-    \ Redraw active beams on top of everything (last layer)
-    beam-timer @ IF draw-beam 1 beam-drawn ! THEN
-    jbeam-timer @ IF draw-jbeam 1 jbeam-drawn ! THEN
+
+    \ ── LAYER 2: Advance beam heads (draw new pixels) ──
+    tick-beam-draw
+    tick-jbeam-draw
+
+    \ ── Apply deferred hit damage ──
+    apply-beam-hit
+    apply-jbeam-hit
     penergy @ prev-energy @ <> IF
       penergy @ prev-energy !
       update-energy
@@ -1821,29 +2285,59 @@ VARIABLE prev-key                 \ last key seen by KEY?
       docked @ prev-docked !
       update-cond
     THEN
+    \ ── Win/lose checks (only after a kill) ──
+    check-win @ IF
+      0 check-win !
+      count-jovians 0= IF
+        cancel-jbeam cancel-beam
+        clear-tactical
+        2 3 at-xy  S" ALL " rg-type  gjovians @ rg-u.
+        S"  JOVIANS" rg-type
+        2 5 at-xy  S" DESTROYED" rg-type
+        2 8 at-xy  S" THE UP SYSTEM" rg-type
+        2 10 at-xy S" IS SAVED" rg-type
+        0 18 at-xy S" AGAIN?" rg-type
+        KEY DROP
+        main EXIT
+      THEN
+      count-bases 0= IF
+        cancel-jbeam cancel-beam
+        clear-tactical
+        2 3 at-xy  S" ALL BASES" rg-type
+        2 5 at-xy  S" DESTROYED" rg-type
+        2 8 at-xy  S" THE UP SYSTEM" rg-type
+        2 10 at-xy S" WILL FALL" rg-type
+        0 18 at-xy S" AGAIN?" rg-type
+        KEY DROP
+        main EXIT
+      THEN
+    THEN
+
+    \ ── Death check: energy depleted ──
     penergy @ 0= IF
+      cancel-jbeam cancel-beam
       SHIP-POS C@ SHIP-POS 1 + C@
-      death-cause @ IF
+      death-cause @ 1 = IF
         \ Black hole — ship vanishes, no explosion
         restore-ship-bg
         DROP DROP
         0 17 at-xy
-        CHAR B rg-emit CHAR L rg-emit CHAR A rg-emit CHAR C rg-emit
-        CHAR K rg-emit  $20 rg-emit
-        CHAR H rg-emit CHAR O rg-emit CHAR L rg-emit CHAR E rg-emit
+        S" BLACK HOLE" rg-type
+      ELSE death-cause @ 2 = IF
+        \ Self-destruct — explosion already happened
+        DROP DROP
+        0 17 at-xy
+        S" DESTROYED" rg-type
       ELSE
         \ Energy depleted or star collision — ship explodes
         restore-ship-bg
         explode-ship
         0 17 at-xy
-        CHAR D rg-emit CHAR E rg-emit CHAR S rg-emit CHAR T rg-emit
-        CHAR R rg-emit CHAR O rg-emit CHAR Y rg-emit CHAR E rg-emit
-        CHAR D rg-emit
-      THEN
+        S" DESTROYED" rg-type
+      THEN THEN
       \ AGAIN? prompt — any key restarts
       0 18 at-xy
-      CHAR A rg-emit CHAR G rg-emit CHAR A rg-emit CHAR I rg-emit
-      CHAR N rg-emit CHAR ? rg-emit
+      S" AGAIN?" rg-type
       KEY DROP
       main EXIT
     THEN

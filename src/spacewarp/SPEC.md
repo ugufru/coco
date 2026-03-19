@@ -71,7 +71,9 @@ The CSS bit (PIA $FF22 bit 3) swaps the blue/red artifact assignment.
 | Masers / phasers | Blue | `10` |
 | Jovians (enemies) | Red/orange | `01` |
 | Enemy fire | Red/orange | `01` |
-| Explosions | Red/orange | `01` |
+| Explosions (hot) | White | `11` |
+| Explosions (warm) | Red/orange | `01` |
+| Explosions (cool) | Blue | `10` |
 | Stars and planets | Mixed (random) | `01`, `10`, `11` |
 | Text (status panel) | White | `11` |
 | Triton missiles | Blue (moving ball) | `10` |
@@ -141,6 +143,18 @@ gives approximately 10 characters per row in the status panel — tight, but
 workable with abbreviations. Alternatively, text can be rendered at full 256x192
 resolution (single-pixel white) for readability, accepting that text characters
 won't show artifact color (white only).
+
+### String Literals
+
+The fc.py cross-compiler supports `S"` and `."` string literals, which compile
+inline string data with a BRANCH-over-skip pattern. At runtime, `S"` pushes
+(addr len) on the stack; `."` additionally calls TYPE. The `rg-type` library
+word loops over a string calling `rg-emit` for each character.
+
+String literals save significant app space compared to per-character `CHAR X
+rg-emit` sequences (4 bytes/char vs ~1.2 bytes/char for strings of 10+
+characters). The status panel labels, title screen, briefing text, and death
+messages all use string literals.
 
 ## Game Architecture
 
@@ -215,7 +229,7 @@ stardates elapsed. Scale 1-250.
 | 4 | Deflectors | 3 digits (0-100) | Set shield energy percentage |
 | 5 | Masers | 3 digits (0-360) | Fire at angle, variable damage by distance |
 | 6 | Triton Missiles | 3 digits (0-360) | Fire at angle, one-hit kill, limited supply |
-| 7 | Self-Destruct | "123" + ENTER | Destroy ship and all Jovians in quadrant |
+| 7 | Self-Destruct | "123" + ENTER | Countdown 5→1, destroy ship + nearby Jovians |
 | Arrows | Ion Engines | Hold | Move within quadrant (real-time, concurrent) |
 
 Arrow keys work at all times, including while entering other commands. This is
@@ -233,6 +247,188 @@ the key real-time element — you can dodge enemy fire while typing a maser angl
 
 Higher levels also increase Jovian aggression (fire rate, movement frequency,
 tendency to attack bases).
+
+## Explosion System
+
+Explosions are animated expanding rings using the trig library. Each frame
+generates dots at random angles along a ring at increasing radius. Dots
+accumulate across frames (no per-frame erase), building an expanding cloud
+that transitions white → red → blue before a final erase.
+
+### Explosion Parameters
+
+| Type | Frames | Start R | End R | Dots/Frame | Blast R | Damage |
+|------|--------|---------|-------|------------|---------|--------|
+| Jovian | 6 | 2 | 12 | 20 | 12px | 30 |
+| Ship | 10 | 3 | 22 | 28 | — | — |
+| Base | 12 | 4 | 26 | 32 | 20px | 50 |
+| Self-destruct | 20 | 8 | 68 | 48 | 60px | 200 |
+
+### Color Schedule
+
+Computed from frame position relative to total frames:
+- First 30%: white (color 3) — hot core
+- Next 30%: red (color 2) — cooling
+- Next 25%: blue (color 1) — fading
+- Last 15%: erase only (no new dots drawn)
+
+### Proximity Damage
+
+After the explosion animation, Manhattan distance from explosion center is
+checked against all living Jovians and the ship. Entities within the blast
+radius take damage. Ship takes half the listed damage amount.
+
+Proximity-killed Jovians chain-explode (erase sprite, play Jovian-sized
+explosion) but secondary explosions do not trigger further proximity checks.
+A bitmask tracks which Jovians were killed per proximity pass.
+
+### Screen Rebuild
+
+After any kill, `refresh-after-kill` clears the tactical area (rows 0–143,
+4608 bytes VRAM) and fully redraws: border, stars, storm stars, event
+horizon, base, all living Jovians, and ship. The status panel is preserved.
+
+## Beam Line of Sight
+
+Both player masers and Jovian beams stop at the first non-black pixel in
+their path. After `beam-trace` computes the full Bresenham line,
+`beam-find-obstacle` scans the path buffer for the first entry with a
+non-zero saved pixel color and truncates the beam total there. This means
+beams are blocked by stars, sprites, the border, and any other visible
+object.
+
+Beam erase plots black (color 0) at beam pixel positions instead of
+restoring saved pixel values. This eliminates stale-pixel artifacts when
+sprites move after the beam was traced. The sprite refresh cycle (forced
+every frame while beams are active) redraws stars and sprites naturally.
+
+## Jovian AI
+
+### Overview
+
+Up to 3 Jovians occupy each quadrant. Each has a position (x, y in pixel
+coordinates), a health value (0–100, 0 = dead), a state byte, and a tick
+counter. The AI runs every frame via `tick-jovians` and `tick-jbeam`.
+
+### Movement
+
+Jovians chase the player ship at a speed that scales with difficulty level.
+Movement is gated by a frame counter per Jovian: when the tick counter reaches
+`jov-speed`, the Jovian moves 1 pixel toward the player and the counter resets.
+
+**Speed formula**: `jov-speed = 10 - level` (minimum 2). At level 1, Jovians
+move every 9 frames (~6.7 px/sec). At level 9, they move every 2 frames
+(~30 px/sec).
+
+**Direction**: Each axis moves independently by `sign(player - jovian)`,
+producing diagonal, horizontal, or vertical chase depending on relative
+position.
+
+**Bounds clamping**: Positions are clamped to 4–123 (x) and 4–139 (y) to keep
+sprites within the tactical view border.
+
+### Obstacle Avoidance
+
+Before committing a move, `jov-blocked?` checks the candidate position against
+all obstacles using Manhattan distance:
+
+| Obstacle | Avoidance radius |
+|----------|-----------------|
+| Stars | 6 px |
+| Black holes | 15 px |
+| Bases | 5 px |
+
+If the diagonal move is blocked, the AI tries x-only movement, then y-only
+movement. If all three are blocked, the Jovian stays put.
+
+### Gravity
+
+Jovians are affected by gravity wells just like the player ship. After
+`tick-jovians`, `jov-gravity` pulls living Jovians toward black holes and
+stars. A Jovian pulled into a black hole or star is killed (triggers explosion
+and `refresh-after-kill`).
+
+### Firing
+
+Jovian beams are managed by a cooldown timer (`jbeam-cool`). When the cooldown
+expires, `pick-jovian` selects a random living Jovian, and `fire-jbeam` fires
+a red beam toward the player.
+
+**Cooldown formula**: `150 - (level × 14)` frames (minimum 24).
+
+| Level | Cooldown | Fire rate |
+|-------|----------|-----------|
+| 1 | ~136 frames | every ~2.3 sec |
+| 5 | ~80 frames | every ~1.3 sec |
+| 9 | ~24 frames | every ~0.4 sec |
+
+**Beam direction**: The endpoint is calculated as `jovian_pos + (player_pos -
+jovian_pos) × 4`, giving a beam that extends well past the player. The origin
+is offset 5 pixels along the firing direction to avoid self-intersection.
+
+**Line of sight**: The beam path is traced via Bresenham and truncated at the
+first non-black pixel (same as player masers). Stars, sprites, and the border
+block Jovian fire.
+
+**Hit detection**: `jbeam-ship-hit?` checks whether any pixel in the beam path
+falls within the ship's bounding box (±4 px horizontal, ±3 px vertical from
+ship center).
+
+### Damage
+
+When a Jovian beam hits the player:
+
+- **Energy damage**: 5 points subtracted from `penergy` (clamped to 0)
+- **System damage**: A random system (ion engines, hyperdrive, scanners,
+  deflectors, or masers) takes 20 points of damage (out of 100)
+
+Jovians do not fire while the player is docked.
+
+### Data Structures
+
+```
+JOV-POS     6 bytes   (3 × 2: x,y per Jovian)
+JOV-DMG     3 bytes   (health: 100=full, 0=dead)
+JOV-STATE   3 bytes   (AI state per Jovian, currently unused — reserved)
+JOV-TICK    3 bytes   (frame counter per Jovian)
+JOV-OLDX    3 bytes   (previous x for sprite redraw)
+JOV-OLDY    3 bytes   (previous y for sprite redraw)
+```
+
+### Not Yet Implemented
+
+- FLEE state (retreat toward stars when health is low)
+- IDLE state (fire opportunistically without chasing)
+- Base targeting priority (Jovians should prefer attacking bases)
+- Jovian-to-Jovian collision avoidance
+- Inter-quadrant movement (Jovians moving between galaxy sectors)
+
+## Hyperdrive Energy Cost
+
+Warp cost = Manhattan distance × 2, capped at 10 energy maximum. Adjacent
+quadrant costs 2 energy; cross-galaxy costs 10.
+
+## Safe Spawn
+
+When entering a quadrant (warp or game start), the ship spawns at the center
+(64, 72). `safe-spawn` then checks Manhattan distance to all stars and the
+black hole. If any gravity source is within 35 pixels, the ship is relocated
+to a random position and rechecked, up to 16 attempts. This prevents spawning
+inside an inescapable gravity well.
+
+## Self-Destruct Sequence
+
+Self-destruct is state-driven and runs inside the game loop (non-blocking).
+
+- `sd-active` holds the current countdown (5→1, or 0 when inactive)
+- `sd-timer` counts down 30 frames (~0.5 sec) per step at 60Hz NTSC
+- `tick-destruct` is called each game loop frame to advance the countdown
+- During countdown, the game loop continues: ship can move, beams fire, etc.
+- Key input is routed to `sd-check-key` which matches the cancel sequence
+  7-1-2-3 (wrong keys reset progress)
+- On detonation: cancel all beams/missiles, erase ship, play self-destruct
+  explosion (largest ring), apply proximity damage, set `death-cause` to 2
+- `death-cause` 2 tells the death handler to skip the redundant ship explosion
 
 ## Docking
 
@@ -285,7 +481,7 @@ issues:
 
 ## Memory Map
 
-ROMs are paged out at boot (`STA $FFDE`), giving full 64K RAM.
+ROMs are paged out at boot (`STA $FFDF`), giving full 64K RAM.
 
 ```
 $0050–$007F   Kernel scratch variables (direct page)

@@ -22,21 +22,29 @@ Implemented:
 - Status panel with live readouts (stardate, energy, missiles, condition)
 - Arrow key movement with energy cost
 - Maser fire (command 5) with angle input, hit detection, beam erase
+- Jovian beam weapons with line-of-sight, hit detection, system damage
 - Triton missiles (command 6) with animated projectile, one-hit kill
+- Hyperdrive (command 2, warp between quadrants with energy cost)
+- Deflectors (command 4, shield energy vs maser tradeoff)
+- Self-destruct (command 7, countdown with cancel sequence, proximity damage)
 - Docking at bases (fly onto base to repair, resupply, restore energy)
 - Black hole gravity wells (30px radius, tiered pull, invisible, instant death)
 - Star gravity wells (10px radius, gentle pull) and star collision (lethal)
 - Energy model (movement, masers, missiles all cost energy; 0% = destroyed)
 - Galaxy generation (8x8 grid, random placement scaled by difficulty)
+- Jovian AI (movement toward ship/base, firing, proximity-triggered attacks)
+- Animated explosions (expanding rings, white/red/blue color schedule, chain explosions)
+- SOS alerts (base under attack notification with coordinates)
+- Title screen with level select (1-9), mission briefing
+- Death/restart flow (black hole, destroyed, self-destruct, AGAIN? prompt)
+- String literals (`S"`, `."`) in fc.py for compact text output via `rg-type`
 - Object redraw after sprite erase (stars/base/jovians persist correctly)
 
 Not yet implemented:
-- Jovian AI (movement, firing, targeting)
-- Hyperdrive (command 2, warp between quadrants)
+- Damage report (command 1, system status display)
 - Long range scan (command 3, galaxy map)
-- Damage report (command 1), deflectors (command 4), self-destruct (command 7)
 - Ship damage system (5 degradable systems)
-- SOS alerts, magnetic storms, scoring, win/lose conditions, title screen
+- Magnetic storms, scoring, win/lose conditions
 
 ## Performance
 
@@ -52,7 +60,7 @@ tightest loops.  These are called hundreds of times per frame:
 | spr-erase-box | Erase sprite bbox (per pixel) | — | ~35 cy | new |
 | rg-char | Render font glyph | ~900 cy | ~320 cy | 3× |
 
-BASIC ROMs are paged out at startup (`$FFDE`) to reclaim the upper 32K
+BASIC ROMs are paged out at startup (`$FFDF`) to reclaim the upper 32K
 as RAM.
 
 ## References

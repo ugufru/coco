@@ -82,6 +82,8 @@ def kernel_words(symbols):
         'rshift':   'CFA_RSHIFT',
         'negate':   'CFA_NEGATE',
         '?dup':     'CFA_QDUP',
+        'type':     'CFA_TYPE',
+        'count':    'CFA_COUNT',
     }
     result = {}
     for forth_name, sym_name in names.items():
@@ -160,7 +162,9 @@ def tokenize(source, base_dir=None):
             in_code_block = True
             continue
 
-        # Process normal tokens
+        # Process normal tokens, with special handling for string literals.
+        # S" and ." need the raw text up to the closing " (preserving spaces).
+        # We extract them from the original line rather than from split tokens.
         i = 0
         while i < len(tokens_on_line):
             tok = tokens_on_line[i]
@@ -170,6 +174,30 @@ def tokenize(source, base_dir=None):
                 filepath = (Path(base_dir) / filename) if base_dir else Path(filename)
                 included = tokenize(filepath.read_text(), base_dir=filepath.parent)
                 result.extend(included)
+            elif tok in ('S"', 's"', '."'):
+                # Find this token in the line and extract text until closing "
+                # Locate the S" or ." token followed by a space in the line
+                marker = tok
+                # Find position after the marker+space in the line
+                idx = line.find(marker)
+                start = idx + len(marker)
+                # Skip the single space that Forth requires after S"/."
+                if start < len(line) and line[start] == ' ':
+                    start += 1
+                # Find closing quote
+                end = line.find('"', start)
+                if end < 0:
+                    raise SyntaxError(f'Unterminated {marker} string literal')
+                string_text = line[start:end]
+                # Emit as a single __SLIT__ or __DOTSLIT__ token + string content
+                result.append(marker)
+                result.append('__STR__' + string_text)
+                # Skip all remaining split tokens that came from this string
+                # by finding which tokens are past the closing quote
+                rest_of_line = line[end + 1:]
+                tokens_on_line = rest_of_line.split()
+                i = 0
+                continue
             else:
                 result.append(tok)
             i += 1
@@ -267,6 +295,25 @@ def parse(tokens):
                 raise SyntaxError(f"CONSTANT {const_name!r} must follow a literal value")
             val = main_thread.pop()[1]
             definitions[const_name] = [('lit', val)]
+
+        elif tok == 'S"' or tok == 's"':
+            i += 1
+            raw = tokens[i]
+            if not raw.startswith('__STR__'):
+                raise SyntaxError('S" string not properly tokenized')
+            text = raw[7:]  # strip __STR__ prefix
+            item = ('slit', text)
+            (current_items if current_def else main_thread).append(item)
+
+        elif tok == '."':
+            i += 1
+            raw = tokens[i]
+            if not raw.startswith('__STR__'):
+                raise SyntaxError('." string not properly tokenized')
+            text = raw[7:]
+            target = current_items if current_def else main_thread
+            target.append(('slit', text))
+            target.append(('word', 'type'))
 
         elif tok.upper() == 'CHAR':
             i += 1
@@ -445,6 +492,9 @@ def item_size(item):
     """Bytes emitted for a single IR item."""
     kind = item[0]
     if kind == 'lit':        return 4    # CFA_LIT (2) + value (2)
+    if kind == 'slit':                   # S" string literal
+        slen = len(item[1])
+        return 4 + slen + 8             # BRANCH(2) + offset(2) + chars + LIT(2)+addr(2) + LIT(2)+len(2)
     if kind == 'label':      return 0    # marker only, no bytes
     if kind == 'do':         return 2    # CFA_DO
     if kind == 'loop_back':  return 4    # CFA_LOOP (2) + offset cell (2)
@@ -557,6 +607,24 @@ def compile_forth(definitions, variables, main_thread, code_definitions,
         if kind == 'lit':
             emit_word(CFA_LIT)
             emit_word(item[1])
+        elif kind == 'slit':
+            text = item[1]
+            slen = len(text)
+            # BRANCH over the string data
+            emit_word(CFA_BRANCH)
+            offset_cell_addr = app_base + len(buf)
+            # offset = bytes to skip: slen bytes of string data
+            # target is the LIT word after the string data
+            # from (offset_cell_addr + 2), skip slen bytes
+            emit_word(slen)
+            # String data (raw ASCII bytes)
+            str_addr = app_base + len(buf)
+            buf.extend(text.encode('ascii'))
+            # LIT addr, LIT len
+            emit_word(CFA_LIT)
+            emit_word(str_addr)
+            emit_word(CFA_LIT)
+            emit_word(slen)
         elif kind == 'label':
             pass    # 0 bytes; position already recorded in label_map
         elif kind == 'do':

@@ -60,3 +60,9 @@ CODE rg-char
         PULS    X               ; restore IP
         ;NEXT
 ;CODE
+
+\ ── rg-type ( addr len -- ) ──────────────────────────────────────────
+\ Output len characters to RG-mode VRAM using rg-emit.
+\ Requires rg-emit to be defined (app-level word using rg-char).
+
+: rg-type  ( addr len -- )  0 DO  DUP I + C@ rg-emit  LOOP  DROP ;

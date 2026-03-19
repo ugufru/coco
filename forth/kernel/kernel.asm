@@ -133,6 +133,10 @@ VAR_RGGLYPHSZ   FCB     8       ; bytes per glyph
 VAR_RGNROWS     FCB     8       ; rows to copy per glyph
 VAR_RGBPR       FCB     32      ; bytes per VRAM row
 VAR_RGROWH      FCB     10      ; row height for cy positioning (pixels)
+;;; Beam system scratch (used by beam-trace/draw-slice/restore-slice in beam.fs)
+VAR_BEAM_BUF    FDB     0       ; path buffer pointer (during trace/draw/restore)
+VAR_BEAM_VRAM   FDB     0       ; VRAM byte address scratch
+VAR_BEAM_CNT    FDB     0       ; pixel count / loop counter scratch
 
 ;;; ─── Bootstrap ──────────────────────────────────────────────────────────────
 ;;; DECB exec address points here.  Runs once at load time, then never again.
@@ -232,6 +236,8 @@ CFA_LSHIFT      FDB     CODE_LSHIFT
 CFA_RSHIFT      FDB     CODE_RSHIFT
 CFA_NEGATE      FDB     CODE_NEGATE
 CFA_QDUP        FDB     CODE_QDUP
+CFA_TYPE        FDB     CODE_TYPE
+CFA_COUNT       FDB     CODE_COUNT
 
 
 ;;; ─── EXIT ( -- ) ─────────────────────────────────────────────────────────────
@@ -991,6 +997,51 @@ CODE_QDUP
         BEQ     QDUP_DONE       ; zero → leave stack unchanged
         STD     ,--U            ; non-zero → push duplicate
 QDUP_DONE
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── TYPE ( addr len -- ) ───────────────────────────────────────────────────
+;;; Output len characters starting at addr to the VDG text screen.
+;;; Calls EMIT logic inline for speed (same encoding: $40 | (ascii & $3F)).
+
+CODE_TYPE
+        PSHS    X               ; save IP — S: [IP]
+        LDD     ,U              ; D = count (TOS)
+        BEQ     TYPE_DONE       ; zero count → skip
+        LDX     2,U             ; X = string address (NOS)
+        PSHS    D               ; save count — S: [count, IP]
+TYPE_LP LDA     ,X+             ; A = next char
+        PSHS    X               ; save string ptr — S: [ptr, count, IP]
+        ANDA    #$3F            ; strip to 6-bit VDG
+        ORA     #$40            ; set normal-video bit
+        LDY     VAR_CUR
+        STA     SCREEN,Y
+        LEAY    1,Y
+        CMPY    #NSCR
+        BLO     TYPE_NOK
+        LDY     #0
+TYPE_NOK STY    VAR_CUR
+        PULS    X               ; restore string ptr — S: [count, IP]
+        LDD     ,S              ; load count
+        SUBD    #1
+        STD     ,S              ; save decremented count
+        BNE     TYPE_LP
+        LEAS    2,S             ; pop count — S: [IP]
+TYPE_DONE
+        LEAU    4,U             ; drop both args
+        PULS    X               ; restore IP
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── COUNT ( c-addr -- addr+1 len ) ────────────────────────────────────────
+;;; Convert a counted string (length byte + chars) to addr+len form.
+
+CODE_COUNT
+        LDY     ,U              ; Y = c-addr
+        LDB     ,Y+             ; B = length byte
+        STY     ,U              ; replace c-addr with addr+1
+        CLRA                    ; D = 0:len
+        STD     ,--U            ; push len
         LDY     ,X++            ; NEXT
         JMP     [,Y]
 
