@@ -106,8 +106,8 @@ CODE plot-dots
 
 \ ── Galaxy array ─────────────────────────────────────────────────────────
 
-\ Game data starts at $7600 (above font which ends at $75D8).
-$7600 CONSTANT GALAXY          \ 64 bytes: 8x8 quadrant data
+\ Game data starts at $7620 (above app code).
+$7620 CONSTANT GALAXY          \ 64 bytes: 8x8 quadrant data
 
 : gal-addr  ( col row -- addr )  8 * + GALAXY + ;
 : gal@  ( col row -- byte )  gal-addr C@ ;
@@ -155,14 +155,14 @@ VARIABLE pdmg-masr             \ maser damage
 \ tactical view (2-125, 2-141).
 
 \ Position arrays (2 bytes each: x then y)
-$7640 CONSTANT STAR-POS        \ 5 stars x 2 bytes = 10 bytes
-$764A CONSTANT JOV-POS         \ 3 jovians x 2 bytes = 6 bytes
-$7650 CONSTANT BASE-POS        \ 1 base x 2 bytes = 2 bytes
-$7652 CONSTANT BHOLE-POS       \ 1 black hole x 2 bytes = 2 bytes
-$7654 CONSTANT SHIP-POS        \ player ship x 2 bytes = 2 bytes
+$7660 CONSTANT STAR-POS        \ 5 stars x 2 bytes = 10 bytes
+$766A CONSTANT JOV-POS         \ 3 jovians x 2 bytes = 6 bytes
+$7670 CONSTANT BASE-POS        \ 1 base x 2 bytes = 2 bytes
+$7672 CONSTANT BHOLE-POS       \ 1 black hole x 2 bytes = 2 bytes
+$7674 CONSTANT SHIP-POS        \ player ship x 2 bytes = 2 bytes
 
 \ Jovian damage (3 bytes, one per jovian: 100=full health, 0=dead)
-$7656 CONSTANT JOV-DMG         \ 3 bytes
+$7676 CONSTANT JOV-DMG         \ 3 bytes
 
 \ Quadrant object counts (from the packed byte, cached for speed)
 VARIABLE qstars                \ star count in current quadrant
@@ -185,20 +185,20 @@ VARIABLE death-cause               \ 0=energy/star, 1=black hole
 \ 7x5 pixel sprites in 2bpp artifact-color format.
 \ Built at init time using datawrite helpers (tb).
 
-$7700 CONSTANT SPR-SHIP           \ Endever: blue chevron (12 bytes)
-$770C CONSTANT SPR-JOV            \ Jovian: red diamond (12 bytes)
-$7718 CONSTANT SPR-BASE           \ UP base: blue cross (12 bytes)
-$7724 CONSTANT SPR-MSL1           \ Missile frame 1: + shape (12 bytes)
-$7730 CONSTANT SPR-MSL2           \ Missile frame 2: x shape (12 bytes)
+$7720 CONSTANT SPR-SHIP           \ Endever: blue chevron (12 bytes)
+$772C CONSTANT SPR-JOV            \ Jovian: red diamond (12 bytes)
+$7738 CONSTANT SPR-BASE           \ UP base: blue cross (12 bytes)
+$7744 CONSTANT SPR-MSL1           \ Missile frame 1: + shape (12 bytes)
+$7750 CONSTANT SPR-MSL2           \ Missile frame 2: x shape (12 bytes)
 
 \ ── Jovian AI data structures ────────────────────────────────────────────
-$773C CONSTANT JOV-STATE        \ 3 bytes: 0=attack, 1=flee, 2=idle
-$773F CONSTANT JOV-TICK         \ 3 bytes: per-Jovian frame counter
-$7742 CONSTANT JOV-BG0          \ 20 bytes: bg save buffer Jovian 0
-$7756 CONSTANT JOV-BG1          \ 20 bytes: bg save buffer Jovian 1
-$776A CONSTANT JOV-BG2          \ 20 bytes: bg save buffer Jovian 2
-$777E CONSTANT JOV-OLDX         \ 3 bytes: previous x per Jovian
-$7781 CONSTANT JOV-OLDY         \ 3 bytes: previous y per Jovian
+$775C CONSTANT JOV-STATE        \ 3 bytes: 0=attack, 1=flee, 2=idle
+$775F CONSTANT JOV-TICK         \ 3 bytes: per-Jovian frame counter
+$7762 CONSTANT JOV-BG0          \ 20 bytes: bg save buffer Jovian 0
+$7776 CONSTANT JOV-BG1          \ 20 bytes: bg save buffer Jovian 1
+$778A CONSTANT JOV-BG2          \ 20 bytes: bg save buffer Jovian 2
+$779E CONSTANT JOV-OLDX         \ 3 bytes: previous x per Jovian
+$77A1 CONSTANT JOV-OLDY         \ 3 bytes: previous y per Jovian
 
 : jov-bg  ( i -- addr )
   DUP 0= IF DROP JOV-BG0 EXIT THEN
@@ -427,7 +427,7 @@ VARIABLE ss-safe
   init-font
   rv @ cv !  32 cb !
   rv @ $57 !                    \ kernel VRAM base
-  $7400 $75 !                   \ font base
+  $9000 $75 !                   \ font base (all-RAM region)
   $20 $77 C!                    \ min char (space)
   8 $78 C!                      \ bytes per glyph
   8 $79 C!                      \ rows to copy
@@ -581,7 +581,7 @@ VARIABLE old-sy                   \ previous ship y
 \ ── Background save/restore for flicker-free ship movement ────────────
 \ Save 4 bytes × 5 rows of VRAM under the sprite bounding box.
 \ Restore to erase without a black flash.
-$76D0 CONSTANT SHIP-BG              \ 20-byte save buffer
+$76F0 CONSTANT SHIP-BG              \ 20-byte save buffer
 
 CODE bg-save   \ ( buf x y -- )  save 4×5 VRAM bytes to buf
         PSHS    X
@@ -648,7 +648,7 @@ CODE bg-restore  \ ( buf x y -- )  restore 4×5 VRAM bytes from buf
   SHIP-BG old-sx @ 3 - old-sy @ 2 - bg-restore ;
 
 \ Missile background buffer
-$76E4 CONSTANT MSL-BG                \ 20-byte save buffer
+$7704 CONSTANT MSL-BG                \ 20-byte save buffer
 
 : save-msl-bg  ( -- )
   MSL-BG msl-scrx 2 - msl-scry 2 - bg-save ;
@@ -750,17 +750,43 @@ VARIABLE jblk
   THEN
   jblk @ ;
 
-\ Try to move one Jovian toward the player (index in jbg-i)
+\ Try to move one Jovian toward a target (index in jbg-i)
+VARIABLE jov-tx                   \ movement target x
+VARIABLE jov-ty                   \ movement target y
+VARIABLE base-attack              \ frame counter for base destruction
+
+\ Does this Jovian target the base?
+\ Jovian 0 always attacks base; wounded Jovians (DMG < 50) flee to base
+: jov-targets-base?  ( -- flag )
+  qbase @ 0= IF 0 EXIT THEN
+  jbg-i @ 0= IF 1 EXIT THEN
+  JOV-DMG jbg-i @ + C@ 50 < IF 1 EXIT THEN
+  0 ;
+
+: jov-target  ( -- )
+  jov-targets-base? IF
+    BASE-POS C@ jov-tx !  BASE-POS 1 + C@ jov-ty !
+  ELSE
+    SHIP-POS C@ jov-tx !  SHIP-POS 1 + C@ jov-ty !
+  THEN ;
+
 : move-one-jovian  ( -- )
   \ Get current position into sg-sx, sg-sy (reuse star gravity scratch)
   JOV-POS jbg-i @ 2 * + C@ sg-sx !
   JOV-POS jbg-i @ 2 * + 1 + C@ sg-sy !
-  \ Compute proposed position: cur + sign(player - cur), clamped
-  SHIP-POS C@ sg-sx @ - sign sg-sx @ +
+  \ Pick movement target
+  jov-target
+  \ Base-targeting Jovians stop at 30px from base (attack from range)
+  jov-targets-base? IF
+    sg-sx @ BASE-POS C@ - abs
+    sg-sy @ BASE-POS 1 + C@ - abs + 30 < IF EXIT THEN
+  THEN
+  \ Compute proposed position: cur + sign(target - cur), clamped
+  jov-tx @ sg-sx @ - sign sg-sx @ +
   DUP 4 < IF DROP sg-sx @ THEN
   DUP 123 > IF DROP sg-sx @ THEN
   jtk-nx !
-  SHIP-POS 1 + C@ sg-sy @ - sign sg-sy @ +
+  jov-ty @ sg-sy @ - sign sg-sy @ +
   DUP 4 < IF DROP sg-sy @ THEN
   DUP 139 > IF DROP sg-sy @ THEN
   jtk-ny !
@@ -1213,7 +1239,7 @@ VARIABLE pj-result
 
 \ Storm star positions saved at quadrant entry for redraw.
 \ Max 25 fake stars (5 real × 5 fake). 3 bytes each: x, y, color.
-$7660 CONSTANT FSTAR-POS          \ 25 × 3 = 75 bytes
+$7680 CONSTANT FSTAR-POS          \ 25 × 3 = 75 bytes
 VARIABLE fstar-count
 
 VARIABLE fs-tmp
@@ -1244,7 +1270,7 @@ VARIABLE fs-tmp
 
 \ Spiral dot positions precomputed at quadrant entry.
 \ 4 arms × 8 dots = 32 dots max. 2 bytes each (x, y).
-$7690 CONSTANT SPIRAL-POS         \ 32 × 2 = 64 bytes
+$76B0 CONSTANT SPIRAL-POS         \ 32 × 2 = 64 bytes
 VARIABLE spiral-count
 
 VARIABLE sp-r
@@ -1910,7 +1936,7 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
   draw-quadrant
   draw-panel
   0 docked !  0 prev-docked !
-  0 jov-moved !
+  0 jov-moved !  0 base-attack !
   jbeam-cooldown jbeam-cool !
   0 msl-dirty ! ;
 
@@ -2176,6 +2202,54 @@ VARIABLE prev-key                 \ last key seen by KEY?
   S" GOOD LUCK" rg-type
   KEY DROP ;
 
+\ ── Base destruction by Jovians ──────────────────────────────────────
+\ When any Jovian is within 30px of the base, base-attack increments.
+\ At 180 frames (~3 seconds) the base is destroyed.
+
+: destroy-base  ( -- )
+  cancel-jbeam cancel-beam
+  \ Cancel active missile
+  msl-active @ IF
+    SPR-MSL1 msl-px @ 2 - msl-py @ 2 - spr-erase-box
+    0 msl-active !
+  THEN
+  \ Erase base sprite
+  SPR-BASE BASE-POS C@ 3 - BASE-POS 1 + C@ 2 - spr-erase-box
+  \ Clear quadrant state
+  0 qbase !
+  \ Clear base bit in galaxy byte
+  pcol @ prow @ gal@ $FB AND pcol @ prow @ gal!
+  \ Explode at base position
+  BASE-POS C@ BASE-POS 1 + C@ explode-base
+  refresh-after-kill
+  draw-panel
+  1 check-win !
+  \ Undock if docked
+  docked @ IF 0 docked ! THEN
+  0 base-attack ! ;
+
+VARIABLE jnb-result
+: jov-near-base?  ( -- flag )
+  qbase @ 0= IF 0 EXIT THEN
+  0 jnb-result !
+  qjovians @ ?DUP IF 0 DO
+    JOV-DMG I + C@ IF
+      JOV-POS I 2 * + C@ BASE-POS C@ - abs
+      JOV-POS I 2 * + 1 + C@ BASE-POS 1 + C@ - abs + 30 < IF
+        1 jnb-result !
+      THEN
+    THEN
+  LOOP THEN
+  jnb-result @ ;
+
+: tick-base-attack  ( -- )
+  jov-near-base? IF
+    base-attack @ 1 + DUP base-attack !
+    180 = IF destroy-base THEN
+  ELSE
+    0 base-attack !
+  THEN ;
+
 : main  ( -- )
   rg-init
   init-text
@@ -2206,7 +2280,7 @@ VARIABLE prev-key                 \ last key seen by KEY?
   0 jbeam-total !  0 jbeam-hit-ship !  jbeam-cooldown jbeam-cool !
   0 msl-active !  0 msl-dirty !
   0 docked !  0 prev-docked !  0 death-cause !
-  0 sd-active !
+  0 sd-active !  0 base-attack !
   0 jov-moved !
   0 check-win !
   100 prev-energy !
@@ -2223,6 +2297,7 @@ VARIABLE prev-key                 \ last key seen by KEY?
     tick-dock
     tick-missile
     tick-jovians
+    tick-base-attack
     jov-gravity
     tick-jbeam
     tick-destruct
