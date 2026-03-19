@@ -1,74 +1,137 @@
 # BARE NAKED SPACE WARP
 
-A reimplementation of Joshua Lavinsky's Space Warp (1980, Personal Software /
-Radio Shack) for the TRS-80 Color Computer, written in Bare Naked Forth.
+A real-time space combat game for the TRS-80 Color Computer, written from
+scratch in Bare Naked Forth — a custom ITC Forth kernel running on bare metal
+with no BASIC ROMs, no OS, and no safety net.
 
-The original was a 4K Z-80 machine language real-time space combat game for the
-TRS-80 Model I — one of the first real-time action games on a home computer,
-predating Atari's Star Raiders by a year. This version preserves the original
-gameplay while taking advantage of the CoCo's color graphics via RG6 NTSC
-artifact coloring.
+## The Original
+
+In 1978, Joshua Lavinsky fit a real-time Star Trek game into 4,096 bytes of
+Z-80 assembly. Multiply, divide, cosine, random numbers, line drawing, sound,
+and dual-threaded game logic — all in 4K. Published by Personal Software (later
+VisiCorp, of VisiCalc fame) as *Time Trek*, it was rebranded *Space Warp* for
+Radio Shack's TRS-80 Model I. It predates Atari's *Star Raiders* by a year.
+
+The Enterprise became the Endever. Klingons became Jovians. Phasers became
+masers. But the gameplay survived intact: an 8x8 galaxy, a lone starship,
+a fleet to destroy, and bases to defend — all in real time.
+
+## This Version
+
+This is not a port. The original Z-80 code doesn't transfer to the 6809. This
+is a from-scratch reimplementation that preserves the original gameplay while
+exploiting what makes the CoCo different: NTSC artifact coloring gives us four
+colors from a monochrome framebuffer, and the 6809's clean architecture lets us
+build a real Forth system to write the game in.
+
+The entire game — galaxy generation, AI, sprite engine, weapon systems, text
+rendering — is written in Forth source compiled by a cross-compiler (`fc.py`)
+into ITC threaded code, with a handful of assembly CODE words for the inner
+pixel loops. The Forth kernel runs in all-RAM mode with BASIC ROMs paged out,
+giving the game the full 64K address space.
+
+No line of this game touches a ROM routine. Every pixel is plotted by hand.
+Every keystroke is read from the PIA. The CoCo is running nothing but the
+game.
+
+### Artifact Color
+
+The CoCo's RG6 mode is officially 256x192 monochrome. But on an NTSC display,
+adjacent pixel pairs create color through chroma interference:
+
+| Bit pair | Color |
+|----------|-------|
+| `00` | Black |
+| `11` | White |
+| `10` | Blue (Endever, bases, masers) |
+| `01` | Red/orange (Jovians, their beams) |
+
+The Endever is a blue chevron. Jovians are red diamonds. Maser beams streak
+blue; Jovian beams burn red. Stars scatter in all four colors. The color
+coding is functional — you can read the tactical display at a glance.
+
+## What's In the Game
+
+**Galaxy.** 64 quadrants in an 8x8 grid, randomly seeded with stars, Jovian
+warships, UP bases, black holes, and magnetic storms. Difficulty level (1-9)
+scales the fleet from 8 to 80+ ships.
+
+**Tactical combat.** Arrow keys move the Endever. Jovians chase you — or the
+base, if there's one to attack. Masers fire at any angle, tracing a visible
+beam across the display. Triton missiles track toward the nearest Jovian.
+Everything happens at 60fps with smooth sprite animation.
+
+**Jovian AI.** Jovians path toward their target, avoid stars and black holes,
+and fire red beams when they have line of sight. The first Jovian in a
+quadrant prioritizes attacking the base; wounded Jovians flee to the base
+instead of chasing you. If they hold position near a base long enough, it's
+destroyed.
+
+**Physics.** Black holes are invisible 30px gravity wells — tiered pull
+strength, instant death on contact. Stars have their own gentle gravity.
+Both affect Jovians too: a black hole will swallow a Jovian as happily as
+it swallows you.
+
+**Base defense.** Fly onto a base to dock: energy recharges, systems repair,
+missiles resupply. But Jovians target bases. Leave one undefended too long
+and it explodes. Lose all bases and the galaxy falls.
+
+**Seven commands:**
+
+| Key | Command |
+|-----|---------|
+| 1 | Damage report — system health for all five subsystems |
+| 2 | Hyperdrive — warp to any quadrant (energy cost scales with distance) |
+| 3 | Long range scan — 3x3 galaxy map centered on your position |
+| 4 | Deflectors — adjust shield strength (trades maser power for defense) |
+| 5 | Maser — fire at an angle (0-360), beam traces across the display |
+| 6 | Triton missile — homing projectile, one-hit kill, limited supply |
+| 7 | Self-destruct — 10-second countdown, massive blast radius |
+
+**Win** by destroying every Jovian with at least one base still standing.
+**Lose** if all bases are destroyed, you run out of energy, you fly into a
+black hole, or you detonate your own ship.
+
+## Technical Notes
+
+The game is about 22K of compiled Forth plus a 1.2K kernel — nearly filling
+the available address space. Performance-critical graphics primitives are
+hand-written 6809 assembly, called as CODE words from Forth:
+
+| Primitive | What it does | Speedup vs Forth |
+|-----------|-------------|-----------------|
+| `rg-pset` | Plot one artifact pixel | 11x |
+| `rg-line` | Bresenham line (per pixel) | 10x |
+| `spr-draw` | Draw 7x5 sprite with transparency | 12x |
+| `spr-erase-box` | Erase sprite bounding box | new (no Forth equivalent) |
+| `rg-char` | Render font glyph to VRAM | 3x |
+| `beam-trace` | Trace beam path with hit detection | new |
+| `plot-dots` | Bulk pixel plotter for explosions | new |
+
+Everything else — the game loop, AI, galaxy model, command input, explosion
+animation, docking, gravity — is pure Forth.
+
+## Building
+
+Requires the Bare Naked Forth kernel (built separately) and Python 3 for the
+cross-compiler:
+
+```
+cd forth/kernel && make        # build kernel
+cd src/spacewarp && make       # build game
+make run                       # launch in XRoar emulator
+```
 
 ## Documents
 
 - [USERGUIDE.md](USERGUIDE.md) — complete gameplay guide
 - [SPEC.md](SPEC.md) — technical specification and architecture
 
-## Current State
-
-Implemented:
-- RG6 NTSC artifact-color display (128x192 effective, 4 colors)
-- Tactical view with border, stars, base, Jovians, ship sprites
-- Status panel with live readouts (stardate, energy, missiles, condition)
-- Arrow key movement with energy cost
-- Maser fire (command 5) with angle input, hit detection, beam erase
-- Jovian beam weapons with line-of-sight, hit detection, system damage
-- Triton missiles (command 6) with animated projectile, one-hit kill
-- Hyperdrive (command 2, warp between quadrants with energy cost)
-- Deflectors (command 4, shield energy vs maser tradeoff)
-- Self-destruct (command 7, countdown with cancel sequence, proximity damage)
-- Docking at bases (fly onto base to repair, resupply, restore energy)
-- Black hole gravity wells (30px radius, tiered pull, invisible, instant death)
-- Star gravity wells (10px radius, gentle pull) and star collision (lethal)
-- Energy model (movement, masers, missiles all cost energy; 0% = destroyed)
-- Galaxy generation (8x8 grid, random placement scaled by difficulty)
-- Jovian AI (movement toward ship/base, firing, proximity-triggered attacks)
-- Animated explosions (expanding rings, white/red/blue color schedule, chain explosions)
-- SOS alerts (base under attack notification with coordinates)
-- Title screen with level select (1-9), mission briefing
-- Death/restart flow (black hole, destroyed, self-destruct, AGAIN? prompt)
-- String literals (`S"`, `."`) in fc.py for compact text output via `rg-type`
-- Object redraw after sprite erase (stars/base/jovians persist correctly)
-
-Not yet implemented:
-- Damage report (command 1, system status display)
-- Long range scan (command 3, galaxy map)
-- Ship damage system (5 degradable systems)
-- Magnetic storms, scoring, win/lose conditions
-
-## Performance
-
-Graphics-intensive primitives are implemented as 6809 assembly kernel
-primitives rather than ITC Forth, eliminating threading overhead in the
-tightest loops.  These are called hundreds of times per frame:
-
-| Primitive | Function | ITC Forth | Kernel asm | Speedup |
-|-----------|----------|-----------|------------|---------|
-| rg-pset | Plot one artifact pixel | ~500 cy | ~45 cy | 11× |
-| rg-line | Bresenham line (per pixel) | ~1500 cy | ~150 cy | 10× |
-| spr-draw | Draw sprite (per pixel) | ~700 cy | ~60 cy | 12× |
-| spr-erase-box | Erase sprite bbox (per pixel) | — | ~35 cy | new |
-| rg-char | Render font glyph | ~900 cy | ~320 cy | 3× |
-
-BASIC ROMs are paged out at startup (`$FFDF`) to reclaim the upper 32K
-as RAM.
-
 ## References
 
-The `refs/` directory contains reference materials from the original game:
+The `refs/` directory contains materials from the original game:
 
-- `TimeTrekDesignDoc.pdf` — Lavinsky's original design document with flowcharts,
-  memory maps, subroutine listings, and entry points
+- `TimeTrekDesignDoc.pdf` — Lavinsky's original design document with
+  flowcharts, memory maps, and subroutine listings
 - `Josh Lavinsky Interview.pdf` — interview about the development of Time Trek
-- `pic*.webp` — screenshots from the original game showing tactical view,
-  scanner, damage report, docking, combat, mission briefing, and box art
+- `pic*.webp` — screenshots from the original TRS-80 Model I version
