@@ -92,7 +92,7 @@ CODE plot-dots
 \  GALAXY DATA MODEL
 \ ══════════════════════════════════════════════════════════════════════════
 \
-\ Galaxy: 8x8 = 64 quadrants, 1 byte each at GALAXY ($7600).
+\ Galaxy: 8x8 = 64 quadrants, 1 byte each at GALAXY ($7640).
 \ Packed format per byte:
 \   bit 7    = magnetic storm (1=yes)
 \   bit 6    = black hole (1=yes)
@@ -106,8 +106,8 @@ CODE plot-dots
 
 \ ── Galaxy array ─────────────────────────────────────────────────────────
 
-\ Game data starts at $7620 (above app code).
-$7620 CONSTANT GALAXY          \ 64 bytes: 8x8 quadrant data
+\ Game data starts at $7640 (above app code).
+$7640 CONSTANT GALAXY          \ 64 bytes: 8x8 quadrant data
 
 : gal-addr  ( col row -- addr )  8 * + GALAXY + ;
 : gal@  ( col row -- byte )  gal-addr C@ ;
@@ -155,14 +155,14 @@ VARIABLE pdmg-masr             \ maser damage
 \ tactical view (2-125, 2-141).
 
 \ Position arrays (2 bytes each: x then y)
-$7660 CONSTANT STAR-POS        \ 5 stars x 2 bytes = 10 bytes
-$766A CONSTANT JOV-POS         \ 3 jovians x 2 bytes = 6 bytes
-$7670 CONSTANT BASE-POS        \ 1 base x 2 bytes = 2 bytes
-$7672 CONSTANT BHOLE-POS       \ 1 black hole x 2 bytes = 2 bytes
-$7674 CONSTANT SHIP-POS        \ player ship x 2 bytes = 2 bytes
+$7680 CONSTANT STAR-POS        \ 5 stars x 2 bytes = 10 bytes
+$768A CONSTANT JOV-POS         \ 3 jovians x 2 bytes = 6 bytes
+$7690 CONSTANT BASE-POS        \ 1 base x 2 bytes = 2 bytes
+$7692 CONSTANT BHOLE-POS       \ 1 black hole x 2 bytes = 2 bytes
+$7694 CONSTANT SHIP-POS        \ player ship x 2 bytes = 2 bytes
 
 \ Jovian damage (3 bytes, one per jovian: 100=full health, 0=dead)
-$7676 CONSTANT JOV-DMG         \ 3 bytes
+$7696 CONSTANT JOV-DMG         \ 3 bytes
 
 \ Quadrant object counts (from the packed byte, cached for speed)
 VARIABLE qstars                \ star count in current quadrant
@@ -185,20 +185,20 @@ VARIABLE death-cause               \ 0=energy/star, 1=black hole
 \ 7x5 pixel sprites in 2bpp artifact-color format.
 \ Built at init time using datawrite helpers (tb).
 
-$7720 CONSTANT SPR-SHIP           \ Endever: blue chevron (12 bytes)
-$772C CONSTANT SPR-JOV            \ Jovian: red diamond (12 bytes)
-$7738 CONSTANT SPR-BASE           \ UP base: blue cross (12 bytes)
-$7744 CONSTANT SPR-MSL1           \ Missile frame 1: + shape (12 bytes)
-$7750 CONSTANT SPR-MSL2           \ Missile frame 2: x shape (12 bytes)
+$7740 CONSTANT SPR-SHIP           \ Endever: blue chevron (12 bytes)
+$774C CONSTANT SPR-JOV            \ Jovian: red diamond (12 bytes)
+$7758 CONSTANT SPR-BASE           \ UP base: blue cross (12 bytes)
+$7764 CONSTANT SPR-MSL1           \ Missile frame 1: + shape (12 bytes)
+$7770 CONSTANT SPR-MSL2           \ Missile frame 2: x shape (12 bytes)
 
 \ ── Jovian AI data structures ────────────────────────────────────────────
-$775C CONSTANT JOV-STATE        \ 3 bytes: 0=attack, 1=flee, 2=idle
-$775F CONSTANT JOV-TICK         \ 3 bytes: per-Jovian frame counter
-$7762 CONSTANT JOV-BG0          \ 20 bytes: bg save buffer Jovian 0
-$7776 CONSTANT JOV-BG1          \ 20 bytes: bg save buffer Jovian 1
-$778A CONSTANT JOV-BG2          \ 20 bytes: bg save buffer Jovian 2
-$779E CONSTANT JOV-OLDX         \ 3 bytes: previous x per Jovian
-$77A1 CONSTANT JOV-OLDY         \ 3 bytes: previous y per Jovian
+$777C CONSTANT JOV-STATE        \ 3 bytes: 0=attack, 1=flee, 2=idle
+$777F CONSTANT JOV-TICK         \ 3 bytes: per-Jovian frame counter
+$7782 CONSTANT JOV-BG0          \ 20 bytes: bg save buffer Jovian 0
+$7796 CONSTANT JOV-BG1          \ 20 bytes: bg save buffer Jovian 1
+$77AA CONSTANT JOV-BG2          \ 20 bytes: bg save buffer Jovian 2
+$77BE CONSTANT JOV-OLDX         \ 3 bytes: previous x per Jovian
+$77C1 CONSTANT JOV-OLDY         \ 3 bytes: previous y per Jovian
 
 : jov-bg  ( i -- addr )
   DUP 0= IF DROP JOV-BG0 EXIT THEN
@@ -581,7 +581,7 @@ VARIABLE old-sy                   \ previous ship y
 \ ── Background save/restore for flicker-free ship movement ────────────
 \ Save 4 bytes × 5 rows of VRAM under the sprite bounding box.
 \ Restore to erase without a black flash.
-$76F0 CONSTANT SHIP-BG              \ 20-byte save buffer
+$7710 CONSTANT SHIP-BG              \ 20-byte save buffer
 
 CODE bg-save   \ ( buf x y -- )  save 4×5 VRAM bytes to buf
         PSHS    X
@@ -648,7 +648,7 @@ CODE bg-restore  \ ( buf x y -- )  restore 4×5 VRAM bytes from buf
   SHIP-BG old-sx @ 3 - old-sy @ 2 - bg-restore ;
 
 \ Missile background buffer
-$7704 CONSTANT MSL-BG                \ 20-byte save buffer
+$7724 CONSTANT MSL-BG                \ 20-byte save buffer
 
 : save-msl-bg  ( -- )
   MSL-BG msl-scrx 2 - msl-scry 2 - bg-save ;
@@ -1239,7 +1239,7 @@ VARIABLE pj-result
 
 \ Storm star positions saved at quadrant entry for redraw.
 \ Max 25 fake stars (5 real × 5 fake). 3 bytes each: x, y, color.
-$7680 CONSTANT FSTAR-POS          \ 25 × 3 = 75 bytes
+$76A0 CONSTANT FSTAR-POS          \ 25 × 3 = 75 bytes
 VARIABLE fstar-count
 
 VARIABLE fs-tmp
@@ -1270,7 +1270,7 @@ VARIABLE fs-tmp
 
 \ Spiral dot positions precomputed at quadrant entry.
 \ 4 arms × 8 dots = 32 dots max. 2 bytes each (x, y).
-$76B0 CONSTANT SPIRAL-POS         \ 32 × 2 = 64 bytes
+$76D0 CONSTANT SPIRAL-POS         \ 32 × 2 = 64 bytes
 VARIABLE spiral-count
 
 VARIABLE sp-r
@@ -2174,6 +2174,9 @@ VARIABLE prev-key                 \ last key seen by KEY?
   \ LEVEL 1-9 on row 9
   11 9 at-xy
   S" LEVEL 1-9" rg-type
+  \ Version in lower right
+  27 18 at-xy
+  S" V0.9" rg-type
   \ Read level key (1-9)
   BEGIN KEY DUP CHAR 1 < OVER CHAR 9 > OR IF DROP 0 ELSE 1 THEN UNTIL
   CHAR 0 - glevel ! ;
