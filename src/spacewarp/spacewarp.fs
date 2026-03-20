@@ -200,6 +200,16 @@ $77AA CONSTANT JOV-BG2          \ 20 bytes: bg save buffer Jovian 2
 $77BE CONSTANT JOV-OLDX         \ 3 bytes: previous x per Jovian
 $77C1 CONSTANT JOV-OLDY         \ 3 bytes: previous y per Jovian
 
+\ ── Genome data (AI diversity system) ──────────────────────────────────
+\ 4 bytes per Jovian: behavior(2) + appearance(1) + emotion|origin(1)
+$77C5 CONSTANT JOV-GENOME       \ 12 bytes: 3 Jovians x 4 bytes
+\ Intent output from jov-think: dx, dy, flags per Jovian
+$77D1 CONSTANT JOV-INTENT       \ 9 bytes: 3 Jovians x 3 bytes
+\ Sprite generation workspace
+$77DA CONSTANT JOV-SPRWORK      \ 12 bytes: scratch for sprite gen
+\ Quadrant mood grid (8x8 sectors, emotion persistence)
+$7E00 CONSTANT MOOD-GRID        \ 64 bytes: mood per sector
+
 : jov-bg  ( i -- addr )
   DUP 0= IF DROP JOV-BG0 EXIT THEN
   1 = IF JOV-BG1 ELSE JOV-BG2 THEN ;
@@ -641,11 +651,72 @@ VARIABLE jbg-i
     JOV-POS jbg-i @ 2 * + 1 + C@ JOV-OLDY jbg-i @ + C!
   LOOP THEN ;
 
+\ ── Genome generation ──────────────────────────────────────────────────
+\ Generate 4 genome bytes per Jovian at spawn time.
+\ Difficulty (glevel 1-10) biases aggression, pilot skill, and speed
+\ upward.  Always with variance so no two Jovians are identical.
+\
+\ Byte layout (see AI_DIVERSITY_STRATEGY.md):
+\   0-1: behavior genome (16 bits, set at spawn, never changes)
+\   2:   appearance seed  (random, cosmetic only)
+\   3:   emotion (hi nibble) | origin (lo nibble)
+\
+\ Difficulty bias: trait = clamp( random + glevel_shift, 0, max )
+\   aggression (0-7): base random 0-7, + (glevel-1)/2
+\   pilot_skill (0-7): base random 0-7, + (glevel-1)/2
+\   speed_mod (0-3): base random 0-3, + (glevel-1)/3
+\   initiative, path, hand, regularity: pure random (no bias)
+\   emotion: seeded from aggression (aggressive=high, peaceful=low)
+
+: clamp7  ( n -- 0..7 )  DUP 7 > IF DROP 7 THEN ;
+: clamp3  ( n -- 0..3 )  DUP 3 > IF DROP 3 THEN ;
+
+: gen-genome  ( i -- )
+  4 *  JOV-GENOME +            \ addr = base + i*4
+
+  \ -- Byte 0: aggression(3) | initiative(2) | pilot_skill_hi(3) --
+  8 rnd  glevel @ 1 - 1 RSHIFT  +  clamp7   \ aggression (biased)
+  DUP >R                       \ R: aggression (for emotion seed)
+  3 LSHIFT                     \ shift to bits 7-5
+  4 rnd  2 LSHIFT  OR          \ initiative (bits 4-3)
+  8 rnd  glevel @ 1 - 1 RSHIFT  +  clamp7  \ pilot_skill (biased)
+  OR                           \ combine into byte 0
+  OVER C!                      \ store byte 0
+
+  \ -- Byte 1: path(2) | speed(2) | hand(2) | regularity(2) --
+  4 rnd  6 LSHIFT              \ path style (bits 7-6)
+  4 rnd  glevel @ 1 - 3 /MOD SWAP DROP  +  clamp3  \ speed_mod (biased)
+  4 LSHIFT  OR                 \ speed (bits 5-4)
+  4 rnd  2 LSHIFT  OR          \ handedness (bits 3-2)
+  4 rnd  OR                    \ regularity (bits 1-0)
+  OVER 1 + C!                  \ store byte 1
+
+  \ -- Byte 2: appearance seed (pure random) --
+  256 rnd  OVER 2 + C!
+
+  \ -- Byte 3: emotion (hi nibble) | origin (lo nibble) --
+  R>                            \ recover aggression (0-7)
+  2 *  8 +                     \ map 0-7 → 8-22, center at neutral
+  DUP 15 > IF DROP 15 THEN    \ clamp to 0-15
+  4 LSHIFT                     \ emotion in hi nibble
+                               \ origin = 0 for now (Phase 7)
+  SWAP 3 + C! ;                \ store byte 3
+
+: gen-genomes  ( -- )
+  qjovians @ ?DUP IF 0 DO
+    I gen-genome
+  LOOP THEN ;
+
 VARIABLE jov-moved               \ flag: did any Jovian move this frame?
 
-\ ── Jovian AI movement ──────────────────────────────────────────────────
-\ Chase player at 1px per N frames (N scales with difficulty).
-\ Obstacle avoidance: stars (6px), black holes (15px), bases (5px).
+\ ── Jovian AI (genome-driven) ──────────────────────────────────────────
+\ jov-think CODE word computes intent (proposed position + flags) from
+\ genome data, current positions, and target selection.
+\ apply-intent applies obstacle avoidance and writes final position.
+\
+\ Intent buffer (JOV-INTENT + i*3): nx, ny, flags
+\   flags bit 0 = targets base
+\   flags bit 1 = base-stop (within 30px, hold position)
 
 VARIABLE hc-jx                    \ scratch: candidate x for obstacle check
 VARIABLE hc-jy                    \ scratch: candidate y for obstacle check
@@ -655,9 +726,6 @@ VARIABLE jtk-ny                   \ proposed new y
 \ Movement speed: frames between moves (lower = faster)
 : jov-speed  ( -- n )
   10 glevel @ - DUP 2 < IF DROP 2 THEN ;
-
-\ Sign: -1, 0, or 1  (reuses existing abs)
-: sign  ( n -- s )  DUP 0= IF ELSE 0 < IF -1 ELSE 1 THEN THEN ;
 
 \ Manhattan distance from (hc-jx, hc-jy) to (x, y) byte pair at addr
 : jov-dist  ( addr -- d )
@@ -681,68 +749,167 @@ VARIABLE jblk
   THEN
   jblk @ ;
 
-\ Try to move one Jovian toward a target (index in jbg-i)
-VARIABLE jov-tx                   \ movement target x
-VARIABLE jov-ty                   \ movement target y
 VARIABLE base-attack              \ frame counter for base destruction
 
-\ Does this Jovian target the base?
-\ Jovian 0 always attacks base; wounded Jovians (DMG < 50) flee to base
-: jov-targets-base?  ( -- flag )
-  qbase @ 0= IF 0 EXIT THEN
-  jbg-i @ 0= IF 1 EXIT THEN
-  JOV-DMG jbg-i @ + C@ 50 < IF 1 EXIT THEN
-  0 ;
+\ ── jov-think: genome-driven intent computation (6809 CODE) ────────────
+\ ( i qbase -- )
+\ Reads: JOV-POS, JOV-DMG, SHIP-POS, BASE-POS, JOV-GENOME (future)
+\ Writes: JOV-INTENT + i*3 = { proposed_x, proposed_y, flags }
+\
+\ Target selection (identical to prior Forth logic):
+\   Jovian 0 → base (if exists), DMG < 50 → base, else → ship
+\ Direction: 1px step toward target, bounds-clamped [4,123] x [4,139]
+\ Base-stop: within 30px manhattan of base → hold position
+\ Genome bytes are loaded but not yet used (Phase 2+)
 
-: jov-target  ( -- )
-  jov-targets-base? IF
-    BASE-POS C@ jov-tx !  BASE-POS 1 + C@ jov-ty !
-  ELSE
-    SHIP-POS C@ jov-tx !  SHIP-POS 1 + C@ jov-ty !
-  THEN ;
+CODE jov-think  ( i qbase -- )
+        PSHS    X               ; save IP
+        LDA     1,U             ; A = qbase (low byte)
+        LDB     3,U             ; B = i (low byte)
+        LEAU    4,U             ; pop 2 args
+        PSHS    D               ; [S+0]=qbase, [S+1]=i
 
-: move-one-jovian  ( -- )
-  \ Get current position into sg-sx, sg-sy (reuse star gravity scratch)
-  JOV-POS jbg-i @ 2 * + >R
-  R@ C@ sg-sx !
-  R@ 1 + C@ sg-sy !
-  \ Pick movement target
-  jov-target
-  \ Base-targeting Jovians stop at 30px from base (attack from range)
-  jov-targets-base? IF
-    sg-sx @ BASE-POS C@ - abs
-    sg-sy @ BASE-POS 1 + C@ - abs + 30 < IF R> DROP EXIT THEN
-  THEN
-  \ Compute proposed position: cur + sign(target - cur), clamped
-  jov-tx @ sg-sx @ - sign sg-sx @ +
-  DUP 4 < IF DROP sg-sx @ THEN
-  DUP 123 > IF DROP sg-sx @ THEN
-  jtk-nx !
-  jov-ty @ sg-sy @ - sign sg-sy @ +
-  DUP 4 < IF DROP sg-sy @ THEN
-  DUP 139 > IF DROP sg-sy @ THEN
-  jtk-ny !
-  \ Check if blocked (both axes)
+        ; Compute intent addr: Y = $77D1 + i*3
+        LDA     #3
+        MUL                     ; D = i*3
+        ADDD    #$77D1
+        TFR     D,Y             ; Y = intent output
+
+        ; Compute pos addr: X = $768A + i*2
+        LDB     1,S             ; B = i
+        ASLB
+        LDX     #$768A
+        ABX                     ; X = &JOV-POS[i]
+
+        ; Save current position
+        LDA     ,X              ; cx
+        LDB     1,X             ; cy
+        PSHS    D               ; [S+0]=cx [S+1]=cy [S+2]=qbase [S+3]=i
+
+        ; --- Target selection ---
+        LDX     #$7694          ; default: SHIP-POS
+        LDA     2,S             ; qbase
+        BEQ     @calc           ; no base, target ship
+        LDA     3,S             ; i
+        BEQ     @tbase          ; i==0, target base
+        LDX     #$7696          ; JOV-DMG
+        LDA     A,X             ; DMG[i]
+        CMPA    #50
+        BHS     @calc           ; healthy, target ship
+
+@tbase  LDX     #$7690          ; BASE-POS
+        BRA     @calc2
+@calc   LDX     #$7694          ; SHIP-POS
+@calc2
+
+        ; --- Flags: bit 0 = targets_base ---
+        CLR     2,Y             ; flags = 0
+        CMPX    #$7690
+        BNE     @nx
+        LDA     #1
+        STA     2,Y             ; flags |= targets_base
+
+        ; --- Base-stop check: manhattan < 30, hold ---
+        LDA     ,X              ; tx
+        SUBA    ,S              ; tx - cx
+        BPL     @absx
+        NEGA
+@absx   TFR     A,B             ; B = |tx-cx|
+        LDA     1,X             ; ty
+        SUBA    1,S             ; ty - cy
+        BPL     @absy
+        NEGA
+@absy   PSHS    B               ; save |tx-cx|
+        ADDA    ,S+             ; A = manhattan dist
+        CMPA    #30
+        BHS     @nx
+        ; Within 30px, stay put
+        LDA     ,S              ; cx
+        STA     ,Y              ; intent.nx = cx (no move)
+        LDA     1,S             ; cy
+        STA     1,Y             ; intent.ny = cy
+        LDA     2,Y
+        ORA     #$02            ; flags |= base_stop
+        STA     2,Y
+        BRA     @done
+
+        ; --- Proposed new x: cx + sign(tx - cx), clamped ---
+@nx     LDA     ,X              ; tx
+        CMPA    ,S              ; vs cx
+        BEQ     @kx             ; same, keep cx
+        BHI     @incx
+        ; tx < cx, decrement
+        LDA     ,S              ; cx
+        DECA
+        CMPA    #4
+        BHS     @sx
+        LDA     ,S              ; clamp: keep cx
+        BRA     @sx
+@incx   LDA     ,S              ; cx
+        INCA
+        CMPA    #123
+        BLS     @sx
+        LDA     ,S              ; clamp: keep cx
+@sx     STA     ,Y              ; intent.nx
+        BRA     @ny
+@kx     LDA     ,S
+        STA     ,Y              ; intent.nx = cx
+
+        ; --- Proposed new y: cy + sign(ty - cy), clamped ---
+@ny     LDA     1,X             ; ty
+        CMPA    1,S             ; vs cy
+        BEQ     @ky
+        BHI     @incy
+        LDA     1,S             ; cy
+        DECA
+        CMPA    #4
+        BHS     @sy
+        LDA     1,S
+        BRA     @sy
+@incy   LDA     1,S             ; cy
+        INCA
+        CMPA    #139
+        BLS     @sy
+        LDA     1,S
+@sy     STA     1,Y             ; intent.ny
+        BRA     @done
+@ky     LDA     1,S
+        STA     1,Y             ; intent.ny = cy
+
+@done   LEAS    4,S             ; pop cx, cy, qbase, i
+        PULS    X               ; restore IP
+        ;NEXT
+;CODE
+
+\ ── apply-intent: obstacle avoidance + position update ─────────────────
+\ Reads proposed position from JOV-INTENT, applies 3-tier obstacle
+\ fallback (both axes → x-only → y-only → stay), writes JOV-POS.
+
+: apply-intent  ( -- )
+  JOV-INTENT jbg-i @ 3 * +       \ intent addr
+  DUP 2 + C@ 2 AND IF DROP EXIT THEN  \ base-stop → no move
+  DUP C@ jtk-nx !                \ proposed x
+  1 + C@ jtk-ny !                \ proposed y
+  JOV-POS jbg-i @ 2 * + >R       \ R: pos addr
+  \ Try both axes
   jtk-nx @ hc-jx !  jtk-ny @ hc-jy !
   jov-blocked? IF
-    \ Try x only
-    jtk-nx @ hc-jx !  sg-sy @ hc-jy !
+    \ Try x only (keep current y)
+    jtk-nx @ hc-jx !  R@ 1 + C@ hc-jy !
     jov-blocked? IF
-      \ Try y only
-      sg-sx @ hc-jx !  jtk-ny @ hc-jy !
+      \ Try y only (keep current x)
+      R@ C@ hc-jx !  jtk-ny @ hc-jy !
       jov-blocked? IF
-        \ both blocked, stay put
-        sg-sx @ jtk-nx !  sg-sy @ jtk-ny !
-      ELSE
-        sg-sx @ jtk-nx !             \ keep old x
+        R> DROP EXIT             \ all blocked → stay put
       THEN
+      R@ C@ jtk-nx !            \ keep old x
     ELSE
-      sg-sy @ jtk-ny !               \ keep old y
+      R@ 1 + C@ jtk-ny !       \ keep old y
     THEN
   THEN
-  \ Apply move if position changed
-  jtk-nx @ sg-sx @ <>
-  jtk-ny @ sg-sy @ <> OR IF
+  \ Apply if changed
+  jtk-nx @ R@ C@ <>
+  jtk-ny @ R@ 1 + C@ <> OR IF
     jtk-nx @ R@ C!
     jtk-ny @ R@ 1 + C!
     1 jov-moved !
@@ -757,7 +924,8 @@ VARIABLE base-attack              \ frame counter for base destruction
         JOV-TICK jbg-i @ + C!
       ELSE
         DROP 0 JOV-TICK jbg-i @ + C!
-        move-one-jovian
+        jbg-i @ qbase @ jov-think
+        apply-intent
       THEN
     THEN
   LOOP THEN ;
@@ -1293,7 +1461,7 @@ VARIABLE sp-r2
   gen-storm-stars gen-event-horizon
   draw-border draw-stars draw-storm-stars draw-event-horizon
   draw-base
-  init-jovian-ai
+  gen-genomes init-jovian-ai
   save-jov-bgs save-jov-oldpos
   draw-jovians-live
   save-ship-bg draw-ship ;
@@ -2316,6 +2484,7 @@ VARIABLE jnb-result
 
   \ Generate galaxy with selected level
   glevel @ gen-galaxy
+  MOOD-GRID 64 8 FILL           \ init mood grid to neutral
 
   \ Mission briefing
   briefing

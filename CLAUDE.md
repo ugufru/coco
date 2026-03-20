@@ -60,3 +60,11 @@ The constraints aren't obstacles — they're the whole point. A 64K ceiling and 
 - **Constraints are features** — the 64K limit and 6809 register pressure are intentional; they produce discipline
 - **On-device workflow** — assembling on the CoCo itself (rather than cross-compiling) is a first-class design goal
 - **Non-destructive delivery** — cartridge can be removed to restore a stock CoCo at any time
+
+## Access Boundaries
+
+Only read, write, or execute files within these directories:
+- `/Users/paul/github/coco` — project root
+- `~/.claude/` — Claude Code config and memory
+
+Do not access, search, or modify files outside these paths. If a task appears to require files elsewhere, ask first.

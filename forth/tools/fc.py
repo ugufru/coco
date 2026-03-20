@@ -422,11 +422,15 @@ def preprocess_asm(name, asm_text):
 
     - Prepend a global label so @-local labels scope correctly
     - Expand ;NEXT into the two-instruction NEXT sequence
+    - Strip blank/comment-only lines (lwasm local label scoping quirk)
     """
     safe = re.sub(r'[^a-z0-9]', '_', name)
     label = f'__code_{safe}'
     lines = [label]
     for line in asm_text.split('\n'):
+        stripped = line.strip()
+        if not stripped or (stripped.startswith(';') and not stripped.startswith(';NEXT')):
+            continue   # skip blank and comment-only lines
         if re.match(r'^\s*;NEXT\b', line):
             lines.append(NEXT_ASM)
         else:
