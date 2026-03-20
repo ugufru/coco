@@ -273,18 +273,23 @@ Jovians elsewhere in the galaxy continue their assault on bases. Don't linger.
 
 The Jovians are not passive targets. They:
 
+- **Chase you** — most Jovians pursue the Endever, moving toward your position
+  each tick. Speed increases with difficulty level.
+- **Target bases** — the first Jovian in a quadrant prioritizes attacking the
+  base instead of chasing you. Wounded Jovians (health below 50%) also flee
+  toward the base for cover.
 - **Fire at you** — Jovian weapons fire appears as red lines on the tactical
-  display. The message "ENDEVER HIT" appears when you take damage.
-- **Move within quadrants** — they dodge your shots and maneuver tactically.
+  display. Fire rate increases with difficulty level.
 - **Move between quadrants** — Jovians actively hunt for bases to destroy.
   When a base is under attack, you'll see the SOS alert.
-- **Attack bases** — if Jovians remain in a quadrant with a base for too long,
-  the base is destroyed. The message "BASE DESTROYED" appears.
+- **Attack bases** — Jovians holding position near a base will eventually
+  destroy it. Defend your bases or lose the war.
+- **Avoid obstacles** — Jovians navigate around stars, black holes, and bases
+  rather than flying through them.
+- **Get pulled by gravity** — black holes and stars pull Jovians just like
+  they pull you. A Jovian caught by a black hole is destroyed.
 - **Get smarter at higher difficulty** — more aggressive movement, faster fire
   rate, more likely to target bases.
-
-At higher difficulty levels, Jovians may also call reinforcements — if a
-quadrant has a base, nearby Jovians will attempt to move into that quadrant.
 
 ## Hazards
 

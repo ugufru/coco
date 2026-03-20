@@ -310,18 +310,30 @@ Up to 3 Jovians occupy each quadrant. Each has a position (x, y in pixel
 coordinates), a health value (0–100, 0 = dead), a state byte, and a tick
 counter. The AI runs every frame via `tick-jovians` and `tick-jbeam`.
 
+### Targeting
+
+Each Jovian selects a target every time it moves (`jov-target`):
+
+- **Jovian 0** always targets the base (if one exists in the quadrant)
+- **Wounded Jovians** (health < 50) flee toward the base for cover
+- **All others** chase the player ship
+
+Base-targeting Jovians stop at 30px Manhattan distance from the base and
+hold position rather than closing further. This standoff distance lets them
+"attack from range" while the base destruction timer runs.
+
 ### Movement
 
-Jovians chase the player ship at a speed that scales with difficulty level.
+Jovians move toward their target at a speed that scales with difficulty level.
 Movement is gated by a frame counter per Jovian: when the tick counter reaches
-`jov-speed`, the Jovian moves 1 pixel toward the player and the counter resets.
+`jov-speed`, the Jovian moves 1 pixel toward its target and the counter resets.
 
 **Speed formula**: `jov-speed = 10 - level` (minimum 2). At level 1, Jovians
 move every 9 frames (~6.7 px/sec). At level 9, they move every 2 frames
 (~30 px/sec).
 
-**Direction**: Each axis moves independently by `sign(player - jovian)`,
-producing diagonal, horizontal, or vertical chase depending on relative
+**Direction**: Each axis moves independently by `sign(target - jovian)`,
+producing diagonal, horizontal, or vertical movement depending on relative
 position.
 
 **Bounds clamping**: Positions are clamped to 4–123 (x) and 4–139 (y) to keep
@@ -395,11 +407,24 @@ JOV-OLDX    3 bytes   (previous x for sprite redraw)
 JOV-OLDY    3 bytes   (previous y for sprite redraw)
 ```
 
+### Base Attack
+
+When a living Jovian is within 10px Manhattan distance of the base
+(`jov-near-base?`), a frame counter (`base-attack`) increments. When it
+reaches the threshold, the base is destroyed:
+
+1. Active beams and missiles are cancelled
+2. The base sprite is erased and the galaxy byte is updated (base bit cleared)
+3. A medium explosion plays at the base position
+4. Full sprite refresh via `refresh-after-kill`
+5. The status panel redraws to show updated base count
+
+If all bases are destroyed, the game is lost.
+
 ### Not Yet Implemented
 
 - FLEE state (retreat toward stars when health is low)
 - IDLE state (fire opportunistically without chasing)
-- Base targeting priority (Jovians should prefer attacking bases)
 - Jovian-to-Jovian collision avoidance
 - Inter-quadrant movement (Jovians moving between galaxy sectors)
 
