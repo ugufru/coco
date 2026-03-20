@@ -238,6 +238,112 @@ CFA_NEGATE      FDB     CODE_NEGATE
 CFA_QDUP        FDB     CODE_QDUP
 CFA_TYPE        FDB     CODE_TYPE
 CFA_COUNT       FDB     CODE_COUNT
+CFA_PLUS_STORE  FDB     CODE_PLUS_STORE
+CFA_2DROP       FDB     CODE_2DROP
+CFA_2DUP        FDB     CODE_2DUP
+CFA_ROT         FDB     CODE_ROT
+CFA_PROX_SCAN   FDB     CODE_PROX_SCAN
+CFA_TOR         FDB     CODE_TOR
+CFA_FROMR       FDB     CODE_FROMR
+CFA_RAT         FDB     CODE_RAT
+
+;;; ─── Sprite data table ─────────────────────────────────────────────────────
+;;; DOVAR entry: calling sprite-data pushes the address of the first byte.
+;;; 5 sprites × 12 bytes = 60 bytes inline.  Format: width, height, then
+;;; 2bpp artifact-color rows (2 bytes/row).  Color encoding:
+;;;   00=transparent  01=blue  10=red  11=white
+;;;
+;;; Application copies to its sprite region with:
+;;;   sprite-data <dest> 60 CMOVE
+
+CFA_SPRITE_DATA FDB     DOVAR
+        ;;; Endever — blue (1) chevron, 7×5
+        FCB     7,5
+        FCB     $01,$00,$04,$40,$14,$50,$55,$54,$55,$54
+        ;;; Jovian — red (2) diamond, 7×5
+        FCB     7,5
+        FCB     $02,$00,$08,$80,$22,$20,$08,$80,$02,$00
+        ;;; Base — blue (1) cross/ring, 7×5
+        FCB     7,5
+        FCB     $05,$40,$10,$10,$41,$04,$10,$10,$05,$40
+        ;;; Missile frame 1 — red (2) plus +, 5×5
+        FCB     5,5
+        FCB     $08,$00,$08,$00,$AA,$80,$08,$00,$08,$00
+        ;;; Missile frame 2 — red (2) cross x, 5×5
+        FCB     5,5
+        FCB     $80,$80,$22,$00,$08,$00,$22,$00,$80,$80
+
+
+;;; ─── Font glyph table ──────────────────────────────────────────────────────
+;;; DOVAR entry: calling font-data pushes the address of the first byte.
+;;; 59 glyphs × 8 bytes = 472 bytes inline.  Covers ASCII $20–$5A
+;;; (space, punctuation, digits, uppercase A–Z).
+;;; 1bpp artifact-color: each byte is one row, 3 artifact pairs in bits 7–2.
+;;; Pixel pair 11=on, 00=off.  Bit 1–0 always 00 (inter-character gap).
+;;;
+;;; Application copies to its font region with:
+;;;   font-data $9000 472 CMOVE
+
+CFA_FONT_DATA   FDB     DOVAR
+        FCB     $00,$00,$00,$00,$00,$00,$00,$00  ; $20 Space
+        FCB     $30,$30,$30,$30,$30,$00,$30,$00  ; $21 !
+        FCB     $00,$00,$00,$00,$00,$00,$00,$00  ; $22 unused
+        FCB     $00,$00,$00,$00,$00,$00,$00,$00  ; $23 unused
+        FCB     $00,$00,$00,$00,$00,$00,$00,$00  ; $24 unused
+        FCB     $00,$00,$00,$00,$00,$00,$00,$00  ; $25 unused
+        FCB     $00,$00,$00,$00,$00,$00,$00,$00  ; $26 unused
+        FCB     $00,$00,$00,$00,$00,$00,$00,$00  ; $27 unused
+        FCB     $00,$00,$00,$00,$00,$00,$00,$00  ; $28 unused
+        FCB     $00,$00,$00,$00,$00,$00,$00,$00  ; $29 unused
+        FCB     $00,$00,$00,$00,$00,$00,$00,$00  ; $2A unused
+        FCB     $00,$00,$00,$00,$00,$00,$00,$00  ; $2B unused
+        FCB     $00,$00,$00,$00,$00,$30,$C0,$00  ; $2C ,
+        FCB     $00,$00,$00,$FC,$00,$00,$00,$00  ; $2D -
+        FCB     $00,$00,$00,$00,$00,$00,$30,$00  ; $2E .
+        FCB     $00,$00,$00,$00,$00,$00,$00,$00  ; $2F unused
+        FCB     $FC,$CC,$CC,$CC,$CC,$CC,$FC,$00  ; $30 0
+        FCB     $30,$F0,$30,$30,$30,$30,$FC,$00  ; $31 1
+        FCB     $FC,$CC,$0C,$FC,$C0,$C0,$FC,$00  ; $32 2
+        FCB     $FC,$0C,$0C,$FC,$0C,$0C,$FC,$00  ; $33 3
+        FCB     $CC,$CC,$CC,$FC,$0C,$0C,$0C,$00  ; $34 4
+        FCB     $FC,$C0,$FC,$0C,$0C,$CC,$FC,$00  ; $35 5
+        FCB     $FC,$C0,$C0,$FC,$CC,$CC,$FC,$00  ; $36 6
+        FCB     $FC,$0C,$0C,$30,$30,$30,$30,$00  ; $37 7
+        FCB     $FC,$CC,$CC,$FC,$CC,$CC,$FC,$00  ; $38 8
+        FCB     $FC,$CC,$CC,$FC,$0C,$0C,$FC,$00  ; $39 9
+        FCB     $00,$00,$30,$00,$00,$30,$00,$00  ; $3A :
+        FCB     $00,$00,$00,$00,$00,$00,$00,$00  ; $3B unused
+        FCB     $00,$00,$00,$00,$00,$00,$00,$00  ; $3C unused
+        FCB     $00,$00,$00,$00,$00,$00,$00,$00  ; $3D unused
+        FCB     $00,$00,$00,$00,$00,$00,$00,$00  ; $3E unused
+        FCB     $FC,$0C,$0C,$3C,$00,$00,$30,$00  ; $3F ?
+        FCB     $00,$00,$00,$00,$00,$00,$00,$00  ; $40 unused
+        FCB     $FC,$CC,$CC,$FC,$CC,$CC,$CC,$00  ; $41 A
+        FCB     $F0,$CC,$CC,$F0,$CC,$CC,$F0,$00  ; $42 B
+        FCB     $FC,$C0,$C0,$C0,$C0,$C0,$FC,$00  ; $43 C
+        FCB     $F0,$CC,$CC,$CC,$CC,$CC,$F0,$00  ; $44 D
+        FCB     $FC,$C0,$C0,$FC,$C0,$C0,$FC,$00  ; $45 E
+        FCB     $FC,$C0,$C0,$FC,$C0,$C0,$C0,$00  ; $46 F
+        FCB     $FC,$C0,$C0,$FC,$CC,$CC,$FC,$00  ; $47 G
+        FCB     $CC,$CC,$CC,$FC,$CC,$CC,$CC,$00  ; $48 H
+        FCB     $FC,$30,$30,$30,$30,$30,$FC,$00  ; $49 I
+        FCB     $3C,$0C,$0C,$0C,$0C,$CC,$3C,$00  ; $4A J
+        FCB     $CC,$CC,$F0,$F0,$CC,$CC,$CC,$00  ; $4B K
+        FCB     $C0,$C0,$C0,$C0,$C0,$C0,$FC,$00  ; $4C L
+        FCB     $CC,$FC,$FC,$CC,$CC,$CC,$CC,$00  ; $4D M
+        FCB     $CC,$CC,$FC,$FC,$CC,$CC,$CC,$00  ; $4E N
+        FCB     $FC,$CC,$CC,$CC,$CC,$CC,$FC,$00  ; $4F O
+        FCB     $FC,$CC,$CC,$FC,$C0,$C0,$C0,$00  ; $50 P
+        FCB     $FC,$CC,$CC,$CC,$CC,$FC,$0C,$00  ; $51 Q
+        FCB     $FC,$CC,$CC,$FC,$F0,$CC,$CC,$00  ; $52 R
+        FCB     $FC,$C0,$C0,$FC,$0C,$0C,$FC,$00  ; $53 S
+        FCB     $FC,$30,$30,$30,$30,$30,$30,$00  ; $54 T
+        FCB     $CC,$CC,$CC,$CC,$CC,$CC,$FC,$00  ; $55 U
+        FCB     $CC,$CC,$CC,$CC,$CC,$F0,$F0,$00  ; $56 V
+        FCB     $CC,$CC,$CC,$CC,$FC,$FC,$CC,$00  ; $57 W
+        FCB     $CC,$CC,$FC,$FC,$FC,$CC,$CC,$00  ; $58 X
+        FCB     $CC,$CC,$CC,$FC,$30,$30,$30,$00  ; $59 Y
+        FCB     $FC,$0C,$0C,$FC,$C0,$C0,$FC,$00  ; $5A Z
 
 
 ;;; ─── EXIT ( -- ) ─────────────────────────────────────────────────────────────
@@ -1043,6 +1149,139 @@ CODE_COUNT
         CLRA                    ; D = 0:len
         STD     ,--U            ; push len
         LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── +! ( n addr -- ) ───────────────────────────────────────────────────────
+;;; Add n to the cell at addr.
+
+CODE_PLUS_STORE
+        LDY     ,U++            ; pop addr
+        LDD     ,U++            ; pop n
+        ADDD    ,Y              ; add to cell
+        STD     ,Y              ; store back
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── 2DROP ( a b -- ) ──────────────────────────────────────────────────────
+;;; Drop the top two stack items.
+
+CODE_2DROP
+        LEAU    4,U             ; drop 2 cells
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── 2DUP ( a b -- a b a b ) ───────────────────────────────────────────────
+;;; Duplicate the top two stack items.
+
+CODE_2DUP
+        LDD     2,U             ; a (NOS)
+        STD     ,--U            ; push a
+        LDD     2,U             ; b (was TOS, now at +2 after push)
+        STD     ,--U            ; push b
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── ROT ( a b c -- b c a ) ────────────────────────────────────────────────
+;;; Rotate third item to top.
+
+CODE_ROT
+        LDD     4,U             ; a (third)
+        LDY     2,U             ; b (second)
+        STY     4,U             ; b → third
+        LDY     ,U              ; c (TOS)
+        STY     2,U             ; c → second
+        STD     ,U              ; a → TOS
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── PROX-SCAN ( cx cy radius array count -- bitmask ) ─────────────────────
+;;; Spatial proximity query.  Scan count (x,y) byte pairs at array.
+;;; Return 16-bit bitmask: bit N set if entry N is within Manhattan
+;;; distance radius of (cx,cy).  Max 16 entries (bits 0–15).
+;;;
+;;; Stack on entry: count(TOS), array, radius, cy, cx (deepest)
+;;; Uses return stack for loop parameters; saves/restores IP.
+
+CODE_PROX_SCAN
+        PSHS    X               ; save IP
+        LDB     1,U             ; B = count (low byte of TOS)
+        BEQ     PS_ZERO         ; count=0 → return 0
+        LDX     2,U             ; X = array pointer
+        LDA     5,U             ; A = radius (low byte)
+        PSHS    A               ; S: [rad, IP]
+        LDA     7,U             ; A = cy (low byte)
+        PSHS    A               ; S: [cy, rad, IP]
+        LDA     9,U             ; A = cx (low byte)
+        PSHS    A               ; S: [cx, cy, rad, IP]
+        LEAU    10,U            ; pop all 5 args
+        PSHS    B               ; S: [count, cx, cy, rad, IP]
+        LDY     #0              ; Y = result bitmask
+        LDD     #1
+        PSHS    D               ; S: [bit_hi, bit_lo, count, cx, cy, rad, IP]
+        ;;; Offsets: 0=bit_hi, 1=bit_lo, 2=count, 3=cx, 4=cy, 5=rad
+PS_LOOP
+        LDA     ,X+             ; A = entry x
+        SUBA    3,S             ; A = x - cx
+        BPL     PS_AX
+        NEGA
+PS_AX   LDB     ,X+             ; B = entry y
+        SUBB    4,S             ; B = y - cy
+        BPL     PS_AY
+        NEGB
+PS_AY   PSHS    A               ; save |dx|
+        ADDB    ,S+             ; B = |dx| + |dy|, pop |dx|
+        BCS     PS_SKIP         ; overflow > 255, definitely out of range
+        CMPB    5,S             ; compare with radius
+        BHS     PS_SKIP         ; B >= radius → out of range
+        ;;; In range — OR bit into Y
+        TFR     Y,D
+        ORA     ,S              ; OR bit_hi
+        ORB     1,S             ; OR bit_lo
+        TFR     D,Y
+PS_SKIP
+        LSL     1,S             ; bit <<= 1
+        ROL     ,S
+        DEC     2,S             ; count--
+        BNE     PS_LOOP
+        ;;; Done — clean up and return
+        LEAS    6,S             ; pop [bit, count, cx, cy, rad]
+        STY     ,--U            ; push bitmask result
+        PULS    X               ; restore IP
+        LDY     ,X++
+        JMP     [,Y]
+PS_ZERO
+        LEAU    10,U            ; pop all 5 args
+        LDD     #0
+        STD     ,--U            ; push 0
+        PULS    X               ; restore IP
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── >R ( n -- ) (R: -- n ) ─────────────────────────────────────────────────
+;;; Move TOS to return stack.
+
+CODE_TOR
+        LDD     ,U++            ; pop TOS
+        PSHS    D               ; push onto return stack
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── R> ( -- n ) (R: n -- ) ─────────────────────────────────────────────────
+;;; Move return stack TOS to data stack.
+
+CODE_FROMR
+        PULS    D               ; pop from return stack
+        STD     ,--U            ; push onto data stack
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── R@ ( -- n ) (R: n -- n ) ──────────────────────────────────────────────
+;;; Copy return stack TOS to data stack (non-destructive).
+
+CODE_RAT
+        LDD     ,S              ; peek return stack TOS
+        STD     ,--U            ; push onto data stack
+        LDY     ,X++
         JMP     [,Y]
 
 CODE_HALT

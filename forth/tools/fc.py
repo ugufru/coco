@@ -84,6 +84,16 @@ def kernel_words(symbols):
         '?dup':     'CFA_QDUP',
         'type':     'CFA_TYPE',
         'count':    'CFA_COUNT',
+        '+!':       'CFA_PLUS_STORE',
+        '2drop':    'CFA_2DROP',
+        '2dup':     'CFA_2DUP',
+        'rot':      'CFA_ROT',
+        'prox-scan': 'CFA_PROX_SCAN',
+        '>r':       'CFA_TOR',
+        'r>':       'CFA_FROMR',
+        'r@':       'CFA_RAT',
+        'sprite-data': 'CFA_SPRITE_DATA',
+        'font-data':   'CFA_FONT_DATA',
     }
     result = {}
     for forth_name, sym_name in names.items():

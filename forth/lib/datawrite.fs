@@ -15,5 +15,5 @@
 
 VARIABLE tp                       \ data write pointer
 
-: tb  ( byte -- )  tp @ C!  tp @ 1 + tp ! ;
-: tw  ( word -- )  tp @ !   tp @ 2 + tp ! ;
+: tb  ( byte -- )  tp @ C!  1 tp +! ;
+: tw  ( word -- )  tp @ !   2 tp +! ;

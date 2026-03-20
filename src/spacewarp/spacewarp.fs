@@ -17,7 +17,7 @@ INCLUDE ../../forth/lib/rg-text.fs
 INCLUDE ../../forth/lib/keyboard.fs
 INCLUDE ../../forth/lib/beam.fs
 
-: min  ( a b -- smaller )  OVER OVER > IF SWAP THEN DROP ;
+: min  ( a b -- smaller )  2DUP > IF SWAP THEN DROP ;
 
 \ ── Bulk pixel plotter (assembly) ───────────────────────────────────────
 \ plot-dots ( addr count color -- )
@@ -204,76 +204,7 @@ $77C1 CONSTANT JOV-OLDY         \ 3 bytes: previous y per Jovian
   DUP 0= IF DROP JOV-BG0 EXIT THEN
   1 = IF JOV-BG1 ELSE JOV-BG2 THEN ;
 
-: init-sprites  ( -- )
-  \ Endever — blue (1) filled chevron
-  \   ...1...
-  \   ..1.1..
-  \   .11.11.
-  \   1111111
-  \   1111111
-  SPR-SHIP tp !
-  7 tb 5 tb
-  $01 tb $00 tb
-  $04 tb $40 tb
-  $14 tb $50 tb
-  $55 tb $54 tb
-  $55 tb $54 tb
-
-  \ Jovian — red (2) diamond
-  \   ...2...
-  \   ..2.2..
-  \   .2.2.2.
-  \   ..2.2..
-  \   ...2...
-  SPR-JOV tp !
-  7 tb 5 tb
-  $02 tb $00 tb
-  $08 tb $80 tb
-  $22 tb $20 tb
-  $08 tb $80 tb
-  $02 tb $00 tb
-
-  \ Base — blue (1) cross/ring
-  \   ..111..
-  \   .1...1.
-  \   1..1..1
-  \   .1...1.
-  \   ..111..
-  SPR-BASE tp !
-  7 tb 5 tb
-  $05 tb $40 tb
-  $10 tb $10 tb
-  $41 tb $04 tb
-  $10 tb $10 tb
-  $05 tb $40 tb
-
-  \ Missile frame 1 — red (2) plus +
-  \   ..2..
-  \   ..2..
-  \   22222
-  \   ..2..
-  \   ..2..
-  SPR-MSL1 tp !
-  5 tb 5 tb
-  $08 tb $00 tb
-  $08 tb $00 tb
-  $AA tb $80 tb
-  $08 tb $00 tb
-  $08 tb $00 tb
-
-  \ Missile frame 2 — red (2) cross x
-  \   2...2
-  \   .2.2.
-  \   ..2..
-  \   .2.2.
-  \   2...2
-  SPR-MSL2 tp !
-  5 tb 5 tb
-  $80 tb $80 tb
-  $22 tb $00 tb
-  $08 tb $00 tb
-  $22 tb $00 tb
-  $80 tb $80 tb ;
+: init-sprites  ( -- )  sprite-data SPR-SHIP 60 CMOVE ;
 
 \ ── Random position within tactical view ─────────────────────────────────
 \ Returns x in 4-123, y in 4-139 (away from borders).
@@ -307,7 +238,7 @@ VARIABLE gq-tmp                \ temp for building quadrant byte
     \ Base: ~12% chance (1 in 8)
     8 rnd 0= IF
       4 gq-tmp @ OR gq-tmp !
-      gbases @ 1 + gbases !
+      1 gbases +!
     THEN
 
     \ Jovians: probability scales with level
@@ -343,7 +274,7 @@ VARIABLE gq-tmp                \ temp for building quadrant byte
 \ Assigns random positions to all objects.
 
 : expand-quadrant  ( col row -- )
-  OVER OVER gal@               \ ( col row qbyte )
+  2DUP gal@                    \ ( col row qbyte )
 
   \ Extract counts
   DUP q-jovians qjovians !
@@ -438,7 +369,7 @@ VARIABLE ss-safe
 VARIABLE tcx
 VARIABLE tcy
 : at-xy  ( cx cy -- )  tcy ! tcx ! ;
-: rg-emit  ( char -- )  tcx @ tcy @ rg-char  tcx @ 1 + tcx ! ;
+: rg-emit  ( char -- )  tcx @ tcy @ rg-char  1 tcx +! ;
 
 : rg-u.  ( u -- )  10 /MOD ?DUP IF rg-u. THEN  CHAR 0 + rg-emit ;
 
@@ -772,14 +703,15 @@ VARIABLE base-attack              \ frame counter for base destruction
 
 : move-one-jovian  ( -- )
   \ Get current position into sg-sx, sg-sy (reuse star gravity scratch)
-  JOV-POS jbg-i @ 2 * + C@ sg-sx !
-  JOV-POS jbg-i @ 2 * + 1 + C@ sg-sy !
+  JOV-POS jbg-i @ 2 * + >R
+  R@ C@ sg-sx !
+  R@ 1 + C@ sg-sy !
   \ Pick movement target
   jov-target
   \ Base-targeting Jovians stop at 30px from base (attack from range)
   jov-targets-base? IF
     sg-sx @ BASE-POS C@ - abs
-    sg-sy @ BASE-POS 1 + C@ - abs + 30 < IF EXIT THEN
+    sg-sy @ BASE-POS 1 + C@ - abs + 30 < IF R> DROP EXIT THEN
   THEN
   \ Compute proposed position: cur + sign(target - cur), clamped
   jov-tx @ sg-sx @ - sign sg-sx @ +
@@ -811,10 +743,10 @@ VARIABLE base-attack              \ frame counter for base destruction
   \ Apply move if position changed
   jtk-nx @ sg-sx @ <>
   jtk-ny @ sg-sy @ <> OR IF
-    jtk-nx @ JOV-POS jbg-i @ 2 * + C!
-    jtk-ny @ JOV-POS jbg-i @ 2 * + 1 + C!
+    jtk-nx @ R@ C!
+    jtk-ny @ R@ 1 + C!
     1 jov-moved !
-  THEN ;
+  THEN R> DROP ;
 
 \ Tick all living Jovians
 : tick-jovians  ( -- )
@@ -836,22 +768,23 @@ VARIABLE base-attack              \ frame counter for base destruction
 
 \ Pull one Jovian (index in jbg-i) toward (sg-sx, sg-sy) by 1px
 : jov-pull  ( -- )
-  JOV-POS jbg-i @ 2 * + C@ sg-sx @ < IF
-    JOV-POS jbg-i @ 2 * + C@ 1 + JOV-POS jbg-i @ 2 * + C!
+  JOV-POS jbg-i @ 2 * + >R
+  R@ C@ sg-sx @ < IF
+    R@ C@ 1 + R@ C!
     1 jov-moved !
   THEN
-  JOV-POS jbg-i @ 2 * + C@ sg-sx @ > IF
-    JOV-POS jbg-i @ 2 * + C@ 1 - JOV-POS jbg-i @ 2 * + C!
+  R@ C@ sg-sx @ > IF
+    R@ C@ 1 - R@ C!
     1 jov-moved !
   THEN
-  JOV-POS jbg-i @ 2 * + 1 + C@ sg-sy @ < IF
-    JOV-POS jbg-i @ 2 * + 1 + C@ 1 + JOV-POS jbg-i @ 2 * + 1 + C!
+  R@ 1 + C@ sg-sy @ < IF
+    R@ 1 + C@ 1 + R@ 1 + C!
     1 jov-moved !
   THEN
-  JOV-POS jbg-i @ 2 * + 1 + C@ sg-sy @ > IF
-    JOV-POS jbg-i @ 2 * + 1 + C@ 1 - JOV-POS jbg-i @ 2 * + 1 + C!
+  R@ 1 + C@ sg-sy @ > IF
+    R@ 1 + C@ 1 - R@ 1 + C!
     1 jov-moved !
-  THEN ;
+  THEN R> DROP ;
 
 \ After any kill + explosion, do a full sprite refresh.
 \ Kills corrupt bg-save buffers (beam pixels, explosion debris), so we must:
@@ -993,7 +926,7 @@ VARIABLE expl-clr                     \ current frame color
       \ Generate ring dots at buffer offset and draw them
       expl-currad @ gen-ring
       EXPLBUF expl-total @ 2 * + expl-dots @ expl-clr @ plot-dots
-      expl-dots @ expl-total @ + expl-total !
+      expl-dots @ expl-total +!
     THEN
   LOOP
   \ Hold the full explosion briefly before erasing
@@ -1023,27 +956,83 @@ VARIABLE expl-clr                     \ current frame color
 \ After explosion, check Manhattan distance from center to all living
 \ Jovians and ship.  Proximity-killed Jovians chain-explode (no further
 \ chain from those secondary explosions).
-VARIABLE pd-i
 VARIABLE pd-kills                     \ bitmask of Jovians killed (max 3)
+
+\ prox-dmg: assembly Jovian proximity scan + damage application.
+\ Scans JOV-POS entries, applies damage to JOV-DMG health bytes,
+\ returns bitmask of killed Jovians.  ~10x faster than ITC equivalent.
+CODE prox-dmg  ( cx cy radius damage count -- killmask )
+        PSHS    X
+        LDA     1,U             ; count
+        BEQ     @zero
+        LDX     #$768A          ; JOV-POS (fixed address)
+        LDY     #$7696          ; JOV-DMG (fixed address)
+        ; Build stack frame
+        LDD     #0
+        PSHS    D               ; +0,1: killmask
+        LDD     #1
+        PSHS    D               ; +2,3: bit
+        LDA     1,U             ; count
+        PSHS    A               ; +4: count
+        LDA     9,U             ; cx
+        LDB     7,U             ; cy
+        PSHS    D               ; +5: cx, +6: cy
+        LDA     5,U             ; radius
+        LDB     3,U             ; damage
+        PSHS    D               ; +7: radius, +8: damage
+        LEAU    10,U            ; pop 5 args
+        ; Frame: +0=radius +1=damage +2=cx +3=cy +4=count
+        ;        +5,6=bit +7,8=killmask +9,10=saved IP
+@loop   LDA     ,Y              ; health
+        BEQ     @next           ; dead
+        LDB     ,X              ; entry x
+        SUBB    2,S             ; - cx
+        BPL     @ax
+        NEGB
+@ax     PSHS    B               ; save |dx| — all offsets +1
+        LDB     1,X             ; entry y
+        SUBB    4,S             ; - cy (+3 shifted to +4)
+        BPL     @ay
+        NEGB
+@ay     ADDB    ,S+             ; |dx|+|dy| — offsets back
+        BCS     @next           ; overflow
+        CMPB    ,S              ; radius (+0)
+        BHS     @next           ; out of range
+        ; Apply damage
+        SUBA    1,S             ; health - damage (+1)
+        BHI     @alive
+        CLRA
+        STA     ,Y              ; health = 0
+        ; Kill: killmask |= bit
+        LDD     7,S             ; killmask (+7,8)
+        ORA     5,S             ; | bit_hi (+5)
+        ORB     6,S             ; | bit_lo (+6)
+        STD     7,S
+        BRA     @next
+@alive  STA     ,Y              ; store reduced health
+@next   LEAX    2,X             ; pos += 2
+        LEAY    1,Y             ; dmg += 1
+        LSL     6,S             ; bit_lo <<= 1 (+6)
+        ROL     5,S             ; bit_hi (+5)
+        DEC     4,S             ; count-- (+4)
+        BNE     @loop
+        ; Return killmask
+        LDD     7,S             ; killmask (+7,8)
+        LEAS    9,S             ; pop frame
+        STD     ,--U
+        PULS    X
+        ;NEXT
+@zero   LEAU    10,U            ; pop 5 args
+        LDD     #0
+        STD     ,--U
+        PULS    X
+        ;NEXT
+;CODE
 
 : proximity-damage  ( -- )
   expl-dmgrad @ 0= IF EXIT THEN
-  0 pd-kills !
-  \ Check each living Jovian
-  qjovians @ ?DUP IF 0 DO
-    I pd-i !
-    JOV-DMG pd-i @ + C@ IF
-      JOV-POS pd-i @ 2 * + C@ expl-cx @ - abs
-      JOV-POS pd-i @ 2 * + 1 + C@ expl-cy @ - abs +
-      expl-dmgrad @ < IF
-        JOV-DMG pd-i @ + C@
-        expl-dmgamt @ -
-        DUP 0 < IF DROP 0 THEN
-        DUP JOV-DMG pd-i @ + C!
-        0= IF  1 pd-i @ LSHIFT pd-kills @ OR pd-kills !  THEN
-      THEN
-    THEN
-  LOOP THEN
+  expl-cx @ expl-cy @ expl-dmgrad @ expl-dmgamt @
+  qjovians @ prox-dmg                    \ ( -- killmask )
   \ Check ship
   SHIP-POS C@ expl-cx @ - abs
   SHIP-POS 1 + C@ expl-cy @ - abs +
@@ -1051,7 +1040,8 @@ VARIABLE pd-kills                     \ bitmask of Jovians killed (max 3)
     penergy @ expl-dmgamt @ 1 RSHIFT - DUP 0 < IF DROP 0 THEN penergy !
   THEN
   \ Chain-explode any proximity-killed Jovians (no further chain)
-  pd-kills @ IF
+  ?DUP IF
+    pd-kills !
     qjovians @ ?DUP IF 0 DO
       1 I LSHIFT pd-kills @ AND IF
         SPR-JOV
@@ -1129,8 +1119,8 @@ VARIABLE pj-result
   \ Cancel any active Jovian beam first
   cancel-jbeam
   \ Get Jovian position
-  DUP 2 * JOV-POS + C@ jbeam-x1 !
-  2 * JOV-POS + 1 + C@ jbeam-y1 !
+  2 * JOV-POS + DUP C@ jbeam-x1 !
+  1 + C@ jbeam-y1 !
   \ Direction from Jovian to player (dx, dy scaled ×4)
   SHIP-POS C@ jbeam-x1 @ - 4 *
   SHIP-POS 1 + C@ jbeam-y1 @ - 4 *
@@ -1233,7 +1223,7 @@ VARIABLE pj-result
 \ boundary is outlined so the player can detect it through the static.
 
 : in-grav-well?  ( x y -- flag )
-  qbhole @ 0= IF DROP DROP 0 EXIT THEN
+  qbhole @ 0= IF 2DROP 0 EXIT THEN
   BHOLE-POS 1 + C@ - abs
   SWAP BHOLE-POS C@ - abs + 30 < ;
 
@@ -1249,14 +1239,14 @@ VARIABLE fs-tmp
   pcol @ prow @ gal@ q-storm? 0= IF EXIT THEN
   qstars @ 3 * ?DUP IF 0 DO
     rnd-x rnd-y                  \ ( x y )
-    OVER OVER in-grav-well? IF
-      DROP DROP
+    2DUP in-grav-well? IF
+      2DROP
     ELSE
       fstar-count @ 3 * FSTAR-POS + fs-tmp !
       3 rnd 1 + fs-tmp @ 2 + C!  \ color
       fs-tmp @ 1 + C!             \ y
       fs-tmp @ C!                  \ x
-      fstar-count @ 1 + fstar-count !
+      1 fstar-count +!
     THEN
   LOOP THEN ;
 
@@ -1284,21 +1274,21 @@ VARIABLE sp-r2
     OVER sp-r @ angle-dy BHOLE-POS 1 + C@ +
     \ Bounds check — skip out-of-range dots ( angle x y )
     DUP 2 < OVER 141 > OR IF
-      DROP DROP
+      2DROP
     ELSE
       SWAP DUP 2 < OVER 125 > OR IF
-        DROP DROP
+        2DROP
       ELSE
         SWAP                       \ ( angle x y )
         spiral-count @ 2 * SPIRAL-POS + fs-tmp !
         fs-tmp @ 1 + C!           \ store y
         fs-tmp @ C!               \ store x
-        spiral-count @ 1 + spiral-count !
+        1 spiral-count +!
       THEN
     THEN
     20 +
     DUP 360 > IF 360 - THEN
-    sp-r2 @ 2 - sp-r2 !
+    -2 sp-r2 +!
   LOOP DROP ;
 
 : gen-event-horizon  ( -- )
@@ -1428,7 +1418,7 @@ VARIABLE grav-tick
 
 : gravity-well  ( -- )
   qbhole @ 0= IF EXIT THEN
-  grav-tick @ 1 + grav-tick !
+  1 grav-tick +!
   SHIP-POS C@ BHOLE-POS C@ - abs
   SHIP-POS 1 + C@ BHOLE-POS 1 + C@ - abs +
   DUP 30 > IF DROP EXIT THEN
@@ -1509,17 +1499,17 @@ VARIABLE dock-tick
 : tick-dock  ( -- )
   docked @ 0= IF EXIT THEN
   penergy @ 100 = IF EXIT THEN
-  dock-tick @ 1 + dock-tick !
+  1 dock-tick +!
   penergy @ 20 < IF                    \ 0-19%: +1 every frame
-    penergy @ 1 + penergy !
+    1 penergy +!
   ELSE penergy @ 40 < IF               \ 20-39%: +1 every 2 frames
-    dock-tick @ 1 AND 0= IF penergy @ 1 + penergy ! THEN
+    dock-tick @ 1 AND 0= IF 1 penergy +! THEN
   ELSE penergy @ 60 < IF               \ 40-59%: +1 every 4 frames
-    dock-tick @ 3 AND 0= IF penergy @ 1 + penergy ! THEN
+    dock-tick @ 3 AND 0= IF 1 penergy +! THEN
   ELSE penergy @ 80 < IF               \ 60-79%: +1 every 8 frames
-    dock-tick @ 7 AND 0= IF penergy @ 1 + penergy ! THEN
+    dock-tick @ 7 AND 0= IF 1 penergy +! THEN
   ELSE                                  \ 80-99%: +1 every 16 frames
-    dock-tick @ 15 AND 0= IF penergy @ 1 + penergy ! THEN
+    dock-tick @ 15 AND 0= IF 1 penergy +! THEN
   THEN THEN THEN THEN
   penergy @ 100 > IF 100 penergy ! THEN
   \ Repair systems: +2 per frame each (0→100 in ~50 frames = 0.8s)
@@ -1868,9 +1858,9 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
 : tick-missile  ( -- )
   msl-active @ 0= IF EXIT THEN
   \ Advance position
-  msl-dx @ msl-x @ + msl-x !
-  msl-dy @ msl-y @ + msl-y !
-  msl-frame @ 1 + msl-frame !
+  msl-dx @ msl-x +!
+  msl-dy @ msl-y +!
+  1 msl-frame +!
   \ Check bounds
   msl-oob? IF
     msl-erase  0 msl-active !
@@ -1889,7 +1879,7 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
   pmissiles @ 0= IF DROP EXIT THEN
   msl-active @ IF DROP EXIT THEN
   MSL-COST use-energy
-  pmissiles @ 1 - pmissiles !
+  -1 pmissiles +!
   \ Start outside ship sprite (offset 8px along firing angle)
   DUP 8 angle-dx SHIP-POS C@ + 7 LSHIFT msl-x !
   DUP 8 angle-dy SHIP-POS 1 + C@ + 7 LSHIFT msl-y !
@@ -1913,12 +1903,12 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
 : do-warp  ( -- )
   cmd-val @ 10 /MOD                  \ ( row col )
   \ Validate coordinates
-  OVER 8 < OVER 8 < AND 0= IF DROP DROP EXIT THEN
+  OVER 8 < OVER 8 < AND 0= IF 2DROP EXIT THEN
   \ Check if already there
-  DUP pcol @ = OVER prow @ = AND IF DROP DROP EXIT THEN
+  DUP pcol @ = OVER prow @ = AND IF 2DROP EXIT THEN
   \ Calculate and pay energy cost
-  OVER OVER warp-cost
-  DUP penergy @ > IF DROP DROP DROP EXIT THEN   \ not enough energy
+  2DUP warp-cost
+  DUP penergy @ > IF 2DROP DROP EXIT THEN   \ not enough energy
   use-energy
   \ Damaged warp: random chance of mis-jump (land in adjacent quadrant)
   pdmg-warp @ 50 < IF
@@ -1988,7 +1978,7 @@ VARIABLE sd-cancel                    \ cancel sequence progress (0-3)
   0= IF
     \ Timer expired — advance countdown
     sd-active @ 1 = IF sd-detonate EXIT THEN
-    sd-active @ 1 - sd-active !
+    -1 sd-active +!
     30 sd-timer !
     sd-show
   THEN ;
@@ -2104,7 +2094,7 @@ VARIABLE sg-row                   \ scan grid: outer loop row
 : cmd-add-digit  ( digit -- )
   cmd-digits @ 3 < IF
     DUP cmd-val @ 10 * + cmd-val !
-    cmd-digits @ 1 + cmd-digits !
+    1 cmd-digits +!
     \ Position cursor explicitly: col 18 + digit count, row 18
     cmd-digits @ 18 + 18 at-xy
     CHAR 0 + rg-emit
@@ -2398,12 +2388,12 @@ VARIABLE jnb-result
       death-cause @ 1 = IF
         \ Black hole — ship vanishes, no explosion
         restore-ship-bg
-        DROP DROP
+        2DROP
         0 17 at-xy
         S" BLACK HOLE" rg-type
       ELSE death-cause @ 2 = IF
         \ Self-destruct — explosion already happened
-        DROP DROP
+        2DROP
         0 17 at-xy
         S" DESTROYED" rg-type
       ELSE
