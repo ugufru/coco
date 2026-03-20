@@ -71,6 +71,9 @@ processors where Forth fits naturally without compromise.
 | `SWAP` | `( n1 n2 -- n2 n1 )` | Exchange top two items |
 | `OVER` | `( n1 n2 -- n1 n2 n1 )` | Copy second item to top |
 | `?DUP` | `( x -- x x \| 0 )` | Duplicate only if non-zero |
+| `2DUP` | `( n1 n2 -- n1 n2 n1 n2 )` | Duplicate top pair |
+| `2DROP` | `( n1 n2 -- )` | Discard top pair |
+| `ROT` | `( n1 n2 n3 -- n2 n3 n1 )` | Rotate third item to top |
 
 ### Arithmetic
 
@@ -111,6 +114,7 @@ processors where Forth fits naturally without compromise.
 | `C!` | `( c addr -- )` | Store low byte to address |
 | `FILL` | `( addr u c -- )` | Fill u bytes at addr with byte c |
 | `CMOVE` | `( src dst u -- )` | Copy u bytes from src to dst |
+| `+!` | `( n addr -- )` | Add n to the cell at addr |
 
 ### I/O and keyboard
 
@@ -137,6 +141,27 @@ processors where Forth fits naturally without compromise.
 | `DO` | `( limit index -- )` | Begin a counted loop; push limit and index to return stack |
 | `LOOP` | — | Increment index; branch back if index < limit |
 | `I` | `( -- n )` | Push current loop index |
+
+### Return stack
+
+| Word | Stack | Description |
+|---|---|---|
+| `>R` | `( n -- ) R:( -- n )` | Move top of data stack to return stack |
+| `R>` | `( -- n ) R:( n -- )` | Move top of return stack to data stack |
+| `R@` | `( -- n ) R:( n -- n )` | Copy top of return stack to data stack |
+
+### Spatial
+
+| Word | Stack | Description |
+|---|---|---|
+| `PROX-SCAN` | `( cx cy radius array count -- bitmask )` | Proximity scan: test each (x,y) pair in array against center, return bitmask of hits within radius |
+
+### Data
+
+| Word | Stack | Description |
+|---|---|---|
+| `sprite-data` | `( -- addr )` | Address of kernel sprite FCB data (5 sprites × 12 bytes) |
+| `font-data` | `( -- addr )` | Address of kernel font FCB data (59 glyphs × 8 bytes) |
 
 ### System
 
@@ -166,8 +191,8 @@ step-by-step walkthrough.
 |---|---|---|---|
 | 1 | `$0050` | 44 B | Kernel variables |
 | 2 | `$0E00` | ~25 B | Bootstrap |
-| 3 | `$1000` | ~1.1K | Staged kernel (remapped from `$E000`) |
-| 4 | `$2000` | ~14K | Application (contiguous) |
+| 3 | `$1000` | ~1.9K | Staged kernel (remapped from `$E000`) |
+| 4 | `$2000` | ~19.3K | Application (contiguous, varies by app) |
 | Exec | `$0E00` | — | Bootstrap entry point |
 
 All DECB records must target the lower 32K (`$0000–$7FFF`) because CLOADM
@@ -220,11 +245,11 @@ $2000–$7FFF   application code (contiguous, ~24K loadable via CLOADM)
 $8000–$DDFF   runtime RAM (24K — variables, tables, buffers; NOT CLOADM-loadable)
 $DE00         data stack base (U, grows downward)
 $E000–$E012   DOCOL, DOVAR entry points (final location)
-$E013–$E060   CFA table (39 entries × 2 bytes)
-$E061–$E432   primitive machine code + MATRIX2ASCII table
-$E433–$E471   START: hardware init + app entry
-$E472         KERN_END (end of bootstrap copy range)
-$E472–$FEFF   free RAM for kernel growth / static data (~7K)
+$E013–$E0B4   CFA table (51 entries × 2 bytes, includes DOVAR data blocks)
+$E0B5–$E761   primitive machine code + font/sprite FCB data + key table
+$E762–$E7A0   START: hardware init + app entry
+$E7A1         KERN_END (end of bootstrap copy range)
+$E7A1–$FEFF   free RAM for kernel growth / static data (~6.1K)
 $FF00–$FFFF   I/O registers + hardware vectors (always mapped, never RAM)
 ```
 
@@ -244,8 +269,8 @@ runtime (after the bootstrap enables all-RAM) but cannot hold loaded code.
 | Runtime RAM | 24K | variables, tables, buffers (`$8000–$DDFF`; not CLOADM-loadable) |
 | Data stack | 512B | grows down from `$DE00` |
 | Return stack | 512B | grows down from `$E000` (below kernel) |
-| Kernel code | ~1.1K | primitives, CFA table, keyboard matrix, startup (`$E000–$E471`) |
-| Post-kernel | ~7K | free for kernel growth / static data (`$E472–$FEFF`) |
+| Kernel code | ~1.9K | primitives, CFA table, font/sprite data, keyboard matrix, startup (`$E000–$E7A0`) |
+| Post-kernel | ~6.1K | free for kernel growth / static data (`$E7A1–$FEFF`) |
 
 ---
 

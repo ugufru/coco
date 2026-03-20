@@ -166,7 +166,7 @@ BASIC's `LOADM` loads it and the kernel's `START` routine jumps to `APP_BASE`.
 | `BEGIN … AGAIN`, `BEGIN … UNTIL` | done |
 | `INCLUDE filename` | done |
 | Runtime dictionary | not applicable (cross-compiler) |
-| String literals (`S"`, `."`) | not yet |
+| String literals (`S"`, `."`) | done |
 | Interactive REPL | not applicable (cross-compiler) |
 
 ---

@@ -80,13 +80,18 @@ All 13 tutorial chapters complete with working example programs.
 | Group | Words |
 |---|---|
 | Threading | DOCOL, DOVAR, EXIT, LIT |
-| Stack | DUP, DROP, SWAP, OVER, ?DUP |
+| Stack | DUP, DROP, SWAP, OVER, ?DUP, 2DUP, 2DROP, ROT |
 | Arithmetic | +, -, \*, /MOD, NEGATE |
-| Memory | @, ! |
-| I/O | EMIT, CR, KEY |
+| Memory | @, !, C@, C!, FILL, CMOVE, +! |
+| Bitwise | AND, OR, LSHIFT, RSHIFT |
+| I/O | EMIT, CR, KEY, KEY?, KBD-SCAN |
 | Control flow | 0BRANCH, BRANCH, DO, LOOP, I |
 | Comparison | =, <>, <, >, 0= |
+| Return stack | >R, R>, R@ |
 | Screen | AT |
+| String | TYPE, COUNT |
+| Spatial | PROX-SCAN |
+| Data | sprite-data, font-data |
 | System | HALT |
 
 ### Cross-compiler (fc.py)
@@ -103,6 +108,7 @@ All 13 tutorial chapters complete with working example programs.
 | Constants (CONSTANT) | done |
 | INCLUDE | done |
 | CODE ... ;CODE (inline 6809 assembly) | done |
+| S" (string literals), ." (print string) | done |
 
 ---
 

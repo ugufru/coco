@@ -94,9 +94,9 @@ black hole, or you detonate your own ship.
 
 ## Technical Notes
 
-The game is about 22K of compiled Forth plus a 1.2K kernel — nearly filling
-the available address space. Performance-critical graphics primitives are
-hand-written 6809 assembly, called as CODE words from Forth:
+The game is about 19.3K of compiled Forth plus a 1.9K kernel. Performance-critical
+graphics primitives are hand-written 6809 assembly, called as CODE words from
+Forth:
 
 | Primitive | What it does | Speedup vs Forth |
 |-----------|-------------|-----------------|
@@ -107,6 +107,9 @@ hand-written 6809 assembly, called as CODE words from Forth:
 | `rg-char` | Render font glyph to VRAM | 3x |
 | `beam-trace` | Trace beam path with hit detection | new |
 | `plot-dots` | Bulk pixel plotter for explosions | new |
+| `prox-dmg` | Proximity-based damage calculation | new |
+| `bg-save` | Save sprite background pixels | new |
+| `bg-restore` | Restore sprite background pixels | new |
 
 Everything else — the game loop, AI, galaxy model, command input, explosion
 animation, docking, gravity — is pure Forth.

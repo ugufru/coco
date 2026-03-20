@@ -118,6 +118,21 @@
           <td class="stack-effect">( x -- x x | 0 )</td>
           <td>Duplicate only if non-zero. If the top of stack is zero, leave it unchanged.</td>
         </tr>
+        <tr>
+          <td class="word-name">2DUP</td>
+          <td class="stack-effect">( n1 n2 -- n1 n2 n1 n2 )</td>
+          <td>Duplicate the top pair of stack items.</td>
+        </tr>
+        <tr>
+          <td class="word-name">2DROP</td>
+          <td class="stack-effect">( n1 n2 -- )</td>
+          <td>Discard the top two stack items.</td>
+        </tr>
+        <tr>
+          <td class="word-name">ROT</td>
+          <td class="stack-effect">( n1 n2 n3 -- n2 n3 n1 )</td>
+          <td>Rotate the third item to the top of the stack.</td>
+        </tr>
       </table>
 
       <!-- Arithmetic -->
@@ -228,6 +243,11 @@
           <td class="stack-effect">( src dest count -- )</td>
           <td>Copy <em>count</em> bytes from <em>src</em> to <em>dest</em>. Ascending copy (safe when dest &gt; src).</td>
         </tr>
+        <tr>
+          <td class="word-name">+!</td>
+          <td class="stack-effect">( n addr -- )</td>
+          <td>Add <em>n</em> to the 16-bit cell at <em>addr</em>. Equivalent to <code>DUP @ ROT + SWAP !</code> but faster.</td>
+        </tr>
       </table>
 
       <!-- Logic / Bitwise -->
@@ -335,6 +355,66 @@
         </tr>
       </table>
 
+      <!-- Return Stack -->
+      <div class="group-label">Return Stack</div>
+      <table class="ref-table">
+        <tr>
+          <th style="width:110px">Word</th>
+          <th style="width:180px">Stack</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td class="word-name">&gt;R</td>
+          <td class="stack-effect">( n -- ) R:( -- n )</td>
+          <td>Move the top of the data stack to the return stack. Must be balanced with <code>R&gt;</code> before the word returns.</td>
+        </tr>
+        <tr>
+          <td class="word-name">R&gt;</td>
+          <td class="stack-effect">( -- n ) R:( n -- )</td>
+          <td>Move the top of the return stack to the data stack.</td>
+        </tr>
+        <tr>
+          <td class="word-name">R@</td>
+          <td class="stack-effect">( -- n ) R:( n -- n )</td>
+          <td>Copy the top of the return stack to the data stack without removing it.</td>
+        </tr>
+      </table>
+
+      <!-- Spatial -->
+      <div class="group-label">Spatial</div>
+      <table class="ref-table">
+        <tr>
+          <th style="width:110px">Word</th>
+          <th style="width:180px">Stack</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td class="word-name">PROX-SCAN</td>
+          <td class="stack-effect">( cx cy r arr n -- mask )</td>
+          <td>Proximity scan. Tests each (x,y) pair in <em>arr</em> (up to <em>n</em> entries) against center point (<em>cx</em>,<em>cy</em>) with radius <em>r</em>. Returns a bitmask of hits.</td>
+        </tr>
+      </table>
+
+      <!-- Data -->
+      <div class="group-label">Data</div>
+      <table class="ref-table">
+        <tr>
+          <th style="width:110px">Word</th>
+          <th style="width:180px">Stack</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td class="word-name">sprite-data</td>
+          <td class="stack-effect">( -- addr )</td>
+          <td>Address of kernel sprite data (5 sprites &times; 12 bytes). Copy to application sprite region with <code>CMOVE</code>.</td>
+        </tr>
+        <tr>
+          <td class="word-name">font-data</td>
+          <td class="stack-effect">( -- addr )</td>
+          <td>Address of kernel font data (59 glyphs &times; 8 bytes). Copy to <code>$9000</code> with <code>CMOVE</code>.</td>
+        </tr>
+      </table>
+
       <!-- System -->
       <div class="group-label">System</div>
       <table class="ref-table">
@@ -422,6 +502,16 @@
           <td class="word-name">INCLUDE</td>
           <td><code>INCLUDE path</code></td>
           <td>Splice the contents of another Forth file at this point in the source. Paths are relative to the including file. Nested includes are supported.</td>
+        </tr>
+        <tr>
+          <td class="word-name">S"</td>
+          <td><code>S" text"</code></td>
+          <td>Compile a string literal. At runtime, pushes the address and length of the string onto the stack.</td>
+        </tr>
+        <tr>
+          <td class="word-name">."</td>
+          <td><code>." text"</code></td>
+          <td>Print a string literal. Compiles as <code>S"</code> followed by <code>TYPE</code>.</td>
         </tr>
         <tr>
           <td class="word-name">\ (backslash)</td>
@@ -774,8 +864,8 @@
           <td>Kernel code begins (DOCOL, DOVAR, CFA table, primitives, START)</td>
         </tr>
         <tr>
-          <td class="word-name">$1013&ndash;$1062</td>
-          <td>CFA table &mdash; 40 entries &times; 2 bytes</td>
+          <td class="word-name">$1013&ndash;$10B4</td>
+          <td>CFA table &mdash; 51 entries &times; 2 bytes (includes DOVAR data blocks)</td>
         </tr>
         <tr>
           <td class="word-name">$2000</td>
