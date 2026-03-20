@@ -192,7 +192,7 @@ step-by-step walkthrough.
 | 1 | `$0050` | 44 B | Kernel variables |
 | 2 | `$0E00` | ~25 B | Bootstrap |
 | 3 | `$1000` | ~1.9K | Staged kernel (remapped from `$E000`) |
-| 4 | `$2000` | ~19.3K | Application (contiguous, varies by app) |
+| 4 | `$2000` | ~18.8K | Application (contiguous, varies by app) |
 | Exec | `$0E00` | — | Bootstrap entry point |
 
 All DECB records must target the lower 32K (`$0000–$7FFF`) because CLOADM
