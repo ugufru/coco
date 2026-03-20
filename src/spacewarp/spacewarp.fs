@@ -768,23 +768,7 @@ VARIABLE base-attack              \ frame counter for base destruction
 
 \ Pull one Jovian (index in jbg-i) toward (sg-sx, sg-sy) by 1px
 : jov-pull  ( -- )
-  JOV-POS jbg-i @ 2 * + >R
-  R@ C@ sg-sx @ < IF
-    R@ C@ 1 + R@ C!
-    1 jov-moved !
-  THEN
-  R@ C@ sg-sx @ > IF
-    R@ C@ 1 - R@ C!
-    1 jov-moved !
-  THEN
-  R@ 1 + C@ sg-sy @ < IF
-    R@ 1 + C@ 1 + R@ 1 + C!
-    1 jov-moved !
-  THEN
-  R@ 1 + C@ sg-sy @ > IF
-    R@ 1 + C@ 1 - R@ 1 + C!
-    1 jov-moved !
-  THEN R> DROP ;
+  JOV-POS jbg-i @ 2 * + sg-sx @ sg-sy @ jov-moved xy-pull ;
 
 \ After any kill + explosion, do a full sprite refresh.
 \ Kills corrupt bg-save buffers (beam pixels, explosion debris), so we must:
@@ -1388,19 +1372,62 @@ VARIABLE was-near-base
 
 \ ── Collision detection (called after move-ship AND gravity-well) ──────
 
+\ Check if any (x,y) pair in array is within 3px of (sx,sy) on both axes.
+\ Returns nonzero flag if collision found.
+CODE collision-scan  ( sx sy array count -- flag )
+        PSHS    X
+        LDA     1,U             ; A = count (low byte)
+        BEQ     @none
+        LDX     2,U             ; X = array base
+        LDB     7,U             ; B = sx (low byte of 16-bit)
+        PSHS    B               ; +0,S = sx
+        LDB     5,U             ; B = sy (low byte)
+        PSHS    B               ; +0,S = sy, +1,S = sx
+@loop   ; check |array[i].x - sx| < 3
+        LDB     ,X              ; B = entry x
+        SUBB    1,S             ; B = entry_x - sx
+        BPL     @ax
+        NEGB
+@ax     CMPB    #3
+        BHS     @next           ; |dx| >= 3, skip
+        ; check |array[i].y - sy| < 3
+        LDB     1,X             ; B = entry y
+        SUBB    ,S              ; B = entry_y - sy
+        BPL     @ay
+        NEGB
+@ay     CMPB    #3
+        BHS     @next           ; |dy| >= 3, skip
+        ; hit!
+        LEAS    2,S             ; pop sx,sy
+        LEAU    8,U             ; pop 4 args
+        LDD     #1
+        STD     ,--U            ; push flag=1
+        PULS    X
+        ;NEXT
+@next   LEAX    2,X             ; next entry
+        DECA
+        BNE     @loop
+        LEAS    2,S             ; pop sx,sy
+@none   LEAU    8,U             ; pop 4 args
+        LDD     #0
+        STD     ,--U            ; push flag=0
+        PULS    X
+        ;NEXT
+;CODE
+
 : check-collisions  ( -- )
   moved @ 0= IF EXIT THEN
   \ Star collision: within 3px = destroyed
-  qstars @ ?DUP IF 0 DO
-    SHIP-POS C@ STAR-POS I 2 * + C@ - abs 3 <
-    SHIP-POS 1 + C@ STAR-POS I 2 * + 1 + C@ - abs 3 < AND IF
+  qstars @ ?DUP IF
+    >R SHIP-POS C@ SHIP-POS 1 + C@ STAR-POS R>
+    collision-scan IF
       0 penergy !
     THEN
-  LOOP THEN
+  THEN
   \ Black hole collision: within 3px = vanish instantly
   qbhole @ IF
-    SHIP-POS C@ BHOLE-POS C@ - abs 3 <
-    SHIP-POS 1 + C@ BHOLE-POS 1 + C@ - abs 3 < AND IF
+    SHIP-POS C@ SHIP-POS 1 + C@ BHOLE-POS 1
+    collision-scan IF
       1 death-cause !
       0 penergy !
     THEN
@@ -1455,12 +1482,42 @@ VARIABLE sg-i                      \ star gravity loop index
 VARIABLE sg-sx                     \ star x cache
 VARIABLE sg-sy                     \ star y cache
 
+\ Pull byte pair at addr toward (tx,ty) by 1px per axis.
+\ Sets the 16-bit cell at flag-addr to 1 if any axis moved.
+CODE xy-pull  ( addr tx ty flag-addr -- )
+        PSHS    X
+        LDX     6,U             ; X = addr of (x,y) byte pair
+        LDY     ,U              ; Y = flag-addr
+        ; -- pull X axis --
+        LDA     ,X              ; A = current x
+        CMPA    5,U             ; compare with tx (low byte)
+        BEQ     @xdone
+        BHS     @xdec           ; current > target: decrement
+        INCA                    ; current < target: increment
+        BRA     @xset
+@xdec   DECA
+@xset   STA     ,X
+        LDD     #1
+        STD     ,Y              ; flag = 1
+@xdone  ; -- pull Y axis --
+        LDA     1,X             ; A = current y
+        CMPA    3,U             ; compare with ty (low byte)
+        BEQ     @ydone
+        BHS     @ydec
+        INCA
+        BRA     @yset
+@ydec   DECA
+@yset   STA     1,X
+        LDD     #1
+        STD     ,Y              ; flag = 1
+@ydone  LEAU    8,U             ; pop 4 args
+        PULS    X
+        ;NEXT
+;CODE
+
 : star-pull  ( -- )
   1 moved !
-  SHIP-POS C@ sg-sx @ < IF  SHIP-POS C@ 1 + SHIP-POS C!  THEN
-  SHIP-POS C@ sg-sx @ > IF  SHIP-POS C@ 1 - SHIP-POS C!  THEN
-  SHIP-POS 1 + C@ sg-sy @ < IF  SHIP-POS 1 + C@ 1 + SHIP-POS 1 + C!  THEN
-  SHIP-POS 1 + C@ sg-sy @ > IF  SHIP-POS 1 + C@ 1 - SHIP-POS 1 + C!  THEN ;
+  SHIP-POS sg-sx @ sg-sy @ moved xy-pull ;
 
 : star-gravity  ( -- )
   qstars @ ?DUP IF 0 DO
