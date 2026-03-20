@@ -707,6 +707,58 @@ VARIABLE jbg-i
     I gen-genome
   LOOP THEN ;
 
+\ ── Emotion system ─────────────────────────────────────────────────────
+\ Emotion = byte 3 high nibble of genome (0-15).
+\ 0-3=fear/panic, 4-7=uneasy, 8-11=neutral/alert, 12-15=angry/enraged.
+\ Decays toward genome baseline every 120 frames (~2s).
+\ Stimuli shift emotion immediately; clamped to 0-15.
+
+: jov-emotion@  ( i -- e )
+  4 * JOV-GENOME + 3 + C@ 4 RSHIFT ;
+
+: jov-emotion!  ( e i -- )
+  4 * JOV-GENOME + 3 +            \ addr of byte 3
+  SWAP DUP 0 < IF DROP 0 THEN
+  DUP 15 > IF DROP 15 THEN        \ clamp 0-15
+  4 LSHIFT                         \ shift to high nibble
+  OVER C@ $0F AND                  \ preserve low nibble (origin)
+  OR SWAP C! ;
+
+\ Genome baseline: aggression (byte 0 bits 7-5) mapped to emotion center
+: jov-emotion-base  ( i -- e )
+  4 * JOV-GENOME + C@ 5 RSHIFT    \ aggression 0-7
+  2 * 8 + DUP 15 > IF DROP 15 THEN ;
+
+\ Drift 1 step toward baseline
+: jov-emotion-decay  ( i -- )
+  DUP jov-emotion@ OVER jov-emotion-base  \ ( i cur base )
+  2DUP = IF 2DROP DROP EXIT THEN          \ at baseline, done
+  < IF 1 ELSE -1 THEN                     \ +1 if cur<base, -1 if cur>base
+  OVER jov-emotion@ + SWAP jov-emotion! ;
+
+\ Apply stimulus (signed delta) to one Jovian
+: jov-emotion-stim  ( delta i -- )
+  DUP jov-emotion@ ROT + SWAP jov-emotion! ;
+
+\ Apply stimulus to all living Jovians
+: jov-emotion-all  ( delta -- )
+  qjovians @ ?DUP IF 0 DO
+    JOV-DMG I + C@ IF
+      DUP I jov-emotion-stim
+    THEN
+  LOOP THEN DROP ;
+
+\ Decay all living Jovians (called every 120 frames)
+: jov-emotion-decay-all  ( -- )
+  qjovians @ ?DUP IF 0 DO
+    JOV-DMG I + C@ IF
+      I jov-emotion-decay
+    THEN
+  LOOP THEN ;
+
+120 CONSTANT EMOTION-DECAY-RATE   \ frames between decay ticks
+VARIABLE emotion-timer            \ frame counter for decay
+
 VARIABLE jov-moved               \ flag: did any Jovian move this frame?
 
 \ ── Jovian AI (genome-driven) ──────────────────────────────────────────
@@ -935,7 +987,14 @@ CODE jov-think  ( i qbase -- )
         apply-intent
       THEN
     THEN
-  LOOP THEN ;
+  LOOP THEN
+  \ Emotion decay: every 120 frames, drift toward baseline
+  emotion-timer @ 1 + DUP EMOTION-DECAY-RATE < IF
+    emotion-timer !
+  ELSE
+    DROP 0 emotion-timer !
+    jov-emotion-decay-all
+  THEN ;
 
 \ ── Jovian gravity (black holes + stars pull/kill Jovians) ────────────
 \ Applies every frame after tick-jovians.  Uses sg-sx/sg-sy as scratch.
@@ -980,6 +1039,7 @@ VARIABLE check-win                \ flag: a kill happened, check win/lose
     JOV-POS jbg-i @ 2 * + 1 + C@
     explode-jovian
     proximity-damage
+    3 jov-emotion-all              \ fellow killed: rage/panic
     refresh-after-kill
   THEN ;
 
@@ -1299,8 +1359,15 @@ VARIABLE pj-result
   jbeam-ship-hit? jbeam-hit-ship !
   \ Start bolt animation
   0 jbeam-head !  0 jbeam-tail !
-  \ Reset cooldown
-  jbeam-cooldown jbeam-cool ! ;
+  \ Reset cooldown, scaled by emotion of firing Jovian
+  \ Rage (15) = 60% cooldown, neutral (8) = 100%, fear (0) = 140%
+  \ Formula: cooldown * (140 - emotion*~5) / 100
+  jbeam-cooldown
+  pj-result @ DUP 0 < 0= IF
+    jov-emotion@ 5 * 140 SWAP -    \ scale factor: 140 at fear, 65 at rage
+    * 100 /MOD SWAP DROP            \ apply percentage
+  ELSE DROP THEN
+  jbeam-cool ! ;
 
 \ Jovian beam tick: erase tail
 : tick-jbeam-erase  ( -- )
@@ -1363,6 +1430,8 @@ VARIABLE pj-result
   ELSE DROP pdmg-masr
   THEN THEN THEN THEN
   SWAP NEGATE OVER @ + DUP 0 < IF DROP 0 THEN SWAP !
+  \ Confidence boost to the shooter
+  pj-result @ DUP 0 < 0= IF 1 SWAP jov-emotion-stim ELSE DROP THEN
   0 jbeam-hit-ship ! ;
 
 \ Tick: cooldown toward next shot, maybe fire
@@ -1469,6 +1538,8 @@ VARIABLE sp-r2
   draw-border draw-stars draw-storm-stars draw-event-horizon
   draw-base
   gen-genomes init-jovian-ai
+  0 emotion-timer !
+  2 jov-emotion-all                \ alarm: player enters quadrant
   save-jov-bgs save-jov-oldpos
   draw-jovians-live
   save-ship-bg draw-ship ;
@@ -1720,7 +1791,8 @@ CODE xyn-pull  ( addr tx ty step flag-addr -- )
 
 : do-dock  ( -- )
   1 docked !
-  10 pmissiles ! ;
+  10 pmissiles !
+  1 jov-emotion-all ;              \ boldness: player docking
 
 : do-undock  ( -- )  0 docked ! ;
 
@@ -1958,7 +2030,15 @@ VARIABLE bfo-found
     DROP  -1 beam-hit-idx !
   THEN
   \ Start bolt animation
-  0 beam-head !  0 beam-tail ! ;
+  0 beam-head !  0 beam-tail !
+  \ Emotion: aggressive Jovians rage, peaceful ones fear
+  qjovians @ ?DUP IF 0 DO
+    JOV-DMG I + C@ IF
+      I 4 * JOV-GENOME + C@ 5 RSHIFT  \ aggression 0-7
+      4 < IF -2 ELSE 2 THEN
+      I jov-emotion-stim
+    THEN
+  LOOP THEN ;
 
 \ ── Beam tick: advance bolt animation ─────────────────────────────────
 
