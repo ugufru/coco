@@ -1458,22 +1458,8 @@ VARIABLE grav-tick
   ELSE                          \ <6: inescapable, 2px/frame
     2
   THEN THEN THEN
-  grav-pull !
-  1 moved !
-  \ Pull X toward black hole
-  SHIP-POS C@ BHOLE-POS C@ < IF
-    SHIP-POS C@ grav-pull @ + SHIP-POS C!
-  THEN
-  SHIP-POS C@ BHOLE-POS C@ > IF
-    SHIP-POS C@ grav-pull @ - SHIP-POS C!
-  THEN
-  \ Pull Y toward black hole
-  SHIP-POS 1 + C@ BHOLE-POS 1 + C@ < IF
-    SHIP-POS 1 + C@ grav-pull @ + SHIP-POS 1 + C!
-  THEN
-  SHIP-POS 1 + C@ BHOLE-POS 1 + C@ > IF
-    SHIP-POS 1 + C@ grav-pull @ - SHIP-POS 1 + C!
-  THEN ;
+  >R 1 moved !
+  SHIP-POS BHOLE-POS C@ BHOLE-POS 1 + C@ R> moved xyn-pull ;
 
 \ ── Star gravity (weaker, smaller) ──────────────────────────────────────
 \ 10px radius. Close (<5): pull every 2 frames. Far (5-10): every 4.
@@ -1482,38 +1468,52 @@ VARIABLE sg-i                      \ star gravity loop index
 VARIABLE sg-sx                     \ star x cache
 VARIABLE sg-sy                     \ star y cache
 
-\ Pull byte pair at addr toward (tx,ty) by 1px per axis.
+\ Pull byte pair at addr toward (tx,ty) by step px per axis.
 \ Sets the 16-bit cell at flag-addr to 1 if any axis moved.
-CODE xy-pull  ( addr tx ty flag-addr -- )
+CODE xyn-pull  ( addr tx ty step flag-addr -- )
         PSHS    X
-        LDX     6,U             ; X = addr of (x,y) byte pair
+        LDX     8,U             ; X = addr of (x,y) byte pair
         LDY     ,U              ; Y = flag-addr
+        LDB     3,U             ; B = step (low byte)
         ; -- pull X axis --
         LDA     ,X              ; A = current x
-        CMPA    5,U             ; compare with tx (low byte)
+        CMPA    7,U             ; compare with tx (low byte)
         BEQ     @xdone
         BHS     @xdec           ; current > target: decrement
-        INCA                    ; current < target: increment
+        PSHS    B               ; save step
+        ADDA    ,S+             ; A += step
         BRA     @xset
-@xdec   DECA
+@xdec   PSHS    A               ; save current
+        TFR     B,A             ; A = step
+        NEGA                    ; A = -step
+        ADDA    ,S+             ; A = current - step
 @xset   STA     ,X
         LDD     #1
         STD     ,Y              ; flag = 1
 @xdone  ; -- pull Y axis --
+        LDB     3,U             ; B = step (reload)
         LDA     1,X             ; A = current y
-        CMPA    3,U             ; compare with ty (low byte)
+        CMPA    5,U             ; compare with ty (low byte)
         BEQ     @ydone
         BHS     @ydec
-        INCA
+        PSHS    B
+        ADDA    ,S+
         BRA     @yset
-@ydec   DECA
+@ydec   PSHS    A
+        TFR     B,A
+        NEGA
+        ADDA    ,S+
 @yset   STA     1,X
         LDD     #1
         STD     ,Y              ; flag = 1
-@ydone  LEAU    8,U             ; pop 4 args
+@ydone  LEAU    10,U            ; pop 5 args
         PULS    X
         ;NEXT
 ;CODE
+
+\ Convenience: pull by 1 pixel (common case)
+: xy-pull  ( addr tx ty flag-addr -- )
+  >R 1 R> xyn-pull ;
 
 : star-pull  ( -- )
   1 moved !
