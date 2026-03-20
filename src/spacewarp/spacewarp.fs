@@ -355,7 +355,7 @@ VARIABLE ss-safe
   100 pdmg-scan !
   100 pdmg-defl !
   100 pdmg-masr !
-  0 gtime !
+  0 gtime !  0 stardate-timer !
   0 move-count ! ;
 
 \ ══════════════════════════════════════════════════════════════════════════
@@ -758,6 +758,61 @@ VARIABLE jbg-i
 
 120 CONSTANT EMOTION-DECAY-RATE   \ frames between decay ticks
 VARIABLE emotion-timer            \ frame counter for decay
+
+\ ── Quadrant mood persistence ──────────────────────────────────────────
+\ MOOD-GRID (64 bytes at $7E00): one byte per sector, 0-15 scale.
+\ Saved on quadrant exit (aggregate Jovian emotions), loaded on entry
+\ (seeds starting emotion).  Decays toward neutral (8) each stardate.
+\ Unvisited quadrants drift aggressive.
+
+\ Mood grid address for quadrant (col, row)
+: mood-addr  ( col row -- addr )  8 * + MOOD-GRID + ;
+
+\ Save current quadrant mood: average emotion of living Jovians
+: mood-save  ( -- )
+  0 0                              \ ( sum count )
+  qjovians @ ?DUP IF 0 DO
+    JOV-DMG I + C@ IF
+      SWAP I jov-emotion@ + SWAP 1 +
+    THEN
+  LOOP THEN
+  DUP 0= IF 2DROP EXIT THEN       \ no living Jovians, keep old mood
+  /MOD SWAP DROP                   \ average
+  pcol @ prow @ mood-addr C! ;
+
+\ Load mood into spawned Jovians: bias starting emotion from mood byte
+: mood-load  ( -- )
+  pcol @ prow @ mood-addr C@       \ mood 0-15
+  DUP 8 = IF DROP EXIT THEN       \ neutral, no bias needed
+  8 -                              \ delta from neutral (-8 to +7)
+  qjovians @ ?DUP IF 0 DO
+    DUP I jov-emotion-stim
+  LOOP THEN DROP ;
+
+3600 CONSTANT STARDATE-FRAMES     \ ~60 seconds per stardate
+VARIABLE stardate-timer            \ frame counter
+
+\ Decay all mood bytes 1 step toward neutral (8)
+\ Unvisited (still at init value 8) drift to 9 (slightly aggressive)
+: mood-decay-all  ( -- )
+  64 0 DO
+    MOOD-GRID I + C@
+    DUP 8 = IF 1 +                \ neutral drifts aggressive
+    ELSE DUP 8 > IF 1 -           \ above neutral: decay down
+    ELSE 1 +                       \ below neutral: decay up
+    THEN THEN
+    MOOD-GRID I + C!
+  LOOP ;
+
+\ Stardate tick: increment gtime, decay mood grid
+: tick-stardate  ( -- )
+  stardate-timer @ 1 + DUP STARDATE-FRAMES < IF
+    stardate-timer !
+  ELSE
+    DROP 0 stardate-timer !
+    1 gtime +!
+    mood-decay-all
+  THEN ;
 
 \ ── Detection & awareness ──────────────────────────────────────────────
 \ Jovians start idle (JOV-STATE=0) on quadrant entry.  Every 30 frames,
@@ -1611,6 +1666,7 @@ VARIABLE sp-r2
   draw-border draw-stars draw-storm-stars draw-event-horizon
   draw-base
   gen-genomes init-jovian-ai
+  mood-load                        \ seed emotions from quadrant mood
   0 emotion-timer !  0 detect-timer !
   2 jov-emotion-all                \ alarm: player enters quadrant
   save-jov-bgs save-jov-oldpos
@@ -2307,6 +2363,8 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
       SWAP 1 + 7 AND SWAP            \ shift col by 1
     THEN
   THEN
+  \ Save mood before leaving quadrant
+  mood-save
   \ Clear beams and missile
   cancel-jbeam cancel-beam
   msl-active @ IF msl-erase 0 msl-active ! THEN
@@ -2686,6 +2744,7 @@ VARIABLE jnb-result
     jov-gravity
     tick-jbeam
     tick-destruct
+    tick-stardate
     process-key
     VSYNC
 
