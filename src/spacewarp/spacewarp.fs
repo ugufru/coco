@@ -723,9 +723,16 @@ VARIABLE hc-jy                    \ scratch: candidate y for obstacle check
 VARIABLE jtk-nx                   \ proposed new x
 VARIABLE jtk-ny                   \ proposed new y
 
-\ Movement speed: frames between moves (lower = faster)
-: jov-speed  ( -- n )
-  10 glevel @ - DUP 2 < IF DROP 2 THEN ;
+\ Per-Jovian tick threshold from genome (lower = faster)
+\ speed_modifier (byte 1, bits 5-4) + pilot_skill (byte 0, bits 2-0)
+\ threshold = 10 - (speed + skill), clamped [2, 8]
+: jov-threshold  ( i -- n )
+  4 * JOV-GENOME +               \ genome addr
+  DUP 1 + C@ 4 RSHIFT 3 AND     \ speed_modifier (0-3)
+  SWAP C@ 7 AND                  \ pilot_skill (0-7)
+  + 10 SWAP -                    \ 10 - (speed + skill)
+  DUP 2 < IF DROP 2 THEN
+  DUP 8 > IF DROP 8 THEN ;
 
 \ Manhattan distance from (hc-jx, hc-jy) to (x, y) byte pair at addr
 : jov-dist  ( addr -- d )
@@ -915,12 +922,12 @@ CODE jov-think  ( i qbase -- )
     1 jov-moved !
   THEN R> DROP ;
 
-\ Tick all living Jovians
+\ Tick all living Jovians (per-Jovian threshold from genome)
 : tick-jovians  ( -- )
   qjovians @ ?DUP IF 0 DO
     I jbg-i !
     JOV-DMG jbg-i @ + C@ IF
-      JOV-TICK jbg-i @ + C@ 1 + DUP jov-speed < IF
+      JOV-TICK jbg-i @ + C@ 1 + DUP I jov-threshold < IF
         JOV-TICK jbg-i @ + C!
       ELSE
         DROP 0 JOV-TICK jbg-i @ + C!
