@@ -759,6 +759,66 @@ VARIABLE jbg-i
 120 CONSTANT EMOTION-DECAY-RATE   \ frames between decay ticks
 VARIABLE emotion-timer            \ frame counter for decay
 
+\ ── Detection & awareness ──────────────────────────────────────────────
+\ Jovians start idle (JOV-STATE=0) on quadrant entry.  Every 30 frames,
+\ idle Jovians roll detection: (pilot_skill + emotion) * 4 >= distance.
+\ On detection → JOV-STATE=1 (attack) + distance-scaled alarm stimulus.
+\ Firing maser/missile instantly reveals player to all Jovians.
+
+30 CONSTANT DETECT-RATE           \ frames between detection rolls
+
+\ Manhattan distance from Jovian i to player
+: jov-player-dist  ( i -- d )
+  2 * JOV-POS + DUP C@ SHIP-POS C@ - abs
+  SWAP 1 + C@ SHIP-POS 1 + C@ - abs + ;
+
+\ Detection range from genome: (pilot_skill + emotion) * 4
+: jov-detect-range  ( i -- r )
+  DUP 4 * JOV-GENOME + C@ 7 AND  \ pilot_skill (0-7)
+  SWAP jov-emotion@               \ emotion (0-15)
+  + 4 * ;                         \ range in pixels
+
+\ Detection roll: returns 1 if player detected
+: jov-detect?  ( i -- flag )
+  DUP jov-detect-range
+  SWAP jov-player-dist
+  > ;                             \ detect if range > distance
+
+\ Reveal player to all living Jovians + distance-scaled alarm
+: jov-reveal-all  ( -- )
+  qjovians @ ?DUP IF 0 DO
+    JOV-DMG I + C@ IF
+      1 JOV-STATE I + C!
+    THEN
+  LOOP THEN ;
+
+\ On detection: set aware + alarm stimulus scaled by distance
+\ Close (<15px): ±4, medium (15-40): ±2, far (>40): ±1
+\ Sign: aggressive (aggr>=4) → positive, peaceful → negative
+: jov-on-detect  ( i -- )
+  DUP 1 SWAP JOV-STATE + C!      \ set JOV-STATE = attack
+  DUP jov-player-dist             \ ( i dist )
+  DUP 15 < IF DROP 4
+  ELSE 40 < IF 2
+  ELSE 1
+  THEN THEN                       \ ( i magnitude )
+  SWAP DUP 4 * JOV-GENOME + C@ 5 RSHIFT  \ ( mag i aggr )
+  4 < IF SWAP NEGATE SWAP         \ peaceful: fear (negative)
+  THEN jov-emotion-stim ;         \ apply stimulus
+
+\ Roll detection for all idle Jovians
+: jov-detect-tick  ( -- )
+  qjovians @ ?DUP IF 0 DO
+    JOV-DMG I + C@ IF
+      JOV-STATE I + C@ 0= IF     \ only check idle Jovians
+        I jov-detect? IF
+          I jov-on-detect
+          1 I jov-emotion-stim    \ +1 alertness
+        THEN
+      THEN
+    THEN
+  LOOP THEN ;
+
 VARIABLE jov-moved               \ flag: did any Jovian move this frame?
 
 \ ── Jovian AI (genome-driven) ──────────────────────────────────────────
@@ -974,20 +1034,31 @@ CODE jov-think  ( i qbase -- )
     1 jov-moved !
   THEN R> DROP ;
 
+VARIABLE detect-timer              \ frame counter for detection rolls
+
 \ Tick all living Jovians (per-Jovian threshold from genome)
 : tick-jovians  ( -- )
   qjovians @ ?DUP IF 0 DO
     I jbg-i !
     JOV-DMG jbg-i @ + C@ IF
-      JOV-TICK jbg-i @ + C@ 1 + DUP I jov-threshold < IF
-        JOV-TICK jbg-i @ + C!
-      ELSE
-        DROP 0 JOV-TICK jbg-i @ + C!
-        jbg-i @ qbase @ jov-think
-        apply-intent
+      JOV-STATE jbg-i @ + C@ IF   \ aware: think + move
+        JOV-TICK jbg-i @ + C@ 1 + DUP I jov-threshold < IF
+          JOV-TICK jbg-i @ + C!
+        ELSE
+          DROP 0 JOV-TICK jbg-i @ + C!
+          jbg-i @ qbase @ jov-think
+          apply-intent
+        THEN
       THEN
     THEN
   LOOP THEN
+  \ Detection: every 30 frames, roll for idle Jovians
+  detect-timer @ 1 + DUP DETECT-RATE < IF
+    detect-timer !
+  ELSE
+    DROP 0 detect-timer !
+    jov-detect-tick
+  THEN
   \ Emotion decay: every 120 frames, drift toward baseline
   emotion-timer @ 1 + DUP EMOTION-DECAY-RATE < IF
     emotion-timer !
@@ -1319,7 +1390,7 @@ VARIABLE jbhit-flag
     THEN
   LOOP jbhit-flag @ ;
 
-\ Pick a random living Jovian index, or -1 if none alive
+\ Pick a random living + aware Jovian index, or -1 if none
 VARIABLE pj-result
 : pick-jovian  ( -- i|-1 )
   -1 pj-result !
@@ -1327,7 +1398,9 @@ VARIABLE pj-result
   rnd                             \ random starting index
   qjovians @ 0 DO
     DUP JOV-DMG + C@ IF           \ alive?
-      pj-result @ 0 < IF DUP pj-result ! THEN  \ take first alive
+      DUP JOV-STATE + C@ IF       \ aware?
+        pj-result @ 0 < IF DUP pj-result ! THEN
+      THEN
     THEN
     1 + DUP qjovians @ < 0= IF DROP 0 THEN  \ wrap
   LOOP DROP
@@ -1538,7 +1611,7 @@ VARIABLE sp-r2
   draw-border draw-stars draw-storm-stars draw-event-horizon
   draw-base
   gen-genomes init-jovian-ai
-  0 emotion-timer !
+  0 emotion-timer !  0 detect-timer !
   2 jov-emotion-all                \ alarm: player enters quadrant
   save-jov-bgs save-jov-oldpos
   draw-jovians-live
@@ -2031,7 +2104,8 @@ VARIABLE bfo-found
   THEN
   \ Start bolt animation
   0 beam-head !  0 beam-tail !
-  \ Emotion: aggressive Jovians rage, peaceful ones fear
+  \ Firing reveals player + emotion reaction
+  jov-reveal-all
   qjovians @ ?DUP IF 0 DO
     JOV-DMG I + C@ IF
       I 4 * JOV-GENOME + C@ 5 RSHIFT  \ aggression 0-7
@@ -2205,7 +2279,8 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
   0 msl-frame !
   1 msl-active !  1 msl-dirty !
   msl-scrx msl-px !  msl-scry msl-py !
-  save-msl-bg ;
+  save-msl-bg
+  jov-reveal-all ;                \ missile launch reveals player
 
 \ ── Command dispatch ───────────────────────────────────────────────────
 
