@@ -1553,6 +1553,10 @@ CODE xyn-pull  ( addr tx ty step flag-addr -- )
 \ Inverse log curve: fast when empty, slows every 20%.
 VARIABLE dock-tick
 
+\ Add 2 to the 16-bit cell at addr, capping at 100. No-op if already >= 100.
+: repair-sys  ( addr -- )
+  DUP @ 100 < IF DUP @ 2 + 100 < IF DUP @ 2 + ELSE 100 THEN SWAP ! ELSE DROP THEN ;
+
 : tick-dock  ( -- )
   docked @ 0= IF EXIT THEN
   penergy @ 100 = IF EXIT THEN
@@ -1570,11 +1574,11 @@ VARIABLE dock-tick
   THEN THEN THEN THEN
   penergy @ 100 > IF 100 penergy ! THEN
   \ Repair systems: +2 per frame each (0→100 in ~50 frames = 0.8s)
-  pdmg-ion  @ 100 < IF pdmg-ion  @ 2 + 100 < IF pdmg-ion  @ 2 + ELSE 100 THEN pdmg-ion  ! THEN
-  pdmg-warp @ 100 < IF pdmg-warp @ 2 + 100 < IF pdmg-warp @ 2 + ELSE 100 THEN pdmg-warp ! THEN
-  pdmg-scan @ 100 < IF pdmg-scan @ 2 + 100 < IF pdmg-scan @ 2 + ELSE 100 THEN pdmg-scan ! THEN
-  pdmg-defl @ 100 < IF pdmg-defl @ 2 + 100 < IF pdmg-defl @ 2 + ELSE 100 THEN pdmg-defl ! THEN
-  pdmg-masr @ 100 < IF pdmg-masr @ 2 + 100 < IF pdmg-masr @ 2 + ELSE 100 THEN pdmg-masr ! THEN ;
+  pdmg-ion  repair-sys
+  pdmg-warp repair-sys
+  pdmg-scan repair-sys
+  pdmg-defl repair-sys
+  pdmg-masr repair-sys ;
 
 : check-dock  ( -- )
   qbase @ 0= IF EXIT THEN
