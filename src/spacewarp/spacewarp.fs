@@ -784,13 +784,31 @@ VARIABLE jbg-i
 : jov-emotion@  ( i -- e )
   4 * JOV-GENOME + 3 + C@ 4 RSHIFT ;
 
-: jov-emotion!  ( e i -- )
-  4 * JOV-GENOME + 3 +            \ addr of byte 3
-  SWAP DUP 0 < IF DROP 0 THEN
-  DUP 15 > IF DROP 15 THEN        \ clamp 0-15
-  4 LSHIFT                         \ shift to high nibble
-  OVER C@ $0F AND                  \ preserve low nibble (origin)
-  OR SWAP C! ;
+CODE jov-emotion!   \ ( e i -- )
+        LDA     1,U             ; A = i
+        LDB     #4
+        MUL
+        ADDD    #$77C8          ; JOV-GENOME + 3
+        TFR     D,Y             ; Y = byte 3 addr
+        LDA     3,U             ; A = e (low byte)
+        LEAU    4,U             ; pop 2 args
+        BPL     @pos
+        CLRA                    ; clamp negative to 0
+        BRA     @cldn
+@pos    CMPA    #15
+        BLS     @cldn
+        LDA     #15             ; clamp to 15
+@cldn   ASLA
+        ASLA
+        ASLA
+        ASLA                    ; A = emotion << 4
+        PSHS    A               ; save shifted emotion
+        LDB     ,Y              ; B = current byte 3
+        ANDB    #$0F            ; preserve low nibble
+        ORB     ,S+             ; combine
+        STB     ,Y              ; write back
+        ;NEXT
+;CODE
 
 \ Genome baseline: aggression (byte 0 bits 7-5) mapped to emotion center
 : jov-emotion-base  ( i -- e )
@@ -831,131 +849,174 @@ VARIABLE emotion-timer            \ frame counter for decay
 \ Each Jovian gets a unique sprite from its genome appearance seed.
 \ Shape from seed, color from emotion band, density from origin.
 
-\ Emotion → 2bpp color: 0-4=blue(1), 5-10=white(3), 11-15=red(2)
-: emo-color  ( emo -- 2bpp )
-  DUP 5 < IF DROP 1 ELSE
-  10 > IF 2 ELSE 3 THEN THEN ;
-
 \ Emotion → band index: 0=fear, 1=neutral, 2=rage
 : jov-color-band  ( emo -- band )
   DUP 5 < IF DROP 0 ELSE
   10 > IF 2 ELSE 1 THEN THEN ;
 
-\ JOV-SPRWORK layout for sprite generation:
-\   +0,+1: sprite buffer address
-\   +2: 2bpp color
-\   +3: half_width
-\   +4: pixel budget
-\   +5: PRNG state (seed)
-\   +6: width
-\   +7: height
-\   +8: loop counter (CODE scratch)
-\   +9: quotient (CODE scratch)
-\   +10: col (CODE scratch)
-\   +11: row (CODE scratch)
-
-\ Core sprite generation engine: per-row bit pattern + mirror.
-\ Each row: PRNG step, check lower bits for columns, mirror to right.
-\ Produces symmetric "space invader" style shapes.
-\ Reads params from JOV-SPRWORK (+0=spr addr, +2=color, +3=half_width,
-\   +5=PRNG state, +6=width, +7=height).
-\ Scratch: +2=col iter, +3=row iter (reused after setup copies to CODE).
-CODE jov-sprite-gen   \ ( -- )
-        PSHS    X
-        ; --- Clear sprite data ---
-        LDX     $77DA           ; sprite buffer addr
-        LEAX    2,X             ; skip header
-        LDA     $77E0           ; width
+\ Generate sprite for Jovian i from its genome (all-in-one CODE word).
+\ Reads appearance seed, computes dimensions + color, generates pixels
+\ with per-row PRNG bit pattern + mirror.  Uses JOV-SPRWORK as scratch.
+CODE gen-jov-sprite   \ ( i -- )
+        PSHS    X               ; save IP
+        LDA     1,U             ; A = i (low byte)
+        LEAU    2,U             ; pop arg
+        ; --- Sprite buffer addr = i * 23 + JOV-SPR0 ---
+        PSHS    A               ; save i
+        LDB     #23
+        MUL
+        ADDD    #$75F8          ; JOV-SPR0
+        STD     $77DA           ; SPRWORK+0 = sprite addr
+        ; --- Genome addr = i * 4 + JOV-GENOME ---
+        LDA     ,S+             ; restore i
+        LDB     #4
+        MUL
+        ADDD    #$77C5          ; JOV-GENOME
+        TFR     D,Y             ; Y = genome ptr
+        ; --- Seed (byte 2) → PRNG state, width, height ---
+        LDA     2,Y             ; appearance seed
+        STA     $77DF           ; PRNG state
+        ; Width from bits 7-6: 00=5, 01=7, 10=7, 11=9
+        TFR     A,B             ; save seed in B
+        LSRA
+        LSRA
+        LSRA
+        LSRA
+        LSRA
+        LSRA                    ; A = seed >> 6
+        CMPA    #0
+        BNE     @nw5
+        LDA     #5
+        BRA     @wdn
+@nw5    CMPA    #3
+        BNE     @w7
+        LDA     #9
+        BRA     @wdn
+@w7     LDA     #7
+@wdn    STA     $77E0           ; width
+        LDX     $77DA
+        STA     ,X              ; sprite header byte 0
+        ; Height from bits 5-4: 00/01=5, 10/11=7
+        TFR     B,A             ; restore seed
+        LSRA
+        LSRA
+        LSRA
+        LSRA
+        ANDA    #$03
+        CMPA    #2
+        BHS     @h7
+        LDA     #5
+        BRA     @hdn
+@h7     LDA     #7
+@hdn    STA     $77E1           ; height
+        STA     1,X             ; sprite header byte 1
+        ; Half-width = (width + 1) / 2
+        LDA     $77E0
+        INCA
+        LSRA
+        STA     $77DD           ; half_width
+        ; --- Emotion (byte 3 high nibble) → 2bpp color ---
+        LDA     3,Y             ; emotion|origin
+        LSRA
+        LSRA
+        LSRA
+        LSRA                    ; A = emotion 0-15
+        CMPA    #5
+        BLO     @cblue
+        CMPA    #11
+        BLO     @cwht
+        LDA     #2              ; red (rage)
+        BRA     @cldn
+@cblue  LDA     #1              ; blue (fear)
+        BRA     @cldn
+@cwht   LDA     #3              ; white (neutral)
+@cldn   STA     $77DC           ; 2bpp color
+        ; === Clear sprite data ===
+        LDX     $77DA
+        LEAX    2,X
+        LDA     $77E0
         ADDA    #3
         LSRA
         LSRA                    ; A = bpr
-        LDB     $77E1           ; height
-        MUL                     ; D = total bytes (max 21)
+        LDB     $77E1
+        MUL
         TSTB
         BEQ     @clrdn
 @clrlp  CLR     ,X+
         DECB
         BNE     @clrlp
 @clrdn
-        ; --- Per-row generation ---
-        CLR     $77E3           ; row counter = 0
-@rowlp  ; PRNG step: state = state * 5 + 3
-        LDB     $77DF           ; state
+        ; === Per-row pixel generation ===
+        CLR     $77E3           ; row = 0
+@rowlp  LDB     $77DF           ; PRNG state
         LDA     #5
         MUL
         ADDB    #3
-        STB     $77DF           ; save new state
-        ; Copy row to setpx input
+        STB     $77DF
         LDA     $77E3
         STA     $77E5           ; row for @setpx
-        ; For each column 0..half_width-1
-        CLR     $77E2           ; col counter = 0
-@collp  ; Check bit[col] of PRNG state
-        LDA     $77DF           ; state
-        LDB     $77E2           ; col
+        CLR     $77E2           ; col = 0
+@collp  LDA     $77DF           ; state
+        LDB     $77E2
         BEQ     @nsh
 @shlp   LSRA
         DECB
         BNE     @shlp
 @nsh    BITA    #$01
-        BEQ     @nopx           ; bit not set, skip
-        ; Set pixel at (col, row)
+        BEQ     @nopx
         LDA     $77E2
         STA     $77E4           ; col for @setpx
         BSR     @setpx
-        ; Mirror if not center column
         LDA     $77DD           ; half_width
         DECA
-        CMPA    $77E2           ; col == center?
+        CMPA    $77E2           ; center?
         BEQ     @nopx
         LDA     $77E0           ; width
         DECA
-        SUBA    $77E2           ; mirror col = width-1-col
+        SUBA    $77E2           ; mirror col
         STA     $77E4
         BSR     @setpx
 @nopx   INC     $77E2
         LDA     $77E2
-        CMPA    $77DD           ; col < half_width?
+        CMPA    $77DD
         BCS     @collp
-        ; Next row
         INC     $77E3
         LDA     $77E3
-        CMPA    $77E1           ; row < height?
+        CMPA    $77E1
         BCS     @rowlp
-        ; --- Center column guarantee ---
-        LDA     $77DD           ; half_width
+        ; === Center column guarantee ===
+        LDA     $77DD
         DECA
-        STA     $77E4           ; center col
-        LDA     $77E1           ; height
-        LSRA                    ; middle row
+        STA     $77E4
+        LDA     $77E1
+        LSRA
         STA     $77E5
         BSR     @setpx
         ;
         PULS    X
         ;NEXT
         ;
-        ; --- Subroutine: set 2bpp pixel at col=$77E4, row=$77E5 ---
-@setpx  LDA     $77E0           ; width
+@setpx  LDA     $77E0
         ADDA    #3
         LSRA
-        LSRA                    ; A = bpr
-        LDB     $77E5           ; row
-        MUL                     ; D = row * bpr
+        LSRA
+        LDB     $77E5
+        MUL
         PSHS    D
-        LDB     $77E4           ; col
+        LDB     $77E4
         LSRB
-        LSRB                    ; B = col/4
+        LSRB
         CLRA
-        ADDD    ,S++            ; D = row*bpr + col/4
-        LDX     $77DA           ; sprite buffer
-        LEAX    2,X             ; skip header
-        LEAX    D,X             ; X = target byte
-        LDA     $77E4           ; col
+        ADDD    ,S++
+        LDX     $77DA
+        LEAX    2,X
+        LEAX    D,X
+        LDA     $77E4
         ANDA    #$03
         NEGA
         ADDA    #3
-        ASLA                    ; A = (3 - col%4) * 2
-        LDB     $77DC           ; 2bpp color
+        ASLA
+        LDB     $77DC
         TSTA
         BEQ     @sns
 @ssh    ASLB
@@ -965,31 +1026,6 @@ CODE jov-sprite-gen   \ ( -- )
         STB     ,X
         RTS
 ;CODE
-
-\ Shorthand for JOV-SPRWORK byte access
-: sw@  ( n -- byte )  JOV-SPRWORK + C@ ;
-: sw!  ( byte n -- )  JOV-SPRWORK + C! ;
-
-\ Generate sprite for Jovian i from its genome
-: gen-jov-sprite  ( i -- )
-  DUP jov-spr JOV-SPRWORK !       \ +0 = sprite buffer addr
-  4 * JOV-GENOME +                 \ ( genome )
-  DUP 2 + C@                      \ ( genome seed )
-  DUP 5 sw!                       \ +5 = PRNG state
-  \ Width from seed bits 7-6: 00=5, 01=7, 10=7, 11=9
-  DUP 6 RSHIFT DUP 0= IF DROP 5 ELSE 3 = IF 9 ELSE 7 THEN THEN
-  DUP 6 sw!                       \ +6 = width
-  JOV-SPRWORK @ C!                \ sprite header byte 0
-  \ Height from seed bits 5-4: 00/01=5, 10/11=7
-  4 RSHIFT 3 AND 2 < IF 5 ELSE 7 THEN
-  DUP 7 sw!                       \ +7 = height
-  JOV-SPRWORK @ 1 + C!            \ sprite header byte 1
-  \ Half-width = (width+1)/2
-  6 sw@ 1 + 1 RSHIFT 3 sw!        \ +3 = half_width
-  \ Emotion → 2bpp color
-  3 + C@ 4 RSHIFT emo-color 2 sw!  \ +2 = color (consumes genome)
-  \ Generate sprite pixels
-  jov-sprite-gen ;
 
 \ Generate sprites for all Jovians in current quadrant
 : gen-jov-sprites  ( -- )
