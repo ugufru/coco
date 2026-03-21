@@ -955,10 +955,21 @@ VARIABLE emotion-timer            \ frame counter for decay
 \ Each Jovian gets a unique sprite from its genome appearance seed.
 \ Shape from seed, color from emotion band, density from origin.
 
-\ Emotion → band index: 0=fear, 1=neutral, 2=rage
-: jov-color-band  ( emo -- band )
-  DUP 5 < IF DROP 0 ELSE
-  10 > IF 2 ELSE 1 THEN THEN ;
+CODE jov-color-band   \ ( emo -- band )  0=fear, 1=neutral, 2=rage
+        LDA     1,U             ; A = emotion
+        CMPA    #5
+        BLO     @fear
+        CMPA    #11
+        BLO     @neut
+        LDB     #2              ; rage
+        BRA     @done
+@fear   LDB     #0
+        BRA     @done
+@neut   LDB     #1
+@done   CLRA
+        STD     ,U              ; replace TOS
+        ;NEXT
+;CODE
 
 \ Generate sprite for Jovian i from its genome (all-in-one CODE word).
 \ Reads appearance seed, computes dimensions + color, generates pixels
@@ -1145,11 +1156,11 @@ CODE gen-jov-sprite   \ ( i -- )
 : jov-check-regen  ( -- )
   qjovians @ ?DUP IF 0 DO
     JOV-DMG I + C@ IF
-      I jov-emotion@ jov-color-band
+      I jov-emotion@ jov-color-band DUP
       I JOV-EMCOL + C@ <> IF
         I gen-jov-sprite
-        I jov-emotion@ jov-color-band I JOV-EMCOL + C!
-      THEN
+        I JOV-EMCOL + C!
+      ELSE DROP THEN
     THEN
   LOOP THEN ;
 
@@ -1573,10 +1584,7 @@ VARIABLE check-win                \ flag: a kill happened, check win/lose
 
 : jov-kill  ( -- )
   JOV-DMG jbg-i @ + C@ IF
-    jbg-i @ jov-spr
-    JOV-POS jbg-i @ 2 * + C@ jbg-i @ jov-draw-dx -
-    JOV-POS jbg-i @ 2 * + 1 + C@ jbg-i @ jov-draw-dy -
-    spr-erase-box
+    jbg-i @ jov-spr-xy spr-erase-box
     0 JOV-DMG jbg-i @ + C!
     -1 gjovians +!
     1 check-win !
