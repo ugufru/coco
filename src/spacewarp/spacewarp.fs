@@ -192,11 +192,18 @@ $7764 CONSTANT SPR-MSL1           \ Missile frame 1: + shape (12 bytes)
 $7770 CONSTANT SPR-MSL2           \ Missile frame 2: x shape (12 bytes)
 
 \ ── Jovian AI data structures ────────────────────────────────────────────
+\ Per-Jovian sprite + bg buffers (headroom gap $7540-$75E0)
+$7540 CONSTANT JOV-BG0          \ 28 bytes: bg save buffer Jovian 0 (4x7)
+$755C CONSTANT JOV-BG1          \ 28 bytes: bg save buffer Jovian 1
+$7578 CONSTANT JOV-BG2          \ 28 bytes: bg save buffer Jovian 2
+$7594 CONSTANT JOV-SPR0         \ 23 bytes: generated sprite Jovian 0
+$75AB CONSTANT JOV-SPR1         \ 23 bytes: generated sprite Jovian 1
+$75C2 CONSTANT JOV-SPR2         \ 23 bytes: generated sprite Jovian 2
+$75D9 CONSTANT JOV-HALF         \ 5 bytes: half-template workspace
+$75DE CONSTANT JOV-EMCOL        \ 3 bytes: cached emotion color band
+
 $777C CONSTANT JOV-STATE        \ 3 bytes: 0=attack, 1=flee, 2=idle
 $777F CONSTANT JOV-TICK         \ 3 bytes: per-Jovian frame counter
-$7782 CONSTANT JOV-BG0          \ 20 bytes: bg save buffer Jovian 0
-$7796 CONSTANT JOV-BG1          \ 20 bytes: bg save buffer Jovian 1
-$77AA CONSTANT JOV-BG2          \ 20 bytes: bg save buffer Jovian 2
 $77BE CONSTANT JOV-OLDX         \ 3 bytes: previous x per Jovian
 $77C1 CONSTANT JOV-OLDY         \ 3 bytes: previous y per Jovian
 
@@ -210,9 +217,12 @@ $77DA CONSTANT JOV-SPRWORK      \ 12 bytes: scratch for sprite gen
 \ Quadrant mood grid (8x8 sectors, emotion persistence)
 $7E00 CONSTANT MOOD-GRID        \ 64 bytes: mood per sector
 
-: jov-bg  ( i -- addr )
-  DUP 0= IF DROP JOV-BG0 EXIT THEN
-  1 = IF JOV-BG1 ELSE JOV-BG2 THEN ;
+: jov-spr  ( i -- addr )  23 * JOV-SPR0 + ;
+: jov-bg  ( i -- addr )  28 * JOV-BG0 + ;
+
+\ Dynamic centering offsets from sprite header
+: jov-draw-dx  ( i -- dx )  jov-spr C@ 1 RSHIFT ;
+: jov-draw-dy  ( i -- dy )  jov-spr 1 + C@ 1 RSHIFT ;
 
 : init-sprites  ( -- )  sprite-data SPR-SHIP 60 CMOVE ;
 
@@ -490,9 +500,9 @@ VARIABLE dj-i
 : draw-jovians  ( -- )
   qjovians @ ?DUP IF 0 DO
     I dj-i !
-    SPR-JOV
-    JOV-POS dj-i @ 2 * + C@ 3 -
-    JOV-POS dj-i @ 2 * + 1 + C@ 2 -
+    dj-i @ jov-spr
+    JOV-POS dj-i @ 2 * + C@ dj-i @ jov-draw-dx -
+    JOV-POS dj-i @ 2 * + 1 + C@ dj-i @ jov-draw-dy -
     spr-draw
   LOOP THEN ;
 
@@ -598,7 +608,65 @@ $7724 CONSTANT MSL-BG                \ 20-byte save buffer
   MSL-BG msl-px @ 2 - msl-py @ 2 - bg-restore ;
 
 \ ── Flicker-free Jovian background save/restore ─────────────────────────
-\ Same pattern as ship: save VRAM under sprite, restore before move.
+\ 4x7 bg save/restore for variable-height Jovian sprites.
+
+CODE bg-save-7   \ ( buf x y -- )  save 4x7 VRAM bytes to buf
+        PSHS    X
+        LDA     1,U             ; A = y
+        LDB     #32
+        MUL                     ; D = y * 32
+        ADDD    VAR_RGVRAM      ; D = row base
+        TFR     D,Y             ; Y = row base
+        LDA     3,U             ; A = x
+        LSRA
+        LSRA                    ; A = x / 4
+        LEAY    A,Y             ; Y = first byte to save
+        LDX     4,U             ; X = buffer address
+        LEAU    6,U             ; pop 3 args
+        LDB     #7
+@row    LDA     ,Y
+        STA     ,X+
+        LDA     1,Y
+        STA     ,X+
+        LDA     2,Y
+        STA     ,X+
+        LDA     3,Y
+        STA     ,X+
+        LEAY    32,Y            ; next VRAM row
+        DECB
+        BNE     @row
+        PULS    X
+        ;NEXT
+;CODE
+
+CODE bg-restore-7  \ ( buf x y -- )  restore 4x7 VRAM bytes from buf
+        PSHS    X
+        LDA     1,U             ; A = y
+        LDB     #32
+        MUL
+        ADDD    VAR_RGVRAM
+        TFR     D,Y
+        LDA     3,U
+        LSRA
+        LSRA
+        LEAY    A,Y
+        LDX     4,U
+        LEAU    6,U
+        LDB     #7
+@row    LDA     ,X+
+        STA     ,Y
+        LDA     ,X+
+        STA     1,Y
+        LDA     ,X+
+        STA     2,Y
+        LDA     ,X+
+        STA     3,Y
+        LEAY    32,Y
+        DECB
+        BNE     @row
+        PULS    X
+        ;NEXT
+;CODE
 
 VARIABLE jbg-i
 
@@ -607,9 +675,9 @@ VARIABLE jbg-i
     I jbg-i !
     JOV-DMG jbg-i @ + C@ IF
       jbg-i @ jov-bg
-      JOV-POS jbg-i @ 2 * + C@ 3 -
-      JOV-POS jbg-i @ 2 * + 1 + C@ 2 -
-      bg-save
+      JOV-POS jbg-i @ 2 * + C@ jbg-i @ jov-draw-dx -
+      JOV-POS jbg-i @ 2 * + 1 + C@ jbg-i @ jov-draw-dy -
+      bg-save-7
     THEN
   LOOP THEN ;
 
@@ -618,9 +686,9 @@ VARIABLE jbg-i
     I jbg-i !
     JOV-DMG jbg-i @ + C@ IF
       jbg-i @ jov-bg
-      JOV-OLDX jbg-i @ + C@ 3 -
-      JOV-OLDY jbg-i @ + C@ 2 -
-      bg-restore
+      JOV-OLDX jbg-i @ + C@ jbg-i @ jov-draw-dx -
+      JOV-OLDY jbg-i @ + C@ jbg-i @ jov-draw-dy -
+      bg-restore-7
     THEN
   LOOP THEN ;
 
@@ -635,9 +703,9 @@ VARIABLE jbg-i
   qjovians @ ?DUP IF 0 DO
     I jbg-i !
     JOV-DMG jbg-i @ + C@ IF
-      SPR-JOV
-      JOV-POS jbg-i @ 2 * + C@ 3 -
-      JOV-POS jbg-i @ 2 * + 1 + C@ 2 -
+      jbg-i @ jov-spr
+      JOV-POS jbg-i @ 2 * + C@ jbg-i @ jov-draw-dx -
+      JOV-POS jbg-i @ 2 * + 1 + C@ jbg-i @ jov-draw-dy -
       spr-draw
     THEN
   LOOP THEN ;
@@ -699,7 +767,8 @@ VARIABLE jbg-i
   2 *  8 +                     \ map 0-7 → 8-22, center at neutral
   DUP 15 > IF DROP 15 THEN    \ clamp to 0-15
   4 LSHIFT                     \ emotion in hi nibble
-                               \ origin = 0 for now (Phase 7)
+  pcol @ prow @ + $0F AND     \ origin = sector hash (0-15)
+  OR
   SWAP 3 + C! ;                \ store byte 3
 
 : gen-genomes  ( -- )
@@ -758,6 +827,190 @@ VARIABLE jbg-i
 
 120 CONSTANT EMOTION-DECAY-RATE   \ frames between decay ticks
 VARIABLE emotion-timer            \ frame counter for decay
+
+\ ── Procedural Jovian sprite generation ────────────────────────────────
+\ Each Jovian gets a unique sprite from its genome appearance seed.
+\ Shape from seed, color from emotion band, density from origin.
+
+\ Emotion → 2bpp color: 0-4=blue(1), 5-10=white(3), 11-15=red(2)
+: emo-color  ( emo -- 2bpp )
+  DUP 5 < IF DROP 1 ELSE
+  10 > IF 2 ELSE 3 THEN THEN ;
+
+\ Emotion → band index: 0=fear, 1=neutral, 2=rage
+: jov-color-band  ( emo -- band )
+  DUP 5 < IF DROP 0 ELSE
+  10 > IF 2 ELSE 1 THEN THEN ;
+
+\ JOV-SPRWORK layout for sprite generation:
+\   +0,+1: sprite buffer address
+\   +2: 2bpp color
+\   +3: half_width
+\   +4: pixel budget
+\   +5: PRNG state (seed)
+\   +6: width
+\   +7: height
+\   +8: loop counter (CODE scratch)
+\   +9: quotient (CODE scratch)
+\   +10: col (CODE scratch)
+\   +11: row (CODE scratch)
+
+\ Core sprite generation engine: per-row bit pattern + mirror.
+\ Each row: PRNG step, check lower bits for columns, mirror to right.
+\ Produces symmetric "space invader" style shapes.
+\ Reads params from JOV-SPRWORK (+0=spr addr, +2=color, +3=half_width,
+\   +5=PRNG state, +6=width, +7=height).
+\ Scratch: +2=col iter, +3=row iter (reused after setup copies to CODE).
+CODE jov-sprite-gen   \ ( -- )
+        PSHS    X
+        ; --- Clear sprite data ---
+        LDX     $77DA           ; sprite buffer addr
+        LEAX    2,X             ; skip header
+        LDA     $77E0           ; width
+        ADDA    #3
+        LSRA
+        LSRA                    ; A = bpr
+        LDB     $77E1           ; height
+        MUL                     ; D = total bytes (max 21)
+        TSTB
+        BEQ     @clrdn
+@clrlp  CLR     ,X+
+        DECB
+        BNE     @clrlp
+@clrdn
+        ; --- Per-row generation ---
+        CLR     $77E3           ; row counter = 0
+@rowlp  ; PRNG step: state = state * 5 + 3
+        LDB     $77DF           ; state
+        LDA     #5
+        MUL
+        ADDB    #3
+        STB     $77DF           ; save new state
+        ; Copy row to setpx input
+        LDA     $77E3
+        STA     $77E5           ; row for @setpx
+        ; For each column 0..half_width-1
+        CLR     $77E2           ; col counter = 0
+@collp  ; Check bit[col] of PRNG state
+        LDA     $77DF           ; state
+        LDB     $77E2           ; col
+        BEQ     @nsh
+@shlp   LSRA
+        DECB
+        BNE     @shlp
+@nsh    BITA    #$01
+        BEQ     @nopx           ; bit not set, skip
+        ; Set pixel at (col, row)
+        LDA     $77E2
+        STA     $77E4           ; col for @setpx
+        BSR     @setpx
+        ; Mirror if not center column
+        LDA     $77DD           ; half_width
+        DECA
+        CMPA    $77E2           ; col == center?
+        BEQ     @nopx
+        LDA     $77E0           ; width
+        DECA
+        SUBA    $77E2           ; mirror col = width-1-col
+        STA     $77E4
+        BSR     @setpx
+@nopx   INC     $77E2
+        LDA     $77E2
+        CMPA    $77DD           ; col < half_width?
+        BCS     @collp
+        ; Next row
+        INC     $77E3
+        LDA     $77E3
+        CMPA    $77E1           ; row < height?
+        BCS     @rowlp
+        ; --- Center column guarantee ---
+        LDA     $77DD           ; half_width
+        DECA
+        STA     $77E4           ; center col
+        LDA     $77E1           ; height
+        LSRA                    ; middle row
+        STA     $77E5
+        BSR     @setpx
+        ;
+        PULS    X
+        ;NEXT
+        ;
+        ; --- Subroutine: set 2bpp pixel at col=$77E4, row=$77E5 ---
+@setpx  LDA     $77E0           ; width
+        ADDA    #3
+        LSRA
+        LSRA                    ; A = bpr
+        LDB     $77E5           ; row
+        MUL                     ; D = row * bpr
+        PSHS    D
+        LDB     $77E4           ; col
+        LSRB
+        LSRB                    ; B = col/4
+        CLRA
+        ADDD    ,S++            ; D = row*bpr + col/4
+        LDX     $77DA           ; sprite buffer
+        LEAX    2,X             ; skip header
+        LEAX    D,X             ; X = target byte
+        LDA     $77E4           ; col
+        ANDA    #$03
+        NEGA
+        ADDA    #3
+        ASLA                    ; A = (3 - col%4) * 2
+        LDB     $77DC           ; 2bpp color
+        TSTA
+        BEQ     @sns
+@ssh    ASLB
+        DECA
+        BNE     @ssh
+@sns    ORB     ,X
+        STB     ,X
+        RTS
+;CODE
+
+\ Shorthand for JOV-SPRWORK byte access
+: sw@  ( n -- byte )  JOV-SPRWORK + C@ ;
+: sw!  ( byte n -- )  JOV-SPRWORK + C! ;
+
+\ Generate sprite for Jovian i from its genome
+: gen-jov-sprite  ( i -- )
+  DUP jov-spr JOV-SPRWORK !       \ +0 = sprite buffer addr
+  4 * JOV-GENOME +                 \ ( genome )
+  DUP 2 + C@                      \ ( genome seed )
+  DUP 5 sw!                       \ +5 = PRNG state
+  \ Width from seed bits 7-6: 00=5, 01=7, 10=7, 11=9
+  DUP 6 RSHIFT DUP 0= IF DROP 5 ELSE 3 = IF 9 ELSE 7 THEN THEN
+  DUP 6 sw!                       \ +6 = width
+  JOV-SPRWORK @ C!                \ sprite header byte 0
+  \ Height from seed bits 5-4: 00/01=5, 10/11=7
+  4 RSHIFT 3 AND 2 < IF 5 ELSE 7 THEN
+  DUP 7 sw!                       \ +7 = height
+  JOV-SPRWORK @ 1 + C!            \ sprite header byte 1
+  \ Half-width = (width+1)/2
+  6 sw@ 1 + 1 RSHIFT 3 sw!        \ +3 = half_width
+  \ Emotion → 2bpp color
+  3 + C@ 4 RSHIFT emo-color 2 sw!  \ +2 = color (consumes genome)
+  \ Generate sprite pixels
+  jov-sprite-gen ;
+
+\ Generate sprites for all Jovians in current quadrant
+: gen-jov-sprites  ( -- )
+  qjovians @ ?DUP IF 0 DO
+    I gen-jov-sprite
+    I jov-emotion@ jov-color-band
+    I JOV-EMCOL + C!               \ cache initial band
+  LOOP THEN ;
+
+\ Check if any Jovian's emotion crossed a color band → regenerate sprite
+: jov-check-regen  ( -- )
+  qjovians @ ?DUP IF 0 DO
+    JOV-DMG I + C@ IF
+      I jov-emotion@ jov-color-band
+      I JOV-EMCOL + C@ <> IF
+        I gen-jov-sprite
+        I jov-emotion@ jov-color-band I JOV-EMCOL + C!
+      THEN
+    THEN
+  LOOP THEN ;
 
 \ ── Quadrant mood persistence ──────────────────────────────────────────
 \ MOOD-GRID (64 bytes at $7E00): one byte per sector, 0-15 scale.
@@ -1155,9 +1408,9 @@ VARIABLE check-win                \ flag: a kill happened, check win/lose
 
 : jov-kill  ( -- )
   JOV-DMG jbg-i @ + C@ IF
-    SPR-JOV
-    JOV-POS jbg-i @ 2 * + C@ 3 -
-    JOV-POS jbg-i @ 2 * + 1 + C@ 2 -
+    jbg-i @ jov-spr
+    JOV-POS jbg-i @ 2 * + C@ jbg-i @ jov-draw-dx -
+    JOV-POS jbg-i @ 2 * + 1 + C@ jbg-i @ jov-draw-dy -
     spr-erase-box
     0 JOV-DMG jbg-i @ + C!
     1 check-win !
@@ -1389,9 +1642,9 @@ CODE prox-dmg  ( cx cy radius damage count -- killmask )
     pd-kills !
     qjovians @ ?DUP IF 0 DO
       1 I LSHIFT pd-kills @ AND IF
-        SPR-JOV
-        JOV-POS I 2 * + C@ 3 -
-        JOV-POS I 2 * + 1 + C@ 2 -
+        I jov-spr
+        JOV-POS I 2 * + C@ I jov-draw-dx -
+        JOV-POS I 2 * + 1 + C@ I jov-draw-dy -
         spr-erase-box
         JOV-POS I 2 * + C@
         JOV-POS I 2 * + 1 + C@
@@ -1669,6 +1922,7 @@ VARIABLE sp-r2
   mood-load                        \ seed emotions from quadrant mood
   0 emotion-timer !  0 detect-timer !
   2 jov-emotion-all                \ alarm: player enters quadrant
+  gen-jov-sprites                  \ generate unique sprites from genomes
   save-jov-bgs save-jov-oldpos
   draw-jovians-live
   save-ship-bg draw-ship ;
@@ -2224,9 +2478,9 @@ VARIABLE bfo-found
   \ If dead, cancel beams, explode, refresh
   JOV-DMG beam-hit-idx @ + C@ 0= IF
     cancel-beam cancel-jbeam
-    SPR-JOV
-    JOV-POS beam-hit-idx @ 2 * + C@ 3 -
-    JOV-POS beam-hit-idx @ 2 * + 1 + C@ 2 -
+    beam-hit-idx @ jov-spr
+    JOV-POS beam-hit-idx @ 2 * + C@ beam-hit-idx @ jov-draw-dx -
+    JOV-POS beam-hit-idx @ 2 * + 1 + C@ beam-hit-idx @ jov-draw-dy -
     spr-erase-box
     JOV-POS beam-hit-idx @ 2 * + C@
     JOV-POS beam-hit-idx @ 2 * + 1 + C@
@@ -2283,9 +2537,9 @@ VARIABLE msl-got                 \ hit flag
         JOV-POS msl-hi @ 2 * + 1 + C@ msl-scry - abs 4 < AND IF
           \ Kill Jovian — erase sprite, explode, full refresh
           0 JOV-DMG msl-hi @ + C!
-          SPR-JOV
-          JOV-POS msl-hi @ 2 * + C@ 3 -
-          JOV-POS msl-hi @ 2 * + 1 + C@ 2 -
+          msl-hi @ jov-spr
+          JOV-POS msl-hi @ 2 * + C@ msl-hi @ jov-draw-dx -
+          JOV-POS msl-hi @ 2 * + 1 + C@ msl-hi @ jov-draw-dy -
           spr-erase-box
           JOV-POS msl-hi @ 2 * + C@
           JOV-POS msl-hi @ 2 * + 1 + C@
@@ -2739,7 +2993,7 @@ VARIABLE jnb-result
     check-dock
     tick-dock
     tick-missile
-    tick-jovians
+    tick-jovians jov-check-regen
     tick-base-attack
     jov-gravity
     tick-jbeam
