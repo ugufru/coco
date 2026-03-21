@@ -1856,15 +1856,16 @@ VARIABLE pj-result
   pj-result @ ;
 
 \ Fire a red beam from Jovian i toward the player
-: fire-jbeam  ( i -- )
+: fire-jbeam  ( i target -- )
   \ Cancel any active Jovian beam first
   cancel-jbeam
+  SWAP
   \ Get Jovian position
   2 * JOV-POS + DUP C@ jbeam-x1 !
   1 + C@ jbeam-y1 !
-  \ Direction from Jovian to player (dx, dy scaled ×4)
-  SHIP-POS C@ jbeam-x1 @ - 4 *
-  SHIP-POS 1 + C@ jbeam-y1 @ - 4 *
+  \ Direction from Jovian to target (dx, dy scaled ×4)
+  DUP C@ jbeam-x1 @ - 4 *
+  SWAP 1 + C@ jbeam-y1 @ - 4 *
   \ Endpoint: Jovian pos + direction
   OVER jbeam-x1 @ + jbeam-x2 !
   DUP  jbeam-y1 @ + jbeam-y2 !
@@ -1961,9 +1962,10 @@ VARIABLE pj-result
   jbeam-cool @ ?DUP IF
     1 - jbeam-cool !
   ELSE
-    \ Cooldown expired — fire if any Jovians alive and not docked
-    docked @ 0= IF
-      pick-jovian DUP 0 < IF DROP ELSE fire-jbeam THEN
+    \ Cooldown expired — fire if any Jovians alive, not docked,
+    \ and no base attack in progress (Jovians busy with base)
+    docked @ 0= base-attack @ 0= AND IF
+      pick-jovian DUP 0 < IF DROP ELSE SHIP-POS fire-jbeam THEN
     THEN
   THEN ;
 
@@ -2746,7 +2748,7 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
   \ Validate coordinates
   OVER 8 < OVER 8 < AND 0= IF 2DROP EXIT THEN
   \ Check if already there
-  DUP pcol @ = OVER prow @ = AND IF 2DROP EXIT THEN
+  2DUP pcol @ = SWAP prow @ = AND IF 2DROP EXIT THEN
   \ Calculate and pay energy cost
   2DUP warp-cost
   DUP penergy @ > IF 2DROP DROP EXIT THEN   \ not enough energy
@@ -3065,25 +3067,32 @@ VARIABLE prev-key                 \ last key seen by KEY?
   0 base-attack ! ;
 
 VARIABLE jnb-result
-: jov-near-base?  ( -- flag )
-  qbase @ 0= IF 0 EXIT THEN
-  0 jnb-result !
+: jov-near-base?  ( -- idx|-1 )
+  qbase @ 0= IF -1 EXIT THEN
+  -1 jnb-result !
   qjovians @ ?DUP IF 0 DO
     JOV-DMG I + C@ IF
       JOV-POS I 2 * + C@ BASE-POS C@ - abs
       JOV-POS I 2 * + 1 + C@ BASE-POS 1 + C@ - abs + 30 < IF
-        1 jnb-result !
+        I jnb-result !
       THEN
     THEN
   LOOP THEN
   jnb-result @ ;
 
 : tick-base-attack  ( -- )
-  jov-near-base? IF
-    base-attack @ 1 + DUP base-attack !
-    180 = IF destroy-base THEN
-  ELSE
+  jov-near-base? DUP 0 < IF DROP
     0 base-attack !
+  ELSE
+    base-attack @ 1 + DUP base-attack !
+    DUP 180 = IF DROP destroy-base
+    ELSE
+      \ Fire beam at base every 60 frames
+      60 /MOD SWAP DROP 0= IF
+        jbeam-cool @ 0= IF BASE-POS fire-jbeam
+        ELSE DROP THEN
+      ELSE DROP THEN
+    THEN
   THEN ;
 
 : main  ( -- )
