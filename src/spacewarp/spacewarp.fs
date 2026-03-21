@@ -17,7 +17,15 @@ INCLUDE ../../forth/lib/rg-text.fs
 INCLUDE ../../forth/lib/keyboard.fs
 INCLUDE ../../forth/lib/beam.fs
 
-: min  ( a b -- smaller )  2DUP > IF SWAP THEN DROP ;
+CODE min   \ ( a b -- smaller )
+        LDD     ,U
+        CMPD    2,U
+        BLE     @ok
+        LDD     2,U
+@ok     LEAU    2,U
+        STD     ,U
+        ;NEXT
+;CODE
 
 \ ── Bulk pixel plotter (assembly) ───────────────────────────────────────
 \ plot-dots ( addr count color -- )
@@ -887,8 +895,22 @@ CODE save-jov-oldpos-n   \ ( n -- )  copy JOV-POS to JOV-OLDX/Y for n Jovians
 \ Decays toward genome baseline every 120 frames (~2s).
 \ Stimuli shift emotion immediately; clamped to 0-15.
 
-: jov-emotion@  ( i -- e )
-  4 * JOV-GENOME + 3 + C@ 4 RSHIFT ;
+CODE jov-emo@   \ ( i -- e )
+        LDA     1,U             ; A = i
+        LDB     #4
+        MUL
+        ADDD    #$77C8          ; JOV-GENOME + 3
+        TFR     D,Y
+        LDA     ,Y
+        LSRA
+        LSRA
+        LSRA
+        LSRA                    ; A = emotion 0-15
+        TFR     A,B
+        CLRA
+        STD     ,U
+        ;NEXT
+;CODE
 
 CODE jov-emotion!   \ ( e i -- )
         LDA     1,U             ; A = i
@@ -916,21 +938,39 @@ CODE jov-emotion!   \ ( e i -- )
         ;NEXT
 ;CODE
 
-\ Genome baseline: aggression (byte 0 bits 7-5) mapped to emotion center
-: jov-emotion-base  ( i -- e )
-  4 * JOV-GENOME + C@ 5 RSHIFT    \ aggression 0-7
-  2 * 8 + DUP 15 > IF DROP 15 THEN ;
+CODE jov-emotion-base   \ ( i -- e )  aggression-derived baseline
+        LDA     1,U             ; A = i
+        LDB     #4
+        MUL
+        ADDD    #$77C5          ; JOV-GENOME
+        TFR     D,Y
+        LDA     ,Y              ; byte 0
+        LSRA
+        LSRA
+        LSRA
+        LSRA
+        LSRA                    ; A = aggression 0-7
+        ASLA                    ; A = aggression * 2
+        ADDA    #8              ; A = aggression * 2 + 8
+        CMPA    #15
+        BLS     @ok
+        LDA     #15
+@ok     TFR     A,B
+        CLRA
+        STD     ,U
+        ;NEXT
+;CODE
 
 \ Drift 1 step toward baseline
 : jov-emotion-decay  ( i -- )
-  DUP jov-emotion@ OVER jov-emotion-base  \ ( i cur base )
-  2DUP = IF 2DROP DROP EXIT THEN          \ at baseline, done
-  < IF 1 ELSE -1 THEN                     \ +1 if cur<base, -1 if cur>base
-  OVER jov-emotion@ + SWAP jov-emotion! ;
+  DUP jov-emo@ OVER jov-emotion-base  \ ( i cur base )
+  2DUP = IF 2DROP DROP ELSE
+  < IF 1 ELSE -1 THEN
+  OVER jov-emo@ + SWAP jov-emotion! THEN ;
 
 \ Apply stimulus (signed delta) to one Jovian
 : jov-emotion-stim  ( delta i -- )
-  DUP jov-emotion@ ROT + SWAP jov-emotion! ;
+  DUP jov-emo@ ROT + SWAP jov-emotion! ;
 
 \ Apply stimulus to all living Jovians
 : jov-emotion-all  ( delta -- )
@@ -1148,7 +1188,7 @@ CODE gen-jov-sprite   \ ( i -- )
 : gen-jov-sprites  ( -- )
   qjovians @ ?DUP IF 0 DO
     I gen-jov-sprite
-    I jov-emotion@ jov-color-band
+    I jov-emo@ jov-color-band
     I JOV-EMCOL + C!               \ cache initial band
   LOOP THEN ;
 
@@ -1156,7 +1196,7 @@ CODE gen-jov-sprite   \ ( i -- )
 : jov-check-regen  ( -- )
   qjovians @ ?DUP IF 0 DO
     JOV-DMG I + C@ IF
-      I jov-emotion@ jov-color-band DUP
+      I jov-emo@ jov-color-band DUP
       I JOV-EMCOL + C@ <> IF
         I gen-jov-sprite
         I JOV-EMCOL + C!
@@ -1178,7 +1218,7 @@ CODE gen-jov-sprite   \ ( i -- )
   0 0                              \ ( sum count )
   qjovians @ ?DUP IF 0 DO
     JOV-DMG I + C@ IF
-      SWAP I jov-emotion@ + SWAP 1 +
+      SWAP I jov-emo@ + SWAP 1 +
     THEN
   LOOP THEN
   DUP 0= IF 2DROP EXIT THEN       \ no living Jovians, keep old mood
@@ -1259,7 +1299,7 @@ VARIABLE stardate-timer            \ frame counter
 \ Detection range from genome: (pilot_skill + emotion) * 4
 : jov-detect-range  ( i -- r )
   DUP 4 * JOV-GENOME + C@ 7 AND  \ pilot_skill (0-7)
-  SWAP jov-emotion@               \ emotion (0-15)
+  SWAP jov-emo@               \ emotion (0-15)
   + 4 * ;                         \ range in pixels
 
 \ Detection roll: returns 1 if player detected
@@ -1923,7 +1963,7 @@ VARIABLE pj-result
   \ Formula: cooldown * (140 - emotion*~5) / 100
   jbeam-cooldown
   pj-result @ DUP 0 < 0= IF
-    jov-emotion@ 5 * 140 SWAP -    \ scale factor: 140 at fear, 65 at rage
+    jov-emo@ 5 * 140 SWAP -    \ scale factor: 140 at fear, 65 at rage
     * 100 /MOD SWAP DROP            \ apply percentage
   ELSE DROP THEN
   jbeam-cool ! ;
