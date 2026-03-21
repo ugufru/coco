@@ -1554,6 +1554,7 @@ VARIABLE check-win                \ flag: a kill happened, check win/lose
     JOV-POS jbg-i @ 2 * + 1 + C@ jbg-i @ jov-draw-dy -
     spr-erase-box
     0 JOV-DMG jbg-i @ + C!
+    -1 gjovians +!
     1 check-win !
     JOV-POS jbg-i @ 2 * + C@
     JOV-POS jbg-i @ 2 * + 1 + C@
@@ -1592,10 +1593,12 @@ VARIABLE check-win                \ flag: a kill happened, check win/lose
           JOV-POS jbg-i @ 2 * + 1 + C@ sg-sy @ - abs +
           DUP 3 < IF                 \ contact: kill
             DROP jov-kill
-          ELSE 8 > IF                \ outside range
-          ELSE                        \ 3-8: pull every 4 frames
+          ELSE 12 > IF               \ outside range
+          ELSE 6 < IF                \ close: pull every 2 frames
+            grav-tick @ 1 AND 0= IF jov-pull THEN
+          ELSE                        \ 6-12: pull every 4 frames
             grav-tick @ 3 AND 0= IF jov-pull THEN
-          THEN THEN
+          THEN THEN THEN
         LOOP THEN
       THEN
     THEN
@@ -1783,6 +1786,7 @@ CODE prox-dmg  ( cx cy radius damage count -- killmask )
     pd-kills !
     qjovians @ ?DUP IF 0 DO
       1 I LSHIFT pd-kills @ AND IF
+        -1 gjovians +!
         I jov-spr
         JOV-POS I 2 * + C@ I jov-draw-dx -
         JOV-POS I 2 * + 1 + C@ I jov-draw-dy -
@@ -2620,6 +2624,7 @@ VARIABLE bfo-found
   JOV-DMG beam-hit-idx @ + C!
   \ If dead, cancel beams, explode, refresh
   JOV-DMG beam-hit-idx @ + C@ 0= IF
+    -1 gjovians +!
     cancel-beam cancel-jbeam
     beam-hit-idx @ jov-spr
     JOV-POS beam-hit-idx @ 2 * + C@ beam-hit-idx @ jov-draw-dx -
@@ -2680,6 +2685,7 @@ VARIABLE msl-got                 \ hit flag
         JOV-POS msl-hi @ 2 * + 1 + C@ msl-scry - abs 4 < AND IF
           \ Kill Jovian — erase sprite, explode, full refresh
           0 JOV-DMG msl-hi @ + C!
+          -1 gjovians +!
           msl-hi @ jov-spr
           JOV-POS msl-hi @ 2 * + C@ msl-hi @ jov-draw-dx -
           JOV-POS msl-hi @ 2 * + 1 + C@ msl-hi @ jov-draw-dy -
@@ -2759,6 +2765,12 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
       SWAP 1 + 7 AND SWAP            \ shift col by 1
     THEN
   THEN
+  \ Update galaxy byte: count living Jovians
+  0 qjovians @ ?DUP IF 0 DO
+    JOV-DMG I + C@ IF 1 + THEN
+  LOOP THEN
+  pcol @ prow @ gal@ $FC AND OR  \ replace low 2 bits with living count
+  pcol @ prow @ gal!
   \ Save mood before leaving quadrant
   mood-save
   \ Clear beams and missile
