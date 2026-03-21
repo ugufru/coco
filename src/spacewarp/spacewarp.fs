@@ -2708,10 +2708,9 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
     draw-border
     EXIT
   THEN
-  \ Check Jovian hit
+  \ Check Jovian hit (refresh-after-kill already redraws everything)
   msl-hit? IF
-    msl-erase  0 msl-active !
-    draw-ship
+    0 msl-active !  0 msl-dirty !
     EXIT
   THEN
   1 msl-dirty ! ;
@@ -3234,6 +3233,9 @@ VARIABLE jnb-result
       death-cause @ 1 = IF
         \ Black hole — ship vanishes, no explosion
         restore-ship-bg
+        clear-tactical
+        draw-border draw-stars draw-storm-stars draw-event-horizon
+        draw-base draw-jovians-live
         2DROP
         0 17 at-xy
         S" BLACK HOLE" rg-type
@@ -3246,6 +3248,9 @@ VARIABLE jnb-result
         \ Energy depleted or star collision — ship explodes
         restore-ship-bg
         explode-ship
+        clear-tactical
+        draw-border draw-stars draw-storm-stars draw-event-horizon
+        draw-base draw-jovians-live
         0 17 at-xy
         S" DESTROYED" rg-type
       THEN THEN
