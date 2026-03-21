@@ -266,12 +266,12 @@ CFA_SPRITE_DATA FDB     DOVAR
         ;;; Base — blue (1) cross/ring, 7×5
         FCB     7,5
         FCB     $05,$40,$10,$10,$41,$04,$10,$10,$05,$40
-        ;;; Missile frame 1 — red (2) plus +, 5×5
-        FCB     5,5
-        FCB     $08,$00,$08,$00,$AA,$80,$08,$00,$08,$00
-        ;;; Missile frame 2 — red (2) cross x, 5×5
-        FCB     5,5
-        FCB     $80,$80,$22,$00,$08,$00,$22,$00,$80,$80
+        ;;; Missile frame 1 — red (2) plus +, 3×3
+        FCB     3,3
+        FCB     $20,$A8,$20
+        ;;; Missile frame 2 — red (2) cross x, 3×3
+        FCB     3,3
+        FCB     $88,$20,$88
 
 
 ;;; ─── Font glyph table ──────────────────────────────────────────────────────

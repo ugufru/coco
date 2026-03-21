@@ -196,8 +196,8 @@ VARIABLE death-cause               \ 0=energy/star, 1=black hole
 $8082 CONSTANT SPR-SHIP           \ Endever: blue chevron (12 bytes)
 $808E CONSTANT SPR-JOV            \ Jovian: red diamond (12 bytes)
 $809A CONSTANT SPR-BASE           \ UP base: blue cross (12 bytes)
-$80A6 CONSTANT SPR-MSL1           \ Missile frame 1: + shape (12 bytes)
-$80B2 CONSTANT SPR-MSL2           \ Missile frame 2: x shape (12 bytes)
+$80A6 CONSTANT SPR-MSL1           \ Missile frame 1: + shape (5 bytes)
+$80AB CONSTANT SPR-MSL2           \ Missile frame 2: x shape (5 bytes)
 
 \ ── Jovian AI data structures ────────────────────────────────────────────
 \ Per-Jovian sprite + bg buffers (packed before GALAXY at $8000)
@@ -231,7 +231,7 @@ $8EB4 CONSTANT MOOD-GRID        \ 64 bytes: mood per sector
 : jov-draw-dx  ( i -- dx )  jov-spr C@ 1 RSHIFT ;
 : jov-draw-dy  ( i -- dy )  jov-spr 1 + C@ 1 RSHIFT ;
 
-: init-sprites  ( -- )  sprite-data SPR-SHIP 60 CMOVE ;
+: init-sprites  ( -- )  sprite-data SPR-SHIP 46 CMOVE ;
 
 \ ── Random position within tactical view ─────────────────────────────────
 \ Returns x in 4-123, y in 4-139 (away from borders).
@@ -604,10 +604,10 @@ CODE bg-restore  \ ( buf x y -- )  restore 4×5 VRAM bytes from buf
 $806E CONSTANT MSL-BG                \ 20-byte save buffer
 
 : save-msl-bg  ( -- )
-  MSL-BG msl-scrx 2 - msl-scry 2 - bg-save ;
+  MSL-BG msl-scrx 1 - msl-scry 1 - bg-save ;
 
 : restore-msl-bg  ( -- )
-  MSL-BG msl-px @ 2 - msl-py @ 2 - bg-restore ;
+  MSL-BG msl-px @ 1 - msl-py @ 1 - bg-restore ;
 
 \ ── Flicker-free Jovian background save/restore ─────────────────────────
 \ 4x7 bg save/restore for variable-height Jovian sprites.
@@ -2777,7 +2777,7 @@ VARIABLE msl-active              \ nonzero = missile in flight
 5 CONSTANT MSL-COST              \ energy per missile
 
 : msl-spr  ( -- addr )
-  msl-frame @ 1 AND IF SPR-MSL2 ELSE SPR-MSL1 THEN ;
+  msl-frame @ 1 RSHIFT 1 AND IF SPR-MSL2 ELSE SPR-MSL1 THEN ;
 
 : msl-scrx  ( -- x )  msl-x @ 7 RSHIFT ;
 : msl-scry  ( -- y )  msl-y @ 7 RSHIFT ;
@@ -3179,7 +3179,7 @@ VARIABLE prev-key                 \ last key seen by KEY?
   cancel-jbeam cancel-beam
   \ Cancel active missile
   msl-active @ IF
-    SPR-MSL1 msl-px @ 2 - msl-py @ 2 - spr-erase-box
+    SPR-MSL1 msl-px @ 1 - msl-py @ 1 - spr-erase-box
     0 msl-active !
   THEN
   \ Erase base sprite
@@ -3309,7 +3309,7 @@ VARIABLE jnb-result
     moved @ jov-moved @ OR msl-dirty @ OR IF
       \ 1. Erase missile at old position
       msl-active @ IF
-        SPR-MSL1 msl-px @ 2 - msl-py @ 2 - spr-erase-box
+        SPR-MSL1 msl-px @ 1 - msl-py @ 1 - spr-erase-box
       THEN
       \ 2. Restore ship and Jovian backgrounds
       restore-ship-bg
@@ -3329,7 +3329,7 @@ VARIABLE jnb-result
         0 msl-dirty !
       THEN
       msl-active @ IF
-        msl-spr msl-px @ 2 - msl-py @ 2 - spr-draw
+        msl-spr msl-px @ 1 - msl-py @ 1 - spr-draw
       THEN
       0 jov-moved !
     THEN
