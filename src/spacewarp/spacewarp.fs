@@ -503,7 +503,6 @@ VARIABLE tcy
     3 rnd 1 + rg-pset
   LOOP THEN ;
 
-VARIABLE dj-i
 : draw-jovians  ( -- )
   qjovians @ ?DUP IF 0 DO
     I jov-spr-xy spr-draw
@@ -1524,6 +1523,53 @@ CODE jov-think  ( i qbase -- )
         ;NEXT
 ;CODE
 
+CODE jov-flee   \ ( i -- )  move 1px away from player, clamp bounds
+        PSHS    X
+        LDA     1,U             ; A = i
+        LEAU    2,U             ; pop
+        ASLA                    ; A = i*2
+        LDX     #$768A          ; JOV-POS
+        LEAX    A,X             ; X = JOV-POS + i*2
+        ; Flee x: move away from SHIP-POS
+        LDA     ,X              ; A = cx
+        CMPA    $7694           ; vs ship_x (SHIP-POS)
+        BEQ     @kx             ; equal: keep x
+        BHI     @fx1            ; cx > sx: flee right
+        DECA                    ; cx < sx: flee left
+        CMPA    #4
+        BHS     @sx
+        LDA     #4              ; clamp
+        BRA     @sx
+@fx1    INCA
+        CMPA    #123
+        BLS     @sx
+        LDA     #123
+@sx     STA     ,X
+@kx     ; Flee y
+        LDA     1,X             ; A = cy
+        CMPA    $7695           ; vs ship_y (SHIP-POS+1)
+        BEQ     @ky
+        BHI     @fy1
+        DECA
+        CMPA    #4
+        BHS     @sy
+        LDA     #4
+        BRA     @sy
+@fy1    INCA
+        CMPA    #139
+        BLS     @sy
+        LDA     #139
+@sy     STA     1,X
+@ky     PULS    X
+        ;NEXT
+;CODE
+
+: jov-flee-check  ( i -- )  \ DMG below 50 → flee + fear
+  DUP JOV-DMG + C@ 50 < IF
+    2 OVER JOV-STATE + C!     \ flee state
+    0 SWAP jov-emotion!       \ fear → sprite turns blue
+  ELSE DROP THEN ;
+
 \ ── apply-intent: obstacle avoidance + position update ─────────────────
 \ Reads proposed position from JOV-INTENT, applies 3-tier obstacle
 \ fallback (both axes → x-only → y-only → stay), writes JOV-POS.
@@ -1570,8 +1616,12 @@ VARIABLE detect-timer              \ frame counter for detection rolls
           JOV-TICK jbg-i @ + C!
         ELSE
           DROP 0 JOV-TICK jbg-i @ + C!
-          jbg-i @ qbase @ jov-think
-          apply-intent
+          JOV-STATE jbg-i @ + C@ 2 = IF
+            jbg-i @ jov-flee  1 jov-moved !
+          ELSE
+            jbg-i @ qbase @ jov-think
+            apply-intent
+          THEN
         THEN
       THEN
     THEN
@@ -1923,7 +1973,7 @@ VARIABLE pj-result
   rnd                             \ random starting index
   qjovians @ 0 DO
     DUP JOV-DMG + C@ IF           \ alive?
-      DUP JOV-STATE + C@ IF       \ aware?
+      DUP JOV-STATE + C@ 1 = IF   \ attack state only (not flee)
         pj-result @ 0 < IF DUP pj-result ! THEN
       THEN
     THEN
@@ -2694,6 +2744,7 @@ VARIABLE bfo-found
   JOV-DMG beam-hit-idx @ + C@
   maser-dmg - DUP 0 < IF DROP 0 THEN
   JOV-DMG beam-hit-idx @ + C!
+  beam-hit-idx @ jov-flee-check
   \ If dead, cancel beams, explode, refresh
   JOV-DMG beam-hit-idx @ + C@ 0= IF
     -1 gjovians +!
@@ -2732,10 +2783,6 @@ VARIABLE msl-active              \ nonzero = missile in flight
 : msl-scry  ( -- y )  msl-y @ 7 RSHIFT ;
 
 : msl-erase  ( -- )  restore-msl-bg ;
-
-: msl-draw  ( -- )
-  save-msl-bg
-  msl-spr msl-scrx 2 - msl-scry 2 - spr-draw ;
 
 : msl-oob?  ( -- flag )
   msl-scrx 3 < IF 1 EXIT THEN
