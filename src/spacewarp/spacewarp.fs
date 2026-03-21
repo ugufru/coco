@@ -1198,7 +1198,30 @@ VARIABLE stardate-timer            \ frame counter
     MOOD-GRID I + C!
   LOOP ;
 
-\ Stardate tick: increment gtime, decay mood grid
+\ Check off-screen bases: any quadrant with both Jovians and a base
+\ (not the player's quadrant) threatens that base each stardate.
+: check-sos  ( -- )
+  0 sos-active !
+  64 0 DO
+    GALAXY I + C@
+    DUP q-base? IF DUP q-jovians IF
+      I 8 /MOD                       \ ( qbyte col row )
+      OVER pcol @ = OVER prow @ = AND IF
+        2DROP                         \ skip current quadrant
+      ELSE
+        sos-row !  sos-col !          \ record threatened base
+        1 sos-active !
+        8 rnd 0= IF
+          GALAXY I + C@ $FB AND GALAXY I + C!
+          -1 gbases +!
+        THEN
+      THEN
+    THEN THEN
+    DROP                              \ always drop qbyte
+  LOOP
+  update-cond ;
+
+\ Stardate tick: increment gtime, decay mood grid, check SOS
 : tick-stardate  ( -- )
   stardate-timer @ 1 + DUP STARDATE-FRAMES < IF
     stardate-timer !
@@ -1206,6 +1229,7 @@ VARIABLE stardate-timer            \ frame counter
     DROP 0 stardate-timer !
     1 gtime +!
     mood-decay-all
+    check-sos
   THEN ;
 
 \ ── Detection & awareness ──────────────────────────────────────────────
