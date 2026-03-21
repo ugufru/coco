@@ -3166,17 +3166,17 @@ VARIABLE jnb-result
       jov-moved @ IF save-jov-oldpos THEN
       save-jov-bgs
       draw-jovians-live
-      \ 5. Draw missile at new position
+      \ 5. Save and draw ship
+      save-ship-bg
+      draw-ship
+      \ 6. Draw missile on top (after ship bg-save to avoid capture)
       msl-dirty @ IF
         msl-scrx msl-px !  msl-scry msl-py !
         0 msl-dirty !
       THEN
       msl-active @ IF
-        msl-spr msl-scrx 2 - msl-scry 2 - spr-draw
+        msl-spr msl-px @ 2 - msl-py @ 2 - spr-draw
       THEN
-      \ 6. Save and draw ship (on top of everything)
-      save-ship-bg
-      draw-ship
       0 jov-moved !
     THEN
 
