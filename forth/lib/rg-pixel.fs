@@ -37,9 +37,9 @@ VARIABLE rv                       \ VRAM base address
 \ ── Lookup tables ─────────────────────────────────────────────────────────
 \ Three 4-byte tables in high RAM, built once by rg-init.
 
-$7CD0 CONSTANT COLTAB            \ color index → 2-bit pattern
-$7CD4 CONSTANT SHFTAB            \ sub-pixel (x%4) → left-shift amount
-$7CD8 CONSTANT MSKTAB            \ sub-pixel (x%4) → AND mask to clear
+$8728 CONSTANT COLTAB            \ color index → 2-bit pattern
+$872C CONSTANT SHFTAB            \ sub-pixel (x%4) → left-shift amount
+$8730 CONSTANT MSKTAB            \ sub-pixel (x%4) → AND mask to clear
 
 : init-tables  ( -- )
   \ Color table: index 0-3 → bit pair value

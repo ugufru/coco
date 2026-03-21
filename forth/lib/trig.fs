@@ -16,11 +16,11 @@
 \   45 64 angle-dx             \ ( -- 45 )  x displacement for 64-pixel line
 \   45 64 angle-dy             \ ( -- -45 ) y displacement (negative = up)
 
-\ ── Sine table (91 bytes at $7C00) ──────────────────────────────────────
+\ ── Sine table (91 bytes at $86CC) ──────────────────────────────────────
 \ sin(0)=0 through sin(90)=127, in 1-degree steps.
 \ Values = round(sin(deg) * 127).
 
-$7C00 CONSTANT SINTAB
+$86CC CONSTANT SINTAB
 
 : init-sin  ( -- )
   SINTAB tp !

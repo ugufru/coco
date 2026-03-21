@@ -100,7 +100,7 @@ CODE plot-dots
 \  GALAXY DATA MODEL
 \ ══════════════════════════════════════════════════════════════════════════
 \
-\ Galaxy: 8x8 = 64 quadrants, 1 byte each at GALAXY ($7640).
+\ Galaxy: 8x8 = 64 quadrants, 1 byte each at GALAXY ($8000).
 \ Packed format per byte:
 \   bit 7    = magnetic storm (1=yes)
 \   bit 6    = black hole (1=yes)
@@ -114,8 +114,8 @@ CODE plot-dots
 
 \ ── Galaxy array ─────────────────────────────────────────────────────────
 
-\ Game data starts at $7640 (above app code).
-$7640 CONSTANT GALAXY          \ 64 bytes: 8x8 quadrant data
+\ Game data at $8000+ (all-RAM region, accessible after kernel boot).
+$8000 CONSTANT GALAXY          \ 64 bytes: 8x8 quadrant data
 
 : gal-addr  ( col row -- addr )  8 * + GALAXY + ;
 : gal@  ( col row -- byte )  gal-addr C@ ;
@@ -163,14 +163,14 @@ VARIABLE pdmg-masr             \ maser damage
 \ tactical view (2-125, 2-141).
 
 \ Position arrays (2 bytes each: x then y)
-$7680 CONSTANT STAR-POS        \ 5 stars x 2 bytes = 10 bytes
-$768A CONSTANT JOV-POS         \ 3 jovians x 2 bytes = 6 bytes
-$7690 CONSTANT BASE-POS        \ 1 base x 2 bytes = 2 bytes
-$7692 CONSTANT BHOLE-POS       \ 1 black hole x 2 bytes = 2 bytes
-$7694 CONSTANT SHIP-POS        \ player ship x 2 bytes = 2 bytes
+$8040 CONSTANT STAR-POS        \ 5 stars x 2 bytes = 10 bytes
+$804A CONSTANT JOV-POS         \ 3 jovians x 2 bytes = 6 bytes
+$8050 CONSTANT BASE-POS        \ 1 base x 2 bytes = 2 bytes
+$8052 CONSTANT BHOLE-POS       \ 1 black hole x 2 bytes = 2 bytes
+$8054 CONSTANT SHIP-POS        \ player ship x 2 bytes = 2 bytes
 
 \ Jovian damage (3 bytes, one per jovian: 100=full health, 0=dead)
-$7696 CONSTANT JOV-DMG         \ 3 bytes
+$8056 CONSTANT JOV-DMG         \ 3 bytes
 
 \ Quadrant object counts (from the packed byte, cached for speed)
 VARIABLE qstars                \ star count in current quadrant
@@ -193,36 +193,36 @@ VARIABLE death-cause               \ 0=energy/star, 1=black hole
 \ 7x5 pixel sprites in 2bpp artifact-color format.
 \ Built at init time using datawrite helpers (tb).
 
-$7740 CONSTANT SPR-SHIP           \ Endever: blue chevron (12 bytes)
-$774C CONSTANT SPR-JOV            \ Jovian: red diamond (12 bytes)
-$7758 CONSTANT SPR-BASE           \ UP base: blue cross (12 bytes)
-$7764 CONSTANT SPR-MSL1           \ Missile frame 1: + shape (12 bytes)
-$7770 CONSTANT SPR-MSL2           \ Missile frame 2: x shape (12 bytes)
+$8082 CONSTANT SPR-SHIP           \ Endever: blue chevron (12 bytes)
+$808E CONSTANT SPR-JOV            \ Jovian: red diamond (12 bytes)
+$809A CONSTANT SPR-BASE           \ UP base: blue cross (12 bytes)
+$80A6 CONSTANT SPR-MSL1           \ Missile frame 1: + shape (12 bytes)
+$80B2 CONSTANT SPR-MSL2           \ Missile frame 2: x shape (12 bytes)
 
 \ ── Jovian AI data structures ────────────────────────────────────────────
-\ Per-Jovian sprite + bg buffers (packed before GALAXY at $7640)
-$75A4 CONSTANT JOV-BG0          \ 28 bytes: bg save buffer Jovian 0 (4x7)
-$75C0 CONSTANT JOV-BG1          \ 28 bytes: bg save buffer Jovian 1
-$75DC CONSTANT JOV-BG2          \ 28 bytes: bg save buffer Jovian 2
-$75F8 CONSTANT JOV-SPR0         \ 23 bytes: generated sprite Jovian 0
-$760F CONSTANT JOV-SPR1         \ 23 bytes: generated sprite Jovian 1
-$7626 CONSTANT JOV-SPR2         \ 23 bytes: generated sprite Jovian 2
-$763D CONSTANT JOV-EMCOL        \ 3 bytes: cached emotion color band
+\ Per-Jovian sprite + bg buffers (packed before GALAXY at $8000)
+$80F0 CONSTANT JOV-BG0          \ 28 bytes: bg save buffer Jovian 0 (4x7)
+$810C CONSTANT JOV-BG1          \ 28 bytes: bg save buffer Jovian 1
+$8128 CONSTANT JOV-BG2          \ 28 bytes: bg save buffer Jovian 2
+$8200 CONSTANT JOV-SPR0         \ 23 bytes: generated sprite Jovian 0
+$8217 CONSTANT JOV-SPR1         \ 23 bytes: generated sprite Jovian 1
+$822E CONSTANT JOV-SPR2         \ 23 bytes: generated sprite Jovian 2
+$8245 CONSTANT JOV-EMCOL        \ 3 bytes: cached emotion color band
 
-$777C CONSTANT JOV-STATE        \ 3 bytes: 0=attack, 1=flee, 2=idle
-$777F CONSTANT JOV-TICK         \ 3 bytes: per-Jovian frame counter
-$77BE CONSTANT JOV-OLDX         \ 3 bytes: previous x per Jovian
-$77C1 CONSTANT JOV-OLDY         \ 3 bytes: previous y per Jovian
+$80BE CONSTANT JOV-STATE        \ 3 bytes: 0=attack, 1=flee, 2=idle
+$80C2 CONSTANT JOV-TICK         \ 3 bytes: per-Jovian frame counter
+$80C6 CONSTANT JOV-OLDX         \ 3 bytes: previous x per Jovian
+$80C9 CONSTANT JOV-OLDY         \ 3 bytes: previous y per Jovian
 
 \ ── Genome data (AI diversity system) ──────────────────────────────────
 \ 4 bytes per Jovian: behavior(2) + appearance(1) + emotion|origin(1)
-$77C5 CONSTANT JOV-GENOME       \ 12 bytes: 3 Jovians x 4 bytes
+$80CE CONSTANT JOV-GENOME       \ 12 bytes: 3 Jovians x 4 bytes
 \ Intent output from jov-think: dx, dy, flags per Jovian
-$77D1 CONSTANT JOV-INTENT       \ 9 bytes: 3 Jovians x 3 bytes
+$80DA CONSTANT JOV-INTENT       \ 9 bytes: 3 Jovians x 3 bytes
 \ Sprite generation workspace
-$77DA CONSTANT JOV-SPRWORK      \ 12 bytes: scratch for sprite gen
+$80E4 CONSTANT JOV-SPRWORK      \ 12 bytes: scratch for sprite gen
 \ Quadrant mood grid (8x8 sectors, emotion persistence)
-$7E00 CONSTANT MOOD-GRID        \ 64 bytes: mood per sector
+$8EB4 CONSTANT MOOD-GRID        \ 64 bytes: mood per sector
 
 : jov-spr  ( i -- addr )  23 * JOV-SPR0 + ;
 : jov-bg  ( i -- addr )  28 * JOV-BG0 + ;
@@ -534,7 +534,7 @@ VARIABLE old-sy                   \ previous ship y
 \ ── Background save/restore for flicker-free ship movement ────────────
 \ Save 4 bytes × 5 rows of VRAM under the sprite bounding box.
 \ Restore to erase without a black flash.
-$7710 CONSTANT SHIP-BG              \ 20-byte save buffer
+$805A CONSTANT SHIP-BG              \ 20-byte save buffer
 
 CODE bg-save   \ ( buf x y -- )  save 4×5 VRAM bytes to buf
         PSHS    X
@@ -601,7 +601,7 @@ CODE bg-restore  \ ( buf x y -- )  restore 4×5 VRAM bytes from buf
   SHIP-BG old-sx @ 3 - old-sy @ 2 - bg-restore ;
 
 \ Missile background buffer
-$7724 CONSTANT MSL-BG                \ 20-byte save buffer
+$806E CONSTANT MSL-BG                \ 20-byte save buffer
 
 : save-msl-bg  ( -- )
   MSL-BG msl-scrx 2 - msl-scry 2 - bg-save ;
@@ -682,13 +682,13 @@ CODE jov-spr-xy   \ ( i -- spr x y )
         PSHS    A               ; save i
         LDB     #23
         MUL
-        ADDD    #$75F8          ; JOV-SPR0
+        ADDD    #$8200          ; JOV-SPR0
         STD     4,U             ; spr addr
         TFR     D,Y             ; Y = spr header
         LDA     ,S+             ; i
         ASLA                    ; A = i*2
         PSHS    A               ; save i*2
-        LDX     #$768A          ; JOV-POS
+        LDX     #$804A          ; JOV-POS
         ; x = JOV-POS[i*2] - width/2
         LDB     ,Y              ; width
         LSRB
@@ -717,19 +717,19 @@ CODE jov-bg-xy   \ ( i -- bg x y )
         ; bg addr = i * 28 + JOV-BG0
         LDB     #28
         MUL
-        ADDD    #$75A4          ; JOV-BG0
+        ADDD    #$80F0          ; JOV-BG0
         STD     4,U             ; bg addr
         ; sprite header for centering: i * 23 + JOV-SPR0
         LDA     ,S+             ; i
         PSHS    A               ; save i again
         LDB     #23
         MUL
-        ADDD    #$75F8          ; JOV-SPR0
+        ADDD    #$8200          ; JOV-SPR0
         TFR     D,Y             ; Y = spr header
         LDA     ,S+             ; i
         ASLA                    ; i*2
         PSHS    A               ; save i*2
-        LDX     #$768A          ; JOV-POS
+        LDX     #$804A          ; JOV-POS
         LDB     ,Y              ; width
         LSRB
         NEGB
@@ -755,18 +755,18 @@ CODE jov-bg-old-xy   \ ( i -- bg oldx oldy )
         PSHS    A               ; save i
         LDB     #28
         MUL
-        ADDD    #$75A4          ; JOV-BG0
+        ADDD    #$80F0          ; JOV-BG0
         STD     4,U             ; bg addr
         LDA     ,S+             ; i
         PSHS    A
         LDB     #23
         MUL
-        ADDD    #$75F8          ; JOV-SPR0
+        ADDD    #$8200          ; JOV-SPR0
         TFR     D,Y             ; Y = spr header (for width/height)
         LDA     ,S+             ; i
         PSHS    A               ; save i
         ; oldx = JOV-OLDX[i] - width/2
-        LDX     #$77BE          ; JOV-OLDX
+        LDX     #$80C6          ; JOV-OLDX
         LDB     ,Y              ; width
         LSRB
         NEGB
@@ -775,7 +775,7 @@ CODE jov-bg-old-xy   \ ( i -- bg oldx oldy )
         STD     2,U
         ; oldy = JOV-OLDY[i] - height/2
         LDA     ,S+             ; i
-        LDX     #$77C1          ; JOV-OLDY
+        LDX     #$80C9          ; JOV-OLDY
         LDB     1,Y             ; height
         LSRB
         NEGB
@@ -792,8 +792,8 @@ CODE save-jov-oldpos-n   \ ( n -- )  copy JOV-POS to JOV-OLDX/Y for n Jovians
         LEAU    2,U             ; pop
         TSTB
         BEQ     @done
-        LDX     #$768A          ; JOV-POS
-        LDY     #$77BE          ; JOV-OLDX
+        LDX     #$804A          ; JOV-POS
+        LDY     #$80C6          ; JOV-OLDX
 @loop   LDA     ,X+             ; pos_x
         STA     ,Y              ; OLDX[i]
         LDA     ,X+             ; pos_y
@@ -898,7 +898,7 @@ CODE jov-emo@   \ ( i -- e )
         LDA     1,U             ; A = i
         LDB     #4
         MUL
-        ADDD    #$77C8          ; JOV-GENOME + 3
+        ADDD    #$80D1          ; JOV-GENOME + 3
         TFR     D,Y
         LDA     ,Y
         LSRA
@@ -915,7 +915,7 @@ CODE jov-emotion!   \ ( e i -- )
         LDA     1,U             ; A = i
         LDB     #4
         MUL
-        ADDD    #$77C8          ; JOV-GENOME + 3
+        ADDD    #$80D1          ; JOV-GENOME + 3
         TFR     D,Y             ; Y = byte 3 addr
         LDA     3,U             ; A = e (low byte)
         LEAU    4,U             ; pop 2 args
@@ -941,7 +941,7 @@ CODE jov-emotion-base   \ ( i -- e )  aggression-derived baseline
         LDA     1,U             ; A = i
         LDB     #4
         MUL
-        ADDD    #$77C5          ; JOV-GENOME
+        ADDD    #$80CE          ; JOV-GENOME
         TFR     D,Y
         LDA     ,Y              ; byte 0
         LSRA
@@ -1021,17 +1021,17 @@ CODE gen-jov-sprite   \ ( i -- )
         PSHS    A               ; save i
         LDB     #23
         MUL
-        ADDD    #$75F8          ; JOV-SPR0
-        STD     $77DA           ; SPRWORK+0 = sprite addr
+        ADDD    #$8200          ; JOV-SPR0
+        STD     $80E4           ; SPRWORK+0 = sprite addr
         ; --- Genome addr = i * 4 + JOV-GENOME ---
         LDA     ,S+             ; restore i
         LDB     #4
         MUL
-        ADDD    #$77C5          ; JOV-GENOME
+        ADDD    #$80CE          ; JOV-GENOME
         TFR     D,Y             ; Y = genome ptr
         ; --- Seed (byte 2) → PRNG state, width, height ---
         LDA     2,Y             ; appearance seed
-        STA     $77DF           ; PRNG state
+        STA     $80E9           ; PRNG state
         ; Width from bits 7-6: 00=5, 01=7, 10=7, 11=9
         TFR     A,B             ; save seed in B
         LSRA
@@ -1049,8 +1049,8 @@ CODE gen-jov-sprite   \ ( i -- )
         LDA     #9
         BRA     @wdn
 @w7     LDA     #7
-@wdn    STA     $77E0           ; width
-        LDX     $77DA
+@wdn    STA     $80EA           ; width
+        LDX     $80E4
         STA     ,X              ; sprite header byte 0
         ; Height from bits 5-4: 00/01=5, 10/11=7
         TFR     B,A             ; restore seed
@@ -1064,13 +1064,13 @@ CODE gen-jov-sprite   \ ( i -- )
         LDA     #5
         BRA     @hdn
 @h7     LDA     #7
-@hdn    STA     $77E1           ; height
+@hdn    STA     $80EB           ; height
         STA     1,X             ; sprite header byte 1
         ; Half-width = (width + 1) / 2
-        LDA     $77E0
+        LDA     $80EA
         INCA
         LSRA
-        STA     $77DD           ; half_width
+        STA     $80E7           ; half_width
         ; --- Emotion (byte 3 high nibble) → 2bpp color ---
         LDA     3,Y             ; emotion|origin
         LSRA
@@ -1086,15 +1086,15 @@ CODE gen-jov-sprite   \ ( i -- )
 @cblue  LDA     #1              ; blue (fear)
         BRA     @cldn
 @cwht   LDA     #3              ; white (neutral)
-@cldn   STA     $77DC           ; 2bpp color
+@cldn   STA     $80E6           ; 2bpp color
         ; === Clear sprite data ===
-        LDX     $77DA
+        LDX     $80E4
         LEAX    2,X
-        LDA     $77E0
+        LDA     $80EA
         ADDA    #3
         LSRA
         LSRA                    ; A = bpr
-        LDB     $77E1
+        LDB     $80EB
         MUL
         TSTB
         BEQ     @clrdn
@@ -1103,76 +1103,76 @@ CODE gen-jov-sprite   \ ( i -- )
         BNE     @clrlp
 @clrdn
         ; === Per-row pixel generation ===
-        CLR     $77E3           ; row = 0
-@rowlp  LDB     $77DF           ; PRNG state
+        CLR     $80ED           ; row = 0
+@rowlp  LDB     $80E9           ; PRNG state
         LDA     #5
         MUL
         ADDB    #3
-        STB     $77DF
-        LDA     $77E3
-        STA     $77E5           ; row for @setpx
-        CLR     $77E2           ; col = 0
-@collp  LDA     $77DF           ; state
-        LDB     $77E2
+        STB     $80E9
+        LDA     $80ED
+        STA     $80EF           ; row for @setpx
+        CLR     $80EC           ; col = 0
+@collp  LDA     $80E9           ; state
+        LDB     $80EC
         BEQ     @nsh
 @shlp   LSRA
         DECB
         BNE     @shlp
 @nsh    BITA    #$01
         BEQ     @nopx
-        LDA     $77E2
-        STA     $77E4           ; col for @setpx
+        LDA     $80EC
+        STA     $80EE           ; col for @setpx
         BSR     @setpx
-        LDA     $77DD           ; half_width
+        LDA     $80E7           ; half_width
         DECA
-        CMPA    $77E2           ; center?
+        CMPA    $80EC           ; center?
         BEQ     @nopx
-        LDA     $77E0           ; width
+        LDA     $80EA           ; width
         DECA
-        SUBA    $77E2           ; mirror col
-        STA     $77E4
+        SUBA    $80EC           ; mirror col
+        STA     $80EE
         BSR     @setpx
-@nopx   INC     $77E2
-        LDA     $77E2
-        CMPA    $77DD
+@nopx   INC     $80EC
+        LDA     $80EC
+        CMPA    $80E7
         BCS     @collp
-        INC     $77E3
-        LDA     $77E3
-        CMPA    $77E1
+        INC     $80ED
+        LDA     $80ED
+        CMPA    $80EB
         BCS     @rowlp
         ; === Center column guarantee ===
-        LDA     $77DD
+        LDA     $80E7
         DECA
-        STA     $77E4
-        LDA     $77E1
+        STA     $80EE
+        LDA     $80EB
         LSRA
-        STA     $77E5
+        STA     $80EF
         BSR     @setpx
         ;
         PULS    X
         ;NEXT
         ;
-@setpx  LDA     $77E0
+@setpx  LDA     $80EA
         ADDA    #3
         LSRA
         LSRA
-        LDB     $77E5
+        LDB     $80EF
         MUL
         PSHS    D
-        LDB     $77E4
+        LDB     $80EE
         LSRB
         LSRB
         CLRA
         ADDD    ,S++
-        LDX     $77DA
+        LDX     $80E4
         LEAX    2,X
         LEAX    D,X
-        LDA     $77E4
+        LDA     $80EE
         ANDA    #$03
         NEGA
         ADDA    #3
         ASLA
-        LDB     $77DC
+        LDB     $80E6
         TSTA
         BEQ     @sns
 @ssh    ASLB
@@ -1188,7 +1188,7 @@ CODE gen-jov-sprite   \ ( i -- )
   qjovians @ ?DUP IF 0 DO
     I gen-jov-sprite
     I jov-emo@ jov-color-band
-    I JOV-EMCOL + C!               \ cache initial band
+    I JOV-EMCOL + C!
   LOOP THEN ;
 
 \ Check if any Jovian's emotion crossed a color band → regenerate sprite
@@ -1204,7 +1204,7 @@ CODE gen-jov-sprite   \ ( i -- )
   LOOP THEN ;
 
 \ ── Quadrant mood persistence ──────────────────────────────────────────
-\ MOOD-GRID (64 bytes at $7E00): one byte per sector, 0-15 scale.
+\ MOOD-GRID (64 bytes at $8EB4): one byte per sector, 0-15 scale.
 \ Saved on quadrant exit (aggregate Jovian emotions), loaded on entry
 \ (seeds starting emotion).  Decays toward neutral (8) each stardate.
 \ Unvisited quadrants drift aggressive.
@@ -1411,16 +1411,16 @@ CODE jov-think  ( i qbase -- )
         LEAU    4,U             ; pop 2 args
         PSHS    D               ; [S+0]=qbase, [S+1]=i
 
-        ; Compute intent addr: Y = $77D1 + i*3
+        ; Compute intent addr: Y = $80DA + i*3
         LDA     #3
         MUL                     ; D = i*3
-        ADDD    #$77D1
+        ADDD    #$80DA
         TFR     D,Y             ; Y = intent output
 
-        ; Compute pos addr: X = $768A + i*2
+        ; Compute pos addr: X = $804A + i*2
         LDB     1,S             ; B = i
         ASLB
-        LDX     #$768A
+        LDX     #$804A
         ABX                     ; X = &JOV-POS[i]
 
         ; Save current position
@@ -1429,24 +1429,24 @@ CODE jov-think  ( i qbase -- )
         PSHS    D               ; [S+0]=cx [S+1]=cy [S+2]=qbase [S+3]=i
 
         ; --- Target selection ---
-        LDX     #$7694          ; default: SHIP-POS
+        LDX     #$8054          ; default: SHIP-POS
         LDA     2,S             ; qbase
         BEQ     @calc           ; no base, target ship
         LDA     3,S             ; i
         BEQ     @tbase          ; i==0, target base
-        LDX     #$7696          ; JOV-DMG
+        LDX     #$8056          ; JOV-DMG
         LDA     A,X             ; DMG[i]
         CMPA    #50
         BHS     @calc           ; healthy, target ship
 
-@tbase  LDX     #$7690          ; BASE-POS
+@tbase  LDX     #$8050          ; BASE-POS
         BRA     @calc2
-@calc   LDX     #$7694          ; SHIP-POS
+@calc   LDX     #$8054          ; SHIP-POS
 @calc2
 
         ; --- Flags: bit 0 = targets_base ---
         CLR     2,Y             ; flags = 0
-        CMPX    #$7690
+        CMPX    #$8050
         BNE     @nx
         LDA     #1
         STA     2,Y             ; flags |= targets_base
@@ -1528,11 +1528,11 @@ CODE jov-flee   \ ( i -- )  move 1px away from player, clamp bounds
         LDA     1,U             ; A = i
         LEAU    2,U             ; pop
         ASLA                    ; A = i*2
-        LDX     #$768A          ; JOV-POS
+        LDX     #$804A          ; JOV-POS
         LEAX    A,X             ; X = JOV-POS + i*2
         ; Flee x: move away from SHIP-POS
         LDA     ,X              ; A = cx
-        CMPA    $7694           ; vs ship_x (SHIP-POS)
+        CMPA    $8054           ; vs ship_x (SHIP-POS)
         BEQ     @kx             ; equal: keep x
         BHI     @fx1            ; cx > sx: flee right
         DECA                    ; cx < sx: flee left
@@ -1547,7 +1547,7 @@ CODE jov-flee   \ ( i -- )  move 1px away from player, clamp bounds
 @sx     STA     ,X
 @kx     ; Flee y
         LDA     1,X             ; A = cy
-        CMPA    $7695           ; vs ship_y (SHIP-POS+1)
+        CMPA    $8055           ; vs ship_y (SHIP-POS+1)
         BEQ     @ky
         BHI     @fy1
         DECA
@@ -1729,10 +1729,10 @@ VARIABLE check-win                \ flag: a kill happened, check win/lose
 \ ── Explosion effects ────────────────────────────────────────────────
 \ Animated expanding ring explosion.  Each frame generates dots along
 \ a ring at increasing radius, cycling white→red→fade.  Uses a buffer
-\ at $7D00 for up to 32 (x,y) pairs = 64 bytes.  Clamped to screen.
+\ at $8734 for up to 32 (x,y) pairs = 64 bytes.  Clamped to screen.
 \ Game loop pauses during the explosion (synchronous).
 
-$7D00 CONSTANT EXPLBUF               \ explosion dot buffer (x,y pairs)
+$8734 CONSTANT EXPLBUF               \ explosion dot buffer (x,y pairs)
 VARIABLE expl-cx                      \ explosion center x
 VARIABLE expl-cy                      \ explosion center y
 VARIABLE expl-rad                     \ start radius
@@ -1829,8 +1829,8 @@ CODE prox-dmg  ( cx cy radius damage count -- killmask )
         PSHS    X
         LDA     1,U             ; count
         BEQ     @zero
-        LDX     #$768A          ; JOV-POS (fixed address)
-        LDY     #$7696          ; JOV-DMG (fixed address)
+        LDX     #$804A          ; JOV-POS (fixed address)
+        LDY     #$8056          ; JOV-DMG (fixed address)
         ; Build stack frame
         LDD     #0
         PSHS    D               ; +0,1: killmask
@@ -2107,7 +2107,7 @@ VARIABLE pj-result
 
 \ Storm star positions saved at quadrant entry for redraw.
 \ Max 25 fake stars (5 real × 5 fake). 3 bytes each: x, y, color.
-$76A0 CONSTANT FSTAR-POS          \ 25 × 3 = 75 bytes
+$8190 CONSTANT FSTAR-POS          \ 25 × 3 = 75 bytes
 VARIABLE fstar-count
 
 VARIABLE fs-tmp
@@ -2138,7 +2138,7 @@ VARIABLE fs-tmp
 
 \ Spiral dot positions precomputed at quadrant entry.
 \ 4 arms × 8 dots = 32 dots max. 2 bytes each (x, y).
-$76D0 CONSTANT SPIRAL-POS         \ 32 × 2 = 64 bytes
+$81DC CONSTANT SPIRAL-POS         \ 32 × 2 = 64 bytes
 VARIABLE spiral-count
 
 VARIABLE sp-r
@@ -2530,11 +2530,11 @@ VARIABLE cmd-digits               \ number of digits entered
 \ Animation: a fixed-length "bolt" travels from ship to target.
 \ Layer 2: always drawn last, always erased first.
 
-\ ── Path buffers (in free RAM $7800+) ──────────────────────────────────
+\ ── Path buffers (in free RAM $821C+) ──────────────────────────────────
 \ 3 bytes per pixel × 200 max pixels = 600 bytes each
 
-$7800 CONSTANT BEAM-PATH           \ player maser path buffer (600 bytes)
-$7A58 CONSTANT JBEAM-PATH          \ Jovian beam path buffer (600 bytes)
+$821C CONSTANT BEAM-PATH           \ player maser path buffer (600 bytes)
+$8474 CONSTANT JBEAM-PATH          \ Jovian beam path buffer (600 bytes)
 
 \ ── Beam state variables ───────────────────────────────────────────────
 \ Per-beam: total pixel count, head index, tail index, hit info
@@ -3227,6 +3227,7 @@ VARIABLE jnb-result
   THEN ;
 
 : main  ( -- )
+  $8000 4096 0 FILL               \ clear game data region ($8000-$8FFF)
   rg-init
   init-text
   init-sin
@@ -3267,6 +3268,20 @@ VARIABLE jnb-result
   BEGIN
     save-ship-pos
     move-ship
+    gravity-well
+    star-gravity
+    check-collisions
+    check-dock
+    tick-dock
+    tick-missile
+    tick-jovians jov-check-regen
+    tick-base-attack
+    jov-gravity
+    tick-jbeam
+    tick-destruct
+    tick-stardate
+    process-key
+    VSYNC
     gravity-well
     star-gravity
     check-collisions
