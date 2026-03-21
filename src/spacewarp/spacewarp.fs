@@ -192,15 +192,14 @@ $7764 CONSTANT SPR-MSL1           \ Missile frame 1: + shape (12 bytes)
 $7770 CONSTANT SPR-MSL2           \ Missile frame 2: x shape (12 bytes)
 
 \ ── Jovian AI data structures ────────────────────────────────────────────
-\ Per-Jovian sprite + bg buffers (headroom gap $7540-$75E0)
-$7540 CONSTANT JOV-BG0          \ 28 bytes: bg save buffer Jovian 0 (4x7)
-$755C CONSTANT JOV-BG1          \ 28 bytes: bg save buffer Jovian 1
-$7578 CONSTANT JOV-BG2          \ 28 bytes: bg save buffer Jovian 2
-$7594 CONSTANT JOV-SPR0         \ 23 bytes: generated sprite Jovian 0
-$75AB CONSTANT JOV-SPR1         \ 23 bytes: generated sprite Jovian 1
-$75C2 CONSTANT JOV-SPR2         \ 23 bytes: generated sprite Jovian 2
-$75D9 CONSTANT JOV-HALF         \ 5 bytes: half-template workspace
-$75DE CONSTANT JOV-EMCOL        \ 3 bytes: cached emotion color band
+\ Per-Jovian sprite + bg buffers (packed before GALAXY at $7640)
+$75A4 CONSTANT JOV-BG0          \ 28 bytes: bg save buffer Jovian 0 (4x7)
+$75C0 CONSTANT JOV-BG1          \ 28 bytes: bg save buffer Jovian 1
+$75DC CONSTANT JOV-BG2          \ 28 bytes: bg save buffer Jovian 2
+$75F8 CONSTANT JOV-SPR0         \ 23 bytes: generated sprite Jovian 0
+$760F CONSTANT JOV-SPR1         \ 23 bytes: generated sprite Jovian 1
+$7626 CONSTANT JOV-SPR2         \ 23 bytes: generated sprite Jovian 2
+$763D CONSTANT JOV-EMCOL        \ 3 bytes: cached emotion color band
 
 $777C CONSTANT JOV-STATE        \ 3 bytes: 0=attack, 1=flee, 2=idle
 $777F CONSTANT JOV-TICK         \ 3 bytes: per-Jovian frame counter
