@@ -498,11 +498,7 @@ VARIABLE tcy
 VARIABLE dj-i
 : draw-jovians  ( -- )
   qjovians @ ?DUP IF 0 DO
-    I dj-i !
-    dj-i @ jov-spr
-    JOV-POS dj-i @ 2 * + C@ dj-i @ jov-draw-dx -
-    JOV-POS dj-i @ 2 * + 1 + C@ dj-i @ jov-draw-dy -
-    spr-draw
+    I jov-spr-xy spr-draw
   LOOP THEN ;
 
 : draw-base  ( -- )
@@ -669,44 +665,154 @@ CODE bg-restore-7  \ ( buf x y -- )  restore 4x7 VRAM bytes from buf
 
 VARIABLE jbg-i
 
+\ CODE helpers: compute sprite/bg addr + centered (x,y) for Jovian i.
+\ Inlines jov-spr/jov-bg/jov-draw-dx/jov-draw-dy into register ops.
+
+CODE jov-spr-xy   \ ( i -- spr x y )
+        PSHS    X               ; save IP
+        LDA     1,U             ; A = i
+        LEAU    -4,U            ; grow stack by 2 cells
+        PSHS    A               ; save i
+        LDB     #23
+        MUL
+        ADDD    #$75F8          ; JOV-SPR0
+        STD     4,U             ; spr addr
+        TFR     D,Y             ; Y = spr header
+        LDA     ,S+             ; i
+        ASLA                    ; A = i*2
+        PSHS    A               ; save i*2
+        LDX     #$768A          ; JOV-POS
+        ; x = JOV-POS[i*2] - width/2
+        LDB     ,Y              ; width
+        LSRB
+        NEGB
+        ADDB    A,X             ; B = pos_x - width/2
+        CLRA
+        STD     2,U             ; x
+        ; y = JOV-POS[i*2+1] - height/2
+        LDA     ,S+             ; i*2
+        INCA                    ; i*2+1
+        LDB     1,Y             ; height
+        LSRB
+        NEGB
+        ADDB    A,X             ; B = pos_y - height/2
+        CLRA
+        STD     ,U              ; y
+        PULS    X
+        ;NEXT
+;CODE
+
+CODE jov-bg-xy   \ ( i -- bg x y )
+        PSHS    X               ; save IP
+        LDA     1,U             ; A = i
+        LEAU    -4,U            ; grow stack by 2 cells
+        PSHS    A               ; save i
+        ; bg addr = i * 28 + JOV-BG0
+        LDB     #28
+        MUL
+        ADDD    #$75A4          ; JOV-BG0
+        STD     4,U             ; bg addr
+        ; sprite header for centering: i * 23 + JOV-SPR0
+        LDA     ,S+             ; i
+        PSHS    A               ; save i again
+        LDB     #23
+        MUL
+        ADDD    #$75F8          ; JOV-SPR0
+        TFR     D,Y             ; Y = spr header
+        LDA     ,S+             ; i
+        ASLA                    ; i*2
+        PSHS    A               ; save i*2
+        LDX     #$768A          ; JOV-POS
+        LDB     ,Y              ; width
+        LSRB
+        NEGB
+        ADDB    A,X             ; pos_x - width/2
+        CLRA
+        STD     2,U
+        LDA     ,S+             ; i*2
+        INCA
+        LDB     1,Y             ; height
+        LSRB
+        NEGB
+        ADDB    A,X             ; pos_y - height/2
+        CLRA
+        STD     ,U
+        PULS    X
+        ;NEXT
+;CODE
+
+CODE jov-bg-old-xy   \ ( i -- bg oldx oldy )
+        PSHS    X               ; save IP
+        LDA     1,U             ; A = i
+        LEAU    -4,U
+        PSHS    A               ; save i
+        LDB     #28
+        MUL
+        ADDD    #$75A4          ; JOV-BG0
+        STD     4,U             ; bg addr
+        LDA     ,S+             ; i
+        PSHS    A
+        LDB     #23
+        MUL
+        ADDD    #$75F8          ; JOV-SPR0
+        TFR     D,Y             ; Y = spr header (for width/height)
+        LDA     ,S+             ; i
+        PSHS    A               ; save i
+        ; oldx = JOV-OLDX[i] - width/2
+        LDX     #$77BE          ; JOV-OLDX
+        LDB     ,Y              ; width
+        LSRB
+        NEGB
+        ADDB    A,X             ; OLDX[i] - width/2
+        CLRA
+        STD     2,U
+        ; oldy = JOV-OLDY[i] - height/2
+        LDA     ,S+             ; i
+        LDX     #$77C1          ; JOV-OLDY
+        LDB     1,Y             ; height
+        LSRB
+        NEGB
+        ADDB    A,X             ; OLDY[i] - height/2
+        CLRA
+        STD     ,U
+        PULS    X
+        ;NEXT
+;CODE
+
+CODE save-jov-oldpos-n   \ ( n -- )  copy JOV-POS to JOV-OLDX/Y for n Jovians
+        PSHS    X               ; save IP
+        LDB     1,U             ; B = count
+        LEAU    2,U             ; pop
+        TSTB
+        BEQ     @done
+        LDX     #$768A          ; JOV-POS
+        LDY     #$77BE          ; JOV-OLDX
+@loop   LDA     ,X+             ; pos_x
+        STA     ,Y              ; OLDX[i]
+        LDA     ,X+             ; pos_y
+        STA     3,Y             ; OLDY[i] (JOV-OLDY = JOV-OLDX + 3)
+        LEAY    1,Y
+        DECB
+        BNE     @loop
+@done   PULS    X
+        ;NEXT
+;CODE
+
 : save-jov-bgs  ( -- )
   qjovians @ ?DUP IF 0 DO
-    I jbg-i !
-    JOV-DMG jbg-i @ + C@ IF
-      jbg-i @ jov-bg
-      JOV-POS jbg-i @ 2 * + C@ jbg-i @ jov-draw-dx -
-      JOV-POS jbg-i @ 2 * + 1 + C@ jbg-i @ jov-draw-dy -
-      bg-save-7
-    THEN
+    JOV-DMG I + C@ IF I jov-bg-xy bg-save-7 THEN
   LOOP THEN ;
 
 : restore-jov-bgs  ( -- )
   qjovians @ ?DUP IF 0 DO
-    I jbg-i !
-    JOV-DMG jbg-i @ + C@ IF
-      jbg-i @ jov-bg
-      JOV-OLDX jbg-i @ + C@ jbg-i @ jov-draw-dx -
-      JOV-OLDY jbg-i @ + C@ jbg-i @ jov-draw-dy -
-      bg-restore-7
-    THEN
+    JOV-DMG I + C@ IF I jov-bg-old-xy bg-restore-7 THEN
   LOOP THEN ;
 
-: save-jov-oldpos  ( -- )
-  qjovians @ ?DUP IF 0 DO
-    I jbg-i !
-    JOV-POS jbg-i @ 2 * + C@ JOV-OLDX jbg-i @ + C!
-    JOV-POS jbg-i @ 2 * + 1 + C@ JOV-OLDY jbg-i @ + C!
-  LOOP THEN ;
+: save-jov-oldpos  ( -- )  qjovians @ save-jov-oldpos-n ;
 
 : draw-jovians-live  ( -- )
   qjovians @ ?DUP IF 0 DO
-    I jbg-i !
-    JOV-DMG jbg-i @ + C@ IF
-      jbg-i @ jov-spr
-      JOV-POS jbg-i @ 2 * + C@ jbg-i @ jov-draw-dx -
-      JOV-POS jbg-i @ 2 * + 1 + C@ jbg-i @ jov-draw-dy -
-      spr-draw
-    THEN
+    JOV-DMG I + C@ IF I jov-spr-xy spr-draw THEN
   LOOP THEN ;
 
 : init-jovian-ai  ( -- )
