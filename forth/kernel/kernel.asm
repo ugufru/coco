@@ -246,6 +246,9 @@ CFA_PROX_SCAN   FDB     CODE_PROX_SCAN
 CFA_TOR         FDB     CODE_TOR
 CFA_FROMR       FDB     CODE_FROMR
 CFA_RAT         FDB     CODE_RAT
+CFA_MIN         FDB     CODE_MIN
+CFA_MAX         FDB     CODE_MAX
+CFA_ABS         FDB     CODE_ABS
 
 ;;; ─── Sprite data table ─────────────────────────────────────────────────────
 ;;; DOVAR entry: calling sprite-data pushes the address of the first byte.
@@ -1081,6 +1084,45 @@ RSH_DONE
         LEAU    2,U             ; pop count cell
         STD     ,U              ; store shifted value
         LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── MIN ( n1 n2 -- smaller ) ───────────────────────────────────────────────
+;;; Keep the smaller of two signed values.
+
+CODE_MIN
+        LDD     ,U              ; D = n2 (TOS)
+        CMPD    2,U             ; n2 vs n1
+        BLE     MIN_OK          ; n2 <= n1, keep n2
+        LDD     2,U             ; else keep n1
+MIN_OK  LEAU    2,U             ; pop one cell
+        STD     ,U              ; store result
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── MAX ( n1 n2 -- larger ) ───────────────────────────────────────────────
+;;; Keep the larger of two signed values.
+
+CODE_MAX
+        LDD     ,U              ; D = n2 (TOS)
+        CMPD    2,U             ; n2 vs n1
+        BGE     MAX_OK          ; n2 >= n1, keep n2
+        LDD     2,U             ; else keep n1
+MAX_OK  LEAU    2,U             ; pop one cell
+        STD     ,U              ; store result
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── ABS ( n -- |n| ) ─────────────────────────────────────────────────────
+;;; Absolute value. If negative, negate.
+
+CODE_ABS
+        LDD     ,U              ; D = TOS
+        BPL     ABS_OK          ; already positive
+        COMA
+        COMB
+        ADDD    #1              ; negate
+        STD     ,U
+ABS_OK  LDY     ,X++            ; NEXT
         JMP     [,Y]
 
 ;;; ─── NEGATE ( n -- -n ) ──────────────────────────────────────────────────────

@@ -92,6 +92,9 @@ def kernel_words(symbols):
         '>r':       'CFA_TOR',
         'r>':       'CFA_FROMR',
         'r@':       'CFA_RAT',
+        'min':      'CFA_MIN',
+        'max':      'CFA_MAX',
+        'abs':      'CFA_ABS',
         'sprite-data': 'CFA_SPRITE_DATA',
         'font-data':   'CFA_FONT_DATA',
     }

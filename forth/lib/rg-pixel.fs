@@ -166,7 +166,6 @@ VARIABLE hl-c  VARIABLE hl-y
 
 \ ── Helpers ──────────────────────────────────────────────────────────────
 
-: abs  ( n -- |n| )  DUP 0 < IF NEGATE THEN ;
 
 \ ── rg-line ( x1 y1 x2 y2 color -- ) ───────────────────────────────────
 \ Bresenham line drawing with inlined pixel write.  All 8 octants.

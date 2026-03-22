@@ -17,25 +17,6 @@ INCLUDE ../../forth/lib/rg-text.fs
 INCLUDE ../../forth/lib/keyboard.fs
 INCLUDE ../../forth/lib/beam.fs
 
-CODE min   \ ( a b -- smaller )
-        LDD     ,U
-        CMPD    2,U
-        BLE     @ok
-        LDD     2,U
-@ok     LEAU    2,U
-        STD     ,U
-        ;NEXT
-;CODE
-
-CODE max   \ ( a b -- larger )
-        LDD     ,U
-        CMPD    2,U
-        BGE     @ok
-        LDD     2,U
-@ok     LEAU    2,U
-        STD     ,U
-        ;NEXT
-;CODE
 
 \ ── Bulk pixel plotter (assembly) ───────────────────────────────────────
 \ plot-dots ( addr count color -- )
