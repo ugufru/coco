@@ -3056,7 +3056,7 @@ VARIABLE sg-row                   \ scan grid: outer loop row
   cmd-num @ 6 = IF cmd-val @ fire-missile THEN
   cmd-num @ 7 = IF do-destruct THEN
   0 cmd-state !
-  draw-cmd-prompt ;
+  sd-active @ 0= IF draw-cmd-prompt THEN ;
 
 : cmd-start  ( cmd -- )
   cmd-num !
@@ -3298,11 +3298,13 @@ VARIABLE jnb-result
     THEN
     latch-key
 
+    tick-destruct
+
     \ ── Every 8th frame: slow background tasks ──
     frame-tick @ 7 AND 0= IF
       jov-check-regen
       check-dock tick-dock
-      tick-base-attack tick-destruct
+      tick-base-attack
       tick-stardate
     THEN
 
