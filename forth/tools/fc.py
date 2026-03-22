@@ -96,6 +96,11 @@ def kernel_words(symbols):
         'max':      'CFA_MAX',
         'abs':      'CFA_ABS',
         'mdist':    'CFA_MDIST',
+        'unloop':   'CFA_UNLOOP',
+        'pick':     'CFA_PICK',
+        'invert':   'CFA_INVERT',
+        'xor':      'CFA_XOR',
+        'j':        'CFA_J',
         'sprite-data': 'CFA_SPRITE_DATA',
         'font-data':   'CFA_FONT_DATA',
     }
@@ -349,6 +354,12 @@ def parse(tokens):
             target = current_items if current_def else main_thread
             target.append(('loop_back', do_stack.pop()))
 
+        elif tok.upper() == '+LOOP':
+            if not do_stack:
+                raise SyntaxError("+LOOP without DO")
+            target = current_items if current_def else main_thread
+            target.append(('plus_loop_back', do_stack.pop()))
+
         elif tok.upper() == 'BEGIN':
             target = current_items if current_def else main_thread
             label = f'__begin_{begin_counter}'
@@ -516,6 +527,7 @@ def item_size(item):
     if kind == 'label':      return 0    # marker only, no bytes
     if kind == 'do':         return 2    # CFA_DO
     if kind == 'loop_back':  return 4    # CFA_LOOP (2) + offset cell (2)
+    if kind == 'plus_loop_back': return 4  # CFA_PLUS_LOOP (2) + offset (2)
     if kind == 'if_fwd':     return 4    # CFA_0BRANCH (2) + forward offset cell (2)
     if kind == 'else_fwd':   return 4    # CFA_BRANCH (2) + forward offset cell (2)
     if kind == 'again_back': return 4    # CFA_BRANCH (2) + backward offset cell (2)
@@ -546,6 +558,7 @@ def compile_forth(definitions, variables, main_thread, code_definitions,
     CFA_LIT  = symbols['CFA_LIT']
     CFA_DO       = symbols['CFA_DO']
     CFA_LOOP     = symbols['CFA_LOOP']
+    CFA_PLUS_LOOP = symbols['CFA_PLUS_LOOP']
     CFA_0BRANCH  = symbols['CFA_0BRANCH']
     CFA_BRANCH   = symbols['CFA_BRANCH']
     kwords       = kernel_words(symbols)
@@ -649,6 +662,10 @@ def compile_forth(definitions, variables, main_thread, code_definitions,
             emit_word(CFA_DO)
         elif kind == 'loop_back':
             emit_word(CFA_LOOP)
+            offset_cell_addr = app_base + len(buf)
+            emit_word(label_map[item[1]] - (offset_cell_addr + 2))
+        elif kind == 'plus_loop_back':
+            emit_word(CFA_PLUS_LOOP)
             offset_cell_addr = app_base + len(buf)
             emit_word(label_map[item[1]] - (offset_cell_addr + 2))
         elif kind == 'if_fwd':

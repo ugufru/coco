@@ -250,6 +250,12 @@ CFA_MIN         FDB     CODE_MIN
 CFA_MAX         FDB     CODE_MAX
 CFA_ABS         FDB     CODE_ABS
 CFA_MDIST       FDB     CODE_MDIST
+CFA_UNLOOP      FDB     CODE_UNLOOP
+CFA_PICK        FDB     CODE_PICK
+CFA_INVERT      FDB     CODE_INVERT
+CFA_XOR         FDB     CODE_XOR
+CFA_J           FDB     CODE_J
+CFA_PLUS_LOOP   FDB     CODE_PLUS_LOOP
 
 ;;; ─── Sprite data table ─────────────────────────────────────────────────────
 ;;; DOVAR entry: calling sprite-data pushes the address of the first byte.
@@ -1151,6 +1157,92 @@ MDIST_AY
         CLRA                    ; D = 16-bit result
         STD     ,U              ; store result
         PULS    X               ; restore IP
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── UNLOOP ( -- ) (R: index limit -- ) ─────────────────────────────────────
+;;; Remove DO/LOOP control parameters from return stack for early EXIT.
+
+CODE_UNLOOP
+        LEAS    4,S             ; pop index + limit from return stack
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── PICK ( n -- x ) ──────────────────────────────────────────────────────
+;;; Copy the nth stack item to TOS. 0 PICK = DUP, 1 PICK = OVER.
+
+CODE_PICK
+        LDD     ,U              ; D = n
+        ASLB
+        ROLA                    ; D = n*2 (byte offset)
+        LDD     D,U             ; D = stack[n]
+        STD     ,U              ; replace TOS
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── INVERT ( n -- ~n ) ───────────────────────────────────────────────────
+;;; Bitwise complement (ones' complement).
+
+CODE_INVERT
+        LDD     ,U
+        COMA
+        COMB
+        STD     ,U
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── XOR ( n1 n2 -- n3 ) ─────────────────────────────────────────────────
+;;; Bitwise exclusive or.
+
+CODE_XOR
+        LDD     ,U              ; D = n2
+        EORA    2,U             ; A ^= n1 high
+        EORB    3,U             ; B ^= n1 low
+        LEAU    2,U             ; pop one cell
+        STD     ,U              ; store result
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── J ( -- n ) (R: ... outer-index outer-limit inner-index inner-limit)──
+;;; Push the outer loop index in nested DO/LOOPs.
+
+CODE_J
+        LDD     4,S             ; outer index is 4 bytes deep
+        STD     ,--U            ; push onto data stack
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── +LOOP ( n -- ) (R: index limit -- or loop continues) ────────────────
+;;; Like LOOP but increments index by n. Uses signed overflow detection:
+;;; loop terminates when the index crosses the limit boundary in either
+;;; direction (the sign of (index-limit) changes after adding n).
+
+CODE_PLUS_LOOP
+        LDD     ,U              ; D = increment n
+        LEAU    2,U             ; pop n from data stack
+        PSHS    D               ; save n
+        LDD     2,S             ; D = current index
+        SUBD    4,S             ; D = index - limit (old sign)
+        TFR     D,Y             ; Y = old (index - limit)
+        LDD     ,S++            ; D = n, pop from S
+        ADDD    ,S              ; D = index + n
+        STD     ,S              ; store new index
+        SUBD    2,S             ; D = new_index - limit (new sign)
+        ; Loop terminates when sign of (index-limit) changes
+        ; XOR old and new: if high bit differs, sign changed
+        PSHS    A               ; save new sign byte
+        TFR     Y,D             ; D = old (index-limit)
+        EORA    ,S+             ; A = old_hi XOR new_hi
+        BMI     PLOOP_DONE      ; sign bit set = sign changed = done
+        ; Not done — branch back
+        LDD     ,X              ; D = back-branch offset
+        LEAX    2,X             ; advance IP past offset cell
+        LEAX    D,X             ; apply signed offset
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+PLOOP_DONE
+        LEAS    4,S             ; pop index + limit from return stack
+        LEAX    2,X             ; skip over offset cell
         LDY     ,X++            ; NEXT
         JMP     [,Y]
 
