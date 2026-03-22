@@ -61,11 +61,7 @@ base, if there's one to attack. Masers fire at any angle, tracing a visible
 beam across the display. Triton missiles track toward the nearest Jovian.
 Everything happens at 60fps with smooth sprite animation.
 
-**Jovian AI.** Jovians path toward their target, avoid stars and black holes,
-and fire red beams when they have line of sight. The first Jovian in a
-quadrant prioritizes attacking the base; wounded Jovians flee to the base
-instead of chasing you. If they hold position near a base long enough, it's
-destroyed.
+**Jovian AI.** Each Jovian has a 4-byte genome controlling aggression, pilot skill, speed, and appearance. Emotion (0-15) drives engagement distance — aggressive Jovians close to 20px, fearful ones orbit at 65px. IDLE Jovians fire opportunistically before detection; ATTACK Jovians chase; wounded Jovians FLEE. Pilot skill determines star avoidance distance (6-13px). Everything bumps — ship, Jovians, and each other collide at 8px.
 
 **Physics.** Black holes are invisible 30px gravity wells — tiered pull
 strength, instant death on contact. Stars have their own gentle gravity.
@@ -82,7 +78,7 @@ and it explodes. Lose all bases and the galaxy falls.
 |-----|---------|
 | 1 | Damage report — system health for all five subsystems |
 | 2 | Hyperdrive — warp to any quadrant (energy cost scales with distance) |
-| 3 | Long range scan — 3x3 galaxy map centered on your position |
+| 3 | Long range scan — 8x8 galaxy map centered on your position |
 | 4 | Deflectors — adjust shield strength (trades maser power for defense) |
 | 5 | Maser — fire at an angle (0-360), beam traces across the display |
 | 6 | Triton missile — homing projectile, one-hit kill, limited supply |
@@ -94,7 +90,7 @@ black hole, or you detonate your own ship.
 
 ## Technical Notes
 
-The game is about 18.8K of compiled Forth plus a 1.9K kernel. Performance-critical
+The game is about 22K of compiled Forth plus a 2.1K kernel (51 primitives). Performance-critical
 routines are hand-written 6809 assembly, called as CODE words from Forth:
 
 | Primitive | What it does | Speedup vs Forth |
@@ -111,6 +107,15 @@ routines are hand-written 6809 assembly, called as CODE words from Forth:
 | `bg-restore` | Restore sprite background pixels | new |
 | `xyn-pull` | Pull position toward target (variable step) | 3x |
 | `collision-scan` | Proximity collision detection loop | 2.5x |
+| `jov-think` | Genome-driven AI intent computation | new |
+| `jov-flee` | Flee intent toward JOV-INTENT | new |
+| `jov-emo@` | Read Jovian emotion from genome | new |
+| `jov-emotion!` | Write Jovian emotion to genome | new |
+| `jov-emotion-base` | Compute aggression-derived baseline | new |
+| `gen-jov-sprite` | Procedural sprite from genome seed | new |
+| `min` | Keep smaller of two values | kernel primitive |
+| `max` | Keep larger of two values | kernel primitive |
+| `mdist` | Manhattan distance between (x,y) pairs | kernel primitive |
 
 Everything else — the game loop, AI, galaxy model, command input, explosion
 animation, docking — is pure Forth.

@@ -83,7 +83,7 @@ into empty space, or when you fly into one (which destroys you instantly).
 
 Commands are entered by pressing a number key. Some commands require additional
 input (angles, coordinates, energy levels). You can move the Endever with the
-arrow keys at any time — even while typing another command.
+arrow keys at any time — even while typing another command. Press **CLEAR** (backslash key) to cancel any command in progress.
 
 ### 1 — Damage Report
 
@@ -229,6 +229,8 @@ You can move, fire, dodge enemy beams. Each count lasts about half a second.
 **To abort**, type **7123** during the countdown. The display shows **ABORT**
 and the self-destruct is cancelled.
 
+You can also press the **CLEAR** key (backslash on most keyboards in XRoar) at any time during command input to cancel the current command and return to the COMMAND prompt.
+
 If the countdown reaches zero, the Endever detonates in a massive explosion.
 Any Jovian within range takes 200 damage — enough to destroy even a
 full-health ship. Proximity-killed Jovians chain-explode in sequence.
@@ -271,25 +273,43 @@ Jovians elsewhere in the galaxy continue their assault on bases. Don't linger.
 
 ## Jovian Behavior
 
-The Jovians are not passive targets. They:
+The Jovians are not passive targets. Each Jovian has a unique genome that determines its personality — aggression, pilot skill, speed, and appearance.
 
-- **Chase you** — most Jovians pursue the Endever, moving toward your position
-  each tick. Speed increases with difficulty level.
-- **Target bases** — the first Jovian in a quadrant prioritizes attacking the
-  base instead of chasing you. Wounded Jovians (health below 50%) also flee
-  toward the base for cover.
-- **Fire at you** — Jovian weapons fire appears as red lines on the tactical
-  display. Fire rate increases with difficulty level.
-- **Move between quadrants** — Jovians actively hunt for bases to destroy.
-  When a base is under attack, you'll see the SOS alert.
-- **Attack bases** — Jovians holding position near a base will eventually
-  destroy it. Defend your bases or lose the war.
-- **Avoid obstacles** — Jovians navigate around stars, black holes, and bases
-  rather than flying through them.
-- **Get pulled by gravity** — black holes and stars pull Jovians just like
-  they pull you. A Jovian caught by a black hole is destroyed.
-- **Get smarter at higher difficulty** — more aggressive movement, faster fire
-  rate, more likely to target bases.
+### Three States
+
+- **IDLE** — Jovians start undetected. They don't chase you, but if you wander within their detection range, they'll take opportunistic pot shots. Detection range depends on pilot skill and emotional state.
+- **ATTACK** — Once a Jovian detects you, it actively pursues. Aggressive Jovians close in tight (as close as 20px). Cautious ones keep their distance (up to 65px). They fire red beams when they have line of sight.
+- **FLEE** — Wounded Jovians (health below 50%) retreat from you, turning blue with fear. They never fire while fleeing.
+
+### Personality Traits
+
+No two Jovians are identical. Their genome controls:
+
+- **Aggression** — determines resting emotional state and how quickly they rage. Aggressive Jovians have shorter engagement distances and faster fire rates.
+- **Pilot skill** — skilled pilots avoid stars at greater distances (6-13px radius), react faster, and detect you from further away. Dumb ones blunder into gravity wells.
+- **Speed** — tick rate determines movement speed, reaction time, and apparent intelligence. Fast Jovians literally think more often.
+- **Appearance** — each Jovian's sprite is procedurally generated from a seed. Emotion tints the color: blue for fear, white for neutral, red for rage.
+
+### Emotion
+
+Jovians react emotionally to events:
+- Entering their quadrant raises alertness (+2)
+- Killing a fellow Jovian causes rage or panic (+3)
+- Docking at a base emboldens them (+1)
+- Over time, emotion decays back to their genetic baseline
+
+Emotion affects everything: fire rate, engagement distance, detection sensitivity, and sprite color. A calm Jovian keeps its distance; an enraged one charges in firing rapidly.
+
+### Collision
+
+Everything bumps. The Endever cannot fly through Jovians — you'll stop against them. Jovians cannot fly through you or through each other. Use this tactically: you can block a Jovian's path to a base.
+
+### Other Behaviors
+
+- **Target bases** — the first Jovian in a quadrant prioritizes attacking the base. If it holds position near a base long enough, the base is destroyed.
+- **Avoid obstacles** — Jovians navigate around stars, black holes, and bases. Skilled pilots give hazards a wide berth; poor pilots barely notice until it's too late.
+- **Get pulled by gravity** — black holes and stars pull Jovians just like they pull you. Skilled pilots resist the pull; dumb ones get sucked in. A Jovian caught by a black hole is destroyed.
+- **Quadrant memory** — Jovians remember their emotional state between visits. Leave a quadrant where you killed a Jovian, and when you return, the survivors will be on edge.
 
 ## Hazards
 

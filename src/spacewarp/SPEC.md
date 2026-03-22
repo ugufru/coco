@@ -307,7 +307,7 @@ every frame while beams are active) redraws stars and sprites naturally.
 ### Overview
 
 Up to 3 Jovians occupy each quadrant. Each has a position (x, y in pixel
-coordinates), a health value (0–100, 0 = dead), a state byte, and a tick
+coordinates), a health value (0–100, 0 = dead), a state byte (0=IDLE, 1=ATTACK, 2=FLEE), a 4-byte genome, and a tick
 counter. The AI runs every frame via `tick-jovians` and `tick-jbeam`.
 
 ### Targeting
@@ -332,12 +332,13 @@ Movement is gated by a frame counter per Jovian: when the tick counter reaches
 move every 9 frames (~6.7 px/sec). At level 9, they move every 2 frames
 (~30 px/sec).
 
+Speed is now genome-driven: each Jovian's tick threshold = `10 - (speed_modifier + pilot_skill)`, clamped to 2-8. A slow dolt ticks every 8 frames; a fast ace ticks every 2 frames.
+
 **Direction**: Each axis moves independently by `sign(target - jovian)`,
 producing diagonal, horizontal, or vertical movement depending on relative
 position.
 
-**Bounds clamping**: Positions are clamped to 4–123 (x) and 4–139 (y) to keep
-sprites within the tactical view border.
+**Bounds clamping**: Positions are clamped to 4–123 (x) and 4–136 (y) to allow margin for 7-pixel-tall sprites within the tactical view border.
 
 ### Obstacle Avoidance
 
@@ -346,12 +347,16 @@ all obstacles using Manhattan distance:
 
 | Obstacle | Avoidance radius |
 |----------|-----------------|
-| Stars | 6 px |
+| Stars | 6-13 px (scales with pilot skill) |
 | Black holes | 15 px |
 | Bases | 5 px |
+| Endever (ship) | 8 px |
+| Other Jovians | 8 px |
 
 If the diagonal move is blocked, the AI tries x-only movement, then y-only
 movement. If all three are blocked, the Jovian stays put.
+
+Star avoidance distance scales with pilot skill: `6 + pilot_skill` (0-7). Skilled pilots also resist star gravity when beyond their avoidance distance. Fleeing Jovians use the same obstacle avoidance as attacking Jovians (via apply-intent).
 
 ### Gravity
 
@@ -373,6 +378,8 @@ a red beam toward the player.
 | 1 | ~136 frames | every ~2.3 sec |
 | 5 | ~80 frames | every ~1.3 sec |
 | 9 | ~24 frames | every ~0.4 sec |
+
+IDLE Jovians (state 0) can also fire opportunistically when the player is within their detection range, without transitioning to ATTACK state. Emotion scales the cooldown: rage (emotion 15) reduces cooldown to 65%, fear (emotion 0) increases it to 140%.
 
 **Beam direction**: The endpoint is calculated as `jovian_pos + (player_pos -
 jovian_pos) × 4`, giving a beam that extends well past the player. The origin
@@ -401,10 +408,15 @@ Jovians do not fire while the player is docked.
 ```
 JOV-POS     6 bytes   (3 × 2: x,y per Jovian)
 JOV-DMG     3 bytes   (health: 100=full, 0=dead)
-JOV-STATE   3 bytes   (AI state per Jovian, currently unused — reserved)
+JOV-STATE   3 bytes   (0=IDLE, 1=ATTACK, 2=FLEE)
 JOV-TICK    3 bytes   (frame counter per Jovian)
 JOV-OLDX    3 bytes   (previous x for sprite redraw)
 JOV-OLDY    3 bytes   (previous y for sprite redraw)
+JOV-GENOME  12 bytes  (3 × 4: behavior, appearance, emotion+origin)
+JOV-INTENT  9 bytes   (3 × 3: proposed x, y, flags)
+JOV-SPRWORK 12 bytes  (sprite generation scratch)
+JOV-EMCOL   3 bytes   (cached emotion color band per Jovian)
+MOOD-GRID   64 bytes  (8×8 quadrant mood persistence)
 ```
 
 ### Base Attack
@@ -421,12 +433,26 @@ reaches the threshold, the base is destroyed:
 
 If all bases are destroyed, the game is lost.
 
+### Implemented Since Initial Spec
+
+- FLEE state — wounded Jovians (health < 50%) retreat from player, sprite turns blue
+- IDLE state — Jovians fire opportunistically when player is within detection range
+- Jovian-to-Jovian collision avoidance (8px threshold)
+- Ship-to-Jovian collision (everything bumps)
+- Emotion-driven engagement distance (rage=20px to fear=65px)
+- Pilot skill-based star avoidance (6-13px)
+- Procedural sprite generation from genome seed
+- Quadrant mood persistence (save/load/stardate decay)
+- CLEAR key cancels command input
+- Beam trace buffer capped at 200 pixels
+
 ### Not Yet Implemented
 
-- FLEE state (retreat toward stars when health is low)
-- IDLE state (fire opportunistically without chasing)
-- Jovian-to-Jovian collision avoidance
-- Inter-quadrant movement (Jovians moving between galaxy sectors)
+- Handedness-based obstacle routing (#213)
+- Sound effects (#188)
+- Inter-quadrant Jovian movement (#160)
+- Missile avoidance (#183)
+- Regional character from origin hash (#179)
 
 ## Hyperdrive Energy Cost
 
@@ -510,15 +536,14 @@ ROMs are paged out at boot (`STA $FFDF`), giving full 64K RAM.
 
 ```
 $0050–$007F   Kernel scratch variables (direct page)
-$0400–$05FF   VDG text VRAM (32x16 alpha mode, used by title/briefing)
-$1000–$1FFF   Kernel code + primitives + CFA table
-$2000–$3FFF   Application code part 1 (8K, before VRAM hole)
-$4000–$57FF   RG6 VRAM (6144 bytes, hole in app binary)
-$5800–$73FF   Application code part 2 (continues after VRAM)
-$7400–$75D8   Font data (font-art.fs, artifact-safe 8-byte glyphs)
-$7600–$7774   Game data (galaxy, positions, sprites, AI state, bg saves)
-$7C00–$7CEF   Lookup tables (sine, pixel color/shift/mask, CG expand)
-$7E00         Data stack base (U register, grows downward)
-$8000         Return stack init (S register, grows downward)
+$0600–$1FFF   RG6 VRAM (6144 bytes, set by rg-init after boot)
+$0E00         Bootstrap (copies staged kernel to $E000, enables all-RAM)
+$1000         Staged kernel (DECB load addr; copied to $E000 at boot)
+$2000–$7708   Application code (~22K compiled Forth)
+$80F0+        Game data (all-RAM region — sprites, positions, AI, beams, etc.)
+$9000–$91D8   Font glyphs (59 × 8 bytes, all-RAM region)
+$DE00         Data stack base (U register, grows downward)
+$E000–$E855   Kernel code (51 primitives + DOVAR data, all-RAM mode)
+$E856–$FEFF   Kernel growth headroom (~5.7K)
 $FF00–$FFFF   I/O (PIA, SAM, VDG registers)
 ```

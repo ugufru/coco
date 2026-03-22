@@ -38,6 +38,7 @@ A kernel, a compiler, a tutorial, and a growing library of programs that prove i
 | `src/tetris/` | Bare Naked Tetris — SG4 semigraphics game |
 | `src/kaleidoscope/` | Kaleidoscope — SG4 symmetric pattern generator |
 | `src/calculator/` | RPN calculator |
+| `src/spacewarp/` | Space Warp — real-time space combat game with genome-driven AI |
 | `docs/` | Tutorial book: *Getting Started with Bare Naked Forth* |
 | `docs/reference.html` | [Language Reference](docs/reference.html) — all words, stack effects, and memory map |
 | `COCO_RENOVATION.md` | Original vision document |
@@ -74,6 +75,7 @@ The foundation is solid. The kernel boots, the compiler works, and real programs
 
 Working: kernel boots, clears screen, executes cross-compiled Forth bytecode.
 All 13 tutorial chapters complete with working example programs.
+Space Warp (src/spacewarp/) — a full real-time space combat game with procedural AI, artifact-color graphics, and 51 kernel primitives.
 
 ### Kernel primitives
 
@@ -81,7 +83,7 @@ All 13 tutorial chapters complete with working example programs.
 |---|---|
 | Threading | DOCOL, DOVAR, EXIT, LIT |
 | Stack | DUP, DROP, SWAP, OVER, ?DUP, 2DUP, 2DROP, ROT |
-| Arithmetic | +, -, \*, /MOD, NEGATE |
+| Arithmetic | +, -, \*, /MOD, NEGATE, MIN, MAX, ABS |
 | Memory | @, !, C@, C!, FILL, CMOVE, +! |
 | Bitwise | AND, OR, LSHIFT, RSHIFT |
 | I/O | EMIT, CR, KEY, KEY?, KBD-SCAN |
@@ -90,7 +92,7 @@ All 13 tutorial chapters complete with working example programs.
 | Return stack | >R, R>, R@ |
 | Screen | AT |
 | String | TYPE, COUNT |
-| Spatial | PROX-SCAN |
+| Spatial | PROX-SCAN, MDIST |
 | Data | sprite-data, font-data |
 | System | HALT |
 
