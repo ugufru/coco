@@ -167,9 +167,13 @@ Every 60 frames, each Jovian's emotion drifts 1 step toward their baseline. This
 |--------|-------------|-------------|
 | Fire rate | Slower cooldown (140%) | Faster cooldown (65%) |
 | Detection range | Shorter | Longer |
+| Engagement range | 65px (keep distance) | 20px (close in) |
 | Sprite color | Blue | Red |
 | Sprite regen | On color band crossing | On color band crossing |
 | Quadrant mood | Seeded from mood grid on entry | Saved to mood grid on exit |
+| IDLE firing | In detection range only (#204) | In detection range only (#204) |
+
+**Engagement range formula**: `range = 20 + (15 - emotion) * 3`, with ±3px dead zone to prevent oscillation. Jovians retreat if closer than range-3, hold position within the dead zone, approach if farther than range+3. Hard minimum of 20px ensures maser fire is always visible. Applies only to ship-targeting Jovians; base-targeting uses a fixed 30px stop distance.
 
 ### Modifier Outputs (spec'd but not yet implemented)
 
@@ -177,7 +181,6 @@ Every 60 frames, each Jovian's emotion drifts 1 step toward their baseline. This
 |--------|-------------|-------------|
 | Movement speed | Faster flee | Faster chase |
 | Obstacle avoidance | Wider berth | Reckless/tight |
-| Engagement range | Keep distance | Close in |
 | Flee threshold | Flee sooner | Fight to death |
 
 ## Quadrant Mood Persistence
