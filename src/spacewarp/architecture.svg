@@ -162,10 +162,6 @@
 <line x1="1771.9" y1="977.7" x2="1542.5" y2="267.6" stroke="hsl(221, 72%, 46%)" stroke-width="0.8" stroke-opacity="0.06"/>
 <line x1="1771.9" y1="977.7" x2="1465.3" y2="865.4" stroke="hsl(221, 72%, 46%)" stroke-width="0.8" stroke-opacity="0.06"/>
 <line x1="1771.9" y1="977.7" x2="1895.9" y2="839.1" stroke="hsl(221, 72%, 46%)" stroke-width="0.8" stroke-opacity="0.06"/>
-<line x1="1930.7" y1="985.5" x2="1572.8" y2="297.0" stroke="hsl(229, 71%, 46%)" stroke-width="0.8" stroke-opacity="0.06"/>
-<line x1="1930.7" y1="985.5" x2="1663.2" y2="304.5" stroke="hsl(229, 71%, 46%)" stroke-width="0.8" stroke-opacity="0.06"/>
-<line x1="1930.7" y1="985.5" x2="1620.2" y2="881.5" stroke="hsl(229, 71%, 46%)" stroke-width="0.8" stroke-opacity="0.06"/>
-<line x1="1930.7" y1="985.5" x2="1895.9" y2="839.1" stroke="hsl(229, 71%, 46%)" stroke-width="0.8" stroke-opacity="0.06"/>
 <line x1="1858.7" y1="817.3" x2="1756.7" y2="917.3" stroke="hsl(224, 71%, 46%)" stroke-width="0.8" stroke-opacity="0.06"/>
 <line x1="1858.7" y1="817.3" x2="1814.0" y2="969.0" stroke="hsl(224, 71%, 46%)" stroke-width="0.8" stroke-opacity="0.05"/>
 <line x1="1858.7" y1="817.3" x2="1542.5" y2="267.6" stroke="hsl(224, 71%, 46%)" stroke-width="0.8" stroke-opacity="0.06"/>
@@ -495,7 +491,6 @@
 <line x1="955.2" y1="1356.8" x2="672.9" y2="1323.7" stroke="hsl(213, 72%, 47%)" stroke-width="0.8" stroke-opacity="0.06"/>
 <line x1="1327.2" y1="741.7" x2="1605.7" y2="598.3" stroke="hsl(219, 72%, 46%)" stroke-width="0.8" stroke-opacity="0.06"/>
 <line x1="1327.2" y1="741.7" x2="1543.6" y2="382.1" stroke="hsl(219, 72%, 46%)" stroke-width="0.8" stroke-opacity="0.06"/>
-<line x1="1327.2" y1="741.7" x2="670.4" y2="1242.7" stroke="hsl(219, 72%, 46%)" stroke-width="0.8" stroke-opacity="0.05"/>
 <line x1="1327.2" y1="741.7" x2="642.9" y2="1258.1" stroke="hsl(219, 72%, 46%)" stroke-width="0.8" stroke-opacity="0.06"/>
 <line x1="1327.2" y1="741.7" x2="806.4" y2="1453.2" stroke="hsl(219, 72%, 46%)" stroke-width="0.8" stroke-opacity="0.06"/>
 <line x1="1327.2" y1="741.7" x2="1541.4" y2="300.2" stroke="hsl(219, 72%, 46%)" stroke-width="0.8" stroke-opacity="0.06"/>
@@ -1119,8 +1114,6 @@
 <text x="965.6" y="1587.0" class="node-label" font-size="7.0">q-bhole?</text>
 <circle cx="981.8" cy="1478.8" r="7.7" fill="hsl(232, 71%, 46%)" fill-opacity="0.71" stroke="hsl(232, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="981.8" y="1478.8" class="node-label" font-size="7.0">q-storm?</text>
-<circle cx="1004.9" cy="1561.0" r="12.9" fill="hsl(240, 70%, 45%)" fill-opacity="0.70" stroke="hsl(240, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="1004.9" y="1561.0" class="node-label" font-size="9.1">q-pack</text>
 <circle cx="1520.3" cy="359.1" r="6.0" fill="hsl(227, 71%, 46%)" fill-opacity="0.72" stroke="hsl(227, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1520.3" y="359.1" class="node-label" font-size="7.0">glevel</text>
 <circle cx="1688.8" cy="362.5" r="6.0" fill="hsl(232, 71%, 46%)" fill-opacity="0.71" stroke="hsl(232, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
@@ -1207,14 +1200,12 @@
 <text x="507.6" y="1135.5" class="node-label" font-size="8.4">jov-bg</text>
 <circle cx="1871.8" cy="874.2" r="8.6" fill="hsl(235, 70%, 45%)" fill-opacity="0.71" stroke="hsl(235, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1871.8" y="874.2" class="node-label" font-size="7.0">init-sprites</text>
-<circle cx="1690.1" cy="288.1" r="6.0" fill="hsl(240, 70%, 45%)" fill-opacity="0.70" stroke="hsl(240, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="1690.1" y="288.1" class="node-label" font-size="7.0">rp-tmp</text>
 <circle cx="1454.5" cy="719.2" r="11.7" fill="hsl(229, 71%, 46%)" fill-opacity="0.71" stroke="hsl(229, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1454.5" y="719.2" class="node-label" font-size="8.2">rnd-x</text>
+<circle cx="1570.0" cy="650.0" r="7.0" fill="hsl(227, 71%, 46%)" fill-opacity="0.72" stroke="hsl(227, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
+<text x="1570.0" y="650.0" class="node-label" font-size="7.0">max</text>
 <circle cx="1514.1" cy="715.1" r="11.7" fill="hsl(229, 71%, 46%)" fill-opacity="0.71" stroke="hsl(229, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1514.1" y="715.1" class="node-label" font-size="8.2">rnd-y</text>
-<circle cx="1638.9" cy="444.9" r="6.0" fill="hsl(240, 70%, 45%)" fill-opacity="0.70" stroke="hsl(240, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="1638.9" y="444.9" class="node-label" font-size="7.0">gi</text>
 <circle cx="1603.4" cy="290.2" r="6.0" fill="hsl(237, 70%, 45%)" fill-opacity="0.70" stroke="hsl(237, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1603.4" y="290.2" class="node-label" font-size="7.0">gq-tmp</text>
 <circle cx="1012.2" cy="1446.1" r="11.5" fill="hsl(235, 70%, 45%)" fill-opacity="0.71" stroke="hsl(235, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
@@ -1273,8 +1264,6 @@
 <text x="1916.4" y="875.1" class="node-label" font-size="7.5">save-ship-pos</text>
 <circle cx="1771.9" cy="977.7" r="11.7" fill="hsl(221, 72%, 46%)" fill-opacity="0.72" stroke="hsl(221, 72%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1771.9" y="977.7" class="node-label" font-size="8.2">draw-ship</text>
-<circle cx="1930.7" cy="985.5" r="10.9" fill="hsl(229, 71%, 46%)" fill-opacity="0.71" stroke="hsl(229, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="1930.7" y="985.5" class="node-label" font-size="7.7">erase-ship</text>
 <circle cx="1814.0" cy="969.0" r="6.7" fill="hsl(235, 70%, 45%)" fill-opacity="0.71" stroke="hsl(235, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1814.0" y="969.0" class="node-label" font-size="7.0">ship-bg</text>
 <rect x="1740.5" y="901.1" width="32.4" height="32.4" fill="hsl(232, 71%, 46%)" fill-opacity="0.71" stroke="hsl(232, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6" rx="2"/>
@@ -1483,8 +1472,6 @@
 <text x="998.5" y="1238.0" class="node-label" font-size="12.0">move-ship</text>
 <circle cx="955.2" cy="1356.8" r="24.1" fill="hsl(213, 72%, 47%)" fill-opacity="0.73" stroke="hsl(213, 72%, 47%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="955.2" y="1356.8" class="node-label" font-size="10.0">check-collisions</text>
-<circle cx="670.4" cy="1242.7" r="6.0" fill="hsl(237, 70%, 45%)" fill-opacity="0.70" stroke="hsl(237, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="670.4" y="1242.7" class="node-label" font-size="7.0">grav-pull</text>
 <circle cx="642.9" cy="1258.1" r="6.0" fill="hsl(232, 71%, 46%)" fill-opacity="0.71" stroke="hsl(232, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="642.9" y="1258.1" class="node-label" font-size="7.0">grav-tick</text>
 <circle cx="1327.2" cy="741.7" r="31.0" fill="hsl(219, 72%, 46%)" fill-opacity="0.73" stroke="hsl(219, 72%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
@@ -1683,6 +1670,10 @@
 <text x="730.2" y="364.4" class="node-label" font-size="9.4">process-idle</text>
 <circle cx="1376.4" cy="1395.9" r="6.0" fill="hsl(235, 70%, 45%)" fill-opacity="0.71" stroke="hsl(235, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1376.4" y="1395.9" class="node-label" font-size="7.0">prev-key</text>
+<circle cx="1340.0" cy="1420.0" r="8.0" fill="hsl(229, 71%, 46%)" fill-opacity="0.71" stroke="hsl(229, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
+<text x="1340.0" y="1420.0" class="node-label" font-size="7.5">latch-key</text>
+<circle cx="1410.0" cy="1420.0" r="6.0" fill="hsl(237, 70%, 45%)" fill-opacity="0.70" stroke="hsl(237, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
+<text x="1410.0" y="1420.0" class="node-label" font-size="7.0">key-latch</text>
 <circle cx="783.7" cy="395.7" r="15.5" fill="hsl(221, 72%, 46%)" fill-opacity="0.72" stroke="hsl(221, 72%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="783.7" y="395.7" class="node-label" font-size="10.9">process-key</text>
 <circle cx="529.5" cy="876.4" r="13.2" fill="hsl(227, 71%, 46%)" fill-opacity="0.72" stroke="hsl(227, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
@@ -1844,5 +1835,5 @@
 <!-- Sprite Gen category label -->
 <text x="1830" y="1120" class="cat-label">Sprite Gen</text>
 <text x="1200.0" y="35" text-anchor="middle" fill="#ccc" font-size="24" font-weight="700">SPACE WARP — Architecture Map</text>
-<text x="1200.0" y="58" text-anchor="middle" fill="#666" font-size="13">421 words · 21,772 bytes · node size = byte count · color = connectivity (red=high, blue=low)</text>
+<text x="1200.0" y="58" text-anchor="middle" fill="#666" font-size="13">419 words · 22,280 bytes · node size = byte count · color = connectivity (red=high, blue=low)</text>
 </svg>
