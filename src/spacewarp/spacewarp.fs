@@ -2935,10 +2935,16 @@ VARIABLE sd-cancel                    \ cancel sequence progress (0-3)
   0 sd-active !
   cancel-jbeam cancel-beam
   msl-active @ IF msl-erase 0 msl-active ! THEN
+  0 17 at-xy  14 0 DO $20 rg-emit LOOP
+  0 17 at-xy  S" DESTROYED" rg-type
   restore-ship-bg
   SHIP-POS C@ SHIP-POS 1 + C@
   explode-destruct
   proximity-damage
+  clear-tactical
+  draw-border draw-stars draw-storm-stars draw-event-horizon
+  draw-base draw-jovians-live
+  0 17 at-xy  S" DESTROYED" rg-type
   2 death-cause !
   0 penergy ! ;
 
@@ -3410,6 +3416,7 @@ VARIABLE jnb-result
     penergy @ 0= IF
       cancel-jbeam cancel-beam
       SHIP-POS C@ SHIP-POS 1 + C@
+      0 17 at-xy  14 0 DO $20 rg-emit LOOP
       death-cause @ 1 = IF
         \ Black hole — ship vanishes, no explosion
         restore-ship-bg
@@ -3426,13 +3433,12 @@ VARIABLE jnb-result
         S" DESTROYED" rg-type
       ELSE
         \ Energy depleted or star collision — ship explodes
+        0 17 at-xy  S" DESTROYED" rg-type
         restore-ship-bg
         explode-ship
         clear-tactical
         draw-border draw-stars draw-storm-stars draw-event-horizon
         draw-base draw-jovians-live
-        0 17 at-xy
-        S" DESTROYED" rg-type
       THEN THEN
       \ AGAIN? prompt — any key restarts
       0 18 at-xy
