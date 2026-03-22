@@ -95,6 +95,7 @@ def kernel_words(symbols):
         'min':      'CFA_MIN',
         'max':      'CFA_MAX',
         'abs':      'CFA_ABS',
+        'mdist':    'CFA_MDIST',
         'sprite-data': 'CFA_SPRITE_DATA',
         'font-data':   'CFA_FONT_DATA',
     }

@@ -332,13 +332,11 @@ VARIABLE ss-safe
   16 0 DO
     1 ss-safe !
     qstars @ ?DUP IF 0 DO
-      SHIP-POS C@ STAR-POS I 2 * + C@ - abs
-      SHIP-POS 1 + C@ STAR-POS I 2 * + 1 + C@ - abs +
+      SHIP-POS STAR-POS I 2 * + mdist
       35 < IF 0 ss-safe ! THEN
     LOOP THEN
     qbhole @ IF
-      SHIP-POS C@ BHOLE-POS C@ - abs
-      SHIP-POS 1 + C@ BHOLE-POS 1 + C@ - abs +
+      SHIP-POS BHOLE-POS mdist
       35 < IF 0 ss-safe ! THEN
     THEN
     ss-safe @ 0= IF
@@ -1270,8 +1268,7 @@ VARIABLE stardate-timer            \ frame counter
 
 \ Manhattan distance from Jovian i to player
 : jov-player-dist  ( i -- d )
-  2 * JOV-POS + DUP C@ SHIP-POS C@ - abs
-  SWAP 1 + C@ SHIP-POS 1 + C@ - abs + ;
+  2 * JOV-POS + SHIP-POS mdist ;
 
 \ Detection range from genome: (pilot_skill + emotion) * 4
 : jov-detect-range  ( i -- r )
@@ -1765,8 +1762,7 @@ VARIABLE check-win                \ flag: a kill happened, check win/lose
       \ Black hole gravity
       qbhole @ IF
         BHOLE-POS C@ sg-sx !  BHOLE-POS 1 + C@ sg-sy !
-        JOV-POS jbg-i @ 2 * + C@ sg-sx @ - abs
-        JOV-POS jbg-i @ 2 * + 1 + C@ sg-sy @ - abs +
+        JOV-POS jbg-i @ 2 * + BHOLE-POS mdist
         DUP 3 < IF                   \ contact: kill
           DROP jov-kill
         ELSE DUP 20 > IF             \ outside well
@@ -1782,8 +1778,7 @@ VARIABLE check-win                \ flag: a kill happened, check win/lose
         qstars @ ?DUP IF 0 DO
           STAR-POS I 2 * + C@ sg-sx !
           STAR-POS I 2 * + 1 + C@ sg-sy !
-          JOV-POS jbg-i @ 2 * + C@ sg-sx @ - abs
-          JOV-POS jbg-i @ 2 * + 1 + C@ sg-sy @ - abs +
+          JOV-POS jbg-i @ 2 * + STAR-POS I 2 * + mdist
           DUP 3 < IF                 \ contact: kill
             DROP jov-kill
           ELSE 12 > IF               \ outside range
@@ -2415,8 +2410,7 @@ VARIABLE grav-tick
 : gravity-well  ( -- )
   qbhole @ 0= IF EXIT THEN
   1 grav-tick +!
-  SHIP-POS C@ BHOLE-POS C@ - abs
-  SHIP-POS 1 + C@ BHOLE-POS 1 + C@ - abs +
+  SHIP-POS BHOLE-POS mdist
   DUP 30 > IF DROP EXIT THEN
   DUP 20 > IF                  \ 20-30: gentle drift, every 4 frames
     DROP grav-tick @ 3 AND IF EXIT THEN 1
@@ -2493,8 +2487,7 @@ CODE xyn-pull  ( addr tx ty step flag-addr -- )
     I sg-i !
     STAR-POS sg-i @ 2 * + C@ sg-sx !
     STAR-POS sg-i @ 2 * + 1 + C@ sg-sy !
-    SHIP-POS C@ sg-sx @ - abs
-    SHIP-POS 1 + C@ sg-sy @ - abs +
+    SHIP-POS STAR-POS sg-i @ 2 * + mdist
     DUP 10 > IF
       DROP
     ELSE
@@ -3285,8 +3278,7 @@ VARIABLE jnb-result
   -1 jnb-result !
   qjovians @ ?DUP IF 0 DO
     JOV-DMG I + C@ IF
-      JOV-POS I 2 * + C@ BASE-POS C@ - abs
-      JOV-POS I 2 * + 1 + C@ BASE-POS 1 + C@ - abs + 30 < IF
+      JOV-POS I 2 * + BASE-POS mdist 30 < IF
         I jnb-result !
       THEN
     THEN

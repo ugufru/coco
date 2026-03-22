@@ -249,6 +249,7 @@ CFA_RAT         FDB     CODE_RAT
 CFA_MIN         FDB     CODE_MIN
 CFA_MAX         FDB     CODE_MAX
 CFA_ABS         FDB     CODE_ABS
+CFA_MDIST       FDB     CODE_MDIST
 
 ;;; ─── Sprite data table ─────────────────────────────────────────────────────
 ;;; DOVAR entry: calling sprite-data pushes the address of the first byte.
@@ -1123,6 +1124,34 @@ CODE_ABS
         ADDD    #1              ; negate
         STD     ,U
 ABS_OK  LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── MDIST ( addr1 addr2 -- d ) ────────────────────────────────────────────
+;;; Manhattan distance between two (x,y) byte pairs in memory.
+;;; d = |addr1[0]-addr2[0]| + |addr1[1]-addr2[1]|
+
+CODE_MDIST
+        PSHS    X               ; save IP
+        LDY     ,U              ; Y = addr2
+        LDX     2,U             ; X = addr1
+        LEAU    2,U             ; pop one cell (result replaces addr1)
+        LDA     ,X              ; A = x1
+        SUBA    ,Y              ; A = x1 - x2
+        BPL     MDIST_AX
+        NEGA                    ; A = |x1 - x2|
+MDIST_AX
+        PSHS    A               ; save |dx|
+        LDA     1,X             ; A = y1
+        SUBA    1,Y             ; A = y1 - y2
+        BPL     MDIST_AY
+        NEGA                    ; A = |y1 - y2|
+MDIST_AY
+        ADDA    ,S+             ; A = |dx| + |dy|
+        TFR     A,B             ; B = result low byte
+        CLRA                    ; D = 16-bit result
+        STD     ,U              ; store result
+        PULS    X               ; restore IP
+        LDY     ,X++            ; NEXT
         JMP     [,Y]
 
 ;;; ─── NEGATE ( n -- -n ) ──────────────────────────────────────────────────────
