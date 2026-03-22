@@ -239,8 +239,8 @@ $8EB4 CONSTANT MOOD-GRID        \ 64 bytes: mood per sector
 
 VARIABLE rp-tmp
 
-: rnd-x  ( -- x )  128 rnd 4 + DUP 123 > IF DROP 123 THEN ;
-: rnd-y  ( -- y )  128 rnd 4 + DUP 139 > IF DROP 139 THEN ;
+: rnd-x  ( -- x )  128 rnd 1 + DUP 123 > IF DROP 123 THEN ;
+: rnd-y  ( -- y )  128 rnd 1 + DUP 139 > IF DROP 139 THEN ;
 
 \ ── Galaxy generation ────────────────────────────────────────────────────
 \ Single-pass generation: iterate all 64 quadrants, roll dice for each.
@@ -492,10 +492,7 @@ VARIABLE tcy
 \ ══════════════════════════════════════════════════════════════════════════
 
 : draw-border  ( -- )
-  0   0   127 0   3 rg-line
-  127 0   127 143 3 rg-line
-  127 143 0   143 3 rg-line
-  0   143 0   0   3 rg-line ;
+  127 143 0   143 3 rg-line ;       \ bottom separator only
 
 : draw-stars  ( -- )
   qstars @ ?DUP IF 0 DO
@@ -988,7 +985,7 @@ CODE jov-emotion-base   \ ( i -- e )  aggression-derived baseline
     THEN
   LOOP THEN ;
 
-120 CONSTANT EMOTION-DECAY-RATE   \ frames between decay ticks
+60 CONSTANT EMOTION-DECAY-RATE    \ frames between decay ticks (tier-2: /2)
 VARIABLE emotion-timer            \ frame counter for decay
 
 \ ── Procedural Jovian sprite generation ────────────────────────────────
@@ -1234,7 +1231,7 @@ CODE gen-jov-sprite   \ ( i -- )
     DUP I jov-emotion-stim
   LOOP THEN DROP ;
 
-3600 CONSTANT STARDATE-FRAMES     \ ~60 seconds per stardate
+450 CONSTANT STARDATE-FRAMES      \ ~60 seconds per stardate (tier-3: /8)
 VARIABLE stardate-timer            \ frame counter
 
 \ Decay all mood bytes 1 step toward neutral (8)
@@ -1289,7 +1286,7 @@ VARIABLE stardate-timer            \ frame counter
 \ On detection → JOV-STATE=1 (attack) + distance-scaled alarm stimulus.
 \ Firing maser/missile instantly reveals player to all Jovians.
 
-30 CONSTANT DETECT-RATE           \ frames between detection rolls
+15 CONSTANT DETECT-RATE            \ frames between detection rolls (tier-2: /2)
 
 \ Manhattan distance from Jovian i to player
 : jov-player-dist  ( i -- d )
@@ -1484,7 +1481,7 @@ CODE jov-think  ( i qbase -- )
         ; tx < cx, decrement
         LDA     ,S              ; cx
         DECA
-        CMPA    #4
+        CMPA    #1
         BHS     @sx
         LDA     ,S              ; clamp: keep cx
         BRA     @sx
@@ -1505,7 +1502,7 @@ CODE jov-think  ( i qbase -- )
         BHI     @incy
         LDA     1,S             ; cy
         DECA
-        CMPA    #4
+        CMPA    #1
         BHS     @sy
         LDA     1,S
         BRA     @sy
@@ -1537,9 +1534,9 @@ CODE jov-flee   \ ( i -- )  move 1px away from player, clamp bounds
         BEQ     @kx             ; equal: keep x
         BHI     @fx1            ; cx > sx: flee right
         DECA                    ; cx < sx: flee left
-        CMPA    #4
+        CMPA    #1
         BHS     @sx
-        LDA     #4              ; clamp
+        LDA     #1              ; clamp
         BRA     @sx
 @fx1    INCA
         CMPA    #123
@@ -1552,9 +1549,9 @@ CODE jov-flee   \ ( i -- )  move 1px away from player, clamp bounds
         BEQ     @ky
         BHI     @fy1
         DECA
-        CMPA    #4
+        CMPA    #1
         BHS     @sy
-        LDA     #4
+        LDA     #1
         BRA     @sy
 @fy1    INCA
         CMPA    #139
@@ -1938,9 +1935,9 @@ VARIABLE jbeam-hit-ship            \ 1 = bolt will hit player ship
   150 glevel @ 14 * - DUP 24 < IF DROP 24 THEN ;
 
 : clamp-jbeam  ( -- )
-  jbeam-x1 @ 2 < IF 2 jbeam-x1 ! THEN
+  jbeam-x1 @ 1 < IF 1 jbeam-x1 ! THEN
   jbeam-x1 @ 125 > IF 125 jbeam-x1 ! THEN
-  jbeam-y1 @ 2 < IF 2 jbeam-y1 ! THEN
+  jbeam-y1 @ 1 < IF 1 jbeam-y1 ! THEN
   jbeam-y1 @ 141 > IF 141 jbeam-y1 ! THEN
   jbeam-x2 @ 1 < IF 1 jbeam-x2 ! THEN
   jbeam-x2 @ 126 > IF 126 jbeam-x2 ! THEN
@@ -1966,7 +1963,7 @@ VARIABLE jbhit-flag
     THEN
   LOOP jbhit-flag @ ;
 
-\ Pick a random living + aware Jovian index, or -1 if none
+\ Pick a random living Jovian: attack, or idle + in range
 VARIABLE pj-result
 : pick-jovian  ( -- i|-1 )
   -1 pj-result !
@@ -1974,9 +1971,14 @@ VARIABLE pj-result
   rnd                             \ random starting index
   qjovians @ 0 DO
     DUP JOV-DMG + C@ IF           \ alive?
-      DUP JOV-STATE + C@ 1 = IF   \ attack state only (not flee)
+      DUP JOV-STATE + C@ DUP 1 = IF  \ attack state?
+        DROP
         pj-result @ 0 < IF DUP pj-result ! THEN
-      THEN
+      ELSE 0= IF                     \ idle state?
+        DUP jov-detect? IF           \ player in detection range?
+          pj-result @ 0 < IF DUP pj-result ! THEN
+        THEN
+      THEN THEN
     THEN
     1 + DUP qjovians @ < 0= IF DROP 0 THEN  \ wrap
   LOOP DROP
@@ -2205,6 +2207,7 @@ VARIABLE sp-r2
 \ Bounds: x 4-123, y 4-139 (inside tactical border).
 
 VARIABLE moved                    \ flag: did ship move this frame?
+VARIABLE frame-tick               \ main loop frame counter
 VARIABLE move-count               \ counts moves; energy charged every 4th
 VARIABLE prev-energy              \ last displayed energy (for dirty check)
 VARIABLE prev-missiles            \ last displayed missile count
@@ -2232,7 +2235,7 @@ VARIABLE was-near-base
   ship-on-base? was-near-base !    \ already near? allow escape
   \ Arrow keys: all on row 3 ($08), different columns
   KB-C3 KBD-SCAN $08 AND IF       \ UP: col 3, row 3
-    SHIP-POS 1 + C@ SHIP-DY 4 + > IF
+    SHIP-POS 1 + C@ SHIP-DY 1 + > IF
       SHIP-POS 1 + C@ SHIP-DY - SHIP-POS 1 + C!
       ship-on-base? was-near-base @ 0= AND IF
         SHIP-POS 1 + C@ SHIP-DY + SHIP-POS 1 + C!
@@ -2248,7 +2251,7 @@ VARIABLE was-near-base
     THEN
   THEN
   KB-C5 KBD-SCAN $08 AND IF       \ LT: col 5, row 3
-    SHIP-POS C@ SHIP-DX 4 + > IF
+    SHIP-POS C@ SHIP-DX 1 + > IF
       SHIP-POS C@ SHIP-DX - SHIP-POS C!
       ship-on-base? was-near-base @ 0= AND IF
         SHIP-POS C@ SHIP-DX + SHIP-POS C!
@@ -2461,16 +2464,16 @@ VARIABLE dock-tick
   docked @ 0= IF EXIT THEN
   penergy @ 100 = IF EXIT THEN
   1 dock-tick +!
-  penergy @ 20 < IF                    \ 0-19%: +1 every frame
+  penergy @ 20 < IF                    \ 0-19%: +4 every frame
+    4 penergy +!
+  ELSE penergy @ 40 < IF               \ 20-39%: +2 every frame
+    2 penergy +!
+  ELSE penergy @ 60 < IF               \ 40-59%: +1 every frame
     1 penergy +!
-  ELSE penergy @ 40 < IF               \ 20-39%: +1 every 2 frames
+  ELSE penergy @ 80 < IF               \ 60-79%: +1 every 2 frames
     dock-tick @ 1 AND 0= IF 1 penergy +! THEN
-  ELSE penergy @ 60 < IF               \ 40-59%: +1 every 4 frames
+  ELSE                                  \ 80-99%: +1 every 4 frames
     dock-tick @ 3 AND 0= IF 1 penergy +! THEN
-  ELSE penergy @ 80 < IF               \ 60-79%: +1 every 8 frames
-    dock-tick @ 7 AND 0= IF 1 penergy +! THEN
-  ELSE                                  \ 80-99%: +1 every 16 frames
-    dock-tick @ 15 AND 0= IF 1 penergy +! THEN
   THEN THEN THEN THEN
   penergy @ 100 > IF 100 penergy ! THEN
   \ Repair systems: +2 per frame each (0→100 in ~50 frames = 0.8s)
@@ -2626,9 +2629,9 @@ VARIABLE bfo-found
   LOOP DROP  bfo-hit @ ;
 
 : clamp-beam  ( -- )
-  beam-x1 @ 2 < IF 2 beam-x1 ! THEN
+  beam-x1 @ 1 < IF 1 beam-x1 ! THEN
   beam-x1 @ 125 > IF 125 beam-x1 ! THEN
-  beam-y1 @ 2 < IF 2 beam-y1 ! THEN
+  beam-y1 @ 1 < IF 1 beam-y1 ! THEN
   beam-y1 @ 141 > IF 141 beam-y1 ! THEN
   beam-x2 @ 1 < IF 1 beam-x2 ! THEN
   beam-x2 @ 126 > IF 126 beam-x2 ! THEN
@@ -3104,9 +3107,17 @@ VARIABLE sg-row                   \ scan grid: outer loop row
 
 \ Poll keyboard and dispatch (debounce: only fire on key change)
 VARIABLE prev-key                 \ last key seen by KEY?
+VARIABLE key-latch                \ latched keypress (survives between polls)
+
+\ Sample keyboard — if a key is down, latch it for later processing.
+\ Called at multiple points in the game loop to catch brief taps.
+: latch-key  ( -- )
+  KEY? ?DUP IF key-latch ! THEN ;
 
 : process-key  ( -- )
-  KEY?
+  latch-key
+  key-latch @
+  0 key-latch !                   \ consume latch
   DUP prev-key @ = IF
     DROP                          \ same or still zero — ignore
   ELSE
@@ -3255,77 +3266,64 @@ VARIABLE jnb-result
   \ Draw initial tactical view and status panel
   draw-quadrant
   draw-panel
-  0 cmd-state !  0 prev-key !
+  0 cmd-state !  0 prev-key !  0 key-latch !
   0 beam-total !  -1 beam-hit-idx !
   0 jbeam-total !  0 jbeam-hit-ship !  jbeam-cooldown jbeam-cool !
   0 msl-active !  0 msl-dirty !
   0 docked !  0 prev-docked !  0 death-cause !
   0 sd-active !  0 base-attack !
   0 jov-moved !
+  0 frame-tick !
   0 check-win !
   100 prev-energy !
   10 prev-missiles !
 
   \ Game loop
   BEGIN
+    1 frame-tick +!
+
+    \ ── Every frame: player input + fast systems ──
     save-ship-pos
     move-ship
-    gravity-well
-    star-gravity
-    check-collisions
-    check-dock
-    tick-dock
-    tick-missile
-    tick-jovians jov-check-regen
-    tick-base-attack
-    jov-gravity
-    tick-jbeam
-    tick-destruct
-    tick-stardate
     process-key
-    VSYNC
-    gravity-well
-    star-gravity
-    check-collisions
-    check-dock
-    tick-dock
     tick-missile
-    tick-jovians jov-check-regen
-    tick-base-attack
-    jov-gravity
     tick-jbeam
-    tick-destruct
-    tick-stardate
-    process-key
+
+    \ ── Every 2nd frame: physics + AI ──
+    frame-tick @ 1 AND 0= IF
+      gravity-well star-gravity
+      check-collisions
+      tick-jovians
+      jov-gravity
+    THEN
+    latch-key
+
+    \ ── Every 8th frame: slow background tasks ──
+    frame-tick @ 7 AND 0= IF
+      jov-check-regen
+      check-dock tick-dock
+      tick-base-attack tick-destruct
+      tick-stardate
+    THEN
+
     VSYNC
 
     \ ── LAYER 2: Erase beam tails (restore saved pixels) ──
-    \ Erase Jovian beam first (drawn last = erased first)
     tick-jbeam-erase
     tick-beam-erase
-    \ Force sprite refresh when beams active (beam restore may
-    \ write stale sprite data if ship/Jovians moved since trace)
     beam-total @ jbeam-total @ OR IF 1 moved ! THEN
 
-    \ ── LAYER 1: Sprite bg-save/restore cycle ──
-    moved @ jov-moved @ OR msl-dirty @ OR IF
-      \ 1. Erase missile at old position
+    \ ── LAYER 1: Sprite rendering (split cycle) ──
+    jov-moved @ IF
+      \ Full cycle: ship + Jovians + stars
       msl-active @ IF
         SPR-MSL1 msl-px @ 1 - msl-py @ 1 - spr-erase-box
       THEN
-      \ 2. Restore ship and Jovian backgrounds
       restore-ship-bg
       restore-jov-bgs
-      \ 3. Redraw stars (fix any black spots from erases)
       draw-stars
-      \ 4. Save and draw Jovians at current positions
-      jov-moved @ IF save-jov-oldpos THEN
-      save-jov-bgs
-      draw-jovians-live
-      \ 5. Save and draw ship
-      save-ship-bg
-      draw-ship
-      \ 6. Draw missile on top (after ship bg-save to avoid capture)
+      save-jov-oldpos save-jov-bgs draw-jovians-live
+      save-ship-bg draw-ship
       msl-dirty @ IF
         msl-scrx msl-px !  msl-scry msl-py !
         0 msl-dirty !
@@ -3334,11 +3332,26 @@ VARIABLE jnb-result
         msl-spr msl-px @ 1 - msl-py @ 1 - spr-draw
       THEN
       0 jov-moved !
-    THEN
+    ELSE moved @ msl-dirty @ OR IF
+      \ Ship/missile only: skip Jovian bg ops + stars
+      msl-active @ IF
+        SPR-MSL1 msl-px @ 1 - msl-py @ 1 - spr-erase-box
+      THEN
+      restore-ship-bg
+      save-ship-bg draw-ship
+      msl-dirty @ IF
+        msl-scrx msl-px !  msl-scry msl-py !
+        0 msl-dirty !
+      THEN
+      msl-active @ IF
+        msl-spr msl-px @ 1 - msl-py @ 1 - spr-draw
+      THEN
+    THEN THEN
 
     \ ── LAYER 2: Advance beam heads (draw new pixels) ──
     tick-beam-draw
     tick-jbeam-draw
+    latch-key
 
     \ ── Apply deferred hit damage ──
     apply-beam-hit
