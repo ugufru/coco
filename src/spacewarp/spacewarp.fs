@@ -27,6 +27,16 @@ CODE min   \ ( a b -- smaller )
         ;NEXT
 ;CODE
 
+CODE max   \ ( a b -- larger )
+        LDD     ,U
+        CMPD    2,U
+        BGE     @ok
+        LDD     2,U
+@ok     LEAU    2,U
+        STD     ,U
+        ;NEXT
+;CODE
+
 \ ── Bulk pixel plotter (assembly) ───────────────────────────────────────
 \ plot-dots ( addr count color -- )
 \ Plots count pixels from (x,y) byte pairs at addr, all in one color.
@@ -131,11 +141,6 @@ $8000 CONSTANT GALAXY          \ 64 bytes: 8x8 quadrant data
 
 \ ── Quadrant byte construction ───────────────────────────────────────────
 
-: q-pack  ( storm bh stars base jovians -- byte )
-  SWAP 2 LSHIFT OR            \ jovians | base<<2
-  SWAP 3 LSHIFT OR            \ | stars<<3
-  SWAP 6 LSHIFT OR            \ | bh<<6
-  SWAP 7 LSHIFT OR ;          \ | storm<<7
 
 \ ── Game variables ───────────────────────────────────────────────────────
 
@@ -237,7 +242,6 @@ $8EB4 CONSTANT MOOD-GRID        \ 64 bytes: mood per sector
 \ ── Random position within tactical view ─────────────────────────────────
 \ Returns x in 4-123, y in 4-139 (away from borders).
 
-VARIABLE rp-tmp
 
 : rnd-x  ( -- x )  128 rnd 1 + DUP 123 > IF DROP 123 THEN ;
 : rnd-y  ( -- y )  128 rnd 1 + DUP 139 > IF DROP 139 THEN ;
@@ -246,7 +250,6 @@ VARIABLE rp-tmp
 \ Single-pass generation: iterate all 64 quadrants, roll dice for each.
 \ No retry loops — guaranteed to terminate.
 
-VARIABLE gi                    \ loop index
 VARIABLE gq-tmp                \ temp for building quadrant byte
 
 : clear-galaxy  ( -- )
@@ -524,10 +527,6 @@ VARIABLE old-sy                   \ previous ship y
   SHIP-POS C@ 3 - SHIP-POS 1 + C@ 2 -
   spr-draw ;
 
-: erase-ship  ( -- )
-  SPR-SHIP
-  old-sx @ 3 - old-sy @ 2 -
-  spr-erase-box ;
 
 \ ── Background save/restore for flicker-free ship movement ────────────
 \ Save 4 bytes × 5 rows of VRAM under the sprite bounding box.
@@ -2028,14 +2027,10 @@ VARIABLE jbeam-hit-ship            \ 1 = bolt will hit player ship
   150 glevel @ 14 * - DUP 24 < IF DROP 24 THEN ;
 
 : clamp-jbeam  ( -- )
-  jbeam-x1 @ 1 < IF 1 jbeam-x1 ! THEN
-  jbeam-x1 @ 125 > IF 125 jbeam-x1 ! THEN
-  jbeam-y1 @ 1 < IF 1 jbeam-y1 ! THEN
-  jbeam-y1 @ 141 > IF 141 jbeam-y1 ! THEN
-  jbeam-x2 @ 1 < IF 1 jbeam-x2 ! THEN
-  jbeam-x2 @ 126 > IF 126 jbeam-x2 ! THEN
-  jbeam-y2 @ 1 < IF 1 jbeam-y2 ! THEN
-  jbeam-y2 @ 142 > IF 142 jbeam-y2 ! THEN ;
+  jbeam-x1 @ 1 max 125 min jbeam-x1 !
+  jbeam-y1 @ 1 max 141 min jbeam-y1 !
+  jbeam-x2 @ 1 max 126 min jbeam-x2 !
+  jbeam-y2 @ 1 max 142 min jbeam-y2 ! ;
 
 \ Check if player ship bbox overlaps any pixel in the Jovian beam path
 \ Ship sprite is 7x5 centered at SHIP-POS: x±3, y±2
@@ -2305,7 +2300,6 @@ VARIABLE move-count               \ counts moves; energy charged every 4th
 VARIABLE prev-energy              \ last displayed energy (for dirty check)
 VARIABLE prev-missiles            \ last displayed missile count
 VARIABLE prev-docked              \ last displayed dock state
-\ Ship speed: 3px at 100% ion engines, 1px at 1-33%, 2px at 34-66%
 : ship-dx  ( -- n )
   pdmg-ion @ DUP 67 > IF DROP 3 ELSE 34 > IF 2 ELSE 1 THEN THEN ;
 : ship-dy  ( -- n )  ship-dx ;
@@ -2435,7 +2429,6 @@ CODE collision-scan  ( sx sy array count -- flag )
 \ Tiered pull rate: edge=every 2 frames, mid=every frame, close=2px/frame.
 \ Ship thrust is 3px/frame, so edge is escapable, core is not.
 
-VARIABLE grav-pull
 VARIABLE grav-tick
 
 : gravity-well  ( -- )
@@ -2722,14 +2715,10 @@ VARIABLE bfo-found
   LOOP DROP  bfo-hit @ ;
 
 : clamp-beam  ( -- )
-  beam-x1 @ 1 < IF 1 beam-x1 ! THEN
-  beam-x1 @ 125 > IF 125 beam-x1 ! THEN
-  beam-y1 @ 1 < IF 1 beam-y1 ! THEN
-  beam-y1 @ 141 > IF 141 beam-y1 ! THEN
-  beam-x2 @ 1 < IF 1 beam-x2 ! THEN
-  beam-x2 @ 126 > IF 126 beam-x2 ! THEN
-  beam-y2 @ 1 < IF 1 beam-y2 ! THEN
-  beam-y2 @ 142 > IF 142 beam-y2 ! THEN ;
+  beam-x1 @ 1 max 125 min beam-x1 !
+  beam-y1 @ 1 max 141 min beam-y1 !
+  beam-x2 @ 1 max 126 min beam-x2 !
+  beam-y2 @ 1 max 142 min beam-y2 ! ;
 
 \ ── Cancel a beam (erase any visible pixels) ──────────────────────────
 
