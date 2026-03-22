@@ -3091,7 +3091,8 @@ VARIABLE sg-row                   \ scan grid: outer loop row
 \ Handle key during digit collection
 : process-cmd-input  ( key -- )
   DUP $30 < IF
-    $0D = IF exec-command THEN
+    DUP $0D = IF DROP exec-command
+    ELSE $0C = IF 0 cmd-state ! draw-cmd-prompt THEN THEN
   ELSE
     DUP $3A < IF
       $30 - cmd-add-digit
