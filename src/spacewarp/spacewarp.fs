@@ -1393,14 +1393,17 @@ VARIABLE base-attack              \ frame counter for base destruction
 
 \ ── jov-think: genome-driven intent computation (6809 CODE) ────────────
 \ ( i qbase -- )
-\ Reads: JOV-POS, JOV-DMG, SHIP-POS, BASE-POS, JOV-GENOME (future)
+\ Reads: JOV-POS, JOV-DMG, SHIP-POS, BASE-POS, JOV-GENOME
 \ Writes: JOV-INTENT + i*3 = { proposed_x, proposed_y, flags }
 \
-\ Target selection (identical to prior Forth logic):
+\ Target selection:
 \   Jovian 0 → base (if exists), DMG < 50 → base, else → ship
-\ Direction: 1px step toward target, bounds-clamped [4,123] x [4,139]
 \ Base-stop: within 30px manhattan of base → hold position
-\ Genome bytes are loaded but not yet used (Phase 2+)
+\ Ship engagement: emotion-driven preferred range
+\   range = 20 + (15 - emotion) * 3  (rage=20px, fear=65px)
+\   dist < range → move away (caution)
+\   dist = range → hold position
+\   dist > range → approach
 
 CODE jov-think  ( i qbase -- )
         PSHS    X               ; save IP
@@ -1445,7 +1448,7 @@ CODE jov-think  ( i qbase -- )
         ; --- Flags: bit 0 = targets_base ---
         CLR     2,Y             ; flags = 0
         CMPX    #$8050
-        BNE     @nx
+        BNE     @ship
         LDA     #1
         STA     2,Y             ; flags |= targets_base
 
@@ -1462,19 +1465,109 @@ CODE jov-think  ( i qbase -- )
 @absy   PSHS    B               ; save |tx-cx|
         ADDA    ,S+             ; A = manhattan dist
         CMPA    #30
-        BHS     @nx
+        LBHS    @twd
         ; Within 30px, stay put
+        LBRA    @hold
+
+        ; --- Ship engagement: emotion-driven range ---
+@ship   ; Compute manhattan dist to ship
+        LDA     ,X              ; tx (ship x)
+        SUBA    ,S              ; tx - cx
+        BPL     @sax
+        NEGA
+@sax    TFR     A,B             ; B = |tx-cx|
+        LDA     1,X             ; ty (ship y)
+        SUBA    1,S             ; ty - cy
+        BPL     @say
+        NEGA
+@say    PSHS    B               ; save |dx|
+        ADDA    ,S+             ; A = manhattan dist
+        PSHS    A               ; save dist on stack
+        ; Compute preferred range: 20 + (15 - emotion) * 3
+        LDA     3,S             ; i (now at S+3: dist,cx,cy,qbase,i)
+        LDB     #4
+        MUL
+        ADDD    #$80D1          ; JOV-GENOME + 3
+        TFR     D,X
+        LDA     ,X              ; genome byte 3
+        LSRA
+        LSRA
+        LSRA
+        LSRA                    ; A = emotion 0-15
+        LDB     #3
+        EORA    #$0F            ; A = 15 - emotion
+        MUL                     ; B = (15-emotion)*3
+        ADDB    #20             ; B = preferred range
+        ; Restore ship pos pointer
+        LDX     #$8054          ; SHIP-POS
+        ; Compare dist vs preferred range (+-3 dead zone)
+        ; A = dist (on stack), B = range
+        LDA     ,S+             ; A = dist, pop it
+        ; Check approach: dist > range+3
+        PSHS    A               ; save dist
+        SUBB    ,S              ; B = range - dist
+        LBLT    @chka            ; range < dist, check approach
+        CMPB    #3              ; range - dist > 3?
+        LBHI    @chkr            ; yes: dist < range-3, retreat
+        PULS    A               ; dead zone: pop dist
+        LBRA    @hold
+@chka   PULS    A               ; pop dist
+        NEGB                    ; B = dist - range
+        CMPB    #3              ; dist - range > 3?
+        LBHI    @twd            ; yes: approach
+        LBRA    @hold           ; no: dead zone
+@chkr   PULS    A               ; pop dist
+        ; dist < range-3: move AWAY from target
+        ; --- Retreat x: cx + sign(cx - tx), clamped ---
         LDA     ,S              ; cx
-        STA     ,Y              ; intent.nx = cx (no move)
+        CMPA    ,X              ; vs tx
+        BEQ     @rkx
+        BHI     @rincx          ; cx > tx: flee right
+        DECA                    ; cx < tx: flee left
+        CMPA    #1
+        BHS     @rsx
+        LDA     ,S
+        BRA     @rsx
+@rincx  INCA
+        CMPA    #123
+        BLS     @rsx
+        LDA     ,S
+@rsx    STA     ,Y              ; intent.nx
+        BRA     @rny
+@rkx    LDA     ,S
+        STA     ,Y
+        ; --- Retreat y: cy + sign(cy - ty), clamped ---
+@rny    LDA     1,S             ; cy
+        CMPA    1,X             ; vs ty
+        BEQ     @rky
+        BHI     @rincy          ; cy > ty: flee down
+        DECA
+        CMPA    #1
+        BHS     @rsy
+        LDA     1,S
+        BRA     @rsy
+@rincy  INCA
+        CMPA    #139
+        BLS     @rsy
+        LDA     1,S
+@rsy    STA     1,Y             ; intent.ny
+        BRA     @done
+@rky    LDA     1,S
+        STA     1,Y
+        BRA     @done
+
+        ; --- Hold position ---
+@hold   LDA     ,S              ; cx
+        STA     ,Y              ; intent.nx = cx
         LDA     1,S             ; cy
         STA     1,Y             ; intent.ny = cy
         LDA     2,Y
-        ORA     #$02            ; flags |= base_stop
+        ORA     #$02            ; flags |= hold
         STA     2,Y
         BRA     @done
 
-        ; --- Proposed new x: cx + sign(tx - cx), clamped ---
-@nx     LDA     ,X              ; tx
+        ; --- Approach: 1px step toward target, clamped ---
+@twd    LDA     ,X              ; tx
         CMPA    ,S              ; vs cx
         BEQ     @kx             ; same, keep cx
         BHI     @incx
