@@ -140,7 +140,8 @@ $8000 CONSTANT GALAXY          \ 64 bytes: 8x8 quadrant data
 \ ── Game variables ───────────────────────────────────────────────────────
 
 VARIABLE glevel                \ difficulty level (1-10)
-VARIABLE gjovians              \ total jovians in galaxy
+VARIABLE gjovians              \ total jovians in galaxy (decrements on kill)
+VARIABLE gjovians0             \ initial total (for win screen)
 VARIABLE gbases                \ total bases in galaxy
 VARIABLE gtime                 \ stardate (increments each real-time minute)
 
@@ -2977,7 +2978,7 @@ VARIABLE sd-cancel                    \ cancel sequence progress (0-3)
   pcol @ prow @ gal@ q-jovians -
   qjovians @ ?DUP IF 0 DO
     JOV-DMG I + C@ IF 1 + THEN
-  LOOP THEN + ;
+  LOOP THEN ;
 
 : count-bases  ( -- n )
   0  64 0 DO GALAXY I + C@ q-base? IF 1 + THEN LOOP ;
@@ -3239,6 +3240,7 @@ VARIABLE jnb-result
 
   \ Generate galaxy with selected level
   glevel @ gen-galaxy
+  gjovians @ gjovians0 !         \ save initial count for win screen
   MOOD-GRID 64 8 FILL           \ init mood grid to neutral
 
   \ Mission briefing
@@ -3353,17 +3355,25 @@ VARIABLE jnb-result
       docked @ prev-docked !
       update-cond
     THEN
-    \ ── Win/lose checks (only after a kill) ──
+    \ ── Win/lose checks (after any kill) ──
     check-win @ IF
-      0 check-win !
       count-jovians 0= IF
+        0 check-win !
         cancel-jbeam cancel-beam
         clear-tactical
-        2 3 at-xy  S" ALL " rg-type  gjovians @ rg-u.
+        2 3 at-xy  S" ALL " rg-type  gjovians0 @ rg-u.
         S"  JOVIANS" rg-type
         2 5 at-xy  S" DESTROYED" rg-type
         2 8 at-xy  S" THE UP SYSTEM" rg-type
         2 10 at-xy S" IS SAVED" rg-type
+        \ Rating: stardates / level → lower is better
+        2 13 at-xy S" RATING  " rg-type
+        gtime @ glevel @ /MOD SWAP DROP  \ stardates per level
+        DUP 2 < IF DROP S" ADMIRAL" ELSE
+        DUP 4 < IF DROP S" COMMANDER" ELSE
+        DUP 7 < IF DROP S" CAPTAIN" ELSE
+        DROP S" ENSIGN"
+        THEN THEN THEN rg-type
         0 18 at-xy S" AGAIN?" rg-type
         KEY DROP
         main EXIT
