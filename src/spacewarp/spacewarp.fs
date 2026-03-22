@@ -1351,11 +1351,15 @@ VARIABLE jtk-ny                   \ proposed new y
 
 \ Check if (hc-jx, hc-jy) is blocked by any obstacle
 VARIABLE jblk
+: jov-avoid-dist  ( -- n )  \ star avoidance radius from pilot skill
+  jbg-i @ 4 * JOV-GENOME + C@ 7 AND  \ pilot_skill 0-7
+  6 + ;                                \ 6 (dumb) to 13 (ace)
+
 : jov-blocked?  ( -- flag )
   0 jblk !
   qstars @ ?DUP IF 0 DO
     jblk @ 0= IF
-      STAR-POS I 2 * + jov-dist 6 < IF 1 jblk ! THEN
+      STAR-POS I 2 * + jov-dist jov-avoid-dist < IF 1 jblk ! THEN
     THEN
   LOOP THEN
   jblk @ 0= IF
@@ -1591,31 +1595,45 @@ CODE jov-think  ( i qbase -- )
         ;NEXT
 ;CODE
 
-CODE jov-flee   \ ( i -- )  move 1px away from player, clamp bounds
+CODE jov-flee   \ ( i -- )  write flee intent to JOV-INTENT
         PSHS    X
         LDA     1,U             ; A = i
         LEAU    2,U             ; pop
-        ASLA                    ; A = i*2
-        LDX     #$804A          ; JOV-POS
+        PSHS    A               ; save i
+        ; Intent addr: Y = JOV-INTENT + i*3
+        LDB     #3
+        MUL                     ; D = i*3
+        ADDD    #$80DA
+        TFR     D,Y             ; Y = intent
+        ; Pos addr: X = JOV-POS + i*2
+        LDA     ,S              ; i
+        ASLA
+        LDX     #$804A
         LEAX    A,X             ; X = JOV-POS + i*2
+        ; Clear flags
+        CLR     2,Y
+        PULS    A               ; done with i
         ; Flee x: move away from SHIP-POS
         LDA     ,X              ; A = cx
-        CMPA    $8054           ; vs ship_x (SHIP-POS)
-        BEQ     @kx             ; equal: keep x
-        BHI     @fx1            ; cx > sx: flee right
-        DECA                    ; cx < sx: flee left
+        CMPA    $8054           ; vs ship_x
+        BEQ     @kx
+        BHI     @fx1
+        DECA                    ; flee left
         CMPA    #1
         BHS     @sx
-        LDA     #1              ; clamp
+        LDA     #1
         BRA     @sx
 @fx1    INCA
         CMPA    #123
         BLS     @sx
         LDA     #123
-@sx     STA     ,X
-@kx     ; Flee y
-        LDA     1,X             ; A = cy
-        CMPA    $8055           ; vs ship_y (SHIP-POS+1)
+@sx     STA     ,Y              ; intent.nx
+        BRA     @ny
+@kx     LDA     ,X
+        STA     ,Y
+        ; Flee y
+@ny     LDA     1,X             ; A = cy
+        CMPA    $8055           ; vs ship_y
         BEQ     @ky
         BHI     @fy1
         DECA
@@ -1627,8 +1645,11 @@ CODE jov-flee   \ ( i -- )  move 1px away from player, clamp bounds
         CMPA    #139
         BLS     @sy
         LDA     #139
-@sy     STA     1,X
-@ky     PULS    X
+@sy     STA     1,Y             ; intent.ny
+        BRA     @done
+@ky     LDA     1,X
+        STA     1,Y
+@done   PULS    X
         ;NEXT
 ;CODE
 
@@ -1685,7 +1706,7 @@ VARIABLE detect-timer              \ frame counter for detection rolls
         ELSE
           DROP 0 JOV-TICK jbg-i @ + C!
           JOV-STATE jbg-i @ + C@ 2 = IF
-            jbg-i @ jov-flee  1 jov-moved !
+            jbg-i @ jov-flee  apply-intent
           ELSE
             jbg-i @ qbase @ jov-think
             apply-intent
@@ -1781,10 +1802,11 @@ VARIABLE check-win                \ flag: a kill happened, check win/lose
           JOV-POS jbg-i @ 2 * + STAR-POS I 2 * + mdist
           DUP 3 < IF                 \ contact: kill
             DROP jov-kill
-          ELSE 12 > IF               \ outside range
+          ELSE DUP jov-avoid-dist < 0= IF  \ pilot avoiding: no pull
+            DROP
           ELSE 6 < IF                \ close: pull every 2 frames
             grav-tick @ 1 AND 0= IF jov-pull THEN
-          ELSE                        \ 6-12: pull every 4 frames
+          ELSE                        \ 6-avoidDist: pull every 4 frames
             grav-tick @ 3 AND 0= IF jov-pull THEN
           THEN THEN THEN
         LOOP THEN
