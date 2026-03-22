@@ -1368,6 +1368,20 @@ VARIABLE jblk
   jblk @ 0= IF
     qbase @ IF BASE-POS jov-dist 5 < IF 1 jblk ! THEN THEN
   THEN
+  jblk @ 0= IF
+    SHIP-POS jov-dist 8 < IF 1 jblk ! THEN
+  THEN
+  jblk @ 0= IF
+    qjovians @ ?DUP IF 0 DO
+      jblk @ 0= IF
+        I jbg-i @ <> IF
+          JOV-DMG I + C@ IF
+            JOV-POS I 2 * + jov-dist 8 < IF 1 jblk ! THEN
+          THEN
+        THEN
+      THEN
+    LOOP THEN
+  THEN
   jblk @ ;
 
 VARIABLE base-attack              \ frame counter for base destruction
@@ -1465,7 +1479,7 @@ CODE jov-think  ( i qbase -- )
         ADDA    ,S+             ; A = manhattan dist
         PSHS    A               ; save dist on stack
         ; Compute preferred range: 20 + (15 - emotion) * 3
-        LDA     3,S             ; i (now at S+3: dist,cx,cy,qbase,i)
+        LDA     4,S             ; i (S: dist,cx,cy,qbase,i)
         LDB     #4
         MUL
         ADDD    #$80D1          ; JOV-GENOME + 3
@@ -1505,7 +1519,7 @@ CODE jov-think  ( i qbase -- )
         BEQ     @rkx
         BHI     @rincx          ; cx > tx: flee right
         DECA                    ; cx < tx: flee left
-        CMPA    #1
+        CMPA    #4
         BHS     @rsx
         LDA     ,S
         BRA     @rsx
@@ -1523,12 +1537,12 @@ CODE jov-think  ( i qbase -- )
         BEQ     @rky
         BHI     @rincy          ; cy > ty: flee down
         DECA
-        CMPA    #1
+        CMPA    #4
         BHS     @rsy
         LDA     1,S
         BRA     @rsy
 @rincy  INCA
-        CMPA    #139
+        CMPA    #136
         BLS     @rsy
         LDA     1,S
 @rsy    STA     1,Y             ; intent.ny
@@ -1555,7 +1569,7 @@ CODE jov-think  ( i qbase -- )
         ; tx < cx, decrement
         LDA     ,S              ; cx
         DECA
-        CMPA    #1
+        CMPA    #4
         BHS     @sx
         LDA     ,S              ; clamp: keep cx
         BRA     @sx
@@ -1576,13 +1590,13 @@ CODE jov-think  ( i qbase -- )
         BHI     @incy
         LDA     1,S             ; cy
         DECA
-        CMPA    #1
+        CMPA    #4
         BHS     @sy
         LDA     1,S
         BRA     @sy
 @incy   LDA     1,S             ; cy
         INCA
-        CMPA    #139
+        CMPA    #136
         BLS     @sy
         LDA     1,S
 @sy     STA     1,Y             ; intent.ny
@@ -1619,9 +1633,9 @@ CODE jov-flee   \ ( i -- )  write flee intent to JOV-INTENT
         BEQ     @kx
         BHI     @fx1
         DECA                    ; flee left
-        CMPA    #1
+        CMPA    #4
         BHS     @sx
-        LDA     #1
+        LDA     #4
         BRA     @sx
 @fx1    INCA
         CMPA    #123
@@ -1637,12 +1651,12 @@ CODE jov-flee   \ ( i -- )  write flee intent to JOV-INTENT
         BEQ     @ky
         BHI     @fy1
         DECA
-        CMPA    #1
+        CMPA    #4
         BHS     @sy
-        LDA     #1
+        LDA     #4
         BRA     @sy
 @fy1    INCA
-        CMPA    #139
+        CMPA    #136
         BLS     @sy
         LDA     #139
 @sy     STA     1,Y             ; intent.ny
@@ -2314,6 +2328,14 @@ VARIABLE prev-docked              \ last displayed dock state
 
 VARIABLE was-near-base
 
+: ship-jov-blocked?  ( -- flag )
+  qjovians @ ?DUP 0= IF 0 EXIT THEN
+  0 SWAP 0 DO
+    JOV-DMG I + C@ IF
+      SHIP-POS JOV-POS I 2 * + mdist 8 < IF DROP 1 THEN
+    THEN
+  LOOP ;
+
 : move-ship  ( -- )
   0 moved !
   penergy @ 0= IF EXIT THEN
@@ -2324,7 +2346,9 @@ VARIABLE was-near-base
       SHIP-POS 1 + C@ SHIP-DY - SHIP-POS 1 + C!
       ship-on-base? was-near-base @ 0= AND IF
         SHIP-POS 1 + C@ SHIP-DY + SHIP-POS 1 + C!
-      ELSE 1 moved ! THEN
+      ELSE ship-jov-blocked? IF
+        SHIP-POS 1 + C@ SHIP-DY + SHIP-POS 1 + C!
+      ELSE 1 moved ! THEN THEN
     THEN
   THEN
   KB-C4 KBD-SCAN $08 AND IF       \ DN: col 4, row 3
@@ -2332,7 +2356,9 @@ VARIABLE was-near-base
       SHIP-POS 1 + C@ SHIP-DY + SHIP-POS 1 + C!
       ship-on-base? was-near-base @ 0= AND IF
         SHIP-POS 1 + C@ SHIP-DY - SHIP-POS 1 + C!
-      ELSE 1 moved ! THEN
+      ELSE ship-jov-blocked? IF
+        SHIP-POS 1 + C@ SHIP-DY - SHIP-POS 1 + C!
+      ELSE 1 moved ! THEN THEN
     THEN
   THEN
   KB-C5 KBD-SCAN $08 AND IF       \ LT: col 5, row 3
@@ -2340,7 +2366,9 @@ VARIABLE was-near-base
       SHIP-POS C@ SHIP-DX - SHIP-POS C!
       ship-on-base? was-near-base @ 0= AND IF
         SHIP-POS C@ SHIP-DX + SHIP-POS C!
-      ELSE 1 moved ! THEN
+      ELSE ship-jov-blocked? IF
+        SHIP-POS C@ SHIP-DX + SHIP-POS C!
+      ELSE 1 moved ! THEN THEN
     THEN
   THEN
   KB-C6 KBD-SCAN $08 AND IF       \ RT: col 6, row 3
@@ -2348,7 +2376,9 @@ VARIABLE was-near-base
       SHIP-POS C@ SHIP-DX + SHIP-POS C!
       ship-on-base? was-near-base @ 0= AND IF
         SHIP-POS C@ SHIP-DX - SHIP-POS C!
-      ELSE 1 moved ! THEN
+      ELSE ship-jov-blocked? IF
+        SHIP-POS C@ SHIP-DX - SHIP-POS C!
+      ELSE 1 moved ! THEN THEN
     THEN
   THEN
   moved @ IF

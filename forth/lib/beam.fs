@@ -125,6 +125,8 @@ CODE beam-trace
         LDD     VAR_BEAM_CNT
         ADDD    #1
         STD     VAR_BEAM_CNT
+        CMPD    #200
+        BHS     @done           ; buffer full — stop tracing
         ; ── Done check ──
         LDA     VAR_LINE_CX
         CMPA    VAR_LINE_X2
