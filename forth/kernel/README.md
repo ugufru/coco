@@ -74,6 +74,7 @@ processors where Forth fits naturally without compromise.
 | `2DUP` | `( n1 n2 -- n1 n2 n1 n2 )` | Duplicate top pair |
 | `2DROP` | `( n1 n2 -- )` | Discard top pair |
 | `ROT` | `( n1 n2 n3 -- n2 n3 n1 )` | Rotate third item to top |
+| `PICK` | `( xu ... x0 u -- xu ... x0 xu )` | Copy u-th stack item to top (0 = DUP) |
 
 ### Arithmetic
 
@@ -84,6 +85,12 @@ processors where Forth fits naturally without compromise.
 | `*` | `( n1 n2 -- product )` | Multiply (16-bit signed, via 6809 MUL) |
 | `/MOD` | `( n1 n2 -- rem quot )` | Divide: remainder and quotient |
 | `NEGATE` | `( n -- -n )` | Two's complement negate |
+| `ABS` | `( n -- |n| )` | Absolute value |
+| `MIN` | `( n1 n2 -- n )` | Smaller of two signed values |
+| `MAX` | `( n1 n2 -- n )` | Larger of two signed values |
+
+> **Tip:** `/MOD` gives both remainder and quotient. For just division use `/MOD SWAP DROP`.
+> For just modulus use `/MOD DROP`. No separate `/` or `MOD` primitives are needed.
 
 ### Logic and bitwise
 
@@ -93,6 +100,8 @@ processors where Forth fits naturally without compromise.
 | `OR` | `( n1 n2 -- n3 )` | Bitwise OR |
 | `LSHIFT` | `( n u -- n' )` | Logical shift left by u bits |
 | `RSHIFT` | `( n u -- n' )` | Logical shift right by u bits |
+| `INVERT` | `( n -- ~n )` | Bitwise complement (one's complement) |
+| `XOR` | `( n1 n2 -- n3 )` | Bitwise exclusive OR |
 
 ### Comparison
 
@@ -125,6 +134,8 @@ processors where Forth fits naturally without compromise.
 | `KEY` | `( -- c )` | Wait for a keypress, push ASCII code (blocking) |
 | `KEY?` | `( -- c\|0 )` | Non-blocking key scan: ASCII code or 0 if no key held |
 | `KBD-SCAN` | `( col -- row )` | Raw PIA0 keyboard matrix scan |
+| `TYPE` | `( addr len -- )` | Output len characters starting at addr |
+| `COUNT` | `( c-addr -- addr+1 len )` | Convert counted string to addr+len |
 
 ### Screen
 
@@ -141,6 +152,9 @@ processors where Forth fits naturally without compromise.
 | `DO` | `( limit index -- )` | Begin a counted loop; push limit and index to return stack |
 | `LOOP` | — | Increment index; branch back if index < limit |
 | `I` | `( -- n )` | Push current loop index |
+| `J` | `( -- n )` | Push outer loop index (in nested DO...LOOP) |
+| `+LOOP` | `( n -- )` | Add n to index; branch back if limit not crossed |
+| `UNLOOP` | `( -- ) R:( limit index -- )` | Discard loop parameters from return stack |
 
 ### Return stack
 
@@ -155,6 +169,7 @@ processors where Forth fits naturally without compromise.
 | Word | Stack | Description |
 |---|---|---|
 | `PROX-SCAN` | `( cx cy radius array count -- bitmask )` | Proximity scan: test each (x,y) pair in array against center, return bitmask of hits within radius |
+| `MDIST` | `( addr1 addr2 -- d )` | Manhattan distance between two (x,y) coordinate pairs |
 
 ### Data
 
@@ -191,8 +206,8 @@ step-by-step walkthrough.
 |---|---|---|---|
 | 1 | `$0050` | 44 B | Kernel variables |
 | 2 | `$0E00` | ~25 B | Bootstrap |
-| 3 | `$1000` | ~1.9K | Staged kernel (remapped from `$E000`) |
-| 4 | `$2000` | ~18.8K | Application (contiguous, varies by app) |
+| 3 | `$1000` | ~2.2K | Staged kernel (remapped from `$E000`) |
+| 4 | `$2000` | ~24K | Application (contiguous, varies by app) |
 | Exec | `$0E00` | — | Bootstrap entry point |
 
 All DECB records must target the lower 32K (`$0000–$7FFF`) because CLOADM
@@ -246,7 +261,7 @@ $2000–$7FFF   application code (contiguous, ~24K loadable via CLOADM)
 $8000–$DDFF   runtime RAM (24K — variables, tables, buffers; NOT CLOADM-loadable)
 $DE00         data stack base (U, grows downward)
 $E000–$E012   DOCOL, DOVAR entry points (final location)
-$E013–$E0BA   CFA table (53 entries × 2 bytes, includes DOVAR data blocks)
+$E013–$E0BA   CFA table (61 entries × 2 bytes, includes DOVAR data blocks)
 $E0BB–$E828   primitive machine code + font/sprite FCB data + key table
 $E829–$E868   START: hardware init + app entry
 $E869         KERN_END (end of bootstrap copy range)

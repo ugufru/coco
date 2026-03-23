@@ -543,7 +543,7 @@ $2000–$7FE8   Application code (~24K compiled Forth, 24552 bytes)
 $8000–$8EF4   Game data (all-RAM region — galaxy, sprites, AI, beams, mood, etc.)
 $9000–$91D8   Font glyphs (59 × 8 bytes, all-RAM region)
 $DE00         Data stack base (U register, grows downward)
-$E000–$E869   Kernel code (53 primitives + DOVAR data, all-RAM mode)
+$E000–$E869   Kernel code (59 primitives + DOVAR data, all-RAM mode)
 $E86A–$FEFF   Kernel growth headroom (~5.7K)
 $FF00–$FFFF   I/O (PIA, SAM, VDG registers)
 ```
