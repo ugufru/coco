@@ -196,7 +196,7 @@ $8217 CONSTANT JOV-SPR1         \ 23 bytes: generated sprite Jovian 1
 $822E CONSTANT JOV-SPR2         \ 23 bytes: generated sprite Jovian 2
 $8245 CONSTANT JOV-EMCOL        \ 3 bytes: cached emotion color band
 
-$80BE CONSTANT JOV-STATE        \ 3 bytes: 0=attack, 1=flee, 2=idle
+$80BE CONSTANT JOV-STATE        \ 3 bytes: 0=idle, 1=attack, 2=flee
 $80C2 CONSTANT JOV-TICK         \ 3 bytes: per-Jovian frame counter
 $80C6 CONSTANT JOV-OLDX         \ 3 bytes: previous x per Jovian
 $80C9 CONSTANT JOV-OLDY         \ 3 bytes: previous y per Jovian
@@ -399,63 +399,36 @@ VARIABLE tcy
 
 \ Panel text rows: cy=15 (pixel 150), 16 (160), 17 (170), 18 (180)
 
-: draw-cond  ( end-col -- )
-  docked @ IF
-    6 - tcx !
-    S" DOCKED" rg-type
-  ELSE
-    qjovians @ IF
-      3 - tcx !
-      S" RED" rg-type
-    ELSE
-      5 - tcx !
-      S" GREEN" rg-type
+\ Count living Jovians (always checks all 3 slots)
+: jov-alive?  ( -- flag )
+  JOV-DMG C@ JOV-DMG 1 + C@ OR JOV-DMG 2 + C@ OR ;
+
+\ Any living Jovian in attack (1) or flee (2) state?
+: jov-engaged?  ( -- flag )
+  0  3 0 DO
+    JOV-DMG I + C@ IF
+      JOV-STATE I + C@ IF 1 OR THEN
     THEN
-  THEN ;
+  LOOP ;
 
 : draw-panel  ( -- )
   clear-panel
 
-  \ Left labels col 0, left values right-align to col 14
-  \ Right labels col 17, right values right-align to col 32
-
   \ Row 15: STARDATE      n  MISSILES      nn
-  0 15 at-xy
-  S" STARDATE" rg-type
-  gtime @ 14 rg-u.r
-
-  17 15 at-xy
-  S" MISSILES" rg-type
-  pmissiles @ 32 rg-u.r
+  0 15 at-xy  S" STARDATE" rg-type  gtime @ 14 rg-u.r
+  17 15 at-xy  S" MISSILES" rg-type  pmissiles @ 32 rg-u.r
 
   \ Row 16: QUADRANT    n n  ENERGY       nnn
-  0 16 at-xy
-  S" QUADRANT" rg-type
+  0 16 at-xy  S" QUADRANT" rg-type
   11 16 at-xy  pcol @ rg-u.  CHAR , rg-emit  prow @ rg-u.
-
-  17 16 at-xy
-  S" ENERGY" rg-type
-  penergy @ 32 rg-u.r
+  17 16 at-xy  S" ENERGY" rg-type  penergy @ 32 rg-u.r
 
   \ Row 17: COND/SOS left, SHIELDS right
-  sos-active @ IF
-    0 17 at-xy
-    S" SOS-BASE" rg-type
-    11 17 at-xy
-    sos-col @ rg-u.  CHAR , rg-emit  sos-row @ rg-u.
-  ELSE
-    0 17 at-xy
-    S" COND" rg-type
-    14 draw-cond
-  THEN
-
-  17 17 at-xy
-  S" SHIELDS" rg-type
-  pshields @ 32 rg-u.r
+  -1 prev-cond !  update-cond
+  17 17 at-xy  S" SHIELDS" rg-type  pshields @ 32 rg-u.r
 
   \ Row 18: COMMAND prompt
-  17 18 at-xy
-  S" COMMAND" rg-type ;
+  17 18 at-xy  S" COMMAND" rg-type ;
 
 \ Quick-update just the energy value (avoids full panel redraw)
 : update-energy  ( -- )
@@ -1224,6 +1197,32 @@ VARIABLE stardate-timer            \ frame counter
     MOOD-GRID I + C!
   LOOP ;
 
+\ Condition state: 0=green 1=yellow 2=red 3=docked 4=sos
+VARIABLE prev-cond
+: cond-state  ( -- n )
+  sos-active @ IF 4 ELSE
+  docked @ IF 3 ELSE
+  jov-alive? 0= IF 0 ELSE
+  jov-engaged? IF 2 ELSE 1
+  THEN THEN THEN THEN ;
+
+\ Redraw condition area (left half of row 17) — only on change
+: update-cond  ( -- )
+  cond-state DUP prev-cond @ = IF DROP ELSE
+    DUP prev-cond !
+    0 17 at-xy  14 0 DO $20 rg-emit LOOP
+    0 17 at-xy
+    DUP 4 = IF S" SOS-BASE" rg-type
+      11 17 at-xy sos-col @ rg-u. CHAR , rg-emit sos-row @ rg-u.
+    ELSE S" COND" rg-type
+      DUP 3 = IF 8 17 at-xy S" DOCKED" rg-type ELSE
+      DUP 0 = IF 9 17 at-xy S" GREEN" rg-type ELSE
+      DUP 2 = IF 11 17 at-xy S" RED" rg-type ELSE
+      8 17 at-xy S" YELLOW" rg-type
+      THEN THEN THEN
+    THEN DROP
+  THEN ;
+
 \ Check off-screen bases: any quadrant with both Jovians and a base
 \ (not the player's quadrant) threatens that base each stardate.
 : check-sos  ( -- )
@@ -1247,6 +1246,260 @@ VARIABLE stardate-timer            \ frame counter
   LOOP
   update-cond ;
 
+\ ── Galaxy migration system (#160, #186, #187) ────────────────────────────
+\ Jovians move between quadrants: drift toward bases, reinforce combat,
+\ migrate toward high-mood zones.  All share migrate-jovian as core op.
+
+VARIABLE mg-sc                        \ migration source col
+VARIABLE mg-sr                        \ migration source row
+VARIABLE mg-dc                        \ migration dest col
+VARIABLE mg-dr                        \ migration dest row
+
+\ migrate-jovian: move one Jovian from src to dst in galaxy bytes
+\ Returns 1 on success, 0 if src empty or dst full.
+: migrate-jovian  ( sc sr dc dr -- flag )
+  mg-dr !  mg-dc !  mg-sr !  mg-sc !
+  mg-sc @ mg-sr @ gal@ q-jovians 0=
+  mg-dc @ mg-dr @ gal@ q-jovians 3 = OR IF
+    0                                 \ src empty or dst full
+  ELSE
+    mg-sc @ mg-sr @ gal@ 1 -
+    mg-sc @ mg-sr @ gal!              \ decrement src
+    mg-dc @ mg-dr @ gal@ 1 +
+    mg-dc @ mg-dr @ gal!              \ increment dst
+    1
+  THEN ;
+
+\ Find nearest base quadrant (Manhattan distance from col,row)
+\ Returns col row of nearest base, or -1 -1 if none.
+VARIABLE fnb-bc                       \ best col
+VARIABLE fnb-br                       \ best row
+VARIABLE fnb-bd                       \ best distance
+
+VARIABLE fnb-col                     \ search col (input)
+VARIABLE fnb-row                     \ search row (input)
+
+: find-nearest-base  ( col row -- bcol brow )
+  fnb-row !  fnb-col !
+  -1 fnb-bc !  -1 fnb-br !  99 fnb-bd !
+  64 0 DO
+    GALAXY I + C@ q-base? IF
+      I 8 /MOD                        \ ( ic ir )
+      fnb-row @ -                     \ ( ic drow )
+      DUP 0 < IF NEGATE THEN           \ |drow|
+      SWAP fnb-col @ -                \ ( |drow| dcol )
+      DUP 0 < IF NEGATE THEN           \ |dcol|
+      +                               \ Manhattan distance
+      DUP fnb-bd @ < IF
+        fnb-bd !
+        I 8 /MOD fnb-br ! fnb-bc !
+      ELSE DROP THEN
+    THEN
+  LOOP
+  fnb-bc @ fnb-br @ ;
+
+\ Step one grid cell toward target.  Cols differ → step col, else step row.
+VARIABLE st-tc                        \ target col
+VARIABLE st-tr                        \ target row
+
+: step-toward  ( col row tcol trow -- ncol nrow )
+  st-tr !  st-tc !                    \ ( col row )
+  OVER st-tc @ <> IF                  \ cols differ?
+    SWAP                              \ ( row col )
+    DUP st-tc @ < IF 1 + ELSE 1 - THEN
+    SWAP                              \ ( ncol row )
+  ELSE                                \ same col → step row
+    DUP st-tr @ < IF 1 + ELSE 1 - THEN
+  THEN ;
+
+\ ── Spawn reinforcement into current quadrant ────────────────────────────
+\ When a Jovian migrates into the player's quadrant, spawn it on-screen.
+
+VARIABLE free-slot                    \ scratch for find-free-slot
+
+: find-free-slot  ( -- i | -1 )
+  -1 free-slot !
+  3 0 DO
+    free-slot @ -1 = IF
+      JOV-DMG I + C@ 0= IF I free-slot ! THEN
+    THEN
+  LOOP
+  free-slot @ ;
+
+\ Spawn a Jovian at screen edge based on source direction.
+\ dir: 0=left, 1=right, 2=above, 3=below
+VARIABLE sp-x                        \ spawn edge x
+VARIABLE sp-y                        \ spawn edge y
+
+: set-edge-pos  ( dir -- )
+  DUP 0 = IF DROP   4 sp-x !  rnd-y sp-y ! ELSE
+  DUP 1 = IF DROP 123 sp-x !  rnd-y sp-y ! ELSE
+  DUP 2 = IF DROP rnd-x sp-x !    4 sp-y ! ELSE
+             DROP rnd-x sp-x !  136 sp-y !
+  THEN THEN THEN ;
+
+VARIABLE spawn-pending                \ deferred spawn dir+1, or 0
+
+: do-spawn  ( dir -- )
+  find-free-slot DUP -1 = IF 2DROP ELSE
+    SWAP set-edge-pos                 \ ( slot )
+    DUP sp-x @ SWAP 2 * JOV-POS + C!    \ store x
+    DUP sp-y @ SWAP 2 * JOV-POS + 1 + C!  \ store y
+    DUP 100 SWAP JOV-DMG + C!        \ full health
+    DUP gen-genome                    \ generate genome
+    DUP 12 SWAP jov-emotion-stim      \ high emotion (rage)
+    DUP 0 SWAP JOV-STATE + C!        \ ATTACK state
+    DUP 0 SWAP JOV-TICK + C!         \ reset tick
+    DUP DUP 2 * JOV-POS + C@ SWAP JOV-OLDX + C!
+    DUP DUP 2 * JOV-POS + 1 + C@ SWAP JOV-OLDY + C!
+    DUP gen-jov-sprite                \ generate sprite
+    DUP DUP jov-emo@ jov-color-band SWAP JOV-EMCOL + C!
+    DROP
+    qjovians @ 3 < IF 1 qjovians +! THEN
+  THEN ;
+
+\ Queue a spawn for deferred execution (after refresh-after-kill is available)
+: spawn-reinforcement  ( dir -- )
+  1 + spawn-pending ! ;
+
+\ Direction a reinforcement arrives from, based on mg-sc/mg-sr (set by
+\ migrate-jovian).  0=left 1=right 2=above 3=below.
+: src-dir  ( -- dir )
+  mg-sr @ prow @ < IF 2 ELSE         \ src above → from above
+  mg-sr @ prow @ > IF 3 ELSE         \ src below → from below
+  mg-sc @ pcol @ < IF 0              \ src left → from left
+  ELSE 1 THEN                        \ src right → from right
+  THEN THEN ;
+
+\ ── #160: Stardate drift — Jovians creep toward bases ─────────────────────
+VARIABLE drift-sc                     \ source col
+VARIABLE drift-sr                     \ source row
+VARIABLE drift-found                  \ search flag
+
+: pick-occupied  ( -- flag )
+  0 drift-found !
+  16 0 DO
+    drift-found @ 0= IF
+      64 rnd 8 /MOD                   \ ( col row )
+      2DUP prow @ = SWAP pcol @ = AND 0= IF
+        2DUP gal@ q-jovians IF
+          drift-sr !  drift-sc !
+          1 drift-found !
+        ELSE 2DROP THEN
+      ELSE 2DROP THEN
+    THEN
+  LOOP
+  drift-found @ ;
+
+: tick-drift  ( -- )
+  pick-occupied 0= IF ELSE
+    drift-sc @ drift-sr @ find-nearest-base   \ ( bcol brow )
+    DUP -1 = IF 2DROP ELSE
+      st-tr !  st-tc !                \ reuse step-toward vars for base coords
+      drift-sc @ drift-sr @
+      st-tc @ st-tr @
+      step-toward                     \ ( ncol nrow )
+      \ migrate-jovian needs ( sc sr dc dr )
+      >R >R                           \ save ncol nrow on return stack
+      drift-sc @ drift-sr @
+      R> R>                           \ ( dsc dsr ncol nrow )
+      migrate-jovian                  \ ( flag )
+      DUP IF
+        \ Did it arrive in player's quadrant?
+        mg-dc @ pcol @ = mg-dr @ prow @ = AND IF
+          src-dir spawn-reinforcement
+        THEN
+      THEN DROP
+    THEN
+  THEN ;
+
+\ ── #186: Reinforcements — adjacent Jovians warp in on kill ───────────────
+VARIABLE reinf-found                  \ flag: found a source
+
+: try-adjacent  ( acol arow -- )
+  reinf-found @ IF 2DROP ELSE
+    2DUP 0 < SWAP 0 < OR IF 2DROP ELSE
+    2DUP 7 > SWAP 7 > OR IF 2DROP ELSE
+      2DUP gal@ q-jovians IF
+        \ Mood-based chance: mood/16 probability (hot = more likely)
+        2DUP mood-addr C@ 1 +         \ mood+1 (1-16)
+        16 rnd < IF                   \ roll under mood → reinforce
+          pcol @ prow @               \ ( acol arow pcol prow = sc sr dc dr )
+          migrate-jovian IF
+            1 reinf-found !
+          THEN
+        ELSE 2DROP THEN
+      ELSE 2DROP THEN
+    THEN THEN
+  THEN ;
+
+: tick-reinforcement  ( -- )
+  0 reinf-found !
+  \ Check 4 adjacent quadrants
+  pcol @ 1 - prow @     try-adjacent  \ left
+  pcol @ 1 + prow @     try-adjacent  \ right
+  pcol @     prow @ 1 - try-adjacent  \ above
+  pcol @     prow @ 1 + try-adjacent  \ below
+  reinf-found @ IF
+    \ Spawn the reinforcement — find which direction it came from
+    src-dir
+    spawn-reinforcement
+  THEN ;
+
+\ ── #187: Galactic migration — aggressive Jovians drift to hot zones ──────
+VARIABLE hot-col                      \ hottest quadrant col
+VARIABLE hot-row                      \ hottest quadrant row
+VARIABLE hot-mood                     \ highest mood found
+VARIABLE calm-sc                      \ calm source col
+VARIABLE calm-sr                      \ calm source row
+VARIABLE calm-found                   \ flag
+
+: find-hottest  ( -- )
+  0 hot-mood !
+  64 0 DO
+    MOOD-GRID I + C@ DUP hot-mood @ > IF
+      hot-mood !
+      I 8 /MOD hot-row ! hot-col !
+    ELSE DROP THEN
+  LOOP ;
+
+: pick-calm-source  ( -- flag )
+  0 calm-found !
+  16 0 DO
+    calm-found @ 0= IF
+      64 rnd 8 /MOD                   \ ( col row )
+      2DUP prow @ = SWAP pcol @ = AND 0= IF
+        2DUP gal@ q-jovians IF
+          2DUP mood-addr C@ 10 < IF
+            calm-sr !  calm-sc !
+            1 calm-found !
+          ELSE 2DROP THEN
+        ELSE 2DROP THEN
+      ELSE 2DROP THEN
+    THEN
+  LOOP
+  calm-found @ ;
+
+: tick-migration  ( -- )
+  gtime @ 1 AND 0= IF                \ every 2nd stardate
+    find-hottest
+    hot-mood @ 10 > IF                \ only if somewhere is actually hot
+      pick-calm-source IF
+        calm-sc @ calm-sr @
+        hot-col @ hot-row @
+        step-toward                   \ ( ncol nrow )
+        >R >R calm-sc @ calm-sr @ R> R>
+        migrate-jovian                \ ( flag )
+        DUP IF
+          mg-dc @ pcol @ = mg-dr @ prow @ = AND IF
+            src-dir
+            spawn-reinforcement
+          THEN
+        THEN DROP
+      THEN
+    THEN
+  THEN ;
+
 \ Stardate tick: increment gtime, decay mood grid, check SOS
 : tick-stardate  ( -- )
   stardate-timer @ 1 + DUP STARDATE-FRAMES < IF
@@ -1254,8 +1507,23 @@ VARIABLE stardate-timer            \ frame counter
   ELSE
     DROP 0 stardate-timer !
     1 gtime +!
+    9 15 at-xy  gtime @ 14 rg-u.r    \ update stardate display
     mood-decay-all
     check-sos
+  THEN ;
+
+\ Migration timer: independent of stardate, fires every ~15 seconds.
+\ Called every 8th frame, so 112 ticks × 8 frames = 896 frames ≈ 15s.
+112 CONSTANT MIGRATE-FRAMES
+VARIABLE migrate-timer
+
+: tick-migrate  ( -- )
+  migrate-timer @ 1 + DUP MIGRATE-FRAMES < IF
+    migrate-timer !
+  ELSE
+    DROP 0 migrate-timer !
+    tick-drift
+    tick-migration
   THEN ;
 
 \ ── Detection & awareness ──────────────────────────────────────────────
@@ -1294,7 +1562,7 @@ VARIABLE stardate-timer            \ frame counter
 \ Close (<15px): ±4, medium (15-40): ±2, far (>40): ±1
 \ Sign: aggressive (aggr>=4) → positive, peaceful → negative
 : jov-on-detect  ( i -- )
-  DUP 1 SWAP JOV-STATE + C!      \ set JOV-STATE = attack
+  DUP 1 SWAP JOV-STATE + C!      \ set JOV-STATE = attack (0→1)
   DUP jov-player-dist             \ ( i dist )
   DUP 15 < IF DROP 4
   ELSE 40 < IF 2
@@ -1772,6 +2040,17 @@ VARIABLE detect-timer              \ frame counter for detection rolls
   save-ship-bg
   draw-ship ;
 
+\ Execute deferred Jovian spawn (requires refresh-after-kill)
+: check-spawn  ( -- )
+  spawn-pending @ ?DUP IF
+    1 - do-spawn
+    0 spawn-pending !
+    1 jov-moved !
+    cancel-jbeam cancel-beam
+    msl-active @ IF msl-erase 0 msl-active ! THEN
+    refresh-after-kill
+  THEN ;
+
 \ Kill Jovian (index in jbg-i) — erase sprite, zero health, explode
 VARIABLE check-win                \ flag: a kill happened, check win/lose
 
@@ -1787,6 +2066,14 @@ VARIABLE check-win                \ flag: a kill happened, check win/lose
     proximity-damage
     3 jov-emotion-all              \ fellow killed: rage/panic
     refresh-after-kill
+    tick-reinforcement              \ adjacent Jovians may warp in (#186)
+    check-spawn                     \ execute deferred spawn if queued
+    \ Clear SOS if we just saved this base
+    sos-active @ IF
+      pcol @ sos-col @ = prow @ sos-row @ = AND IF
+        0 sos-active !  update-cond
+      THEN
+    THEN
   THEN ;
 
 : jov-gravity  ( -- )
@@ -2604,19 +2891,7 @@ VARIABLE dock-tick
     docked @ IF do-undock THEN
   THEN ;
 
-\ Redraw condition area (left half of row 17)
-: update-cond  ( -- )
-  0 17 at-xy  14 0 DO $20 rg-emit LOOP
-  sos-active @ IF
-    0 17 at-xy
-    S" SOS-BASE" rg-type
-    11 17 at-xy
-    sos-col @ rg-u.  CHAR , rg-emit  sos-row @ rg-u.
-  ELSE
-    0 17 at-xy
-    S" COND" rg-type
-    14 draw-cond
-  THEN ;
+\ (update-cond moved earlier — before check-sos)
 
 \ ══════════════════════════════════════════════════════════════════════════
 \  COMMAND INPUT SYSTEM
@@ -3012,6 +3287,12 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
   SWAP expand-quadrant
   safe-spawn
   draw-quadrant
+  \ Clear SOS if we just arrived at the threatened base
+  sos-active @ IF
+    pcol @ sos-col @ = prow @ sos-row @ = AND IF
+      0 sos-active !
+    THEN
+  THEN
   draw-panel
   0 docked !  0 prev-docked !
   0 jov-moved !  0 base-attack !
@@ -3386,7 +3667,7 @@ VARIABLE jnb-result
   0 msl-active !  0 msl-dirty !
   0 docked !  0 prev-docked !  0 death-cause !
   0 sd-active !  0 base-attack !
-  0 jov-moved !
+  0 jov-moved !  0 spawn-pending !  0 migrate-timer !  -1 prev-cond !
   0 frame-tick !
   0 check-win !
   100 prev-energy !
@@ -3420,6 +3701,9 @@ VARIABLE jnb-result
       check-dock tick-dock
       tick-base-attack
       tick-stardate
+      tick-migrate
+      check-spawn
+      update-cond
     THEN
 
     VSYNC
