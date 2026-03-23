@@ -535,15 +535,15 @@ issues:
 ROMs are paged out at boot (`STA $FFDF`), giving full 64K RAM.
 
 ```
-$0050–$007F   Kernel scratch variables (direct page)
+$0050–$0082   Kernel scratch variables (direct page, 51 bytes)
 $0600–$1FFF   RG6 VRAM (6144 bytes, set by rg-init after boot)
 $0E00         Bootstrap (copies staged kernel to $E000, enables all-RAM)
 $1000         Staged kernel (DECB load addr; copied to $E000 at boot)
-$2000–$7708   Application code (~22K compiled Forth)
-$80F0+        Game data (all-RAM region — sprites, positions, AI, beams, etc.)
+$2000–$7FE8   Application code (~24K compiled Forth, 24552 bytes)
+$8000–$8EF4   Game data (all-RAM region — galaxy, sprites, AI, beams, mood, etc.)
 $9000–$91D8   Font glyphs (59 × 8 bytes, all-RAM region)
 $DE00         Data stack base (U register, grows downward)
-$E000–$E855   Kernel code (51 primitives + DOVAR data, all-RAM mode)
-$E856–$FEFF   Kernel growth headroom (~5.7K)
+$E000–$E869   Kernel code (53 primitives + DOVAR data, all-RAM mode)
+$E86A–$FEFF   Kernel growth headroom (~5.7K)
 $FF00–$FFFF   I/O (PIA, SAM, VDG registers)
 ```

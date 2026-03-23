@@ -192,7 +192,7 @@ One mood byte per sector in the galaxy grid. 64 bytes total.
 - **Between visits**: Decay by 1 per stardate toward neutral
 - **Unvisited**: Drift slightly aggressive (territorial/hungry)
 - **After killing all**: High mood persists — replacements arrive hostile
-- **Storage**: 64 bytes at $7E00–$7E3F
+- **Storage**: 64 bytes at $8EB4–$8EF3 (MOOD-GRID, all-RAM region)
 
 ## Algorithmic Sprite Generation
 
@@ -216,10 +216,10 @@ During development, on-screen overlay showing:
 
 | Item | Bytes | Address |
 |------|-------|---------|
-| Genome data (3 × 4 bytes) | 12 | $77C5–$77D0 |
-| Intent output (3 × 3 bytes: dx, dy, flags) | 9 | $77D1–$77D9 |
-| Quadrant mood grid (8 × 8) | 64 | $7E00–$7E3F |
-| Sprite generation workspace | 12 | $77DA–$77E5 |
+| Genome data (3 × 4 bytes) | 12 | $80CE–$80D9 (JOV-GENOME) |
+| Intent output (3 × 3 bytes: dx, dy, flags) | 9 | $80DA–$80E2 (JOV-INTENT) |
+| Quadrant mood grid (8 × 8) | 64 | $8EB4–$8EF3 (MOOD-GRID) |
+| Sprite generation workspace | 12 | $80E4–$80EF (JOV-SPRWORK) |
 | **Total new RAM** | **97** | |
 
 ## Code Budget

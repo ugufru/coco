@@ -215,7 +215,7 @@ Requires 64K×1 DRAM (4164 chips).  XRoar: use `-ram 64`.
 
 ## Memory map
 
-### Kernel variables ($0050–$007B)
+### Kernel variables ($0050–$0082)
 
 Scratch variables in low RAM, accessed via extended addressing. Zero ROM cost.
 
@@ -230,13 +230,14 @@ $0057  VAR_RGVRAM       RG6 VRAM base address (set by rg-init)
 $0059  VAR_LINE_*       Bresenham line scratch (13 bytes, used by rg-line CODE word)
 $0066  VAR_SPR_*        sprite drawing scratch (15 bytes, used by spr-draw/spr-erase-box CODE words)
 $0075  VAR_RG*          text rendering config (7 bytes, used by rg-char CODE word)
+$007C  VAR_BEAM_*       beam rendering scratch (5 bytes)
 ```
 
 ### Full address space
 
 ```
 $0000–$004F   direct page (reserved)
-$0050–$007B   kernel scratch variables (see above)
+$0050–$0082   kernel scratch variables (see above)
 $0400–$05FF   VDG text VRAM (32×16, boot only)
 $0600–$1FFF   RG6 VRAM (6144 bytes, set by rg-init after boot)
               ├ $0E00  bootstrap (dead after boot, overwritten by VRAM)
@@ -245,11 +246,11 @@ $2000–$7FFF   application code (contiguous, ~24K loadable via CLOADM)
 $8000–$DDFF   runtime RAM (24K — variables, tables, buffers; NOT CLOADM-loadable)
 $DE00         data stack base (U, grows downward)
 $E000–$E012   DOCOL, DOVAR entry points (final location)
-$E013–$E0B4   CFA table (51 entries × 2 bytes, includes DOVAR data blocks)
-$E0B5–$E761   primitive machine code + font/sprite FCB data + key table
-$E762–$E7A0   START: hardware init + app entry
-$E7A1         KERN_END (end of bootstrap copy range)
-$E7A1–$FEFF   free RAM for kernel growth / static data (~6.1K)
+$E013–$E0BA   CFA table (53 entries × 2 bytes, includes DOVAR data blocks)
+$E0BB–$E828   primitive machine code + font/sprite FCB data + key table
+$E829–$E868   START: hardware init + app entry
+$E869         KERN_END (end of bootstrap copy range)
+$E869–$FEFF   free RAM for kernel growth / static data (~5.7K)
 $FF00–$FFFF   I/O registers + hardware vectors (always mapped, never RAM)
 ```
 
@@ -269,8 +270,8 @@ runtime (after the bootstrap enables all-RAM) but cannot hold loaded code.
 | Runtime RAM | 24K | variables, tables, buffers (`$8000–$DDFF`; not CLOADM-loadable) |
 | Data stack | 512B | grows down from `$DE00` |
 | Return stack | 512B | grows down from `$E000` (below kernel) |
-| Kernel code | ~1.9K | primitives, CFA table, font/sprite data, keyboard matrix, startup (`$E000–$E7A0`) |
-| Post-kernel | ~6.1K | free for kernel growth / static data (`$E7A1–$FEFF`) |
+| Kernel code | ~2.2K | primitives, CFA table, font/sprite data, keyboard matrix, startup (`$E000–$E868`) |
+| Post-kernel | ~5.7K | free for kernel growth / static data (`$E869–$FEFF`) |
 
 ---
 

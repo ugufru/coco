@@ -90,7 +90,7 @@ black hole, or you detonate your own ship.
 
 ## Technical Notes
 
-The game is about 22K of compiled Forth plus a 2.1K kernel (51 primitives). Performance-critical
+The game is about 24K of compiled Forth (24552 bytes) plus a 2.2K kernel (53 primitives). Performance-critical
 routines are hand-written 6809 assembly, called as CODE words from Forth:
 
 | Primitive | What it does | Speedup vs Forth |
