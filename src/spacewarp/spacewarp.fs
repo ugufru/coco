@@ -2789,7 +2789,13 @@ CODE xyn-pull  ( addr tx ty step flag-addr -- )
         TFR     B,A             ; A = step
         NEGA                    ; A = -step
         ADDA    ,S+             ; A = current - step
-@xset   STA     ,X
+@xset   CMPA    #2              ; clamp x lower bound
+        BHS     @xnl
+        LDA     #2
+@xnl    CMPA    #125            ; clamp x upper bound
+        BLS     @xnh
+        LDA     #125
+@xnh    STA     ,X
         LDD     #1
         STD     ,Y              ; flag = 1
 @xdone  ; -- pull Y axis --
@@ -2805,7 +2811,13 @@ CODE xyn-pull  ( addr tx ty step flag-addr -- )
         TFR     B,A
         NEGA
         ADDA    ,S+
-@yset   STA     1,X
+@yset   CMPA    #2              ; clamp y lower bound
+        BHS     @ynl
+        LDA     #2
+@ynl    CMPA    #139            ; clamp y upper bound
+        BLS     @ynh
+        LDA     #139
+@ynh    STA     1,X
         LDD     #1
         STD     ,Y              ; flag = 1
 @ydone  LEAU    10,U            ; pop 5 args
