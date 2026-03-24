@@ -14,7 +14,7 @@ spacewarp.bin: spacewarp.fs $(KERNEL_MAP) $(KERNEL_BIN)
 	    --output    spacewarp.bin
 
 run: spacewarp.bin
-	xroar -machine coco2bus -ram 64 $(XROAR_ROMS) -tv-type ntsc -tv-input cmp-br -kbd-translate -run spacewarp.bin
+	xroar -machine coco2bus -ram 64 $(XROAR_ROMS) -tv-type ntsc -tv-input cmp-br -kbd-translate -kbd-bind KP_Enter=pre:enter -run spacewarp.bin
 
 kernel:
 	$(MAKE) -C $(KERNEL_DIR)
