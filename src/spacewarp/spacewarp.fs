@@ -2623,50 +2623,42 @@ VARIABLE was-near-base
     THEN
   LOOP ;
 
+\ try-move: attempt one axis of ship movement
+\ addr = SHIP-POS or SHIP-POS 1 + (axis byte address)
+\ delta = signed displacement (+dx/-dx or +dy/-dy)
+\ max = upper bound for this axis (123 for X, 139 for Y)
+\ Applies tentative move, checks base proximity and Jovian collision,
+\ undoes move if blocked, sets moved flag if accepted.
+: try-move  ( addr delta max -- )
+  >R OVER C@ OVER +               \ addr delta new-val  R: max
+  DUP 4 < OVER R> > OR IF         \ out of bounds?
+    DROP 2DROP EXIT
+  THEN
+  ROT DUP >R C!                   \ write tentative pos; R: addr
+  ship-on-base? was-near-base @ 0= AND IF
+    R@ C@ SWAP - R> C! EXIT       \ undo: newly on base
+  THEN
+  ship-jov-blocked? IF
+    R@ C@ SWAP - R> C! EXIT       \ undo: blocked by Jovian
+  THEN
+  R> DROP DROP 1 moved ! ;
+
 : move-ship  ( -- )
   0 moved !
   penergy @ 0= IF EXIT THEN
   ship-on-base? was-near-base !    \ already near? allow escape
   \ Arrow keys: all on row 3 ($08), different columns
   KB-C3 KBD-SCAN $08 AND IF       \ UP: col 3, row 3
-    SHIP-POS 1 + C@ SHIP-DY 1 + > IF
-      SHIP-POS 1 + C@ SHIP-DY - SHIP-POS 1 + C!
-      ship-on-base? was-near-base @ 0= AND IF
-        SHIP-POS 1 + C@ SHIP-DY + SHIP-POS 1 + C!
-      ELSE ship-jov-blocked? IF
-        SHIP-POS 1 + C@ SHIP-DY + SHIP-POS 1 + C!
-      ELSE 1 moved ! THEN THEN
-    THEN
+    SHIP-POS 1 + ship-dy NEGATE 139 try-move
   THEN
   KB-C4 KBD-SCAN $08 AND IF       \ DN: col 4, row 3
-    SHIP-POS 1 + C@ 139 SHIP-DY - < IF
-      SHIP-POS 1 + C@ SHIP-DY + SHIP-POS 1 + C!
-      ship-on-base? was-near-base @ 0= AND IF
-        SHIP-POS 1 + C@ SHIP-DY - SHIP-POS 1 + C!
-      ELSE ship-jov-blocked? IF
-        SHIP-POS 1 + C@ SHIP-DY - SHIP-POS 1 + C!
-      ELSE 1 moved ! THEN THEN
-    THEN
+    SHIP-POS 1 + ship-dy 139 try-move
   THEN
   KB-C5 KBD-SCAN $08 AND IF       \ LT: col 5, row 3
-    SHIP-POS C@ SHIP-DX 1 + > IF
-      SHIP-POS C@ SHIP-DX - SHIP-POS C!
-      ship-on-base? was-near-base @ 0= AND IF
-        SHIP-POS C@ SHIP-DX + SHIP-POS C!
-      ELSE ship-jov-blocked? IF
-        SHIP-POS C@ SHIP-DX + SHIP-POS C!
-      ELSE 1 moved ! THEN THEN
-    THEN
+    SHIP-POS ship-dx NEGATE 123 try-move
   THEN
   KB-C6 KBD-SCAN $08 AND IF       \ RT: col 6, row 3
-    SHIP-POS C@ 123 SHIP-DX - < IF
-      SHIP-POS C@ SHIP-DX + SHIP-POS C!
-      ship-on-base? was-near-base @ 0= AND IF
-        SHIP-POS C@ SHIP-DX - SHIP-POS C!
-      ELSE ship-jov-blocked? IF
-        SHIP-POS C@ SHIP-DX - SHIP-POS C!
-      ELSE 1 moved ! THEN THEN
-    THEN
+    SHIP-POS ship-dx 123 try-move
   THEN
   moved @ IF
     move-count @ 1 + DUP 32 = IF
