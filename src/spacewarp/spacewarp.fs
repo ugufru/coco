@@ -1977,8 +1977,11 @@ CODE jov-flee   \ ( i -- )  write flee intent to JOV-INTENT
 
 VARIABLE detect-timer              \ frame counter for detection rolls
 
-\ Tick all living Jovians (per-Jovian threshold from genome)
+\ Tick all Jovians, but limit to 1 think per frame
+VARIABLE jov-thought              \ flag: a Jovian already thought this frame
+
 : tick-jovians  ( -- )
+  0 jov-thought !
   qjovians @ ?DUP IF 0 DO
     I jbg-i !
     JOV-DMG jbg-i @ + C@ IF
@@ -1986,12 +1989,17 @@ VARIABLE detect-timer              \ frame counter for detection rolls
         JOV-TICK jbg-i @ + C@ 1 + DUP I jov-threshold < IF
           JOV-TICK jbg-i @ + C!
         ELSE
-          DROP 0 JOV-TICK jbg-i @ + C!
-          JOV-STATE jbg-i @ + C@ 2 = IF
-            jbg-i @ jov-flee  apply-intent
+          jov-thought @ IF
+            JOV-TICK jbg-i @ + C!   \ defer: keep counter at threshold
           ELSE
-            jbg-i @ qbase @ jov-think
-            apply-intent
+            DROP 0 JOV-TICK jbg-i @ + C!
+            JOV-STATE jbg-i @ + C@ 2 = IF
+              jbg-i @ jov-flee  apply-intent
+            ELSE
+              jbg-i @ qbase @ jov-think
+              apply-intent
+            THEN
+            1 jov-thought !
           THEN
         THEN
       THEN
@@ -2076,44 +2084,50 @@ VARIABLE check-win                \ flag: a kill happened, check win/lose
     THEN
   THEN ;
 
+\ Process gravity for one Jovian
+: jov-gravity-one  ( i -- )
+  jbg-i !
+  JOV-DMG jbg-i @ + C@ IF
+    \ Black hole gravity
+    qbhole @ IF
+      BHOLE-POS C@ sg-sx !  BHOLE-POS 1 + C@ sg-sy !
+      JOV-POS jbg-i @ 2 * + BHOLE-POS mdist
+      DUP 3 < IF                   \ contact: kill
+        DROP jov-kill
+      ELSE DUP 20 > IF             \ outside well
+        DROP
+      ELSE 10 > IF                  \ 10-20: pull every 2 frames
+        grav-tick @ 1 AND 0= IF jov-pull THEN
+      ELSE                          \ <10: pull every frame
+        jov-pull
+      THEN THEN THEN
+    THEN
+    \ Star gravity (only if still alive)
+    JOV-DMG jbg-i @ + C@ IF
+      qstars @ ?DUP IF 0 DO
+        STAR-POS I 2 * + C@ sg-sx !
+        STAR-POS I 2 * + 1 + C@ sg-sy !
+        JOV-POS jbg-i @ 2 * + STAR-POS I 2 * + mdist
+        DUP 3 < IF                 \ contact: kill
+          DROP jov-kill
+        ELSE DUP jov-avoid-dist < 0= IF  \ pilot avoiding: no pull
+          DROP
+        ELSE 6 < IF                \ close: pull every 2 frames
+          grav-tick @ 1 AND 0= IF jov-pull THEN
+        ELSE                        \ 6-avoidDist: pull every 4 frames
+          grav-tick @ 3 AND 0= IF jov-pull THEN
+        THEN THEN THEN
+      LOOP THEN
+    THEN
+  THEN ;
+
+\ Round-robin: one Jovian's gravity per frame
+VARIABLE jgrav-rr
 : jov-gravity  ( -- )
   qjovians @ ?DUP 0= IF EXIT THEN
-  0 DO
-    I jbg-i !
-    JOV-DMG jbg-i @ + C@ IF
-      \ Black hole gravity
-      qbhole @ IF
-        BHOLE-POS C@ sg-sx !  BHOLE-POS 1 + C@ sg-sy !
-        JOV-POS jbg-i @ 2 * + BHOLE-POS mdist
-        DUP 3 < IF                   \ contact: kill
-          DROP jov-kill
-        ELSE DUP 20 > IF             \ outside well
-          DROP
-        ELSE 10 > IF                  \ 10-20: pull every 2 frames
-          grav-tick @ 1 AND 0= IF jov-pull THEN
-        ELSE                          \ <10: pull every frame
-          jov-pull
-        THEN THEN THEN
-      THEN
-      \ Star gravity (only if still alive)
-      JOV-DMG jbg-i @ + C@ IF
-        qstars @ ?DUP IF 0 DO
-          STAR-POS I 2 * + C@ sg-sx !
-          STAR-POS I 2 * + 1 + C@ sg-sy !
-          JOV-POS jbg-i @ 2 * + STAR-POS I 2 * + mdist
-          DUP 3 < IF                 \ contact: kill
-            DROP jov-kill
-          ELSE DUP jov-avoid-dist < 0= IF  \ pilot avoiding: no pull
-            DROP
-          ELSE 6 < IF                \ close: pull every 2 frames
-            grav-tick @ 1 AND 0= IF jov-pull THEN
-          ELSE                        \ 6-avoidDist: pull every 4 frames
-            grav-tick @ 3 AND 0= IF jov-pull THEN
-          THEN THEN THEN
-        LOOP THEN
-      THEN
-    THEN
-  LOOP ;
+  jgrav-rr @ OVER < 0= IF DROP 0 THEN
+  DUP jov-gravity-one
+  1 + jgrav-rr ! ;
 
 \ ── Explosion effects ────────────────────────────────────────────────
 \ Animated expanding ring explosion.  Each frame generates dots along
@@ -3174,7 +3188,7 @@ VARIABLE msl-active              \ nonzero = missile in flight
 : msl-scry  ( -- y )  msl-y @ 7 RSHIFT ;
 
 : msl-erase  ( -- )  restore-msl-bg ;
-: cancel-msl  ( -- )  cancel-msl ;
+: cancel-msl  ( -- )  msl-active @ IF msl-erase 0 msl-active ! THEN ;
 
 : msl-oob?  ( -- flag )
   msl-scrx 3 < IF 1 EXIT THEN
@@ -3444,26 +3458,25 @@ VARIABLE sg-row                   \ scan grid: outer loop row
   draw-quadrant ;
 
 : exec-command  ( -- )
-  cmd-num @ >R
-  R@ 1 = IF do-damage-report THEN
-  R@ 2 = IF do-warp THEN
-  R@ 3 = IF do-scan THEN
-  R@ 4 = IF
+  cmd-num @ 1 = IF do-damage-report THEN
+  cmd-num @ 2 = IF do-warp THEN
+  cmd-num @ 3 = IF do-scan THEN
+  cmd-num @ 4 = IF
     cmd-val @ DUP 100 > IF DROP 100 THEN
     DUP pdmg-defl @ > IF DROP pdmg-defl @ THEN pshields !
     draw-panel
   THEN
-  R@ 5 = IF cmd-val @ fire-maser THEN
-  R@ 6 = IF cmd-val @ fire-missile THEN
-  R> 7 = IF do-destruct THEN
+  cmd-num @ 5 = IF cmd-val @ fire-maser THEN
+  cmd-num @ 6 = IF cmd-val @ fire-missile THEN
+  cmd-num @ 7 = IF do-destruct THEN
   0 cmd-state !
   sd-active @ 0= IF draw-cmd-prompt THEN ;
 
 : cmd-start  ( cmd -- )
-  DUP cmd-num !
+  cmd-num !
   \ Commands 1, 3: immediate (no parameter)
-  DUP 1 = IF DROP exec-command EXIT THEN
-  3 = IF exec-command EXIT THEN
+  cmd-num @ 1 = IF exec-command EXIT THEN
+  cmd-num @ 3 = IF exec-command EXIT THEN
   \ Others: clear area once, show "N? ", start digit collection
   1 cmd-state !
   0 cmd-val !  0 cmd-digits !
@@ -3701,15 +3714,11 @@ VARIABLE jnb-result
 
     tick-destruct
 
-    \ ── Every 8th frame: slow background tasks ──
-    frame-tick @ 7 AND 0= IF
-      jov-check-regen
-      check-dock tick-dock
-      tick-base-attack
-      tick-stardate
-      tick-migrate
-      check-spawn
-      update-cond
+    \ ── Background tasks: split across even/odd frames (every 8th) ──
+    frame-tick @ 7 AND DUP 0 = IF
+      jov-check-regen  check-dock  tick-dock  tick-base-attack
+    THEN 4 = IF
+      tick-stardate  tick-migrate  check-spawn  update-cond
     THEN
 
     VSYNC
