@@ -2047,7 +2047,7 @@ VARIABLE detect-timer              \ frame counter for detection rolls
     0 spawn-pending !
     1 jov-moved !
     cancel-jbeam cancel-beam
-    msl-active @ IF msl-erase 0 msl-active ! THEN
+    cancel-msl
     refresh-after-kill
   THEN ;
 
@@ -3174,6 +3174,7 @@ VARIABLE msl-active              \ nonzero = missile in flight
 : msl-scry  ( -- y )  msl-y @ 7 RSHIFT ;
 
 : msl-erase  ( -- )  restore-msl-bg ;
+: cancel-msl  ( -- )  cancel-msl ;
 
 : msl-oob?  ( -- flag )
   msl-scrx 3 < IF 1 EXIT THEN
@@ -3285,7 +3286,7 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
   mood-save
   \ Clear beams and missile
   cancel-jbeam cancel-beam
-  msl-active @ IF msl-erase 0 msl-active ! THEN
+  cancel-msl
   \ Expand new quadrant and redraw
   rg-pcls
   SWAP expand-quadrant
@@ -3327,7 +3328,7 @@ VARIABLE sd-cancel                    \ cancel sequence progress (0-3)
 : sd-detonate  ( -- )
   0 sd-active !
   cancel-jbeam cancel-beam
-  msl-active @ IF msl-erase 0 msl-active ! THEN
+  cancel-msl
   0 17 at-xy  14 0 DO $20 rg-emit LOOP
   0 17 at-xy  S" DESTROYED" rg-type
   restore-ship-bg
@@ -3443,25 +3444,26 @@ VARIABLE sg-row                   \ scan grid: outer loop row
   draw-quadrant ;
 
 : exec-command  ( -- )
-  cmd-num @ 1 = IF do-damage-report THEN
-  cmd-num @ 2 = IF do-warp THEN
-  cmd-num @ 3 = IF do-scan THEN
-  cmd-num @ 4 = IF
+  cmd-num @ >R
+  R@ 1 = IF do-damage-report THEN
+  R@ 2 = IF do-warp THEN
+  R@ 3 = IF do-scan THEN
+  R@ 4 = IF
     cmd-val @ DUP 100 > IF DROP 100 THEN
     DUP pdmg-defl @ > IF DROP pdmg-defl @ THEN pshields !
     draw-panel
   THEN
-  cmd-num @ 5 = IF cmd-val @ fire-maser THEN
-  cmd-num @ 6 = IF cmd-val @ fire-missile THEN
-  cmd-num @ 7 = IF do-destruct THEN
+  R@ 5 = IF cmd-val @ fire-maser THEN
+  R@ 6 = IF cmd-val @ fire-missile THEN
+  R> 7 = IF do-destruct THEN
   0 cmd-state !
   sd-active @ 0= IF draw-cmd-prompt THEN ;
 
 : cmd-start  ( cmd -- )
-  cmd-num !
+  DUP cmd-num !
   \ Commands 1, 3: immediate (no parameter)
-  cmd-num @ 1 = IF exec-command EXIT THEN
-  cmd-num @ 3 = IF exec-command EXIT THEN
+  DUP 1 = IF DROP exec-command EXIT THEN
+  3 = IF exec-command EXIT THEN
   \ Others: clear area once, show "N? ", start digit collection
   1 cmd-state !
   0 cmd-val !  0 cmd-digits !
