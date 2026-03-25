@@ -775,7 +775,7 @@ CODE save-jov-oldpos-n   \ ( n -- )  copy JOV-POS to JOV-OLDX/Y for n Jovians
   qjovians @ ?DUP IF 0 DO
     I jbg-i !
     0 JOV-STATE jbg-i @ + C!
-    0 JOV-TICK jbg-i @ + C!
+    I JOV-TICK jbg-i @ + C!          \ stagger: 0, 1, 2 — avoid simultaneous ticks
     JOV-POS jbg-i @ 2 * + C@ JOV-OLDX jbg-i @ + C!
     JOV-POS jbg-i @ 2 * + 1 + C@ JOV-OLDY jbg-i @ + C!
   LOOP THEN ;
@@ -1977,11 +1977,8 @@ CODE jov-flee   \ ( i -- )  write flee intent to JOV-INTENT
 
 VARIABLE detect-timer              \ frame counter for detection rolls
 
-\ Tick all Jovians, but limit to 1 think per frame
-VARIABLE jov-thought              \ flag: a Jovian already thought this frame
-
+\ Tick all Jovians — AI think when tick counter fires
 : tick-jovians  ( -- )
-  0 jov-thought !
   qjovians @ ?DUP IF 0 DO
     I jbg-i !
     JOV-DMG jbg-i @ + C@ IF
@@ -1989,17 +1986,12 @@ VARIABLE jov-thought              \ flag: a Jovian already thought this frame
         JOV-TICK jbg-i @ + C@ 1 + DUP I jov-threshold < IF
           JOV-TICK jbg-i @ + C!
         ELSE
-          jov-thought @ IF
-            JOV-TICK jbg-i @ + C!   \ defer: keep counter at threshold
+          DROP 0 JOV-TICK jbg-i @ + C!
+          JOV-STATE jbg-i @ + C@ 2 = IF
+            jbg-i @ jov-flee  apply-intent
           ELSE
-            DROP 0 JOV-TICK jbg-i @ + C!
-            JOV-STATE jbg-i @ + C@ 2 = IF
-              jbg-i @ jov-flee  apply-intent
-            ELSE
-              jbg-i @ qbase @ jov-think
-              apply-intent
-            THEN
-            1 jov-thought !
+            jbg-i @ qbase @ jov-think
+            apply-intent
           THEN
         THEN
       THEN
@@ -2039,6 +2031,7 @@ VARIABLE jov-thought              \ flag: a Jovian already thought this frame
   rv @ 4608 0 FILL ;              \ clear rows 0-143 (144 * 32 bytes)
 
 : refresh-after-kill  ( -- )
+  cancel-beam cancel-jbeam cancel-msl
   clear-tactical
   draw-border draw-stars draw-storm-stars draw-event-horizon
   draw-base
@@ -2077,6 +2070,7 @@ VARIABLE check-win                \ flag: a kill happened, check win/lose
     refresh-after-kill
     tick-reinforcement              \ adjacent Jovians may warp in (#186)
     check-spawn                     \ execute deferred spawn if queued
+    update-cond
     \ Clear SOS if we just saved this base
     sos-active @ IF
       pcol @ sos-col @ = prow @ sos-row @ = AND IF
@@ -2122,13 +2116,9 @@ VARIABLE check-win                \ flag: a kill happened, check win/lose
     THEN
   THEN ;
 
-\ Round-robin: one Jovian's gravity per frame
-VARIABLE jgrav-rr
 : jov-gravity  ( -- )
   qjovians @ ?DUP 0= IF EXIT THEN
-  jgrav-rr @ OVER < 0= IF DROP 0 THEN
-  DUP jov-gravity-one
-  1 + jgrav-rr ! ;
+  0 DO I jov-gravity-one LOOP ;
 
 \ ── Explosion effects ────────────────────────────────────────────────
 \ Animated expanding ring explosion.  Each frame generates dots along
@@ -3179,7 +3169,7 @@ VARIABLE msl-px                  \ previous screen x (for erase)
 VARIABLE msl-py                  \ previous screen y (for erase)
 VARIABLE msl-frame               \ animation frame counter
 VARIABLE msl-active              \ nonzero = missile in flight
-100 CONSTANT MSL-SPEED           \ pixels per frame
+256 CONSTANT MSL-SPEED           \ 2 pixels per frame (fixed-point /128)
 5 CONSTANT MSL-COST              \ energy per missile
 
 : msl-spr  ( -- addr )
@@ -3715,23 +3705,22 @@ VARIABLE jnb-result
     THEN
 
     overlay @ 0= IF
-      \ ── Every 2nd frame: physics + AI ──
       frame-tick @ 1 AND 0= IF
+        \ ── Even frames: ship physics + AI thinking ──
         gravity-well star-gravity
         check-collisions
         tick-jovians
+      ELSE
+        \ ── Odd frames: Jovian gravity + background tasks ──
         jov-gravity
+        frame-tick @ 7 AND DUP 1 = IF
+          jov-check-regen  check-dock  tick-dock  tick-base-attack
+        THEN 5 = IF
+          tick-stardate  tick-migrate  check-spawn  update-cond
+        THEN
       THEN
       latch-key
-
       tick-destruct
-
-      \ ── Background tasks: split across even/odd frames (every 8th) ──
-      frame-tick @ 7 AND DUP 0 = IF
-        jov-check-regen  check-dock  tick-dock  tick-base-attack
-      THEN 4 = IF
-        tick-stardate  tick-migrate  check-spawn  update-cond
-      THEN
     THEN
 
     VSYNC
