@@ -224,8 +224,8 @@ $8EB4 CONSTANT MOOD-GRID        \ 64 bytes: mood per sector
 \ Returns x in 4-123, y in 4-139 (away from borders).
 
 
-: rnd-x  ( -- x )  128 rnd 1 + DUP 123 > IF DROP 123 THEN ;
-: rnd-y  ( -- y )  128 rnd 1 + DUP 139 > IF DROP 139 THEN ;
+: rnd-x  ( -- x )  116 rnd 5 + ;    \ 5-120
+: rnd-y  ( -- y )  130 rnd 5 + ;    \ 5-134
 
 \ ── Galaxy generation ────────────────────────────────────────────────────
 \ Single-pass generation: iterate all 64 quadrants, roll dice for each.
@@ -2044,9 +2044,10 @@ VARIABLE jov-thought              \ flag: a Jovian already thought this frame
   draw-base
   save-jov-oldpos
   save-jov-bgs
+  save-ship-pos save-ship-bg
   draw-jovians-live
-  save-ship-bg
-  draw-ship ;
+  draw-ship
+  0 moved !  0 jov-moved ! ;
 
 \ Execute deferred Jovian spawn (requires refresh-after-kill)
 : check-spawn  ( -- )
@@ -3188,7 +3189,12 @@ VARIABLE msl-active              \ nonzero = missile in flight
 : msl-scry  ( -- y )  msl-y @ 7 RSHIFT ;
 
 : msl-erase  ( -- )  restore-msl-bg ;
-: cancel-msl  ( -- )  msl-active @ IF msl-erase 0 msl-active ! THEN ;
+: msl-kill  ( -- )  \ deactivate missile + trigger full redraw
+  msl-active @ IF
+    SPR-MSL1 msl-px @ 1 - msl-py @ 1 - spr-erase-box
+    0 msl-active !  1 jov-moved !
+  THEN ;
+: cancel-msl  ( -- )  msl-kill ;
 
 : msl-oob?  ( -- flag )
   msl-scrx 3 < IF 1 EXIT THEN
@@ -3237,13 +3243,12 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
   1 msl-frame +!
   \ Check bounds
   msl-oob? IF
-    msl-erase  0 msl-active !
-    draw-border
+    msl-kill  draw-border
     EXIT
   THEN
   \ Check Jovian hit (refresh-after-kill already redraws everything)
   msl-hit? IF
-    0 msl-active !  0 msl-dirty !
+    msl-kill  0 msl-dirty !
     EXIT
   THEN
   1 msl-dirty ! ;
@@ -3400,25 +3405,23 @@ VARIABLE sd-cancel                    \ cancel sequence progress (0-3)
 : count-bases  ( -- n )
   0  64 0 DO GALAXY I + C@ q-base? IF 1 + THEN LOOP ;
 
-: do-damage-report  ( -- )
+VARIABLE overlay                  \ 0=tactical, 1=damage, 2=scan
+
+: draw-damage  ( -- )
   clear-tactical
-  \ Header: Jovians and bases remaining
   2 2 at-xy  count-jovians rg-u.
   S"  JOVIANS LEFT" rg-type
   2 4 at-xy  count-bases rg-u.
   S"  BASES LEFT" rg-type
-  \ DAMAGE heading
   2 7 at-xy  S" DAMAGE" rg-type
-  \ Five systems with percentages
   2 9 at-xy   S" ION ENGINES" rg-type     pdmg-ion @ 28 rg-u.r
   2 10 at-xy  S" HYPERDRIVE" rg-type      pdmg-warp @ 28 rg-u.r
   2 11 at-xy  S" SCANNERS" rg-type        pdmg-scan @ 28 rg-u.r
   2 12 at-xy  S" DEFLECTORS" rg-type      pdmg-defl @ 28 rg-u.r
-  2 13 at-xy  S" MASERS" rg-type          pdmg-masr @ 28 rg-u.r
-  \ Wait for key, then restore tactical view
-  KEY DROP
-  clear-tactical
-  draw-quadrant ;
+  2 13 at-xy  S" MASERS" rg-type          pdmg-masr @ 28 rg-u.r ;
+
+: do-damage-report  ( -- )
+  draw-damage 1 overlay ! ;
 
 \ ── Long range scan (command 3) ───────────────────────────────────────
 \ Display 8x8 galaxy map showing Jovians, bases, storms, player position.
@@ -3427,20 +3430,17 @@ VARIABLE sd-cancel                    \ cancel sequence progress (0-3)
 
 VARIABLE sg-row                   \ scan grid: outer loop row
 
-: do-scan  ( -- )
+: draw-scan  ( -- )
   clear-tactical
   4 1 at-xy  S" LONG RANGE SCAN" rg-type
-  \ Column headers: row 3, starting col 4
   8 0 DO
     I 3 * 5 + 3 at-xy  I CHAR 0 + rg-emit
   LOOP
-  \ Galaxy grid: rows 4-11
-  8 0 DO    \ row
+  8 0 DO
     I sg-row !
-    1 I 4 + at-xy  I CHAR 0 + rg-emit    \ row label
-    8 0 DO  \ col
+    1 I 4 + at-xy  I CHAR 0 + rg-emit
+    8 0 DO
       I 3 * 4 + sg-row @ 4 + at-xy
-      \ Check if this is the player's quadrant
       I pcol @ =  sg-row @ prow @ =  AND IF
         CHAR E rg-emit
       ELSE
@@ -3452,10 +3452,10 @@ VARIABLE sg-row                   \ scan grid: outer loop row
         THEN
       THEN
     LOOP
-  LOOP
-  KEY DROP
-  clear-tactical
-  draw-quadrant ;
+  LOOP ;
+
+: do-scan  ( -- )
+  draw-scan 2 overlay ! ;
 
 : exec-command  ( -- )
   cmd-num @ 1 = IF do-damage-report THEN
@@ -3529,6 +3529,12 @@ VARIABLE key-latch                \ latched keypress (survives between polls)
 : latch-key  ( -- )
   KEY? ?DUP IF key-latch ! THEN ;
 
+: dismiss-overlay  ( -- )
+  0 overlay !
+  clear-tactical
+  draw-quadrant
+  save-jov-bgs save-ship-bg ;
+
 : process-key  ( -- )
   latch-key
   key-latch @
@@ -3538,6 +3544,7 @@ VARIABLE key-latch                \ latched keypress (survives between polls)
   ELSE
     DUP prev-key !
     ?DUP IF
+      overlay @ IF DROP dismiss-overlay EXIT THEN
       DUP sd-active @ IF sd-check-key ELSE DROP THEN
       cmd-state @ IF process-cmd-input ELSE process-idle THEN
     THEN
@@ -3686,7 +3693,7 @@ VARIABLE jnb-result
   0 msl-active !  0 msl-dirty !
   0 docked !  0 prev-docked !  0 death-cause !
   0 sd-active !  0 base-attack !
-  0 jov-moved !  0 spawn-pending !  0 migrate-timer !  -1 prev-cond !
+  0 jov-moved !  0 spawn-pending !  0 migrate-timer !  -1 prev-cond !  0 overlay !
   0 frame-tick !
   0 check-win !
   100 prev-energy !
@@ -3697,31 +3704,44 @@ VARIABLE jnb-result
     1 frame-tick +!
 
     \ ── Every frame: player input + fast systems ──
-    save-ship-pos
-    move-ship
-    process-key
-    tick-missile
-    tick-jbeam
-
-    \ ── Every 2nd frame: physics + AI ──
-    frame-tick @ 1 AND 0= IF
-      gravity-well star-gravity
-      check-collisions
-      tick-jovians
-      jov-gravity
+    overlay @ 0= IF
+      save-ship-pos
+      move-ship
     THEN
-    latch-key
+    process-key
+    overlay @ 0= IF
+      tick-missile
+      tick-jbeam
+    THEN
 
-    tick-destruct
+    overlay @ 0= IF
+      \ ── Every 2nd frame: physics + AI ──
+      frame-tick @ 1 AND 0= IF
+        gravity-well star-gravity
+        check-collisions
+        tick-jovians
+        jov-gravity
+      THEN
+      latch-key
 
-    \ ── Background tasks: split across even/odd frames (every 8th) ──
-    frame-tick @ 7 AND DUP 0 = IF
-      jov-check-regen  check-dock  tick-dock  tick-base-attack
-    THEN 4 = IF
-      tick-stardate  tick-migrate  check-spawn  update-cond
+      tick-destruct
+
+      \ ── Background tasks: split across even/odd frames (every 8th) ──
+      frame-tick @ 7 AND DUP 0 = IF
+        jov-check-regen  check-dock  tick-dock  tick-base-attack
+      THEN 4 = IF
+        tick-stardate  tick-migrate  check-spawn  update-cond
+      THEN
     THEN
 
     VSYNC
+
+    overlay @ IF
+      \ Overlay active: update damage display live if showing damage
+      overlay @ 1 = IF
+        frame-tick @ 15 AND 0= IF draw-damage THEN
+      THEN
+    ELSE
 
     \ ── LAYER 2: Erase beam tails (restore saved pixels) ──
     tick-jbeam-erase
@@ -3737,8 +3757,10 @@ VARIABLE jnb-result
       restore-ship-bg
       restore-jov-bgs
       draw-stars
-      save-jov-oldpos save-jov-bgs draw-jovians-live
-      save-ship-bg draw-ship
+      save-jov-oldpos save-jov-bgs
+      save-ship-bg
+      draw-jovians-live
+      draw-ship
       msl-dirty @ IF
         msl-scrx msl-px !  msl-scry msl-py !
         0 msl-dirty !
@@ -3853,6 +3875,7 @@ VARIABLE jnb-result
       KEY DROP
       main EXIT
     THEN
+    THEN                          \ close overlay IF/ELSE
   AGAIN ;
 
 main
