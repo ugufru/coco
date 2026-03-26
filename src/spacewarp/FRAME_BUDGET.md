@@ -119,111 +119,114 @@ Jovian tick counters staggered at init (0, 1, 2) to reduce simultaneous thinks.
 
 ## Jitter Sources
 
-1. **Even vs odd frames**: Even frames do physics+AI (~3,400cy), odd frames do Jovian gravity+BG (~3,000cy). Balanced within ~10% thanks to rebalanced scheduling.
+1. **Even vs odd frames**: Even frames do physics+AI, odd frames do gravity+BG. Gravity loops gated to every 4th frame, so most frames are lightweight.
 
 2. **Jovian tick synchronization**: Tick counters staggered at init (I=0,1,2). Max overlap is 2 Jovians thinking on the same even frame when LCM of thresholds aligns. Each think = ~700cy.
 
 3. **`jov-blocked?` cascades**: Each Jovian think calls `apply-intent` which calls `jov-blocked?` up to 3x (try both axes, try x-only, try y-only). Each call loops all stars + checks 4 other obstacle types.
 
-4. **Star count variance**: Quadrants with 5 stars add ~800cy to star-gravity (even) and compound with jov-gravity (odd, 3 Jovians x 5 stars = 15 distance calcs).
+4. **Gravity gating**: All gravity distance loops (star-gravity, jov-gravity star loop, gravity-well pull, jov-gravity bhole pull) gated on `grav-tick @ 3 AND 0=`. Only runs every 4th even frame. Contact-range kills (<3px star, <6px bhole) still check every frame.
 
 5. **Rendering path**: Full cycle (jov-moved) = ~2,500cy. Ship-only = ~500cy. The full cycle runs when any Jovian moves, which is most even frames during combat.
+
+6. **Frame drops**: Confirmed 0 drops via vsync-check instrumentation. Peak utilization ~35% of budget. All jitter is visual (rendering path variation), not temporal.
 
 ## Optimization Opportunities
 
 | Opportunity | Estimated Savings | Complexity |
 |-------------|-------------------|------------|
 | `jov-blocked?` -> CODE word | ~400cy per call (3-9x/frame) | High (variable address issue) |
-| `star-gravity` -> CODE word | ~300cy (5 stars) | Medium |
-| `jov-gravity` star loop -> CODE | ~400cy (3 Jovians x 5 stars) | Medium |
 | `move-ship` -> CODE word | ~300cy | Medium |
-| Move `star-gravity` to odd frames | Balances even further | Low |
 
 ## Appendix: 60-Frame Cycle Map
 
 Worst case scenario: 3 Jovians (thresholds 4/6/3, staggered 0/1/2), 5 stars, black hole, base, active beam + missile.
 
-Columns: `EF` = every-frame tasks, `Grav` = gravity-well + star-gravity, `Coll` = check-collisions, `J0/J1/J2` = Jovian think, `JGrv` = jov-gravity, `BG` = background slot, `Rnd` = rendering, `Post` = post-render. All values in cycles.
+Columns: `EF` = every-frame tasks, `SGrv` = star-gravity (ship), `GW` = gravity-well (bhole), `Coll` = check-collisions, `J0/J1/J2` = Jovian think, `JGrv` = jov-gravity (all Jovians), `BG` = background slot, `Rnd` = rendering, `Post` = post-render. All values in cycles.
 
 Even frames: ship physics + AI thinking. Odd frames: Jovian gravity + background tasks.
+Gravity loops gated: only run when `grav-tick MOD 4 = 0` (grav-tick increments on even frames).
+`G` suffix marks frames where gravity distance loops are active.
 
-| Fr | E/O | EF | Grav | Coll | J0 | J1 | J2 | JGrv | BG | Rnd | Post | **Total** |
-|----|-----|----|------|------|----|----|----|------|----|-----|------|-----------|
-| 0 | E | 1000 | 1100 | 200 | | | | | | 2500 | 500 | **5300** |
-| 1 | O | 1000 | | | | | | 1500 | 850 | 500 | 500 | **4350** |
-| 2 | E | 1000 | 1100 | 200 | | | 700 | | | 2500 | 500 | **6000** |
-| 3 | O | 1000 | | | | | | 1500 | | 500 | 500 | **3500** |
-| 4 | E | 1000 | 1100 | 200 | 700 | | | | | 2500 | 500 | **6000** |
-| 5 | O | 1000 | | | | | | 1500 | 950 | 500 | 500 | **4450** |
-| 6 | E | 1000 | 1100 | 200 | | | 700 | | | 2500 | 500 | **6000** |
-| 7 | O | 1000 | | | | | | 1500 | | 500 | 500 | **3500** |
-| 8 | E | 1000 | 1100 | 200 | | | | | | 2500 | 500 | **5300** |
-| 9 | O | 1000 | | | | | | 1500 | 850 | 500 | 500 | **4350** |
-| 10 | E | 1000 | 1100 | 200 | 700 | | 700 | | | 2500 | 500 | **6700** |
-| 11 | O | 1000 | | | | | | 1500 | | 500 | 500 | **3500** |
-| 12 | E | 1000 | 1100 | 200 | | 700 | | | | 2500 | 500 | **6000** |
-| 13 | O | 1000 | | | | | | 1500 | 950 | 500 | 500 | **4450** |
-| 14 | E | 1000 | 1100 | 200 | | | 700 | | | 2500 | 500 | **6000** |
-| 15 | O | 1000 | | | | | | 1500 | | 500 | 500 | **3500** |
-| 16 | E | 1000 | 1100 | 200 | 700 | | | | | 2500 | 500 | **6000** |
-| 17 | O | 1000 | | | | | | 1500 | 850 | 500 | 500 | **4350** |
-| 18 | E | 1000 | 1100 | 200 | | | 700 | | | 2500 | 500 | **6000** |
-| 19 | O | 1000 | | | | | | 1500 | | 500 | 500 | **3500** |
-| 20 | E | 1000 | 1100 | 200 | | 700 | | | | 2500 | 500 | **6000** |
-| 21 | O | 1000 | | | | | | 1500 | 950 | 500 | 500 | **4450** |
-| 22 | E | 1000 | 1100 | 200 | 700 | | 700 | | | 2500 | 500 | **6700** |
-| 23 | O | 1000 | | | | | | 1500 | | 500 | 500 | **3500** |
-| 24 | E | 1000 | 1100 | 200 | | | | | | 2500 | 500 | **5300** |
-| 25 | O | 1000 | | | | | | 1500 | 850 | 500 | 500 | **4350** |
-| 26 | E | 1000 | 1100 | 200 | | | 700 | | | 2500 | 500 | **6000** |
-| 27 | O | 1000 | | | | | | 1500 | | 500 | 500 | **3500** |
-| 28 | E | 1000 | 1100 | 200 | 700 | 700 | | | | 2500 | 500 | **6700** |
-| 29 | O | 1000 | | | | | | 1500 | 950 | 500 | 500 | **4450** |
-| 30 | E | 1000 | 1100 | 200 | | | 700 | | | 2500 | 500 | **6000** |
-| 31 | O | 1000 | | | | | | 1500 | | 500 | 500 | **3500** |
-| 32 | E | 1000 | 1100 | 200 | | | | | | 2500 | 500 | **5300** |
-| 33 | O | 1000 | | | | | | 1500 | 850 | 500 | 500 | **4350** |
-| 34 | E | 1000 | 1100 | 200 | 700 | | 700 | | | 2500 | 500 | **6700** |
-| 35 | O | 1000 | | | | | | 1500 | | 500 | 500 | **3500** |
-| 36 | E | 1000 | 1100 | 200 | | | | | | 2500 | 500 | **5300** |
-| 37 | O | 1000 | | | | | | 1500 | 950 | 500 | 500 | **4450** |
-| 38 | E | 1000 | 1100 | 200 | | 700 | 700 | | | 2500 | 500 | **6700** |
-| 39 | O | 1000 | | | | | | 1500 | | 500 | 500 | **3500** |
-| 40 | E | 1000 | 1100 | 200 | 700 | | | | | 2500 | 500 | **6000** |
-| 41 | O | 1000 | | | | | | 1500 | 850 | 500 | 500 | **4350** |
-| 42 | E | 1000 | 1100 | 200 | | | 700 | | | 2500 | 500 | **6000** |
-| 43 | O | 1000 | | | | | | 1500 | | 500 | 500 | **3500** |
-| 44 | E | 1000 | 1100 | 200 | | 700 | | | | 2500 | 500 | **6000** |
-| 45 | O | 1000 | | | | | | 1500 | 950 | 500 | 500 | **4450** |
-| 46 | E | 1000 | 1100 | 200 | 700 | | 700 | | | 2500 | 500 | **6700** |
-| 47 | O | 1000 | | | | | | 1500 | | 500 | 500 | **3500** |
-| 48 | E | 1000 | 1100 | 200 | | | | | | 2500 | 500 | **5300** |
-| 49 | O | 1000 | | | | | | 1500 | 850 | 500 | 500 | **4350** |
-| 50 | E | 1000 | 1100 | 200 | | | 700 | | | 2500 | 500 | **6000** |
-| 51 | O | 1000 | | | | | | 1500 | | 500 | 500 | **3500** |
-| 52 | E | 1000 | 1100 | 200 | 700 | | | | | 2500 | 500 | **6000** |
-| 53 | O | 1000 | | | | | | 1500 | 950 | 500 | 500 | **4450** |
-| 54 | E | 1000 | 1100 | 200 | | 700 | 700 | | | 2500 | 500 | **6700** |
-| 55 | O | 1000 | | | | | | 1500 | | 500 | 500 | **3500** |
-| 56 | E | 1000 | 1100 | 200 | | | | | | 2500 | 500 | **5300** |
-| 57 | O | 1000 | | | | | | 1500 | 850 | 500 | 500 | **4350** |
-| 58 | E | 1000 | 1100 | 200 | 700 | | 700 | | | 2500 | 500 | **6700** |
-| 59 | O | 1000 | | | | | | 1500 | | 500 | 500 | **3500** |
+| Fr | E/O | EF | SGrv | GW | Coll | J0 | J1 | J2 | JGrv | BG | Rnd | Post | **Total** |
+|----|-----|----|------|----|------|----|----|----|------|----|-----|------|-----------|
+| 0 | E/G | 1000 | 800 | 300 | 200 | | | | | | 2500 | 500 | **5300** |
+| 1 | O/G | 1000 | | | | | | | 1500 | 850 | 500 | 500 | **4350** |
+| 2 | E | 1000 | | 50 | 200 | | | 700 | | | 2500 | 500 | **4950** |
+| 3 | O | 1000 | | | | | | | 50 | | 500 | 500 | **2050** |
+| 4 | E | 1000 | | 50 | 200 | 700 | | | | | 2500 | 500 | **4950** |
+| 5 | O | 1000 | | | | | | | 50 | 950 | 500 | 500 | **3000** |
+| 6 | E | 1000 | | 50 | 200 | | | 700 | | | 2500 | 500 | **4950** |
+| 7 | O | 1000 | | | | | | | 50 | | 500 | 500 | **2050** |
+| 8 | E/G | 1000 | 800 | 300 | 200 | | | | | | 2500 | 500 | **5300** |
+| 9 | O/G | 1000 | | | | | | | 1500 | 850 | 500 | 500 | **4350** |
+| 10 | E | 1000 | | 50 | 200 | 700 | | 700 | | | 2500 | 500 | **5650** |
+| 11 | O | 1000 | | | | | | | 50 | | 500 | 500 | **2050** |
+| 12 | E | 1000 | | 50 | 200 | | 700 | | | | 2500 | 500 | **4950** |
+| 13 | O | 1000 | | | | | | | 50 | 950 | 500 | 500 | **3000** |
+| 14 | E | 1000 | | 50 | 200 | | | 700 | | | 2500 | 500 | **4950** |
+| 15 | O | 1000 | | | | | | | 50 | | 500 | 500 | **2050** |
+| 16 | E/G | 1000 | 800 | 300 | 200 | 700 | | | | | 2500 | 500 | **6000** |
+| 17 | O/G | 1000 | | | | | | | 1500 | 850 | 500 | 500 | **4350** |
+| 18 | E | 1000 | | 50 | 200 | | | 700 | | | 2500 | 500 | **4950** |
+| 19 | O | 1000 | | | | | | | 50 | | 500 | 500 | **2050** |
+| 20 | E | 1000 | | 50 | 200 | | 700 | | | | 2500 | 500 | **4950** |
+| 21 | O | 1000 | | | | | | | 50 | 950 | 500 | 500 | **3000** |
+| 22 | E | 1000 | | 50 | 200 | 700 | | 700 | | | 2500 | 500 | **5650** |
+| 23 | O | 1000 | | | | | | | 50 | | 500 | 500 | **2050** |
+| 24 | E/G | 1000 | 800 | 300 | 200 | | | | | | 2500 | 500 | **5300** |
+| 25 | O/G | 1000 | | | | | | | 1500 | 850 | 500 | 500 | **4350** |
+| 26 | E | 1000 | | 50 | 200 | | | 700 | | | 2500 | 500 | **4950** |
+| 27 | O | 1000 | | | | | | | 50 | | 500 | 500 | **2050** |
+| 28 | E | 1000 | | 50 | 200 | 700 | 700 | | | | 2500 | 500 | **5650** |
+| 29 | O | 1000 | | | | | | | 50 | 950 | 500 | 500 | **3000** |
+| 30 | E | 1000 | | 50 | 200 | | | 700 | | | 2500 | 500 | **4950** |
+| 31 | O | 1000 | | | | | | | 50 | | 500 | 500 | **2050** |
+| 32 | E/G | 1000 | 800 | 300 | 200 | | | | | | 2500 | 500 | **5300** |
+| 33 | O/G | 1000 | | | | | | | 1500 | 850 | 500 | 500 | **4350** |
+| 34 | E | 1000 | | 50 | 200 | 700 | | 700 | | | 2500 | 500 | **5650** |
+| 35 | O | 1000 | | | | | | | 50 | | 500 | 500 | **2050** |
+| 36 | E | 1000 | | 50 | 200 | | | | | | 2500 | 500 | **4250** |
+| 37 | O | 1000 | | | | | | | 50 | 950 | 500 | 500 | **3000** |
+| 38 | E | 1000 | | 50 | 200 | | 700 | 700 | | | 2500 | 500 | **5650** |
+| 39 | O | 1000 | | | | | | | 50 | | 500 | 500 | **2050** |
+| 40 | E/G | 1000 | 800 | 300 | 200 | 700 | | | | | 2500 | 500 | **6000** |
+| 41 | O/G | 1000 | | | | | | | 1500 | 850 | 500 | 500 | **4350** |
+| 42 | E | 1000 | | 50 | 200 | | | 700 | | | 2500 | 500 | **4950** |
+| 43 | O | 1000 | | | | | | | 50 | | 500 | 500 | **2050** |
+| 44 | E | 1000 | | 50 | 200 | | 700 | | | | 2500 | 500 | **4950** |
+| 45 | O | 1000 | | | | | | | 50 | 950 | 500 | 500 | **3000** |
+| 46 | E | 1000 | | 50 | 200 | 700 | | 700 | | | 2500 | 500 | **5650** |
+| 47 | O | 1000 | | | | | | | 50 | | 500 | 500 | **2050** |
+| 48 | E/G | 1000 | 800 | 300 | 200 | | | | | | 2500 | 500 | **5300** |
+| 49 | O/G | 1000 | | | | | | | 1500 | 850 | 500 | 500 | **4350** |
+| 50 | E | 1000 | | 50 | 200 | | | 700 | | | 2500 | 500 | **4950** |
+| 51 | O | 1000 | | | | | | | 50 | | 500 | 500 | **2050** |
+| 52 | E | 1000 | | 50 | 200 | 700 | | | | | 2500 | 500 | **4950** |
+| 53 | O | 1000 | | | | | | | 50 | 950 | 500 | 500 | **3000** |
+| 54 | E | 1000 | | 50 | 200 | | 700 | 700 | | | 2500 | 500 | **5650** |
+| 55 | O | 1000 | | | | | | | 50 | | 500 | 500 | **2050** |
+| 56 | E/G | 1000 | 800 | 300 | 200 | | | | | | 2500 | 500 | **5300** |
+| 57 | O/G | 1000 | | | | | | | 1500 | 850 | 500 | 500 | **4350** |
+| 58 | E | 1000 | | 50 | 200 | 700 | | 700 | | | 2500 | 500 | **5650** |
+| 59 | O | 1000 | | | | | | | 50 | | 500 | 500 | **2050** |
 
 ### Summary
 
 | Metric | Value |
 |--------|-------|
 | **Budget per frame** | 14,917 cy |
-| **Even frame (no thinks)** | ~5,300 cy (36% budget) |
-| **Even + 1 think** | ~6,000 cy (40% budget) |
-| **Even + 2 thinks** | ~6,700 cy (45% budget) |
-| **Odd frame (no BG)** | ~3,500 cy (23% budget) |
-| **Odd frame + BG slot** | ~4,450 cy (30% budget) |
-| **Peak even** | ~6,700 cy (45% budget) |
-| **Peak odd** | ~4,450 cy (30% budget) |
-| **Headroom at peak** | ~8,217 cy (55%) |
-| **Even/odd swing** | 5,300-6,700 vs 3,500-4,450 (~1.5:1) |
-| **Old even/odd swing** | 7,650-9,150 vs 2,000 (~4:1) |
+| **Light odd frame** | ~2,050 cy (14% budget) |
+| **Light even frame (no thinks)** | ~4,250 cy (28% budget) |
+| **Even + 1 think** | ~4,950 cy (33% budget) |
+| **Even + 2 thinks** | ~5,650 cy (38% budget) |
+| **Gravity even (no thinks)** | ~5,300 cy (36% budget) |
+| **Peak: gravity even + 1 think** | ~6,000 cy (40% budget) |
+| **Gravity odd + BG** | ~4,350 cy (29% budget) |
+| **Odd + BG (no gravity)** | ~3,000 cy (20% budget) |
+| **Headroom at peak** | ~8,917 cy (60%) |
+| **Frame load range** | 2,050 - 6,000 (~3:1) |
 
-The rebalanced schedule reduced the even/odd swing from ~4:1 to ~1.5:1 by moving Jovian gravity and background tasks to odd frames. Peak frame load dropped from 9,150cy (61%) to 6,700cy (45%), providing 55% headroom at worst case.
+With gravity gated to every 4th frame, 6 of every 8 frames run at 2,050-5,650cy (14-38% budget).
+Only 2 of every 8 frames hit the gravity loops at 4,350-6,000cy (29-40% budget).
+Confirmed 0 frame drops via instrumentation — 60% headroom at absolute peak.

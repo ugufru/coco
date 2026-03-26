@@ -2083,19 +2083,21 @@ VARIABLE check-win                \ flag: a kill happened, check win/lose
 : jov-gravity-one  ( i -- )
   jbg-i !
   JOV-DMG jbg-i @ + C@ IF
-    \ Black hole gravity
+    \ Black hole gravity (gated: full check every 4th frame, contact every frame)
     qbhole @ IF
       BHOLE-POS C@ sg-sx !  BHOLE-POS 1 + C@ sg-sy !
       JOV-POS jbg-i @ 2 * + BHOLE-POS mdist
-      DUP 3 < IF                   \ contact: kill
+      DUP 3 < IF                   \ contact: kill (always check)
         DROP jov-kill
+      ELSE grav-tick @ 3 AND IF
+        DROP                        \ skip pull calc on 3/4 frames
       ELSE DUP 20 > IF             \ outside well
         DROP
-      ELSE 10 > IF                  \ 10-20: pull every 2 frames
-        grav-tick @ 1 AND 0= IF jov-pull THEN
-      ELSE                          \ <10: pull every frame
+      ELSE 10 > IF                  \ 10-20: pull
         jov-pull
-      THEN THEN THEN
+      ELSE                          \ <10: pull
+        jov-pull
+      THEN THEN THEN THEN
     THEN
     \ Star gravity (only if still alive, skip on non-pull frames)
     JOV-DMG jbg-i @ + C@ IF
@@ -2749,15 +2751,14 @@ VARIABLE grav-tick
   qbhole @ 0= IF EXIT THEN
   1 grav-tick +!
   SHIP-POS BHOLE-POS mdist
-  DUP 30 > IF DROP EXIT THEN
-  DUP 20 > IF                  \ 20-30: gentle drift, every 4 frames
-    DROP grav-tick @ 3 AND IF EXIT THEN 1
-  ELSE DUP 10 > IF             \ 10-20: moderate, every 2 frames
-    DROP grav-tick @ 1 AND IF EXIT THEN 1
-  ELSE 6 > IF                  \ 6-10: every frame
-    1
-  ELSE                          \ <6: inescapable, 2px/frame
-    2
+  DUP 6 < IF                   \ <6: inescapable, 2px/frame (always)
+    DROP 2
+  ELSE grav-tick @ 3 AND IF
+    DROP EXIT                   \ skip pull calc on 3/4 frames
+  ELSE 30 > IF
+    EXIT                        \ outside well
+  ELSE
+    1                           \ 6-30: pull 1px on qualifying frames
   THEN THEN THEN
   >R 1 moved !
   SHIP-POS BHOLE-POS C@ BHOLE-POS 1 + C@ R> moved xyn-pull ;
