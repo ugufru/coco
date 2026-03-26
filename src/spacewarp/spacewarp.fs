@@ -3521,9 +3521,7 @@ VARIABLE key-latch                \ latched keypress (survives between polls)
 
 : dismiss-overlay  ( -- )
   0 overlay !
-  clear-tactical
-  draw-quadrant
-  save-jov-bgs save-ship-bg ;
+  refresh-after-kill ;
 
 : process-key  ( -- )
   latch-key
