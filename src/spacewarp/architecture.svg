@@ -1868,6 +1868,31 @@
 <text x="856.5" y="1449.5" class="node-label" font-size="8.0">ship-jov-blocked?</text>
 <text x="581.4" y="862.2" class="node-label" font-size="8.0">check-spawn</text>
 <text x="571.4" y="917.2" class="node-label" font-size="7.0">frame-tick</text>
+<!-- New words added 2026-03-26 -->
+<!-- Missiles: cancel-msl, msl-kill -->
+<circle cx="958" cy="258" r="4" fill="#5588cc"/>
+<text x="958" y="268" class="node-label" font-size="7.0">cancel-msl</text>
+<circle cx="938" cy="240" r="4" fill="#5588cc"/>
+<text x="938" y="250" class="node-label" font-size="7.0">msl-kill</text>
+
+<!-- UI/Commands: dismiss-overlay, draw-damage, draw-scan, overlay -->
+<circle cx="1106" cy="720" r="5" fill="#6688bb"/>
+<text x="1106" y="730" class="node-label" font-size="8.0">dismiss-overlay</text>
+<circle cx="1106" cy="752" r="5" fill="#6688bb"/>
+<text x="1106" y="762" class="node-label" font-size="8.0">draw-damage</text>
+<circle cx="1025" cy="610" r="5" fill="#6688bb"/>
+<text x="1025" y="620" class="node-label" font-size="8.0">draw-scan</text>
+<circle cx="1126" cy="738" r="3" fill="#4466aa"/>
+<text x="1126" y="748" class="node-label" font-size="7.0">overlay</text>
+
+<!-- Jovian AI: jov-gravity-one -->
+<circle cx="893" cy="1060" r="5" fill="#7799cc"/>
+<text x="893" y="1070" class="node-label" font-size="8.0">jov-gravity-one</text>
+
+<!-- Navigation: try-move -->
+<circle cx="1018" cy="1252" r="5" fill="#7799cc"/>
+<text x="1018" y="1262" class="node-label" font-size="8.0">try-move</text>
+
 <text x="1200.0" y="35" text-anchor="middle" fill="#ccc" font-size="24" font-weight="700">SPACE WARP — Architecture Map</text>
-<text x="1200.0" y="58" text-anchor="middle" fill="#666" font-size="13">467 words · 24,552 bytes · node size = byte count · color = connectivity (red=high, blue=low)</text>
+<text x="1200.0" y="58" text-anchor="middle" fill="#666" font-size="13">474 words · 24,388 bytes · node size = byte count · color = connectivity (red=high, blue=low)</text>
 </svg>
