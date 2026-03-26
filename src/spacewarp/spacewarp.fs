@@ -2097,22 +2097,24 @@ VARIABLE check-win                \ flag: a kill happened, check win/lose
         jov-pull
       THEN THEN THEN
     THEN
-    \ Star gravity (only if still alive)
+    \ Star gravity (only if still alive, skip on non-pull frames)
     JOV-DMG jbg-i @ + C@ IF
-      qstars @ ?DUP IF 0 DO
-        STAR-POS I 2 * + C@ sg-sx !
-        STAR-POS I 2 * + 1 + C@ sg-sy !
-        JOV-POS jbg-i @ 2 * + STAR-POS I 2 * + mdist
-        DUP 3 < IF                 \ contact: kill
-          DROP jov-kill
-        ELSE DUP jov-avoid-dist < 0= IF  \ pilot avoiding: no pull
-          DROP
-        ELSE 6 < IF                \ close: pull every 2 frames
-          grav-tick @ 1 AND 0= IF jov-pull THEN
-        ELSE                        \ 6-avoidDist: pull every 4 frames
-          grav-tick @ 3 AND 0= IF jov-pull THEN
-        THEN THEN THEN
-      LOOP THEN
+      grav-tick @ 3 AND 0= IF        \ only check every 4th frame
+        qstars @ ?DUP IF 0 DO
+          STAR-POS I 2 * + C@ sg-sx !
+          STAR-POS I 2 * + 1 + C@ sg-sy !
+          JOV-POS jbg-i @ 2 * + STAR-POS I 2 * + mdist
+          DUP 3 < IF                 \ contact: kill
+            DROP jov-kill
+          ELSE DUP jov-avoid-dist < 0= IF  \ pilot avoiding: no pull
+            DROP
+          ELSE 6 < IF                \ close: always pull
+            jov-pull
+          ELSE                        \ far: every other qualifying frame
+            grav-tick @ 1 AND 0= IF jov-pull THEN
+          THEN THEN THEN
+        LOOP THEN
+      THEN
     THEN
   THEN ;
 
@@ -2831,6 +2833,7 @@ CODE xyn-pull  ( addr tx ty step flag-addr -- )
   SHIP-POS sg-sx @ sg-sy @ moved xy-pull ;
 
 : star-gravity  ( -- )
+  grav-tick @ 3 AND IF EXIT THEN     \ only check on frames 0,4,8... (every 4th)
   qstars @ ?DUP IF 0 DO
     I sg-i !
     STAR-POS sg-i @ 2 * + C@ sg-sx !
@@ -2840,9 +2843,9 @@ CODE xyn-pull  ( addr tx ty step flag-addr -- )
       DROP
     ELSE
       5 < IF
-        grav-tick @ 1 AND 0= IF star-pull THEN
+        star-pull                     \ close: always pull (was every 2 frames)
       ELSE
-        grav-tick @ 3 AND 0= IF star-pull THEN
+        grav-tick @ 1 AND 0= IF star-pull THEN  \ far: every other qualifying frame
       THEN
     THEN
   LOOP THEN ;
