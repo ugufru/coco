@@ -770,6 +770,580 @@ def write_decb(records, exec_addr, out_file):
         f.write(struct.pack('>H', exec_addr))
 
 
+# ── 6809 Cycle Counter ────────────────────────────────────────────────────────
+#
+# The 6809 is fully deterministic: no pipeline, no cache, no branch prediction.
+# Every instruction has an exact cycle count determined by the opcode and
+# addressing mode.  This module computes per-word cycle costs for both
+# CODE words (6809 assembly) and Forth colon definitions (ITC threading).
+
+# Opcode table: mnemonic → (inherent, immediate, direct, extended, indexed_base)
+# None = mode unavailable for that opcode.
+# Sources: Motorola MC6809E data sheet, Table A-1.
+OPCODE_CYCLES = {
+    # ── 8-bit loads/stores ──
+    'LDA':  (None, 2, 4, 5, 4),  'LDB':  (None, 2, 4, 5, 4),
+    'STA':  (None, None, 4, 5, 4), 'STB':  (None, None, 4, 5, 4),
+    # ── 16-bit loads/stores ──
+    'LDD':  (None, 3, 5, 6, 5),  'STD':  (None, None, 5, 6, 5),
+    'LDX':  (None, 3, 5, 6, 5),  'STX':  (None, None, 5, 6, 5),
+    'LDY':  (None, 4, 6, 7, 6),  'STY':  (None, None, 6, 7, 6),
+    'LDU':  (None, 3, 5, 6, 5),  'STU':  (None, None, 5, 6, 5),
+    'LDS':  (None, 4, 6, 7, 6),  'STS':  (None, None, 6, 7, 6),
+    # ── 8-bit arithmetic ──
+    'ADDA': (None, 2, 4, 5, 4),  'ADDB': (None, 2, 4, 5, 4),
+    'ADCA': (None, 2, 4, 5, 4),  'ADCB': (None, 2, 4, 5, 4),
+    'SUBA': (None, 2, 4, 5, 4),  'SUBB': (None, 2, 4, 5, 4),
+    'SBCA': (None, 2, 4, 5, 4),  'SBCB': (None, 2, 4, 5, 4),
+    'CMPA': (None, 2, 4, 5, 4),  'CMPB': (None, 2, 4, 5, 4),
+    # ── 16-bit arithmetic ──
+    'ADDD': (None, 4, 6, 7, 6),  'SUBD': (None, 4, 6, 7, 6),
+    'CMPD': (None, 5, 7, 8, 7),
+    'CMPX': (None, 4, 6, 7, 6),  'CMPY': (None, 5, 7, 8, 7),
+    'CMPU': (None, 5, 7, 8, 7),  'CMPS': (None, 5, 7, 8, 7),
+    # ── 8-bit logic ──
+    'ANDA': (None, 2, 4, 5, 4),  'ANDB': (None, 2, 4, 5, 4),
+    'ORA':  (None, 2, 4, 5, 4),  'ORB':  (None, 2, 4, 5, 4),
+    'EORA': (None, 2, 4, 5, 4),  'EORB': (None, 2, 4, 5, 4),
+    'BITA': (None, 2, 4, 5, 4),  'BITB': (None, 2, 4, 5, 4),
+    # ── Inherent (register) ──
+    'NEGA': (2,), 'NEGB': (2,), 'COMA': (2,), 'COMB': (2,),
+    'INCA': (2,), 'INCB': (2,), 'DECA': (2,), 'DECB': (2,),
+    'CLRA': (2,), 'CLRB': (2,), 'TSTA': (2,), 'TSTB': (2,),
+    'ASLA': (2,), 'ASLB': (2,), 'ASRA': (2,), 'ASRB': (2,),
+    'LSLA': (2,), 'LSLB': (2,), 'LSRA': (2,), 'LSRB': (2,),
+    'ROLA': (2,), 'ROLB': (2,), 'RORA': (2,), 'RORB': (2,),
+    'MUL':  (11,), 'ABX':  (3,), 'DAA':  (2,), 'NOP':  (2,),
+    'SEX':  (2,),
+    # ── Memory read-modify-write ──
+    'NEG':  (None, None, 6, 7, 6), 'COM':  (None, None, 6, 7, 6),
+    'INC':  (None, None, 6, 7, 6), 'DEC':  (None, None, 6, 7, 6),
+    'CLR':  (None, None, 6, 7, 6), 'TST':  (None, None, 6, 7, 6),
+    'ASL':  (None, None, 6, 7, 6), 'ASR':  (None, None, 6, 7, 6),
+    'LSL':  (None, None, 6, 7, 6), 'LSR':  (None, None, 6, 7, 6),
+    'ROL':  (None, None, 6, 7, 6), 'ROR':  (None, None, 6, 7, 6),
+    # ── Transfers ──
+    'TFR':  (6,), 'EXG':  (8,),
+    # ── LEA ──
+    'LEAX': (None, None, None, None, 4),
+    'LEAY': (None, None, None, None, 4),
+    'LEAU': (None, None, None, None, 4),
+    'LEAS': (None, None, None, None, 4),
+    # ── Jumps ──
+    'JMP':  (None, None, 3, 4, 3),
+    'JSR':  (None, None, 7, 8, 7),
+    'RTS':  (5,),
+    # ── CC ops ──
+    'ANDCC': (3,), 'ORCC': (3,),
+    'CWAI': (20,), 'SYNC': (2,),
+    'SWI': (19,), 'SWI2': (20,), 'SWI3': (20,),
+}
+
+# Additional cycles for indexed addressing postbyte variants.
+# The base indexed cycle count from OPCODE_CYCLES is added to these.
+INDEXED_ADDER = {
+    ',R':     0,   ',R+':    2,   ',R++':   3,
+    ',-R':    2,   ',--R':   3,
+    'n5,R':   1,   'n8,R':   1,   'n16,R':  4,
+    'A,R':    1,   'B,R':    1,   'D,R':    4,
+    'n8,PCR': 1,   'n16,PCR':5,
+    # Indirect variants (extra level of indirection)
+    '[,R]':     3,  '[n8,R]':   4,  '[n16,R]':  7,
+    '[A,R]':    4,  '[B,R]':    4,  '[D,R]':    7,
+    '[n8,PCR]': 4,  '[n16,PCR]':8,  '[n16]':    5,
+}
+
+# PSHS/PULS/PSHU/PULU: base 5 cycles + per-register cost.
+_REG_CYCLES = {
+    'CC': 1, 'A': 1, 'B': 1, 'DP': 1,
+    'D': 2, 'X': 2, 'Y': 2, 'U': 2, 'S': 2, 'PC': 2,
+}
+
+# Short conditional branches: 3 cycles regardless of taken/not-taken.
+_SHORT_BRANCHES = {
+    'BEQ', 'BNE', 'BCS', 'BCC', 'BMI', 'BPL', 'BVS', 'BVC',
+    'BHI', 'BLS', 'BGE', 'BLE', 'BGT', 'BLT', 'BLO', 'BHS',
+}
+# Long conditional branches: 5 not-taken, 6 taken.
+_LONG_BRANCHES = {
+    'LBEQ', 'LBNE', 'LBCS', 'LBCC', 'LBMI', 'LBPL', 'LBVS', 'LBVC',
+    'LBHI', 'LBLS', 'LBGE', 'LBLE', 'LBGT', 'LBLT', 'LBLO', 'LBHS',
+}
+
+
+def _parse_stack_regs(operand):
+    """Count cycles for PSHS/PULS register list."""
+    total = 5  # base cost
+    for reg in operand.upper().replace(' ', '').split(','):
+        total += _REG_CYCLES.get(reg, 0)
+    return total
+
+
+def _classify_indexed(operand):
+    """Classify an indexed operand and return the INDEXED_ADDER key."""
+    op = operand.strip()
+    indirect = op.startswith('[') and op.endswith(']')
+    if indirect:
+        op = op[1:-1].strip()
+
+    # ,R++ or ,R+
+    if re.match(r'^,\s*[XYUS]\+\+$', op, re.I):
+        key = ',R++'
+    elif re.match(r'^,\s*[XYUS]\+$', op, re.I):
+        key = ',R+'
+    # ,--R or ,-R
+    elif re.match(r'^,\s*--[XYUS]$', op, re.I):
+        key = ',--R'
+    elif re.match(r'^,\s*-[XYUS]$', op, re.I):
+        key = ',-R'
+    # A,R  B,R  D,R
+    elif re.match(r'^[ABD]\s*,\s*[XYUS]$', op, re.I):
+        reg = op[0].upper()
+        key = f'{reg},R'
+    # n,PCR
+    elif re.match(r'^.+,\s*PCR$', op, re.I):
+        # Assume 8-bit offset by default; 16-bit if large label
+        key = 'n8,PCR'
+    # ,R  (zero offset)
+    elif re.match(r'^,\s*[XYUS]$', op, re.I):
+        key = ',R'
+    # n,R  (offset)
+    elif re.match(r'^[^,]+,\s*[XYUS]$', op, re.I):
+        offset_str = op.split(',')[0].strip()
+        try:
+            val = int(offset_str.replace('$', '0x'), 0)
+            if -16 <= val <= 15:
+                key = 'n5,R'
+            elif -128 <= val <= 127:
+                key = 'n8,R'
+            else:
+                key = 'n16,R'
+        except ValueError:
+            key = 'n16,R'  # named label → assume 16-bit
+    # Extended indirect [n]
+    elif indirect and ',' not in operand:
+        return INDEXED_ADDER.get('[n16]', 5)
+    else:
+        key = ',R'  # fallback
+
+    if indirect:
+        key = f'[{key}]'
+    return INDEXED_ADDER.get(key, 0)
+
+
+def _classify_operand(mnemonic, operand):
+    """Classify addressing mode → 'inherent'|'immediate'|'direct'|'extended'|'indexed'."""
+    if not operand:
+        return 'inherent', 0
+    op = operand.strip()
+    if op.startswith('#'):
+        return 'immediate', 0
+    if op.startswith('<'):
+        return 'direct', 0
+    if op.startswith('>'):
+        return 'extended', 0
+    if op.startswith('[') or ',' in op:
+        return 'indexed', _classify_indexed(operand)
+    # Bare number or label — heuristic: small hex values (< $100) are direct page
+    # but in this kernel all variables use extended addressing, so default to extended.
+    return 'extended', 0
+
+
+def instruction_cycles(mnemonic, operand):
+    """Return (min_cycles, max_cycles) for a single 6809 instruction.
+
+    Returns (0, 0) for unrecognised instructions (FCB, FDB, ORG, etc.)."""
+    mn = mnemonic.upper()
+
+    # Stack push/pull — variable cycles based on register list
+    if mn in ('PSHS', 'PULS', 'PSHU', 'PULU'):
+        cy = _parse_stack_regs(operand)
+        return (cy, cy)
+
+    # Short conditional branch: always 3 cycles
+    if mn in _SHORT_BRANCHES:
+        return (3, 3)
+    # Short unconditional: BRA=3, BSR=7
+    if mn == 'BRA':
+        return (3, 3)
+    if mn == 'BRN':
+        return (3, 3)
+    if mn == 'BSR':
+        return (7, 7)
+
+    # Long conditional branch: 5 not-taken, 6 taken
+    if mn in _LONG_BRANCHES:
+        return (5, 6)
+    if mn == 'LBRA':
+        return (5, 5)
+    if mn == 'LBSR':
+        return (9, 9)
+
+    entry = OPCODE_CYCLES.get(mn)
+    if entry is None:
+        return (0, 0)  # directive or unknown
+
+    # Inherent-only (single-element tuple)
+    if len(entry) == 1:
+        return (entry[0], entry[0])
+
+    # Full 5-tuple: (inherent, immediate, direct, extended, indexed_base)
+    mode, idx_adder = _classify_operand(mn, operand)
+    mode_idx = {'inherent': 0, 'immediate': 1, 'direct': 2,
+                'extended': 3, 'indexed': 4}[mode]
+    base_cy = entry[mode_idx]
+    if base_cy is None:
+        return (0, 0)  # invalid mode for this opcode
+    cy = base_cy + idx_adder
+    return (cy, cy)
+
+
+# ── Assembly line parser ─────────────────────────────────────────────────────
+
+def parse_asm_line(line):
+    """Parse one assembly line → (mnemonic, operand) or None for labels/blanks."""
+    # Strip comment
+    s = line.split(';')[0].strip()
+    if not s:
+        return None
+    # Skip labels on their own line (start with @ or letter at column 0, no space before)
+    # Labels: start at column 0 (no leading whitespace)
+    if not line[0:1].isspace() and not line[0:1] == '':
+        # It's a label.  There may be an instruction after it on the same line.
+        parts = s.split(None, 1)
+        if len(parts) < 2:
+            return None  # label only
+        s = parts[1].strip()
+        if not s:
+            return None
+    # Now parse mnemonic + operand
+    parts = s.split(None, 1)
+    mnemonic = parts[0]
+    operand = parts[1].strip() if len(parts) > 1 else ''
+    # Skip assembler directives
+    if mnemonic.upper() in ('FCB', 'FDB', 'FCC', 'RMB', 'ORG', 'EQU',
+                             'PRAGMA', 'SECTION', 'ENDSECT', 'INCLUDE',
+                             'SET', 'SETDP', 'FILL'):
+        return None
+    return (mnemonic, operand)
+
+
+# ── CODE word cycle analyzer ─────────────────────────────────────────────────
+
+def analyze_code_block(asm_text):
+    """Analyze a block of 6809 assembly, return (min_cy, max_cy, notes).
+
+    Sums straight-line cycles.  Detects backward branches (loops) and
+    forward branches (min/max paths) heuristically."""
+    total_min = 0
+    total_max = 0
+    notes = []
+    labels_seen = {}   # label → cumulative cycle count at that point
+    line_num = 0
+
+    for line in asm_text.split('\n'):
+        parsed = parse_asm_line(line)
+
+        # Track label positions (for backward branch detection)
+        s = line.split(';')[0].strip()
+        if s and not line[0:1].isspace():
+            label = s.split()[0]
+            labels_seen[label] = total_max
+
+        if parsed is None:
+            continue
+        mnemonic, operand = parsed
+        mn = mnemonic.upper()
+        cmin, cmax = instruction_cycles(mn, operand)
+        total_min += cmin
+        total_max += cmax
+
+        # Backward branch detection (loop)
+        if mn in _SHORT_BRANCHES and operand.strip() in labels_seen:
+            loop_start = labels_seen[operand.strip()]
+            loop_body = total_max - loop_start
+            notes.append(f"loop: ~{loop_body}cy/iter")
+
+    return (total_min, total_max, notes)
+
+
+def analyze_code_word(name, asm_text):
+    """Analyze a user CODE word from fc.py source."""
+    _, preprocessed = preprocess_asm(name, asm_text)
+    return analyze_code_block(preprocessed)
+
+
+# ── Kernel primitive analyzer ────────────────────────────────────────────────
+
+def analyze_kernel_primitives(kernel_asm_path):
+    """Parse kernel.asm and compute cycle costs for each CODE_xxx primitive.
+
+    Returns dict mapping Forth name → (min_cy, max_cy)."""
+    try:
+        with open(kernel_asm_path) as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        return {}
+
+    # Extract CODE_xxx blocks: from label to next CODE_ label or DOCOL/DOVAR
+    blocks = {}
+    current_label = None
+    current_lines = []
+    boundaries = {'DOCOL', 'DOVAR'}
+    capture_labels = {'DOCOL', 'DOVAR'}  # also capture these as blocks
+
+    for line in lines:
+        stripped = line.strip()
+        # Check for CODE_xxx label at column 0
+        if stripped and not line[0].isspace():
+            word = stripped.split()[0]
+            if word.startswith('CODE_') or word in boundaries:
+                if current_label and (current_label.startswith('CODE_') or
+                                       current_label in capture_labels):
+                    blocks[current_label] = '\n'.join(current_lines)
+                current_label = word
+                current_lines = []
+                continue
+        if current_label:
+            current_lines.append(line.rstrip())
+
+    # Don't forget the last block
+    if current_label and (current_label.startswith('CODE_') or
+                           current_label in capture_labels):
+        blocks[current_label] = '\n'.join(current_lines)
+
+    # Analyze each block
+    raw_costs = {}
+    for label, asm in blocks.items():
+        cmin, cmax, _ = analyze_code_block(asm)
+        raw_costs[label] = (cmin, cmax)
+
+    # Build reverse mapping: CFA_xxx → Forth name
+    # Use the same names dict from kernel_words()
+    cfa_to_forth = {
+        'CODE_EMIT': 'emit', 'CODE_HALT': 'halt', 'CODE_EXIT': 'exit',
+        'CODE_ADD': '+', 'CODE_SUB': '-', 'CODE_CR': 'cr',
+        'CODE_DUP': 'dup', 'CODE_DROP': 'drop', 'CODE_SWAP': 'swap',
+        'CODE_OVER': 'over', 'CODE_FETCH': '@', 'CODE_STORE': '!',
+        'CODE_DO': 'do', 'CODE_LOOP': 'loop', 'CODE_I': 'i',
+        'CODE_MUL': '*', 'CODE_DIVMOD': '/mod',
+        'CODE_KBD_SCAN': 'kbd-scan', 'CODE_KEY': 'key',
+        'CODE_KEY_NB': 'key?',
+        'CODE_0BRANCH': '0branch', 'CODE_BRANCH': 'branch',
+        'CODE_EQ': '=', 'CODE_NEQ': '<>', 'CODE_LT': '<', 'CODE_GT': '>',
+        'CODE_ZEQU': '0=', 'CODE_AT': 'at',
+        'CODE_CSTORE': 'c!', 'CODE_CFETCH': 'c@',
+        'CODE_AND': 'and', 'CODE_OR': 'or',
+        'CODE_FILL': 'fill', 'CODE_CMOVE': 'cmove',
+        'CODE_LSHIFT': 'lshift', 'CODE_RSHIFT': 'rshift',
+        'CODE_NEGATE': 'negate', 'CODE_QDUP': '?dup',
+        'CODE_TYPE': 'type', 'CODE_COUNT': 'count',
+        'CODE_PLUS_STORE': '+!', 'CODE_2DROP': '2drop', 'CODE_2DUP': '2dup',
+        'CODE_ROT': 'rot', 'CODE_PROX_SCAN': 'prox-scan',
+        'CODE_TOR': '>r', 'CODE_FROMR': 'r>', 'CODE_RAT': 'r@',
+        'CODE_MIN': 'min', 'CODE_MAX': 'max', 'CODE_ABS': 'abs',
+        'CODE_MDIST': 'mdist', 'CODE_UNLOOP': 'unloop',
+        'CODE_PICK': 'pick', 'CODE_INVERT': 'invert', 'CODE_XOR': 'xor',
+        'CODE_J': 'j', 'CODE_PLUS_LOOP': '+loop',
+        'CODE_LIT': 'lit',
+    }
+
+    result = {}
+    for code_label, costs in raw_costs.items():
+        forth_name = cfa_to_forth.get(code_label, code_label)
+        result[forth_name] = costs
+
+    return result
+
+
+# ── Forth word cycle analyzer ────────────────────────────────────────────────
+
+def analyze_forth_words(definitions, kernel_costs, code_word_costs, variables=None):
+    """Compute cycle costs for all user Forth (colon) definitions.
+
+    Returns dict mapping word name → (min_cy, max_cy, notes)."""
+    docol_cost = kernel_costs.get('DOCOL', (0, 0))
+    exit_cost  = kernel_costs.get('exit', (0, 0))
+    lit_cost   = kernel_costs.get('lit', (0, 0))
+    branch_cost = kernel_costs.get('branch', (0, 0))
+    zbranch_cost = kernel_costs.get('0branch', (0, 0))
+    do_cost    = kernel_costs.get('do', (0, 0))
+    loop_cost  = kernel_costs.get('loop', (0, 0))
+    ploop_cost = kernel_costs.get('+loop', (0, 0))
+    dovar_cost = kernel_costs.get('DOVAR', (0, 0))
+
+    var_set = set(variables) if variables else set()
+
+    user_costs = {}  # name → (min, max, notes)
+
+    def lookup_word(name):
+        """Get (min, max) for a word by name."""
+        if name in user_costs:
+            return (user_costs[name][0], user_costs[name][1])
+        if name in var_set:
+            return dovar_cost
+        if name in kernel_costs:
+            return kernel_costs[name]
+        if name in code_word_costs:
+            return (code_word_costs[name][0], code_word_costs[name][1])
+        return (0, 0)  # unknown
+
+    def analyze_one(name, visited):
+        if name in user_costs:
+            return user_costs[name]
+        if name not in definitions:
+            return (0, 0, [])
+        if name in visited:
+            return (0, 0, ['recursive'])
+        visited = visited | {name}
+
+        items = definitions[name]
+        total_min = docol_cost[0]
+        total_max = docol_cost[1]
+        notes = []
+
+        # For IF/ELSE/THEN and loop tracking
+        i = 0
+        while i < len(items):
+            item = items[i]
+
+            if item[0] == 'word':
+                wname = item[1]
+                if wname in definitions and wname not in user_costs:
+                    analyze_one(wname, visited)
+                wmin, wmax = lookup_word(wname)
+                total_min += wmin
+                total_max += wmax
+
+            elif item[0] == 'lit':
+                total_min += lit_cost[0]
+                total_max += lit_cost[1]
+
+            elif item[0] == 'slit':
+                # String literal: BRANCH + string data + LIT addr + LIT len
+                total_min += branch_cost[0] + lit_cost[0] * 2
+                total_max += branch_cost[1] + lit_cost[1] * 2
+
+            elif item[0] == 'do':
+                total_min += do_cost[0]
+                total_max += do_cost[1]
+
+            elif item[0] == 'if_fwd':
+                total_min += zbranch_cost[0]
+                total_max += zbranch_cost[1]
+
+            elif item[0] == 'else_fwd':
+                total_min += branch_cost[0]
+                total_max += branch_cost[1]
+
+            elif item[0] == 'loop_back':
+                # LOOP: min = exit loop, max = continue
+                total_min += loop_cost[0]
+                total_max += loop_cost[1]
+                notes.append('has DO/LOOP')
+
+            elif item[0] == 'ploop_back':
+                total_min += ploop_cost[0]
+                total_max += ploop_cost[1]
+                notes.append('has DO/+LOOP')
+
+            elif item[0] == 'again_back':
+                total_min += branch_cost[0]
+                total_max += branch_cost[1]
+                notes.append('infinite loop (per-iter cost)')
+
+            elif item[0] == 'until_back':
+                total_min += zbranch_cost[0]
+                total_max += zbranch_cost[1]
+                notes.append('has BEGIN/UNTIL loop')
+
+            elif item[0] == 'label':
+                pass  # no cost
+
+            i += 1
+
+        # Add EXIT cost
+        total_min += exit_cost[0]
+        total_max += exit_cost[1]
+
+        user_costs[name] = (total_min, total_max, notes)
+        return user_costs[name]
+
+    for name in definitions:
+        analyze_one(name, set())
+
+    return user_costs
+
+
+# ── Cycle report ─────────────────────────────────────────────────────────────
+
+def cycle_report(definitions, code_definitions, variables, kernel_map_path):
+    """Print per-word cycle cost report."""
+    # Derive kernel.asm path from kernel.map path
+    kernel_asm_path = str(Path(kernel_map_path).parent.parent / 'kernel.asm')
+
+    # Step 1: Analyze kernel primitives
+    kernel_costs = analyze_kernel_primitives(kernel_asm_path)
+    if not kernel_costs:
+        print(f"\n  warning: could not read {kernel_asm_path}, skipping cycle report")
+        return
+
+    # Step 2: Analyze user CODE words
+    code_word_costs = {}
+    for name, asm_text in code_definitions.items():
+        code_word_costs[name] = analyze_code_word(name, asm_text)
+
+    # Step 3: Analyze user Forth words
+    user_costs = analyze_forth_words(definitions, kernel_costs, code_word_costs,
+                                      variables=variables)
+
+    # Step 4: Print report
+    docol = kernel_costs.get('DOCOL', (0, 0))
+    exit_ = kernel_costs.get('exit', (0, 0))
+    next_cy = instruction_cycles('LDY', ',X++')[0] + instruction_cycles('JMP', '[,Y]')[0]
+
+    print(f"\n=== Cycle Estimates (6809 @ 0.895 MHz, 14917 cy/frame) ===")
+    print(f"NEXT: {next_cy}cy  DOCOL: {docol[0]}cy  EXIT: {exit_[0]}cy")
+
+    # Kernel primitives (compact)
+    print(f"\nKernel Primitives:")
+    kp_items = [(n, c) for n, c in sorted(kernel_costs.items())
+                if n not in ('DOCOL', 'DOVAR')]
+    row = []
+    for name, (cmin, cmax) in kp_items:
+        if cmin == cmax:
+            row.append(f"  {name:<12s} {cmin:>4d}cy")
+        else:
+            row.append(f"  {name:<12s} {cmin}-{cmax}cy")
+        if len(row) == 4:
+            print(''.join(row))
+            row = []
+    if row:
+        print(''.join(row))
+
+    # CODE words
+    if code_word_costs:
+        print(f"\nCODE Words:")
+        for name, (cmin, cmax, notes) in sorted(code_word_costs.items(),
+                                                  key=lambda x: -x[1][1]):
+            note_str = f"  ({', '.join(notes)})" if notes else ""
+            if cmin == cmax:
+                print(f"  {name:<24s} {cmin:>6d}cy{note_str}")
+            else:
+                print(f"  {name:<24s} {cmin:>5d}-{cmax}cy{note_str}")
+
+    # Forth words (sorted by max cost, descending)
+    if user_costs:
+        print(f"\nForth Words (by max cost):")
+        for name, (cmin, cmax, notes) in sorted(user_costs.items(),
+                                                  key=lambda x: -x[1][1]):
+            note_str = f"  ({', '.join(notes)})" if notes else ""
+            if cmin == cmax:
+                print(f"  {name:<24s} {cmin:>6d}cy{note_str}")
+            else:
+                print(f"  {name:<24s} {cmin:>5d}-{cmax}cy{note_str}")
+
+
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 def main():
@@ -785,6 +1359,8 @@ def main():
                         help='application load address (default: 0x2000)')
     parser.add_argument('--hole',           default=None,
                         help='reserved address hole, e.g. 0x4000,6144 (start,size)')
+    parser.add_argument('--cycles',        action='store_true',
+                        help='print per-word 6809 cycle cost estimates')
     args = parser.parse_args()
 
     app_base = int(args.base, 16)
@@ -852,6 +1428,9 @@ def main():
         print(f"  CODE:  {', '.join(code_defs)}")
     if variables:
         print(f"  vars:  {', '.join(variables)}")
+
+    if args.cycles:
+        cycle_report(defs, code_defs, variables, args.kernel)
 
 
 if __name__ == '__main__':

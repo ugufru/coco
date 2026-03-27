@@ -310,10 +310,24 @@ VARIABLE gq-tmp                \ temp for building quadrant byte
     100 JOV-DMG I + C!         \ full health
   LOOP THEN
 
-  \ Generate base position
+  \ Generate base position (away from gravity sources)
   qbase @ IF
-    rnd-x BASE-POS C!
-    rnd-y BASE-POS 1 + C!
+    0 ss-safe !
+    6 0 DO
+      ss-safe @ 0= IF
+        rnd-x BASE-POS C!
+        rnd-y BASE-POS 1 + C!
+        1 ss-safe !
+        qstars @ ?DUP IF 0 DO
+          BASE-POS STAR-POS I 2 * + mdist
+          35 < IF 0 ss-safe ! THEN
+        LOOP THEN
+        qbhole @ IF
+          BASE-POS BHOLE-POS mdist
+          35 < IF 0 ss-safe ! THEN
+        THEN
+      THEN
+    LOOP
   THEN
 
   \ Generate black hole position
@@ -3055,7 +3069,7 @@ VARIABLE bfo-found
 \ Trace path, detect hits, start bolt animation.
 
 : fire-maser  ( angle -- )
-  penergy @ 0= IF DROP EXIT THEN
+  penergy @ MASER-COST 1 + < IF DROP EXIT THEN
   MASER-COST use-energy
   \ Cancel any active beam first
   cancel-beam
@@ -3249,6 +3263,7 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
 
 : fire-missile  ( angle -- )
   pmissiles @ 0= IF DROP EXIT THEN
+  penergy @ MSL-COST 1 + < IF DROP EXIT THEN
   msl-active @ IF DROP EXIT THEN
   MSL-COST use-energy
   -1 pmissiles +!
