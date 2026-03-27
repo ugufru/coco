@@ -157,7 +157,7 @@ VAR_BEAM_CNT    FDB     0       ; pixel count / loop counter scratch
 
 BOOTSTRAP
         ORCC    #$50            ; mask IRQ/FIRQ
-        STA     $FFDF           ; all-RAM mode: $FFDF sets SAM TY bit
+        STA     $FFDF           ; all-RAM mode
         LDX     #$1000          ; source: staged kernel
         LDY     #$E000          ; dest: final location
 BOOT_LP LDD     ,X++
