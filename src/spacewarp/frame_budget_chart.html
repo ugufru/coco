@@ -276,7 +276,7 @@ statsEl.innerHTML = `
   (${Math.round(avgCycles / BUDGET * 100)}% of budget)<br>
   Effective FPS: ~${effectiveFPS} fps (over-budget frames drop to 30fps)<br>
   <br>
-  <span style="color:#00ff88">After #166 + #215 + #241 + #242 + #243 + #244 + #245 + #246 + #247 + #248 + #249 + #250:</span>
+  <span style="color:#00ff88">After #166 + #215 + #241-#253:</span>
   <code>tick-jovians-inner</code> CODE: tick loop + inlined threshold (200cy; was ~4,140cy Forth).
   <code>apply-intent</code> CODE with inlined <code>jov-blocked?</code> (Think: 2,058cy; was 17,000cy).
   <code>move-ship</code> CODE (993cy; was 1,633cy).
@@ -286,6 +286,9 @@ statsEl.innerHTML = `
   <code>draw-stars</code> CODE with fixed colors (400cy; was 1,840cy).
   <code>check-win</code> bug fixed: galaxy scan no longer runs every frame (#250).
   All constants inlined as LIT.
+  #251: <code>apply-intent</code> CMPB 10,S→9,S fix (Jovians were frozen).
+  #252: Sprite coordinate underflow clamping (BCS/CLRB).
+  #253: Two STA ,-S → PSHS A fixes.
   Note: DO/LOOP and nested-loop costs are fc.py base values (single iteration);
   real multi-iteration costs are higher. Relative comparisons remain valid.
 `;

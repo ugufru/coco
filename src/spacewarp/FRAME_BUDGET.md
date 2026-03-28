@@ -71,8 +71,6 @@ Assembly CODE words bypass ITC overhead — their costs are exact:
 | `spr-draw` | 410 | Sprite blit with loops |
 | `draw-stars` | 400 | Fixed-color star plot (#249) |
 | `jov-gravity-pull` | 400 | Per-Jovian star+bhole gravity (#243, grav frames) |
-| `save-jov-bgs` | 353 | Jovian background save (#248) |
-| `restore-jov-bgs` | 327 | Jovian background restore (#248) |
 | `prox-dmg` | 306 | Proximity scan loop |
 | `jov-contact` | 300 | Ship-Jovian collision (#243, every frame) |
 | `beam-draw-slice` | 285 | Beam segment draw |
@@ -110,11 +108,11 @@ the dominant cost, not the primitive operations.
 
 1. **Even vs odd frames**: Even frames do physics+AI, odd frames do gravity+BG.
 
-2. **Jovian think frequency**: At level 9, `jov-threshold` returns 2-3 (vs 4-6 at
+2. **Jovian think frequency**: At level 9, think thresholds are 2-3 (vs 4-6 at
    moderate levels).  All 3 Jovians can think on the same even frame, each adding
    ~2,058cy (jov-think 689 + apply-intent 1,369).
 
-3. **Rendering path**: Full redraw (jov-moved) costs ~4,731cy.  Ship-only render
+3. **Rendering path**: Full redraw (jov-moved) costs ~5,948cy.  Ship-only render
    costs ~2,447cy.
 
 ## Completed Optimizations
@@ -129,12 +127,13 @@ the dominant cost, not the primitive operations.
 | #244 | `move-ship` CODE | 1,633cy | 993cy | 640cy/frame |
 | #245/#246 | All CONSTANTs inlined as LIT | 80cy/ref | 31cy/ref | ~4,900cy total |
 | #247 | Deduplicate latch-key (3x to 1x) | 1,059cy | 353cy | 706cy/frame |
-| #248 | `save/restore-jov-bgs` CODE | 900+899cy | 327+353cy | 1,119cy/render |
+| #248 | `save/restore-jov-bgs` CODE — **REVERTED** (rendering bug) | — | — | — |
 | #249 | `draw-stars` CODE with fixed colors | 1,840cy | 400cy | 1,440cy/render |
 | #250 | `check-win` bug fix (count not every frame) | 2,443cy/frame | amortized | ~2,400cy saved |
 
-Also fixed: `apply-intent` CMPB 10,S off-by-one (9,S correct) — Jovians couldn't
-move since original commit.
+Also fixed: #251 `apply-intent` CMPB 10,S→9,S (Jovians were frozen since #241).
+#252 Sprite coordinate underflow clamping (BCS/CLRB).
+#253 Two STA ,-S → PSHS A fixes.
 
 ## Remaining Targets
 
@@ -142,7 +141,7 @@ move since original commit.
 |------|-------|
 | #188 Sound | Feature, not optimization |
 | #181 Emotion edge cases | Behavioral tuning |
-| 2-think frames (~15,600cy) | Slightly over budget (104%), acceptable |
+| 2-think frames (~16,750cy) | Over budget (112%), acceptable |
 | Background slots | Typical-path costs already reasonable (~3,000cy) |
 
 ## Measurement
@@ -158,7 +157,7 @@ The appendix below uses manually expanded costs with correct loop iteration coun
 
 ## Appendix: Component Cost Table
 
-Current measured costs after all optimizations (#166, #215, #241-#250).
+Current measured costs after all optimizations (#166, #215, #241-#253).
 
 | Component | Cycles | Derivation |
 |-----------|--------|------------|
@@ -171,7 +170,7 @@ Current measured costs after all optimizations (#166, #215, #241-#250).
 | Jov-gravity-pull (non-grav) | 30 | Contact check only |
 | Background slot 1 | 3,000 | jov-check-regen + check-dock + tick-dock + tick-base-attack (typical) |
 | Background slot 5 | 3,000 | tick-stardate + tick-migrate + check-spawn + update-cond (typical) |
-| Full render | 4,731 | draw-stars(400) + draw-jovians(1,141) + draw-ship(819) + bg-jov(871: restore 327 + save 353 + oldpos 191) + bg-ship(1,025) + overhead(475) |
+| Full render | 5,948 | draw-stars(400) + draw-jovians(1,141) + draw-ship(819) + bg-jov(2,088: save 949 + restore 948 + oldpos 191 Forth) + bg-ship(1,025) + overhead(475) |
 | Ship-only render | 2,447 | draw-ship(819) + bg-ship(1,025) + overhead(603) |
 | Post-render | 2,510 | panel-checks + apply-beam-hit + tick-beam-draw + tick-jbeam-draw + apply-jbeam-hit + check-win (amortized) |
 
@@ -185,14 +184,14 @@ See `frame_budget_chart.html` for the interactive chart.
 |--------|---------|---------------------|
 | **Budget per frame** | 14,930 cy | 14,930 cy |
 | **Light frame (no thinks, no gravity)** | ~9,800 cy (66%) | ~10,126 cy (68%) |
-| **1 Jovian think** | ~13,500 cy (90%) | ~20,840 cy (140%) |
-| **2 Jovians think** | ~15,600 cy (104%) | ~26,466 cy (177%) |
-| **Gravity even + 1 think** | ~14,000 cy (94%) | ~27,155 cy (182%) |
-| **Gravity even, no think** | ~11,900 cy (80%) | ~16,441 cy (110%) |
-| **App size** | 24,253 bytes | 24,501 bytes |
-| **Headroom** | 323 bytes | 75 bytes |
+| **1 Jovian think** | ~14,700 cy (98%) | ~20,840 cy (140%) |
+| **2 Jovians think** | ~16,750 cy (112%) | ~26,466 cy (177%) |
+| **Gravity even + 1 think** | ~15,200 cy (102%) | ~27,155 cy (182%) |
+| **Gravity even, no think** | ~12,900 cy (86%) | ~16,441 cy (110%) |
+| **App size** | 24,080 bytes | 24,501 bytes |
+| **Headroom** | 496 bytes | 75 bytes |
 
-Most frames now fit within the 14,930cy budget.  Only 2-think frames (~15,600cy,
-104%) slightly exceed it — a single dropped VSYNC every few seconds under heavy AI
-load.  This is a dramatic improvement from the pre-optimization state where 29 of
+Most frames now fit within the 14,930cy budget.  Only 2-think frames (~16,750cy,
+112%) consistently exceed it — a single dropped VSYNC every few seconds under heavy
+AI load.  This is a dramatic improvement from the pre-optimization state where 29 of
 60 frames (48%) exceeded budget with worst cases at 177-326%.
