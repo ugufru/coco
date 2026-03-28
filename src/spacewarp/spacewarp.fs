@@ -3853,7 +3853,6 @@ VARIABLE jnb-result
           tick-stardate  tick-migrate  check-spawn  update-cond
         THEN
       THEN
-      latch-key
       tick-destruct
     THEN
 
@@ -3911,7 +3910,6 @@ VARIABLE jnb-result
     \ ── LAYER 2: Advance beam heads (draw new pixels) ──
     tick-beam-draw
     tick-jbeam-draw
-    latch-key
 
     \ ── Apply deferred hit damage ──
     apply-beam-hit
