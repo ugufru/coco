@@ -826,7 +826,7 @@ CODE save-jov-oldpos-n   \ ( n -- )  copy JOV-POS to JOV-OLDX/Y for n Jovians
         ;NEXT
 ;CODE
 
-\ save-jov-bgs / restore-jov-bgs — reverted to Forth (#248 CODE had rendering bug)
+\ save-jov-bgs / restore-jov-bgs — Forth calling proven CODE helpers
 : save-jov-bgs  ( -- )
   qjovians @ ?DUP IF 0 DO
     JOV-DMG I + C@ IF I jov-bg-xy bg-save-7 THEN
@@ -836,6 +836,7 @@ CODE save-jov-oldpos-n   \ ( n -- )  copy JOV-POS to JOV-OLDX/Y for n Jovians
   qjovians @ ?DUP IF 0 DO
     JOV-DMG I + C@ IF I jov-bg-old-xy bg-restore-7 THEN
   LOOP THEN ;
+
 
 
 : save-jov-oldpos  ( -- )  qjovians @ save-jov-oldpos-n ;
