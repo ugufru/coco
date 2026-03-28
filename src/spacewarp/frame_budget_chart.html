@@ -114,9 +114,9 @@ function buildFrame(f) {
     sgrv: (even && isGrav) ? 3889 : 0,  // star-gravity (was 4183)
     gw:   (even && isGrav) ? 1887 : 0,  // gravity-well (was 2132)
     coll: even ? 1000 : 0,
-    j0:   hasJ0 ? 5577 : 0,             // jov-think(689) + apply-intent(4888)
-    j1:   hasJ1 ? 5577 : 0,
-    j2:   hasJ2 ? 5577 : 0,
+    j0:   hasJ0 ? 2058 : 0,             // jov-think(689) + apply-intent CODE(1369 typical)
+    j1:   hasJ1 ? 2058 : 0,
+    j2:   hasJ2 ? 2058 : 0,
     jgrv: !even ? (isGrav ? 5000 : 1200) : 0,
     bg:   hasBG(f) ? 3000 : 0,
     // Post-VSYNC render breakdown (fc.py --cycles after full inlining):
@@ -267,14 +267,13 @@ statsEl.innerHTML = `
   (${Math.round(avgCycles / BUDGET * 100)}% of budget)<br>
   Effective FPS (estimated): ~${effectiveFPS} fps<br>
   <br>
-  <span style="color:#00ff88">After #215 + #244 + #245 + #246 + #247:</span>
-  <code>jov-blocked?</code> CODE (1,105cy; was 13,800cy).
+  <span style="color:#00ff88">After #215 + #241 + #244 + #245 + #246 + #247:</span>
+  <code>apply-intent</code> CODE with inlined <code>jov-blocked?</code>
+  (1,369cy typical; was 5,577cy). Think: 2,058cy (was 17,000cy original).
   <code>move-ship</code> CODE (993cy; was 1,633cy).
-  All constants inlined as LIT (80cy&rarr;31cy per ref).
-  Redundant <code>latch-key</code> removed (3x&rarr;1x).
+  All constants inlined as LIT.
   Pre-VSYNC: 3,345cy.  Render: 7,290cy full / 2,447cy ship-only.  Post: 2,510cy.
-  Post corrected: now includes beam-erase(424), overlay check(126), beam-OR(225)
-  that were previously uncounted. All costs from <code>fc.py --cycles</code>.
+  All costs from <code>fc.py --cycles</code> + traced idle paths.
 `;
 </script>
 

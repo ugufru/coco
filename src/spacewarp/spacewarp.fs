@@ -1620,8 +1620,6 @@ VARIABLE jov-moved               \ flag: did any Jovian move this frame?
 \   flags bit 0 = targets base
 \   flags bit 1 = base-stop (within 30px, hold position)
 
-VARIABLE jtk-nx                   \ proposed new x
-VARIABLE jtk-ny                   \ proposed new y
 
 \ Per-Jovian tick threshold from genome (lower = faster)
 \ speed_modifier (byte 1, bits 5-4) + pilot_skill (byte 0, bits 2-0)
@@ -1638,148 +1636,230 @@ VARIABLE jtk-ny                   \ proposed new y
   jbg-i @ 4 * JOV-GENOME + C@ 7 AND  \ pilot_skill 0-7
   6 + ;                                \ 6 (dumb) to 13 (ace)
 
-\ jov-blocked? ( x y i -- flag )
-\ Check if candidate position (x,y) is blocked by any obstacle.
-\ Returns 1 if blocked, 0 if clear.  i = current Jovian index (skip self).
-\ Checks: stars (avoid_dist), black hole (<15), base (<5), ship (<8),
-\         other live Jovians (<8).
-\ All data at fixed $80xx addresses; counts from QCOUNTS ($80B0).
-CODE jov-blocked?
-        PSHS    X               ; save IP
-        ; Pop args: TOS=i, NOS=y, 3OS=x
-        LDA     1,U             ; A = i
-        LDB     3,U             ; B = y
-        PSHS    D               ; S+0=i, S+1=y
-        LDA     5,U             ; A = x
-        LEAU    4,U             ; pop 3 cells, keep 1 result slot
-        PSHS    A               ; S+0=cx, S+1=i, S+2=cy, S+3..4=IP
+\ jov-blocked? inlined into apply-intent CODE word (#241).
+\ Dummy so any stale reference compiles (not called at runtime).
+: jov-blocked?  ( x y i -- flag )  DROP 2DROP 0 ;
 
-        ; Compute avoid_dist = (genome[i*4] & 7) + 6
-        LDA     1,S             ; i
+\ ── apply-intent CODE word (#241) ─────────────────────────────────────
+\ ( i -- )  Read JOV-INTENT[i], apply 3-tier obstacle fallback, write
+\ JOV-POS[i].  Sets jov-moved if position changed.  Inlines full
+\ jov-blocked? logic as @chk subroutine.
+CODE apply-intent
+        PSHS    X               ; save IP
+        ; Pop arg: i (Jovian index)
+        LDB     1,U             ; B = i
+        LEAU    2,U             ; pop 1 cell
+        PSHS    B               ; S+0=i, S+1..2=saved IP
+
+        ; Intent addr: X = JOV-INTENT + i*3 = $80DA + i*3
+        LDA     #3
+        MUL                     ; D = i*3 (in B since i<3)
+        LDX     #$80DA
+        ABX                     ; X = intent ptr
+
+        ; Check base-stop (flags bit 1)
+        LDA     2,X             ; flags
+        ANDA    #2
+        LBNE    @done           ; base-stop, no move
+
+        ; Read proposed nx, ny
+        LDA     ,X              ; nx
+        LDB     1,X             ; ny
+        PSHS    D               ; S+0=nx, S+1=ny, S+2=i, S+3..4=IP
+
+        ; Pos addr: Y = JOV-POS + i*2 = $804A + i*2
+        LDA     2,S             ; i
+        ASLA                    ; i*2
+        LDY     #$804A
+        LEAY    A,Y             ; Y = &JOV-POS[i] (preserved across @chk)
+
+        ; Save current pos for comparison
+        LDA     ,Y              ; cur_x
+        LDB     1,Y             ; cur_y
+        PSHS    D               ; S+0=cur_x, S+1=cur_y, S+2=nx, S+3=ny, S+4=i, S+5..6=IP
+
+        ; ── Tier 1: try (nx, ny) ──
+        LDA     2,S             ; nx
+        LDB     3,S             ; ny
+        LBSR    @chk            ; A = blocked?
+        TSTA
+        BEQ     @apply          ; clear → apply nx, ny
+
+        ; ── Tier 2: try (nx, cur_y) ──
+        LDA     2,S             ; nx
+        LDB     1,S             ; cur_y
+        LBSR    @chk
+        TSTA
+        BEQ     @t2ok
+
+        ; ── Tier 3: try (cur_x, ny) ──
+        LDA     ,S              ; cur_x
+        LDB     3,S             ; ny
+        LBSR    @chk
+        TSTA
+        BEQ     @t3ok
+
+        ; All blocked → stay put
+        LEAS    5,S             ; pop cur_x, cur_y, nx, ny, i
+        PULS    X
+        ;NEXT
+
+@t2ok   ; Tier 2 clear: use nx, keep cur_y
+        LDA     2,S             ; nx
+        LDB     1,S             ; cur_y (keep old y)
+        BRA     @apply2
+@t3ok   ; Tier 3 clear: use cur_x, ny
+        LDA     ,S              ; cur_x (keep old x)
+        LDB     3,S             ; ny
+@apply2 STA     2,S             ; final_x → nx slot
+        STB     3,S             ; final_y → ny slot
+@apply  ; Apply position: write nx, ny to JOV-POS[i] if changed
+        LDA     2,S             ; final_x
+        LDB     3,S             ; final_y
+        CMPA    ,S              ; changed x?
+        BNE     @wr
+        CMPB    1,S             ; changed y?
+        BEQ     @nowr
+@wr     STA     ,Y              ; write new x
+        STB     1,Y             ; write new y
+        LDD     #1
+        STD     FVAR_jov_moved  ; jov-moved = 1
+@nowr   LEAS    5,S             ; pop cur_x, cur_y, nx, ny, i
+        PULS    X
+        ;NEXT
+
+@done   LEAS    1,S             ; pop i
+        PULS    X
+        ;NEXT
+
+        ; ── @chk: obstacle check subroutine ──────────────────
+        ; A = candidate x, B = candidate y
+        ; Uses i from stack (offset depends on LBSR return addr)
+        ; Returns A = 1 if blocked, 0 if clear.
+        ; Preserves Y (pos addr).  Clobbers B, X.
+        ; Stack at entry: S+0..2=LBSR ret, S+3=cur_x, S+4=cur_y,
+        ;   S+5=nx, S+6=ny, S+7=i, S+8..9=saved IP
+@chk    PSHS    D               ; S+0=cx, S+1=cy; ret at S+2..4
+        ; S+0=cx, S+1=cy, S+2..4=ret, S+5=cur_x, S+6=cur_y,
+        ;   S+7=nx, S+8=ny, S+9=i, S+10..11=IP
+
+        ; Compute avoid_dist from genome[i*4] & 7 + 6
+        LDA     9,S             ; i
         LDB     #4
-        MUL                     ; D = i*4 (B has result since i<3)
+        MUL
         LDX     #$80CE          ; JOV-GENOME
         ABX
-        LDA     ,X              ; genome byte 0
-        ANDA    #7              ; pilot_skill 0-7
-        ADDA    #6              ; avoid_dist 6-13
-        STA     ,-S             ; S+0=avoid, S+1=cx, S+2=i, S+3=cy, S+4..5=IP
+        LDA     ,X
+        ANDA    #7
+        ADDA    #6              ; A = avoid_dist
+        STA     ,-S             ; S+0=avoid, S+1=cx, S+2=cy
 
         ; -- Stars --
         LDB     $80B0           ; nstars
-        BEQ     @bhlk
-        LDX     #$8040          ; STAR-POS
-@slp    PSHS    B               ; save counter
-        ; S: cnt(0) avoid(1) cx(2) i(3) cy(4) IP(5..6)
+        LBEQ    @cbh
+        LDX     #$8040
+@cslp   PSHS    B               ; save counter
+        ; S: cnt(0) avoid(1) cx(2) cy(3)
         LDA     ,X              ; star_x
         SUBA    2,S             ; - cx
-        BCC     @sa1
+        BCC     @cs1
         NEGA
-@sa1    TFR     A,B             ; B = |dx|
+@cs1    TFR     A,B
         LDA     1,X             ; star_y
-        SUBA    4,S             ; - cy
-        BCC     @sa2
+        SUBA    3,S             ; - cy
+        BCC     @cs2
         NEGA
-@sa2    PSHS    B
+@cs2    PSHS    B
         ADDA    ,S+             ; A = manhattan
         CMPA    1,S             ; vs avoid_dist
-        BLO     @sblk
-        LEAX    2,X             ; next star
+        BLO     @csbl
+        LEAX    2,X
         LDB     ,S+             ; pop counter
         DECB
-        BNE     @slp
-        BRA     @bhlk
-@sblk   LEAS    1,S             ; pop counter
-        LBRA    @blk
+        BNE     @cslp
+        BRA     @cbh
+@csbl   LEAS    1,S             ; pop counter
+        LBRA    @cblk
 
         ; -- Black hole --
-@bhlk   LDA     $80B3           ; hasbhole
-        BEQ     @bslk
-        LDX     #$8052          ; BHOLE-POS
-        BSR     @mdst           ; A = manhattan
+@cbh    LDA     $80B3
+        BEQ     @cbs
+        LDX     #$8052
+        LBSR    @cmd
         CMPA    #15
-        BLO     @blk
+        LBLO    @cblk
 
         ; -- Base --
-@bslk   LDA     $80B2           ; hasbase
-        BEQ     @shpk
-        LDX     #$8050          ; BASE-POS
-        BSR     @mdst
+@cbs    LDA     $80B2
+        BEQ     @csh
+        LDX     #$8050
+        LBSR    @cmd
         CMPA    #5
-        BLO     @blk
+        LBLO    @cblk
 
         ; -- Ship --
-@shpk   LDX     #$8054          ; SHIP-POS
-        BSR     @mdst
+@csh    LDX     #$8054
+        LBSR    @cmd
         CMPA    #8
-        BLO     @blk
+        LBLO    @cblk
 
         ; -- Other Jovians --
-        LDA     $80B1           ; njovians
-        BEQ     @clr
-        LDB     #0              ; j = 0
-@jlp    CMPB    2,S             ; j == i?
-        BEQ     @jnx
-        PSHS    B               ; save j
-        ; Check alive: JOV-DMG + j
+        LDA     $80B1
+        BEQ     @cclr
+        LDB     #0              ; j
+@cjlp   CMPB    10,S            ; j == i? (S+10=i with avoid+cx+cy pushed)
+        BEQ     @cjnx
+        PSHS    B
         LDX     #$8056
         ABX
-        LDA     ,X              ; dmg[j]
-        BEQ     @jded
-        ; JOV-POS + j*2
+        LDA     ,X
+        BEQ     @cjdd
         LDB     ,S              ; j
         ASLB
         LDX     #$804A
-        ABX                     ; X = &JOV-POS[j]
-        ; S: j(0) avoid(1) cx(2) i(3) cy(4) IP(5..6)
+        ABX
         LDA     ,X              ; jov_x
-        SUBA    2,S             ; - cx
-        BCC     @ja1
+        SUBA    2,S             ; - cx (S+0=j, S+1=avoid, S+2=cx)
+        BCC     @cj1
         NEGA
-@ja1    TFR     A,B
-        LDA     1,X             ; jov_y
-        SUBA    4,S             ; - cy
-        BCC     @ja2
+@cj1    TFR     A,B
+        LDA     1,X
+        SUBA    3,S             ; - cy
+        BCC     @cj2
         NEGA
-@ja2    PSHS    B
-        ADDA    ,S+             ; A = manhattan
+@cj2    PSHS    B
+        ADDA    ,S+
         CMPA    #8
         PULS    B               ; restore j (no CC change)
-        BLO     @blk
-        BRA     @jnx
-@jded   PULS    B               ; restore j
-@jnx    INCB
-        CMPB    $80B1           ; j < njovians?
-        BLO     @jlp
+        BLO     @cblk
+        BRA     @cjnx
+@cjdd   PULS    B
+@cjnx   INCB
+        CMPB    $80B1
+        BLO     @cjlp
 
-        ; -- Not blocked --
-@clr    LEAS    4,S             ; pop avoid, cx, i, cy
-        LDD     #0
-        STD     ,U
-        PULS    X               ; restore IP
-        ;NEXT
+@cclr   LEAS    3,S             ; pop avoid, cx, cy
+        CLRA                    ; not blocked
+        RTS
 
-        ; -- Blocked --
-@blk    LEAS    4,S             ; pop avoid, cx, i, cy
-        LDD     #1
-        STD     ,U
-        PULS    X               ; restore IP
-        ;NEXT
+@cblk   LEAS    3,S             ; pop avoid, cx, cy
+        LDA     #1              ; blocked
+        RTS
 
-        ; -- Manhattan distance subroutine --
-        ; X = ptr to (ox, oy).  Returns A = manhattan dist.
-        ; Stack +2 for return addr: S+2=avoid, S+3=cx, S+4=i, S+5=cy
-@mdst   LDA     ,X              ; ox
-        SUBA    3,S             ; - cx (offset +2 for BSR ret)
-        BCC     @md1
+        ; -- Manhattan subroutine for @chk --
+        ; X = ptr to (ox, oy).  Returns A = dist.
+        ; Stack: S+0..1=ret, S+2=avoid, S+3=cx, S+4=cy
+@cmd    LDA     ,X
+        SUBA    3,S             ; - cx
+        BCC     @cm1
         NEGA
-@md1    TFR     A,B             ; B = |dx|
-        LDA     1,X             ; oy
-        SUBA    5,S             ; - cy
-        BCC     @md2
+@cm1    TFR     A,B
+        LDA     1,X
+        SUBA    4,S             ; - cy
+        BCC     @cm2
         NEGA
-@md2    PSHS    B
-        ADDA    ,S+             ; A = |dx| + |dy|
+@cm2    PSHS    B
+        ADDA    ,S+
         RTS
 ;CODE
 
@@ -2072,39 +2152,9 @@ CODE jov-flee   \ ( i -- )  write flee intent to JOV-INTENT
     0 SWAP jov-emotion!       \ fear → sprite turns blue
   ELSE DROP THEN ;
 
-\ ── apply-intent: obstacle avoidance + position update ─────────────────
-\ Reads proposed position from JOV-INTENT, applies 3-tier obstacle
-\ fallback (both axes → x-only → y-only → stay), writes JOV-POS.
-
-: apply-intent  ( -- )
-  JOV-INTENT jbg-i @ 3 * +       \ intent addr
-  DUP 2 + C@ 2 AND IF DROP EXIT THEN  \ base-stop → no move
-  DUP C@ jtk-nx !                \ proposed x
-  1 + C@ jtk-ny !                \ proposed y
-  JOV-POS jbg-i @ 2 * + >R       \ R: pos addr
-  \ Try both axes
-  jtk-nx @ jtk-ny @ jbg-i @
-  jov-blocked? IF
-    \ Try x only (keep current y)
-    jtk-nx @ R@ 1 + C@ jbg-i @
-    jov-blocked? IF
-      \ Try y only (keep current x)
-      R@ C@ jtk-ny @ jbg-i @
-      jov-blocked? IF
-        R> DROP EXIT             \ all blocked → stay put
-      THEN
-      R@ C@ jtk-nx !            \ keep old x
-    ELSE
-      R@ 1 + C@ jtk-ny !       \ keep old y
-    THEN
-  THEN
-  \ Apply if changed
-  jtk-nx @ R@ C@ <>
-  jtk-ny @ R@ 1 + C@ <> OR IF
-    jtk-nx @ R@ C!
-    jtk-ny @ R@ 1 + C!
-    1 jov-moved !
-  THEN R> DROP ;
+\ apply-intent is now a CODE word defined above (#241).
+\ Signature changed from ( -- ) to ( i -- ).
+\ jtk-nx, jtk-ny no longer needed (intent read inline).
 
 VARIABLE detect-timer              \ frame counter for detection rolls
 
@@ -2119,10 +2169,10 @@ VARIABLE detect-timer              \ frame counter for detection rolls
         ELSE
           DROP 0 JOV-TICK jbg-i @ + C!
           JOV-STATE jbg-i @ + C@ 2 = IF
-            jbg-i @ jov-flee  apply-intent
+            jbg-i @ jov-flee  jbg-i @ apply-intent
           ELSE
             jbg-i @ qbase @ jov-think
-            apply-intent
+            jbg-i @ apply-intent
           THEN
         THEN
       THEN
