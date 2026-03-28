@@ -515,6 +515,67 @@ def assemble_code_words(code_defs, symbols):
     return code_bytes
 
 
+# ── Constant inlining ─────────────────────────────────────────────────────────
+
+MAX_INLINE_REFS = 3   # inline constants referenced at most this many times
+
+def inline_constants(definitions, main_thread):
+    """Replace low-reference CONSTANT words with inline LIT values.
+
+    A CONSTANT definition is [('lit', val)].  Each reference emits a CFA token
+    (2 bytes, 80cy).  Inlining emits LIT+value (4 bytes, 31cy) and removes the
+    definition (8 bytes).  Net size: saves space when refs <= 3, costs when >= 5.
+    """
+    # Identify constants: definitions whose body is exactly [('lit', val)]
+    constants = {}
+    for name, body in definitions.items():
+        if len(body) == 1 and body[0][0] == 'lit':
+            constants[name] = body[0][1]
+
+    if not constants:
+        return
+
+    # Count references across all IR
+    def count_refs(items):
+        refs = {}
+        for item in items:
+            if item[0] == 'word' and item[1] in constants:
+                refs[item[1]] = refs.get(item[1], 0) + 1
+        return refs
+
+    ref_counts = count_refs(main_thread)
+    for name, body in definitions.items():
+        if name not in constants:
+            for cname, cnt in count_refs(body).items():
+                ref_counts[cname] = ref_counts.get(cname, 0) + cnt
+
+    # Determine which to inline
+    to_inline = {name: constants[name] for name, cnt in ref_counts.items()
+                 if cnt <= MAX_INLINE_REFS}
+    # Also inline constants with zero references (removes dead definition)
+    for name in constants:
+        if name not in ref_counts:
+            to_inline[name] = constants[name]
+
+    if not to_inline:
+        return
+
+    # Replace references with inline LIT
+    def rewrite(items):
+        for i, item in enumerate(items):
+            if item[0] == 'word' and item[1] in to_inline:
+                items[i] = ('lit', to_inline[item[1]])
+
+    rewrite(main_thread)
+    for name, body in definitions.items():
+        if name not in to_inline:
+            rewrite(body)
+
+    # Remove inlined definitions
+    for name in to_inline:
+        del definitions[name]
+
+
 # ── Compiler ──────────────────────────────────────────────────────────────────
 
 def item_size(item):
@@ -1378,6 +1439,7 @@ def main():
     source               = src_path.read_text()
     tokens               = tokenize(source, base_dir=src_path.parent)
     defs, variables, main, code_defs = parse(tokens)
+    inline_constants(defs, main)
     code                 = compile_forth(defs, variables, main, code_defs, symbols, app_base,
                                          hole_start=hole_start, hole_end=hole_end)
 

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Space Warp — 60-Frame Cycle Budget</title>
+<style>
+  body { background: #1a1a2e; color: #e0e0e0; font-family: 'Menlo', 'Consolas', monospace; margin: 0; padding: 20px; }
+  h1 { color: #00ff88; font-size: 18px; margin-bottom: 4px; }
+  h2 { color: #888; font-size: 13px; font-weight: normal; margin-top: 0; }
+  .chart-container { position: relative; margin: 20px 0; }
+  canvas { display: block; }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; font-size: 12px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-swatch { width: 14px; height: 14px; border-radius: 2px; }
+  .stats { margin-top: 20px; font-size: 13px; line-height: 1.8; }
+  .stats .over { color: #ff4444; }
+  .stats .ok { color: #00ff88; }
+</style>
+</head>
+<body>
+
+<h1>Space Warp — 60-Frame Cycle Map (1 Second @ 60fps)</h1>
+<h2>Moderate difficulty: 3 Jovians (thresholds 4/6/3), 5 stars, black hole, base</h2>
+
+<div class="chart-container">
+  <canvas id="chart" width="1200" height="500"></canvas>
+</div>
+
+<div class="legend" id="legend"></div>
+
+<div class="stats" id="stats"></div>
+
+<script>
+const BUDGET = 14930;  // 894886 Hz (14.31818 MHz / 16) / 59.94 Hz NTSC
+const FRAMES = 60;
+const BAR_W = 16;
+const GAP = 4;
+const LEFT = 60;
+const TOP = 30;
+const BOTTOM = 60;
+const MAX_CY = 25000;
+
+// Component colors
+const COMPONENTS = [
+  // Pre-VSYNC every-frame breakdown (was single "ef" at 5000cy)
+  { name: 'move-ship',       key: 'ms',    color: '#3377bb' },  // 4x KBD-SCAN + try-move
+  { name: 'process-key',     key: 'pk',    color: '#5599dd' },  // latch-key + key dispatch
+  { name: 'save-ship-pos',   key: 'ssp',   color: '#2266aa' },  // copy ship x,y
+  { name: 'latch-key',       key: 'lk',    color: '#77bbee' },  // standalone kbd scan
+  { name: 'tick systems',    key: 'tks',   color: '#4488cc' },  // missile + jbeam + destruct
+  { name: 'loop overhead',   key: 'lovr',  color: '#336699' },  // frame-tick, overlay checks
+  // Even-frame systems
+  { name: 'Star Gravity',    key: 'sgrv',  color: '#cc8844' },
+  { name: 'Gravity Well',    key: 'gw',    color: '#aa6622' },
+  { name: 'Collisions',      key: 'coll',  color: '#66aa44' },
+  { name: 'J0 Think',        key: 'j0',    color: '#ff4444' },
+  { name: 'J1 Think',        key: 'j1',    color: '#ff6666' },
+  { name: 'J2 Think',        key: 'j2',    color: '#ff8888' },
+  // Odd-frame systems
+  { name: 'Jov Gravity',     key: 'jgrv',  color: '#cc6600' },
+  { name: 'Background',      key: 'bg',    color: '#8866aa' },
+  // Post-VSYNC render breakdown (was single "rnd")
+  { name: 'draw-stars',      key: 'rds',   color: '#44aacc' },  // DO/LOOP 5 stars
+  { name: 'draw-jovians',    key: 'rdj',   color: '#55bbdd' },  // DO/LOOP 3 Jovians
+  { name: 'draw-ship',       key: 'rsh',   color: '#66ccee' },  // spr-draw ship
+  { name: 'bg-jov',          key: 'bgj',   color: '#338899' },  // save/restore jov bgs + oldpos
+  { name: 'bg-ship',         key: 'bgs',   color: '#449999' },  // save/restore ship bg
+  { name: 'rnd overhead',    key: 'rovr',  color: '#2a6677' },  // conditional checks
+  { name: 'Post-Render',     key: 'post',  color: '#668899' },
+];
+
+// Jovian think schedule
+// J0 (threshold 4, start 0): thinks at even frames 6, 14, 22, 30, 38, 46, 54
+// J1 (threshold 6, start 1): thinks at even frames 8, 20, 32, 44, 56
+// J2 (threshold 3, start 2): thinks at even frames 0, 6, 12, 18, 24, 30, 36, 42, 48, 54
+const J0_FRAMES = new Set([6, 14, 22, 30, 38, 46, 54]);
+const J1_FRAMES = new Set([8, 20, 32, 44, 56]);
+const J2_FRAMES = new Set([0, 6, 12, 18, 24, 30, 36, 42, 48, 54]);
+
+// Gravity frames (grav-tick MOD 4 = 0, even frames 0, 8, 16, 24, 32, 40, 48, 56)
+const GRAV_EVEN = new Set([0, 8, 16, 24, 32, 40, 48, 56]);
+// Odd gravity frames
+const GRAV_ODD = new Set([1, 9, 17, 25, 33, 41, 49, 57]);
+
+// BG slot 1: odd frames where N AND 7 = 1
+// BG slot 5: odd frames where N AND 7 = 5
+function hasBG(frame) {
+  if (frame % 2 === 0) return false;
+  const slot = frame & 7;
+  return slot === 1 || slot === 5;
+}
+
+function buildFrame(f) {
+  const even = (f % 2 === 0);
+  const isGrav = even ? GRAV_EVEN.has(f) : GRAV_ODD.has(f);
+  const hasJ0 = even && J0_FRAMES.has(f);
+  const hasJ1 = even && J1_FRAMES.has(f);
+  const hasJ2 = even && J2_FRAMES.has(f);
+  const anyThink = hasJ0 || hasJ1 || hasJ2;
+  const jovMoved = anyThink || (isGrav && !even); // gravity can move Jovians
+
+  // Pre-VSYNC every-frame breakdown (idle path, measured via primitive costs):
+  //   move-ship: 1633cy idle (4x KBD-SCAN + Forth overhead, no keys held)
+  //   process-key: 785cy idle (latch-key + key-latch compare, no new key)
+  //   save-ship-pos: 472cy exact
+  //   latch-key: 353cy exact (standalone call, separate from process-key)
+  //   tick systems: 764cy idle (missile 212 + jbeam 340 + destruct 212)
+  //   loop overhead: 429cy (frame-tick +! 103 + 2x overlay check 326)
+  return {
+    ms:   1633,                             // move-ship (idle, no keys held)
+    pk:   785,                              // process-key (idle, no new key)
+    ssp:  472,                              // save-ship-pos (exact)
+    lk:   353,                              // latch-key (exact)
+    tks:  764,                              // tick-missile + tick-jbeam + tick-destruct (idle)
+    lovr: 429,                              // frame-tick +! + 2x overlay @ 0= IF
+    sgrv: (even && isGrav) ? 4183 : 0,
+    gw:   (even && isGrav) ? 2132 : 0,
+    coll: even ? 1000 : 0,
+    j0:   hasJ0 ? 5626 : 0,
+    j1:   hasJ1 ? 5626 : 0,
+    j2:   hasJ2 ? 5626 : 0,
+    jgrv: !even ? (isGrav ? 5000 : 1200) : 0,
+    bg:   hasBG(f) ? 3000 : 0,
+    // Post-VSYNC render breakdown (measured via primitive cycle costs):
+    // Full render (jov-moved=1): 7732cy total
+    //   draw-stars: 1938, draw-jovians: 1190, draw-ship: 918
+    //   bg-jov (save+restore+oldpos): 2088, bg-ship (save+restore): 1123
+    //   overhead (conditionals): 475
+    // Ship-only (moved=1): 2644cy total
+    //   draw-ship: 918, bg-ship: 1123, overhead: 603
+    rds:  jovMoved ? 1938 : 0,
+    rdj:  jovMoved ? 1190 : 0,
+    rsh:  918,                              // always (ship always redrawn)
+    bgj:  jovMoved ? 2088 : 0,             // restore(948) + save(949) + oldpos(191)
+    bgs:  1123,                             // restore(476) + save(647)
+    rovr: jovMoved ? 475 : 603,            // conditional checks (more in ship-only path)
+    // Post-render (measured idle): 2046cy
+    //   tick-beam/jbeam-draw(2x212) + latch-key(353) + apply-beam/jbeam-hit(259+212)
+    //   + panel checks(672) + check-win(126)
+    post: 2046,
+  };
+}
+
+// Build all frames
+const frames = [];
+for (let f = 0; f < FRAMES; f++) {
+  frames.push(buildFrame(f));
+}
+
+// Draw
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
+const chartW = canvas.width - LEFT - 20;
+const chartH = canvas.height - TOP - BOTTOM;
+
+function yPos(cy) {
+  return TOP + chartH - (cy / MAX_CY) * chartH;
+}
+
+// Background
+ctx.fillStyle = '#1a1a2e';
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+// Y-axis gridlines
+ctx.strokeStyle = '#333';
+ctx.lineWidth = 1;
+ctx.font = '11px Menlo, Consolas, monospace';
+ctx.fillStyle = '#666';
+ctx.textAlign = 'right';
+for (let cy = 0; cy <= MAX_CY; cy += 5000) {
+  const y = yPos(cy);
+  ctx.beginPath();
+  ctx.moveTo(LEFT, y);
+  ctx.lineTo(canvas.width - 20, y);
+  ctx.stroke();
+  ctx.fillText((cy / 1000).toFixed(0) + 'K', LEFT - 8, y + 4);
+}
+
+// Budget line
+ctx.strokeStyle = '#ff4444';
+ctx.lineWidth = 2;
+ctx.setLineDash([6, 4]);
+ctx.beginPath();
+ctx.moveTo(LEFT, yPos(BUDGET));
+ctx.lineTo(canvas.width - 20, yPos(BUDGET));
+ctx.stroke();
+ctx.setLineDash([]);
+ctx.fillStyle = '#ff4444';
+ctx.textAlign = 'left';
+ctx.fillText('BUDGET 14,930cy', canvas.width - 140, yPos(BUDGET) - 6);
+
+// Draw stacked bars
+let overCount = 0;
+let totalCycles = 0;
+
+for (let f = 0; f < FRAMES; f++) {
+  const x = LEFT + f * (BAR_W + GAP);
+  const data = frames[f];
+  let y = yPos(0);
+
+  let frameTotal = 0;
+  for (const comp of COMPONENTS) {
+    const val = data[comp.key];
+    if (val === 0) continue;
+    const h = (val / MAX_CY) * chartH;
+    ctx.fillStyle = comp.color;
+    ctx.fillRect(x, y - h, BAR_W, h);
+    y -= h;
+    frameTotal += val;
+  }
+
+  totalCycles += frameTotal;
+  if (frameTotal > BUDGET) overCount++;
+
+  // Frame number
+  ctx.fillStyle = (f % 2 === 0) ? '#aaa' : '#666';
+  ctx.textAlign = 'center';
+  ctx.font = '9px Menlo, Consolas, monospace';
+  ctx.fillText(f, x + BAR_W / 2, canvas.height - BOTTOM + 14);
+
+  // Even/Odd marker
+  ctx.fillStyle = (f % 2 === 0) ? '#4488cc' : '#335566';
+  ctx.fillText(f % 2 === 0 ? 'E' : 'O', x + BAR_W / 2, canvas.height - BOTTOM + 26);
+
+  // Over-budget marker
+  if (frameTotal > BUDGET) {
+    ctx.fillStyle = '#ff4444';
+    ctx.font = 'bold 10px Menlo, Consolas, monospace';
+    const totalY = yPos(frameTotal);
+    ctx.fillText((frameTotal / 1000).toFixed(1) + 'K', x + BAR_W / 2, totalY - 4);
+  }
+}
+
+// X-axis label
+ctx.fillStyle = '#888';
+ctx.textAlign = 'center';
+ctx.font = '12px Menlo, Consolas, monospace';
+ctx.fillText('Frame Number (1 second = 60 frames @ 60fps VSYNC)', LEFT + chartW / 2, canvas.height - 8);
+
+// Y-axis label
+ctx.save();
+ctx.translate(14, TOP + chartH / 2);
+ctx.rotate(-Math.PI / 2);
+ctx.fillText('CPU Cycles', 0, 0);
+ctx.restore();
+
+// Legend
+const legendEl = document.getElementById('legend');
+for (const comp of COMPONENTS) {
+  const item = document.createElement('div');
+  item.className = 'legend-item';
+  item.innerHTML = `<div class="legend-swatch" style="background:${comp.color}"></div>${comp.name}`;
+  legendEl.appendChild(item);
+}
+// Budget legend
+const budgetItem = document.createElement('div');
+budgetItem.className = 'legend-item';
+budgetItem.innerHTML = `<div class="legend-swatch" style="background:#ff4444; height:3px; margin:5px 0;"></div>Budget (14,930cy)`;
+legendEl.appendChild(budgetItem);
+
+// Stats
+const avgCycles = totalCycles / FRAMES;
+const effectiveFPS = Math.round(FRAMES / (totalCycles / BUDGET) * 10) / 10;
+const statsEl = document.getElementById('stats');
+statsEl.innerHTML = `
+  <span class="${overCount ? 'over' : 'ok'}">Frames over budget: ${overCount} of ${FRAMES} (${Math.round(overCount/FRAMES*100)}%)</span><br>
+  <span class="ok">Frames under budget: ${FRAMES - overCount} of ${FRAMES} (${Math.round((FRAMES-overCount)/FRAMES*100)}%)</span><br>
+  Average cycles/frame: ${Math.round(avgCycles).toLocaleString()}cy
+  (${Math.round(avgCycles / BUDGET * 100)}% of budget)<br>
+  Effective FPS (estimated): ~${effectiveFPS} fps<br>
+  <br>
+  <span style="color:#00ff88">After #215 + #245:</span> <code>jov-blocked?</code> converted to CODE word
+  (488cy + 77cy/star + 116cy/Jovian = 1,105cy; was 13,800cy Forth).
+  Low-ref constants inlined as LIT (80cy &rarr; 31cy, 23 constants, saved 262 bytes).
+  Think: 5,626cy (was 17,000cy).  Render: 7,066cy full / 2,041cy ship-only.
+  Measured via <code>fc.py --cycles</code>.  29 of 60 frames still over budget;
+  gravity odd (21,566cy) and think frames (20,192cy) are the remaining overruns.
+`;
+</script>
+
+</body>
+</html>

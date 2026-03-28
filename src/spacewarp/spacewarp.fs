@@ -165,6 +165,14 @@ VARIABLE qjovians              \ jovian count in current quadrant
 VARIABLE qbase                 \ base present? (0 or 1)
 VARIABLE qbhole                \ black hole present? (0 or 1)
 
+\ Shadow bytes at fixed addresses for CODE word access
+$80B0 CONSTANT QCOUNTS         \ 4 bytes: nstars, njovians, hasbase, hasbhole
+: sync-qcounts  ( -- )
+  qstars @ QCOUNTS C!
+  qjovians @ QCOUNTS 1 + C!
+  qbase @ QCOUNTS 2 + C!
+  qbhole @ QCOUNTS 3 + C! ;
+
 \ SOS alert state
 VARIABLE sos-active
 VARIABLE sos-col
@@ -293,6 +301,7 @@ VARIABLE gq-tmp                \ temp for building quadrant byte
   DUP q-base? IF 1 ELSE 0 THEN qbase !
   DUP q-bhole? IF 1 ELSE 0 THEN qbhole !
   q-stars qstars !
+  sync-qcounts
 
   \ Save player quadrant
   SWAP pcol ! prow !
@@ -1369,7 +1378,8 @@ VARIABLE spawn-pending                \ deferred spawn dir+1, or 0
     DUP gen-jov-sprite                \ generate sprite
     DUP DUP jov-emo@ jov-color-band SWAP JOV-EMCOL + C!
     DROP
-    qjovians @ 3 < IF 1 qjovians +! THEN
+    qjovians @ 3 < IF 1 qjovians +!
+      qjovians @ QCOUNTS 1 + C! THEN
   THEN ;
 
 \ Queue a spawn for deferred execution (after refresh-after-kill is available)
@@ -1610,8 +1620,6 @@ VARIABLE jov-moved               \ flag: did any Jovian move this frame?
 \   flags bit 0 = targets base
 \   flags bit 1 = base-stop (within 30px, hold position)
 
-VARIABLE hc-jx                    \ scratch: candidate x for obstacle check
-VARIABLE hc-jy                    \ scratch: candidate y for obstacle check
 VARIABLE jtk-nx                   \ proposed new x
 VARIABLE jtk-ny                   \ proposed new y
 
@@ -1626,45 +1634,154 @@ VARIABLE jtk-ny                   \ proposed new y
   DUP 2 < IF DROP 2 THEN
   DUP 8 > IF DROP 8 THEN ;
 
-\ Manhattan distance from (hc-jx, hc-jy) to (x, y) byte pair at addr
-: jov-dist  ( addr -- d )
-  DUP C@ hc-jx @ - abs
-  SWAP 1 + C@ hc-jy @ - abs + ;
-
-\ Check if (hc-jx, hc-jy) is blocked by any obstacle
-VARIABLE jblk
 : jov-avoid-dist  ( -- n )  \ star avoidance radius from pilot skill
   jbg-i @ 4 * JOV-GENOME + C@ 7 AND  \ pilot_skill 0-7
   6 + ;                                \ 6 (dumb) to 13 (ace)
 
-: jov-blocked?  ( -- flag )
-  0 jblk !
-  qstars @ ?DUP IF 0 DO
-    jblk @ 0= IF
-      STAR-POS I 2 * + jov-dist jov-avoid-dist < IF 1 jblk ! THEN
-    THEN
-  LOOP THEN
-  jblk @ 0= IF
-    qbhole @ IF BHOLE-POS jov-dist 15 < IF 1 jblk ! THEN THEN
-  THEN
-  jblk @ 0= IF
-    qbase @ IF BASE-POS jov-dist 5 < IF 1 jblk ! THEN THEN
-  THEN
-  jblk @ 0= IF
-    SHIP-POS jov-dist 8 < IF 1 jblk ! THEN
-  THEN
-  jblk @ 0= IF
-    qjovians @ ?DUP IF 0 DO
-      jblk @ 0= IF
-        I jbg-i @ <> IF
-          JOV-DMG I + C@ IF
-            JOV-POS I 2 * + jov-dist 8 < IF 1 jblk ! THEN
-          THEN
-        THEN
-      THEN
-    LOOP THEN
-  THEN
-  jblk @ ;
+\ jov-blocked? ( x y i -- flag )
+\ Check if candidate position (x,y) is blocked by any obstacle.
+\ Returns 1 if blocked, 0 if clear.  i = current Jovian index (skip self).
+\ Checks: stars (avoid_dist), black hole (<15), base (<5), ship (<8),
+\         other live Jovians (<8).
+\ All data at fixed $80xx addresses; counts from QCOUNTS ($80B0).
+CODE jov-blocked?
+        PSHS    X               ; save IP
+        ; Pop args: TOS=i, NOS=y, 3OS=x
+        LDA     1,U             ; A = i
+        LDB     3,U             ; B = y
+        PSHS    D               ; S+0=i, S+1=y
+        LDA     5,U             ; A = x
+        LEAU    4,U             ; pop 3 cells, keep 1 result slot
+        PSHS    A               ; S+0=cx, S+1=i, S+2=cy, S+3..4=IP
+
+        ; Compute avoid_dist = (genome[i*4] & 7) + 6
+        LDA     1,S             ; i
+        LDB     #4
+        MUL                     ; D = i*4 (B has result since i<3)
+        LDX     #$80CE          ; JOV-GENOME
+        ABX
+        LDA     ,X              ; genome byte 0
+        ANDA    #7              ; pilot_skill 0-7
+        ADDA    #6              ; avoid_dist 6-13
+        STA     ,-S             ; S+0=avoid, S+1=cx, S+2=i, S+3=cy, S+4..5=IP
+
+        ; -- Stars --
+        LDB     $80B0           ; nstars
+        BEQ     @bhlk
+        LDX     #$8040          ; STAR-POS
+@slp    PSHS    B               ; save counter
+        ; S: cnt(0) avoid(1) cx(2) i(3) cy(4) IP(5..6)
+        LDA     ,X              ; star_x
+        SUBA    2,S             ; - cx
+        BCC     @sa1
+        NEGA
+@sa1    TFR     A,B             ; B = |dx|
+        LDA     1,X             ; star_y
+        SUBA    4,S             ; - cy
+        BCC     @sa2
+        NEGA
+@sa2    PSHS    B
+        ADDA    ,S+             ; A = manhattan
+        CMPA    1,S             ; vs avoid_dist
+        BLO     @sblk
+        LEAX    2,X             ; next star
+        LDB     ,S+             ; pop counter
+        DECB
+        BNE     @slp
+        BRA     @bhlk
+@sblk   LEAS    1,S             ; pop counter
+        LBRA    @blk
+
+        ; -- Black hole --
+@bhlk   LDA     $80B3           ; hasbhole
+        BEQ     @bslk
+        LDX     #$8052          ; BHOLE-POS
+        BSR     @mdst           ; A = manhattan
+        CMPA    #15
+        BLO     @blk
+
+        ; -- Base --
+@bslk   LDA     $80B2           ; hasbase
+        BEQ     @shpk
+        LDX     #$8050          ; BASE-POS
+        BSR     @mdst
+        CMPA    #5
+        BLO     @blk
+
+        ; -- Ship --
+@shpk   LDX     #$8054          ; SHIP-POS
+        BSR     @mdst
+        CMPA    #8
+        BLO     @blk
+
+        ; -- Other Jovians --
+        LDA     $80B1           ; njovians
+        BEQ     @clr
+        LDB     #0              ; j = 0
+@jlp    CMPB    2,S             ; j == i?
+        BEQ     @jnx
+        PSHS    B               ; save j
+        ; Check alive: JOV-DMG + j
+        LDX     #$8056
+        ABX
+        LDA     ,X              ; dmg[j]
+        BEQ     @jded
+        ; JOV-POS + j*2
+        LDB     ,S              ; j
+        ASLB
+        LDX     #$804A
+        ABX                     ; X = &JOV-POS[j]
+        ; S: j(0) avoid(1) cx(2) i(3) cy(4) IP(5..6)
+        LDA     ,X              ; jov_x
+        SUBA    2,S             ; - cx
+        BCC     @ja1
+        NEGA
+@ja1    TFR     A,B
+        LDA     1,X             ; jov_y
+        SUBA    4,S             ; - cy
+        BCC     @ja2
+        NEGA
+@ja2    PSHS    B
+        ADDA    ,S+             ; A = manhattan
+        CMPA    #8
+        PULS    B               ; restore j (no CC change)
+        BLO     @blk
+        BRA     @jnx
+@jded   PULS    B               ; restore j
+@jnx    INCB
+        CMPB    $80B1           ; j < njovians?
+        BLO     @jlp
+
+        ; -- Not blocked --
+@clr    LEAS    4,S             ; pop avoid, cx, i, cy
+        LDD     #0
+        STD     ,U
+        PULS    X               ; restore IP
+        ;NEXT
+
+        ; -- Blocked --
+@blk    LEAS    4,S             ; pop avoid, cx, i, cy
+        LDD     #1
+        STD     ,U
+        PULS    X               ; restore IP
+        ;NEXT
+
+        ; -- Manhattan distance subroutine --
+        ; X = ptr to (ox, oy).  Returns A = manhattan dist.
+        ; Stack +2 for return addr: S+2=avoid, S+3=cx, S+4=i, S+5=cy
+@mdst   LDA     ,X              ; ox
+        SUBA    3,S             ; - cx (offset +2 for BSR ret)
+        BCC     @md1
+        NEGA
+@md1    TFR     A,B             ; B = |dx|
+        LDA     1,X             ; oy
+        SUBA    5,S             ; - cy
+        BCC     @md2
+        NEGA
+@md2    PSHS    B
+        ADDA    ,S+             ; A = |dx| + |dy|
+        RTS
+;CODE
 
 VARIABLE base-attack              \ frame counter for base destruction
 
@@ -1966,13 +2083,13 @@ CODE jov-flee   \ ( i -- )  write flee intent to JOV-INTENT
   1 + C@ jtk-ny !                \ proposed y
   JOV-POS jbg-i @ 2 * + >R       \ R: pos addr
   \ Try both axes
-  jtk-nx @ hc-jx !  jtk-ny @ hc-jy !
+  jtk-nx @ jtk-ny @ jbg-i @
   jov-blocked? IF
     \ Try x only (keep current y)
-    jtk-nx @ hc-jx !  R@ 1 + C@ hc-jy !
+    jtk-nx @ R@ 1 + C@ jbg-i @
     jov-blocked? IF
       \ Try y only (keep current x)
-      R@ C@ hc-jx !  jtk-ny @ hc-jy !
+      R@ C@ jtk-ny @ jbg-i @
       jov-blocked? IF
         R> DROP EXIT             \ all blocked → stay put
       THEN
@@ -3626,7 +3743,7 @@ VARIABLE key-latch                \ latched keypress (survives between polls)
   \ Erase base sprite
   SPR-BASE BASE-POS C@ 3 - BASE-POS 1 + C@ 2 - spr-erase-box
   \ Clear quadrant state
-  0 qbase !
+  0 qbase !  0 QCOUNTS 2 + C!
   \ Clear base bit in galaxy byte
   pcol @ prow @ gal@ $FB AND pcol @ prow @ gal!
   \ Explode at base position

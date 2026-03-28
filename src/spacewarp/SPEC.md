@@ -342,8 +342,8 @@ position.
 
 ### Obstacle Avoidance
 
-Before committing a move, `jov-blocked?` checks the candidate position against
-all obstacles using Manhattan distance:
+Before committing a move, `jov-blocked?` (6809 CODE word, ~1,105cy) checks the
+candidate position against all obstacles using Manhattan distance:
 
 | Obstacle | Avoidance radius |
 |----------|-----------------|
@@ -539,7 +539,7 @@ $0050–$0082   Kernel scratch variables (direct page, 51 bytes)
 $0600–$1FFF   RG6 VRAM (6144 bytes, set by rg-init after boot)
 $0E00         Bootstrap (copies staged kernel to $E000, enables all-RAM)
 $1000         Staged kernel (DECB load addr; copied to $E000 at boot)
-$2000–$7FE8   Application code (~24K compiled Forth, 24552 bytes)
+$2000–$7FE8   Application code (~24K compiled Forth, 24261 bytes)
 $8000–$8EF4   Game data (all-RAM region — galaxy, sprites, AI, beams, mood, etc.)
 $9000–$91D8   Font glyphs (59 × 8 bytes, all-RAM region)
 $DE00         Data stack base (U register, grows downward)

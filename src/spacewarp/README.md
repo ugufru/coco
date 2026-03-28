@@ -90,7 +90,7 @@ black hole, or you detonate your own ship.
 
 ## Technical Notes
 
-The game is about 24K of compiled Forth (24552 bytes) plus a 2.2K kernel (59 primitives). Performance-critical
+The game is about 24K of compiled Forth (24261 bytes) plus a 2.2K kernel (59 primitives). Performance-critical
 routines are hand-written 6809 assembly, called as CODE words from Forth:
 
 | Primitive | What it does | Speedup vs Forth |
@@ -107,6 +107,7 @@ routines are hand-written 6809 assembly, called as CODE words from Forth:
 | `bg-restore` | Restore sprite background pixels | new |
 | `xyn-pull` | Pull position toward target (variable step) | 3x |
 | `collision-scan` | Proximity collision detection loop | 2.5x |
+| `jov-blocked?` | Obstacle avoidance (stars, bhole, base, ship, Jovians) | 12.5x |
 | `jov-think` | Genome-driven AI intent computation | new |
 | `jov-flee` | Flee intent toward JOV-INTENT | new |
 | `jov-emo@` | Read Jovian emotion from genome | new |
