@@ -2739,72 +2739,232 @@ VARIABLE move-count               \ counts moves; energy charged every 4th
 VARIABLE prev-energy              \ last displayed energy (for dirty check)
 VARIABLE prev-missiles            \ last displayed missile count
 VARIABLE prev-docked              \ last displayed dock state
-: ship-dx  ( -- n )
-  pdmg-ion @ DUP 67 > IF DROP 3 ELSE 34 > IF 2 ELSE 1 THEN THEN ;
-: ship-dy  ( -- n )  ship-dx ;
 10 CONSTANT MASER-COST            \ energy per maser fire
 
 : use-energy  ( cost -- )
   penergy @ SWAP - DUP 0 < IF DROP 0 THEN penergy ! ;
 
-\ Check if ship overlaps base (within 5px both axes)
-: ship-on-base?  ( -- flag )
-  qbase @ 0= IF 0 EXIT THEN
-  SHIP-POS C@ BASE-POS C@ - abs 5 <
-  SHIP-POS 1 + C@ BASE-POS 1 + C@ - abs 5 < AND ;
-
 VARIABLE was-near-base
 
-: ship-jov-blocked?  ( -- flag )
-  qjovians @ ?DUP 0= IF 0 EXIT THEN
-  0 SWAP 0 DO
-    JOV-DMG I + C@ IF
-      SHIP-POS JOV-POS I 2 * + mdist 8 < IF DROP 1 THEN
-    THEN
-  LOOP ;
+\ move-ship CODE word: keyboard scan + try-move + collision checks
+\ Inlines: ship-dx, ship-dy, ship-on-base?, ship-jov-blocked?, try-move.
+\ Scans 4 arrow key columns via PIA0 ($FF00/$FF02) directly.
+\ Uses Y register for axis address (preserved across subroutines).
+\ Reads QCOUNTS shadow bytes at $80B0 for base/Jovian presence.
+CODE move-ship
+        PSHS    X               ; save IP
 
-\ try-move: attempt one axis of ship movement
-\ addr = SHIP-POS or SHIP-POS 1 + (axis byte address)
-\ delta = signed displacement (+dx/-dx or +dy/-dy)
-\ max = upper bound for this axis (123 for X, 139 for Y)
-\ Applies tentative move, checks base proximity and Jovian collision,
-\ undoes move if blocked, sets moved flag if accepted.
-: try-move  ( addr delta max -- )
-  >R OVER C@ OVER +               \ addr delta new-val  R: max
-  DUP 4 < OVER R> > OR IF         \ out of bounds?
-    DROP 2DROP EXIT
-  THEN
-  ROT DUP >R C!                   \ write tentative pos; R: addr
-  ship-on-base? was-near-base @ 0= AND IF
-    R@ C@ SWAP - R> C! EXIT       \ undo: newly on base
-  THEN
-  ship-jov-blocked? IF
-    R@ C@ SWAP - R> C! EXIT       \ undo: blocked by Jovian
-  THEN
-  R> DROP DROP 1 moved ! ;
+        ; -- Clear moved flag --
+        LDD     #0
+        STD     FVAR_moved
 
-: move-ship  ( -- )
-  0 moved !
-  penergy @ 0= IF EXIT THEN
-  ship-on-base? was-near-base !    \ already near? allow escape
-  \ Arrow keys: all on row 3 ($08), different columns
-  KB-C3 KBD-SCAN $08 AND IF       \ UP: col 3, row 3
-    SHIP-POS 1 + ship-dy NEGATE 139 try-move
-  THEN
-  KB-C4 KBD-SCAN $08 AND IF       \ DN: col 4, row 3
-    SHIP-POS 1 + ship-dy 139 try-move
-  THEN
-  KB-C5 KBD-SCAN $08 AND IF       \ LT: col 5, row 3
-    SHIP-POS ship-dx NEGATE 123 try-move
-  THEN
-  KB-C6 KBD-SCAN $08 AND IF       \ RT: col 6, row 3
-    SHIP-POS ship-dx 123 try-move
-  THEN
-  moved @ IF
-    move-count @ 1 + DUP 32 = IF
-      DROP 0  1 use-energy
-    THEN move-count !
-  THEN ;
+        ; -- Check penergy > 0 --
+        LDD     FVAR_penergy
+        LBEQ    @exit
+
+        ; -- Compute was-near-base = ship-on-base? --
+        LBSR    @onbase
+        TFR     A,B             ; result in B (low byte)
+        CLRA                    ; high byte = 0
+        STD     FVAR_was_near_base  ; big-endian: 0:result
+
+        ; -- Compute speed from pdmg-ion --
+        ; > 67 -> 3, > 34 -> 2, else 1
+        LDA     FVAR_pdmg_ion+1
+        CMPA    #68
+        BLO     @sp2
+        LDA     #3
+        BRA     @spd
+@sp2    CMPA    #35
+        BLO     @sp1
+        LDA     #2
+        BRA     @spd
+@sp1    LDA     #1
+@spd    STA     ,-S             ; S+0=speed, S+1..2=saved IP
+
+        ; -- Scan UP: col 3 ($F7), row 3 ($08) --
+        LDA     #$F7
+        STA     $FF02
+        LDA     $FF00
+        COMA
+        ANDA    #$08
+        BEQ     @noup
+        LDY     #$8055          ; SHIP-POS+1 (Y axis)
+        LDA     ,S              ; speed
+        NEGA                    ; up = negative
+        LDB     #139
+        LBSR    @try
+@noup
+        ; -- Scan DN: col 4 ($EF), row 3 --
+        LDA     #$EF
+        STA     $FF02
+        LDA     $FF00
+        COMA
+        ANDA    #$08
+        BEQ     @nodn
+        LDY     #$8055
+        LDA     ,S              ; speed (positive = down)
+        LDB     #139
+        LBSR    @try
+@nodn
+        ; -- Scan LT: col 5 ($DF), row 3 --
+        LDA     #$DF
+        STA     $FF02
+        LDA     $FF00
+        COMA
+        ANDA    #$08
+        BEQ     @nolt
+        LDY     #$8054          ; SHIP-POS (X axis)
+        LDA     ,S
+        NEGA                    ; left = negative
+        LDB     #123
+        LBSR    @try
+@nolt
+        ; -- Scan RT: col 6 ($BF), row 3 --
+        LDA     #$BF
+        STA     $FF02
+        LDA     $FF00
+        COMA
+        ANDA    #$08
+        BEQ     @nort
+        LDY     #$8054
+        LDA     ,S              ; speed (positive = right)
+        LDB     #123
+        LBSR    @try
+@nort
+        ; -- Deselect keyboard columns --
+        LDA     #$FF
+        STA     $FF02
+
+        ; -- Pop speed --
+        LEAS    1,S
+
+        ; -- Update move-count / energy drain --
+        LDD     FVAR_moved
+        BEQ     @exit
+        LDA     FVAR_move_count+1
+        INCA
+        CMPA    #32
+        BNE     @svmc
+        ; Every 32 moves: drain 1 energy
+        CLRA
+        LDD     FVAR_penergy
+        SUBD    #1
+        BPL     @eok
+        LDD     #0
+@eok    STD     FVAR_penergy
+        CLRA                    ; A = 0 for move_count
+@svmc   TFR     A,B             ; count in B (low byte)
+        CLRA                    ; high byte = 0
+        STD     FVAR_move_count
+
+@exit   PULS    X               ; restore IP
+        ;NEXT
+
+        ; ── try-move subroutine ──────────────────────────────
+        ; Y = axis address (SHIP-POS or SHIP-POS+1)
+        ; A = signed delta, B = max bound
+        ; Preserves Y.  Modifies A, B, X.
+@try    PSHS    D               ; S+0=delta, S+1=max
+        LDA     ,Y              ; current pos
+        ADDA    ,S              ; + delta = new
+        CMPA    #4
+        BLO     @tund           ; < 4: out of bounds
+        CMPA    1,S             ; > max?
+        BHI     @tund
+        ; Write tentative position
+        STA     ,Y
+        ; Check ship-on-base?
+        LBSR    @onbase         ; A = 0/1 (Y preserved)
+        TSTA
+        BEQ     @tjov           ; not on base
+        LDA     FVAR_was_near_base+1
+        BNE     @tjov           ; already near, allow escape
+        ; Undo: newly on base
+        LDA     ,Y
+        SUBA    ,S              ; new - delta = old
+        STA     ,Y
+        LEAS    2,S
+        RTS
+@tjov   ; Check ship-jov-blocked?
+        LBSR    @sjblk          ; A = 0/1 (Y preserved)
+        TSTA
+        BEQ     @tok            ; not blocked
+        ; Undo: blocked by Jovian
+        LDA     ,Y
+        SUBA    ,S
+        STA     ,Y
+        LEAS    2,S
+        RTS
+@tok    LEAS    2,S
+        LDD     #1
+        STD     FVAR_moved
+        RTS
+@tund   LEAS    2,S
+        RTS
+
+        ; ── ship-on-base? subroutine ─────────────────────────
+        ; Returns A = 1 if within 5px on both axes, else 0.
+        ; Does not modify Y.
+@onbase LDA     $80B2           ; QCOUNTS hasbase
+        BEQ     @ob0
+        LDA     $8054           ; ship_x
+        SUBA    $8050           ; - base_x
+        BCC     @ob1
+        NEGA
+@ob1    CMPA    #5
+        BHS     @ob0            ; |dx| >= 5
+        LDA     $8055           ; ship_y
+        SUBA    $8051           ; - base_y
+        BCC     @ob2
+        NEGA
+@ob2    CMPA    #5
+        BHS     @ob0            ; |dy| >= 5
+        LDA     #1
+        RTS
+@ob0    CLRA
+        RTS
+
+        ; ── ship-jov-blocked? subroutine ─────────────────────
+        ; Returns A = 1 if ship within 8px manhattan of any live
+        ; Jovian, else 0.  Does not modify Y.
+@sjblk  LDA     $80B1           ; QCOUNTS njovians
+        BEQ     @sj0
+        LDB     #0              ; j = 0
+@sjlp   PSHS    B               ; save j
+        LDX     #$8056          ; JOV-DMG
+        ABX
+        LDA     ,X
+        BEQ     @sjdd           ; dead, skip
+        ; Manhattan: |ship_x - jov_x| + |ship_y - jov_y|
+        LDB     ,S              ; j
+        ASLB
+        LDX     #$804A          ; JOV-POS
+        ABX
+        LDA     $8054           ; ship_x
+        SUBA    ,X              ; - jov_x
+        BCC     @sja
+        NEGA
+@sja    TFR     A,B             ; B = |dx|
+        LDA     $8055           ; ship_y
+        SUBA    1,X             ; - jov_y
+        BCC     @sjc
+        NEGA
+@sjc    PSHS    B
+        ADDA    ,S+             ; A = manhattan
+        CMPA    #8
+        PULS    B               ; restore j (no CC change)
+        BLO     @sjht           ; blocked!
+        BRA     @sjnx
+@sjdd   PULS    B               ; dead: pop j
+@sjnx   INCB
+        CMPB    $80B1           ; j < njovians?
+        BLO     @sjlp
+@sj0    CLRA                    ; not blocked
+        RTS
+@sjht   LDA     #1              ; blocked
+        RTS
+;CODE
 
 \ ── Collision detection (called after move-ship AND gravity-well) ──────
 

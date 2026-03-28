@@ -454,10 +454,14 @@ def preprocess_asm(name, asm_text):
     return label, '\n'.join(lines)
 
 
-def assemble_code_words(code_defs, symbols):
+def assemble_code_words(code_defs, symbols, var_addrs=None):
     """Assemble all CODE words into machine code via lwasm.
 
     Returns an ordered dict of name → bytes (raw machine code for each word).
+
+    var_addrs: optional dict of variable name → address.  When provided,
+    each entry is emitted as  FVAR_<name>  EQU  $<addr>  so CODE words
+    can reference Forth VARIABLEs by their data-cell address (CFA + 2).
     """
     if not code_defs:
         return {}
@@ -466,6 +470,12 @@ def assemble_code_words(code_defs, symbols):
     asm_parts = ['        PRAGMA  6809', '        ORG     $0000', '']
     for sym_name, addr in sorted(symbols.items()):
         asm_parts.append(f'{sym_name:20s} EQU     ${addr:04X}')
+    if var_addrs:
+        asm_parts.append('')
+        asm_parts.append('; Forth VARIABLE data-cell addresses')
+        for vname, vaddr in sorted(var_addrs.items()):
+            label = 'FVAR_' + vname.replace('-', '_')
+            asm_parts.append(f'{label:20s} EQU     ${vaddr:04X}')
     asm_parts.append('')
 
     labels = {}  # name → (start_label, end_label)
@@ -624,8 +634,11 @@ def compile_forth(definitions, variables, main_thread, code_definitions,
     CFA_BRANCH   = symbols['CFA_BRANCH']
     kwords       = kernel_words(symbols)
 
-    # Assemble CODE words to get their sizes
-    code_bytes = assemble_code_words(code_definitions, symbols)
+    # Assemble CODE words to get their sizes.
+    # Provide dummy variable addresses (all $0000) so FVAR_* symbols resolve.
+    # Real addresses are computed in Pass 1 and CODE words are re-assembled.
+    dummy_vars = {name: 0x4000 for name in variables} if variables else None
+    code_bytes = assemble_code_words(code_definitions, symbols, dummy_vars)
 
     def skip_hole(addr):
         """If addr falls inside the reserved hole, jump past it."""
@@ -680,6 +693,13 @@ def compile_forth(definitions, variables, main_thread, code_definitions,
         var_cfa[name] = cursor
         cursor += 2                                      # DOVAR (the CFA cell)
         cursor += 2                                      # data cell (16-bit, init 0)
+
+    # ── Re-assemble CODE words with variable addresses ───────────────────────
+    # Now that var_cfa is known, re-assemble so CODE words can use FVAR_* EQUs.
+    # Data cell = CFA + 2 (skip the DOVAR pointer to get the actual storage).
+    if code_definitions and variables:
+        var_addrs = {name: addr + 2 for name, addr in var_cfa.items()}
+        code_bytes = assemble_code_words(code_definitions, symbols, var_addrs)
 
     # ── Pass 2: generate binary ───────────────────────────────────────────────
 
