@@ -715,7 +715,9 @@ CODE jov-spr-xy   \ ( i -- spr x y )
         LSRB
         NEGB
         ADDB    A,X             ; B = pos_x - width/2
-        CLRA
+        BCS     @xok
+        CLRB                    ; clamp underflow to 0
+@xok    CLRA
         STD     2,U             ; x
         ; y = JOV-POS[i*2+1] - height/2
         LDA     ,S+             ; i*2
@@ -724,7 +726,9 @@ CODE jov-spr-xy   \ ( i -- spr x y )
         LSRB
         NEGB
         ADDB    A,X             ; B = pos_y - height/2
-        CLRA
+        BCS     @yok
+        CLRB                    ; clamp underflow to 0
+@yok    CLRA
         STD     ,U              ; y
         PULS    X
         ;NEXT
@@ -792,7 +796,9 @@ CODE jov-bg-old-xy   \ ( i -- bg oldx oldy )
         LSRB
         NEGB
         ADDB    A,X             ; OLDX[i] - width/2
-        CLRA
+        BCS     @xok
+        CLRB
+@xok    CLRA
         STD     2,U
         ; oldy = JOV-OLDY[i] - height/2
         LDA     ,S+             ; i
@@ -801,7 +807,9 @@ CODE jov-bg-old-xy   \ ( i -- bg oldx oldy )
         LSRB
         NEGB
         ADDB    A,X             ; OLDY[i] - height/2
-        CLRA
+        BCS     @yok
+        CLRB
+@yok    CLRA
         STD     ,U
         PULS    X
         ;NEXT
