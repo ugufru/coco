@@ -1238,14 +1238,15 @@
 <text x="582.9" y="1124.2" class="node-label" font-size="8.4">jov-dist</text>
 <circle cx="514.3" cy="1093.8" r="6.0" fill="hsl(237, 70%, 45%)" fill-opacity="0.70" stroke="hsl(237, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="514.3" y="1093.8" class="node-label" font-size="7.0">jblk</text>
-<circle cx="764.5" cy="1122.3" r="22.0" fill="hsl(216, 72%, 46%)" fill-opacity="0.73" stroke="hsl(216, 72%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="764.5" y="1122.3" class="node-label" font-size="12.0">jov-blocked?</text>
+<!-- jov-blocked? removed (inlined into apply-intent CODE #241) -->
 <circle cx="553.9" cy="839.3" r="6.0" fill="hsl(229, 71%, 46%)" fill-opacity="0.71" stroke="hsl(229, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="553.9" y="839.3" class="node-label" font-size="7.0">base-attack</text>
-<circle cx="554.2" cy="995.4" r="18.3" fill="hsl(221, 72%, 46%)" fill-opacity="0.72" stroke="hsl(221, 72%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="554.2" y="995.4" class="node-label" font-size="12.0">tick-jovians</text>
-<circle cx="772.3" cy="970.4" r="30.2" fill="hsl(224, 71%, 46%)" fill-opacity="0.72" stroke="hsl(224, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="772.3" y="970.4" class="node-label" font-size="12.0">jov-pull</text>
+<!-- tick-jovians-inner CODE (#166) -->
+<circle cx="554.2" cy="995.4" r="12" fill="hsl(30, 90%, 55%)" fill-opacity="0.75" stroke="hsl(30, 90%, 55%)" stroke-width="1.5" stroke-opacity="0.6"/>
+<text x="554.2" y="995.4" class="node-label" font-size="8.0">tick-jovians-inner</text>
+<!-- jov-contact CODE (#243) -->
+<circle cx="830" cy="970" r="12" fill="hsl(30, 90%, 55%)" fill-opacity="0.75" stroke="hsl(30, 90%, 55%)" stroke-width="1.5" stroke-opacity="0.6"/>
+<text x="830" y="970" class="node-label" font-size="9.0">jov-contact</text>
 <circle cx="638.8" cy="659.9" r="9.4" fill="hsl(227, 71%, 46%)" fill-opacity="0.72" stroke="hsl(227, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="638.8" y="659.9" class="node-label" font-size="7.0">clear-tactical</text>
 <circle cx="593.7" cy="668.6" r="10.6" fill="hsl(197, 74%, 48%)" fill-opacity="0.75" stroke="hsl(197, 74%, 48%)" stroke-width="1.5" stroke-opacity="0.6"/>
@@ -1254,8 +1255,11 @@
 <text x="497.5" y="845.6" class="node-label" font-size="7.0">check-win</text>
 <circle cx="713.2" cy="1052.6" r="20.6" fill="hsl(213, 72%, 47%)" fill-opacity="0.73" stroke="hsl(213, 72%, 47%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="713.2" y="1052.6" class="node-label" font-size="12.0">jov-kill</text>
-<circle cx="872.9" cy="1043.2" r="32.8" fill="hsl(200, 73%, 48%)" fill-opacity="0.75" stroke="hsl(200, 73%, 48%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="872.9" y="1043.2" class="node-label" font-size="12.0">jov-gravity</text>
+<!-- jov-contact-check + jov-gravity-pull (#243) -->
+<circle cx="870" cy="1040" r="10" fill="hsl(200, 73%, 48%)" fill-opacity="0.75" stroke="hsl(200, 73%, 48%)" stroke-width="1.5" stroke-opacity="0.6"/>
+<text x="870" y="1040" class="node-label" font-size="8.0">jov-contact-check</text>
+<circle cx="780" cy="1060" r="12" fill="hsl(30, 90%, 55%)" fill-opacity="0.75" stroke="hsl(30, 90%, 55%)" stroke-width="1.5" stroke-opacity="0.6"/>
+<text x="780" y="1060" class="node-label" font-size="8.0">jov-gravity-pull</text>
 <circle cx="690.3" cy="452.3" r="6.7" fill="hsl(235, 70%, 45%)" fill-opacity="0.71" stroke="hsl(235, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="690.3" y="452.3" class="node-label" font-size="7.0">explbuf</text>
 <circle cx="579.1" cy="465.4" r="6.0" fill="hsl(232, 71%, 46%)" fill-opacity="0.71" stroke="hsl(232, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
@@ -1392,18 +1396,16 @@
 <text x="955.2" y="1356.8" class="node-label" font-size="10.0">check-collisions</text>
 <circle cx="642.9" cy="1258.1" r="6.0" fill="hsl(232, 71%, 46%)" fill-opacity="0.71" stroke="hsl(232, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="642.9" y="1258.1" class="node-label" font-size="7.0">grav-tick</text>
-<circle cx="1327.2" cy="741.7" r="31.0" fill="hsl(219, 72%, 46%)" fill-opacity="0.73" stroke="hsl(219, 72%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="1327.2" y="741.7" class="node-label" font-size="12.0">gravity-well</text>
+<!-- ship-gravity CODE (#242) -->
+<circle cx="1327" cy="742" r="14" fill="hsl(30, 90%, 55%)" fill-opacity="0.75" stroke="hsl(30, 90%, 55%)" stroke-width="1.5" stroke-opacity="0.6"/>
+<text x="1327" y="742" class="node-label" font-size="9.0">ship-gravity</text>
 <circle cx="1669.8" cy="391.4" r="6.0" fill="hsl(237, 70%, 45%)" fill-opacity="0.70" stroke="hsl(237, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1669.8" y="391.4" class="node-label" font-size="7.0">sg-i</text>
 <circle cx="1710.9" cy="337.2" r="6.0" fill="hsl(227, 71%, 46%)" fill-opacity="0.72" stroke="hsl(227, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1710.9" y="337.2" class="node-label" font-size="7.0">sg-sx</text>
 <circle cx="1582.7" cy="419.5" r="6.0" fill="hsl(227, 71%, 46%)" fill-opacity="0.72" stroke="hsl(227, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1582.7" y="419.5" class="node-label" font-size="7.0">sg-sy</text>
-<circle cx="849.3" cy="1149.1" r="22.0" fill="hsl(227, 71%, 46%)" fill-opacity="0.72" stroke="hsl(227, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="849.3" y="1149.1" class="node-label" font-size="12.0">star-pull</text>
-<circle cx="941.6" cy="1136.3" r="23.0" fill="hsl(213, 72%, 47%)" fill-opacity="0.73" stroke="hsl(213, 72%, 47%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="941.6" y="1136.3" class="node-label" font-size="12.0">star-gravity</text>
+<!-- star-pull + star-gravity removed (#242, merged into ship-gravity CODE) -->
 <circle cx="760.1" cy="322.4" r="9.7" fill="hsl(232, 71%, 46%)" fill-opacity="0.71" stroke="hsl(232, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="760.1" y="322.4" class="node-label" font-size="7.0">do-dock</text>
 <circle cx="865.2" cy="375.4" r="8.2" fill="hsl(235, 70%, 45%)" fill-opacity="0.71" stroke="hsl(235, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
@@ -1647,8 +1649,7 @@
 <text x="430" y="1190" class="node-label" font-size="12">jov-think</text>
 <circle cx="400" cy="1170" r="8" fill="hsl(210, 71%, 46%)" fill-opacity="0.85" filter="url(#glow)"/>
 <text x="400" y="1170" class="node-label" font-size="10">apply-intent</text>
-<circle cx="370" cy="1180" r="6" fill="hsl(220, 71%, 46%)" fill-opacity="0.85" filter="url(#glow)"/>
-<text x="370" y="1180" class="node-label" font-size="8">jov-threshold</text>
+<!-- jov-threshold removed (#166, inlined into tick-jovians-inner CODE) -->
 <!-- Group B: Emotion system -->
 
 <rect x="344.0" y="1074.0" width="12.0" height="12.0" fill="hsl(220, 71%, 46%)" fill-opacity="0.85" filter="url(#glow)" rx="2"/>
@@ -1735,10 +1736,7 @@
 <text x="690" y="440" class="node-label" font-size="10">collision-scan</text>
 <rect x="652.0" y="462.0" width="16.0" height="16.0" fill="hsl(200, 71%, 46%)" fill-opacity="0.85" filter="url(#glow)" rx="2"/>
 <text x="660" y="470" class="node-label" font-size="10">prox-dmg</text>
-<rect x="743.0" y="1423.0" width="14.0" height="14.0" fill="hsl(215, 71%, 46%)" fill-opacity="0.85" filter="url(#glow)" rx="2"/>
-<text x="750" y="1430" class="node-label" font-size="8">xyn-pull</text>
-<circle cx="720" cy="1440" r="6" fill="hsl(220, 71%, 46%)" fill-opacity="0.85" filter="url(#glow)"/>
-<text x="720" y="1440" class="node-label" font-size="8">xy-pull</text>
+<!-- xyn-pull + xy-pull removed (#242, inlined into ship-gravity CODE) -->
 <circle cx="730" cy="1310" r="6" fill="hsl(220, 71%, 46%)" fill-opacity="0.85" filter="url(#glow)"/>
 <text x="730" y="1310" class="node-label" font-size="8">repair-sys</text>
 <!-- Sprite Gen category label -->
@@ -1791,7 +1789,7 @@
 <circle cx="1148.1" cy="1707.8" r="3.5" fill="hsl(230, 70%, 45%)" fill-opacity="0.71" stroke="hsl(230, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <circle cx="558.2" cy="1035.1" r="5.5" fill="hsl(230, 70%, 45%)" fill-opacity="0.71" stroke="hsl(230, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <circle cx="608.5" cy="1068.1" r="5.5" fill="hsl(230, 70%, 45%)" fill-opacity="0.71" stroke="hsl(230, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<circle cx="628.7" cy="1129.2" r="5.5" fill="hsl(230, 70%, 45%)" fill-opacity="0.71" stroke="hsl(230, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
+<!-- jov-avoid-dist removed (#243, inlined into jov-gravity-pull CODE) -->
 <circle cx="586.2" cy="1190.7" r="5.5" fill="hsl(230, 70%, 45%)" fill-opacity="0.71" stroke="hsl(230, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <circle cx="501.2" cy="1194.8" r="5.5" fill="hsl(230, 70%, 45%)" fill-opacity="0.71" stroke="hsl(230, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <circle cx="605.9" cy="1134.7" r="7" fill="hsl(250, 70%, 50%)" fill-opacity="0.71" stroke="hsl(250, 70%, 50%)" stroke-width="1.5" stroke-opacity="0.6"/>
@@ -1853,7 +1851,7 @@
 <text x="1148.1" y="1707.8" class="node-label" font-size="7.0">gjovians0</text>
 <text x="558.2" y="1035.1" class="node-label" font-size="8.0">jov-alive?</text>
 <text x="608.5" y="1068.1" class="node-label" font-size="8.0">jov-engaged?</text>
-<text x="628.7" y="1129.2" class="node-label" font-size="8.0">jov-avoid-dist</text>
+<!-- jov-avoid-dist text removed (see circle comment above) -->
 <text x="586.2" y="1190.7" class="node-label" font-size="8.0">jov-flee</text>
 <text x="501.2" y="1194.8" class="node-label" font-size="8.0">jov-flee-check</text>
 <text x="605.9" y="1134.7" class="node-label" font-size="9.0">jov-emo@</text>
@@ -1885,14 +1883,12 @@
 <circle cx="1126" cy="738" r="3" fill="#4466aa"/>
 <text x="1126" y="748" class="node-label" font-size="7.0">overlay</text>
 
-<!-- Jovian AI: jov-gravity-one -->
-<circle cx="893" cy="1060" r="5" fill="#7799cc"/>
-<text x="893" y="1070" class="node-label" font-size="8.0">jov-gravity-one</text>
+<!-- jov-gravity-one removed (#243) -->
 
 <!-- Navigation: try-move -->
 <circle cx="1018" cy="1252" r="5" fill="#7799cc"/>
 <text x="1018" y="1262" class="node-label" font-size="8.0">try-move</text>
 
 <text x="1200.0" y="35" text-anchor="middle" fill="#ccc" font-size="24" font-weight="700">SPACE WARP — Architecture Map</text>
-<text x="1200.0" y="58" text-anchor="middle" fill="#666" font-size="13">474 words · 24,388 bytes · node size = byte count · color = connectivity (red=high, blue=low)</text>
+<text x="1200.0" y="58" text-anchor="middle" fill="#666" font-size="13">468 words · 24,251 bytes · node size = byte count · color = connectivity (red=high, blue=low)</text>
 </svg>

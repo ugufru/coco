@@ -472,12 +472,61 @@ VARIABLE tcy
 : draw-border  ( -- )
   127 143 0   143 3 rg-line ;       \ bottom separator only
 
-: draw-stars  ( -- )
-  qstars @ ?DUP IF 0 DO
-    STAR-POS I 2 * + C@
-    STAR-POS I 2 * + 1 + C@
-    3 rnd 1 + rg-pset
-  LOOP THEN ;
+\ draw-stars CODE word (#249) — inlines rg-pset loop with fast twinkle.
+CODE draw-stars
+        PSHS    X               ; save IP
+        LDB     $80B0           ; nstars
+        LBEQ    @done
+        LDX     #$8040          ; STAR-POS
+@lp     PSHS    B               ; save counter
+        ; ── Compute VRAM byte address: rv + y*32 + x/4 ──
+        LDB     1,X             ; B = y
+        LDA     #32
+        MUL                     ; D = y * 32
+        ADDD    FVAR_rv         ; D += VRAM base
+        TFR     D,Y             ; Y = row start
+        LDA     ,X              ; A = x
+        LSRA
+        LSRA                    ; A = x / 4
+        LEAY    A,Y             ; Y = VRAM byte address
+        ; ── Shift count: 6 - (x%4)*2 ──
+        LDA     ,X              ; A = x
+        ANDA    #3
+        ASLA
+        NEGA
+        ADDA    #6              ; A = shift count
+        PSHS    A               ; save shift count
+        ; ── Fixed color from position: ((x + y) & 2) + 1 → 1 or 3 ──
+        LDA     ,X              ; star_x
+        ADDA    1,X             ; + star_y
+        ANDA    #2              ; 0 or 2
+        INCA                    ; 1 or 3
+        ; ── Shift color into pixel position ──
+        LDB     ,S              ; B = shift count
+        BEQ     @ns
+@sh     ASLA
+        DECB
+        BNE     @sh
+@ns     PSHS    A               ; save shifted color
+        ; ── Build clear mask and write pixel ──
+        LDA     #3
+        LDB     1,S             ; shift count
+        BEQ     @nm
+@sm     ASLA
+        DECB
+        BNE     @sm
+@nm     COMA                    ; clear mask
+        ANDA    ,Y              ; clear old pixel bits
+        ORA     ,S              ; OR in new color
+        STA     ,Y              ; write to VRAM
+        LEAS    2,S             ; pop shifted color + shift count
+        LEAX    2,X             ; next star
+        PULS    B               ; restore counter
+        DECB
+        BNE     @lp
+@done   PULS    X
+        ;NEXT
+;CODE
 
 : draw-jovians  ( -- )
   qjovians @ ?DUP IF 0 DO
@@ -777,164 +826,17 @@ CODE save-jov-oldpos-n   \ ( n -- )  copy JOV-POS to JOV-OLDX/Y for n Jovians
         ;NEXT
 ;CODE
 
-\ save-jov-bgs / restore-jov-bgs / save-jov-oldpos — CODE + Forth (#248)
-\ save/restore converted to CODE with inline bg copy loops.
-\ @bgcalc computes buf(X) + VRAM(Y) from j(B) and pos ptr(Y).
+\ save-jov-bgs / restore-jov-bgs — reverted to Forth (#248 CODE had rendering bug)
+: save-jov-bgs  ( -- )
+  qjovians @ ?DUP IF 0 DO
+    JOV-DMG I + C@ IF I jov-bg-xy bg-save-7 THEN
+  LOOP THEN ;
 
-CODE save-jov-bgs  ( -- )
-        PSHS    X               ; save IP
-        LDA     $80B1           ; njovians
-        BEQ     @done
-        CLRB
-@lp     PSHS    B               ; save j
-        LDX     #$8056          ; JOV-DMG
-        ABX
-        TST     ,X
-        BEQ     @nx
-        LDB     ,S              ; j
-        ; Y = &JOV-POS[j] (current position)
-        ASLB
-        LDY     #$804A
-        LEAY    B,Y
-        LDB     ,S              ; j (for @bgcalc)
-        LBSR    @bgcalc         ; X=buf, Y=VRAM
-        LDB     #7
-@sr     LDA     ,Y
-        STA     ,X+
-        LDA     1,Y
-        STA     ,X+
-        LDA     2,Y
-        STA     ,X+
-        LDA     3,Y
-        STA     ,X+
-        LEAY    32,Y
-        DECB
-        BNE     @sr
-@nx     PULS    B
-        INCB
-        CMPB    $80B1
-        BLO     @lp
-@done   PULS    X
-        ;NEXT
+: restore-jov-bgs  ( -- )
+  qjovians @ ?DUP IF 0 DO
+    JOV-DMG I + C@ IF I jov-bg-old-xy bg-restore-7 THEN
+  LOOP THEN ;
 
-        ; ── @bgcalc: bg buffer (X) + VRAM addr (Y) from j and pos ──
-        ; Input: B = j, Y = ptr to (pos_x, pos_y) byte pair
-        ; Output: X = bg buf addr, Y = VRAM start addr
-        ; Clobbers: A, D
-@bgcalc PSHS    B               ; save j
-        LDA     #28
-        MUL                     ; D = j*28
-        ADDD    #$80F0          ; JOV-BG0
-        PSHS    D               ; save buf; S+0..1=buf, S+2=j
-        ; sprite header = JOV-SPR0 + j*23
-        LDA     2,S             ; j
-        LDB     #23
-        MUL
-        ADDD    #$8200
-        TFR     D,X             ; X = spr header (temp)
-        ; screen_x = pos_x - width/2
-        LDA     ,Y              ; pos_x
-        LDB     ,X              ; spr width
-        LSRB
-        PSHS    B               ; save w/2
-        SUBA    ,S+             ; A = screen_x
-        PSHS    A               ; save sx; S+0=sx, S+1..2=buf, S+3=j
-        ; screen_y = pos_y - height/2
-        LDA     1,Y             ; pos_y
-        LDB     1,X             ; spr height
-        LSRB
-        PSHS    B               ; save h/2
-        SUBA    ,S+             ; A = screen_y
-        ; VRAM = RGVRAM + screen_y*32 + screen_x/4
-        LDB     #32
-        MUL                     ; D = screen_y * 32
-        ADDD    VAR_RGVRAM
-        TFR     D,Y             ; Y = row base
-        LDA     ,S+             ; A = screen_x; pop sx
-        LSRA
-        LSRA                    ; A = screen_x / 4
-        LEAY    A,Y             ; Y = VRAM addr
-        PULS    X               ; X = buf addr; pop buf
-        LEAS    1,S             ; pop j
-        RTS
-;CODE
-
-CODE restore-jov-bgs  ( -- )
-        PSHS    X
-        LDA     $80B1
-        BEQ     @done
-        CLRB
-@lp     PSHS    B
-        LDX     #$8056
-        ABX
-        TST     ,X
-        BEQ     @nx
-        LDB     ,S              ; j
-        ; Build (oldx, oldy) pair on stack, point Y at it
-        LDX     #$80C6          ; JOV-OLDX
-        ABX
-        LDA     ,X              ; oldx
-        LDX     #$80C9          ; JOV-OLDY
-        ABX
-        LDB     ,X              ; oldy
-        PSHS    D               ; S+0=oldx, S+1=oldy
-        LEAY    ,S              ; Y = ptr to (oldx, oldy)
-        LDB     2,S             ; j (shifted +2)
-        LBSR    @bgcalc         ; X=buf, Y=VRAM
-        LEAS    2,S             ; pop temp pair
-        LDB     #7
-@rr     LDA     ,X+
-        STA     ,Y
-        LDA     ,X+
-        STA     1,Y
-        LDA     ,X+
-        STA     2,Y
-        LDA     ,X+
-        STA     3,Y
-        LEAY    32,Y
-        DECB
-        BNE     @rr
-@nx     PULS    B
-        INCB
-        CMPB    $80B1
-        BLO     @lp
-@done   PULS    X
-        ;NEXT
-
-        ; Duplicate @bgcalc (can't share across CODE words)
-@bgcalc PSHS    B
-        LDA     #28
-        MUL
-        ADDD    #$80F0
-        PSHS    D
-        LDA     2,S
-        LDB     #23
-        MUL
-        ADDD    #$8200
-        TFR     D,X
-        LDA     ,Y
-        LDB     ,X
-        LSRB
-        PSHS    B
-        SUBA    ,S+
-        PSHS    A
-        LDA     1,Y
-        LDB     1,X
-        LSRB
-        PSHS    B
-        SUBA    ,S+
-        LDB     #32
-        MUL
-        ADDD    VAR_RGVRAM
-        TFR     D,Y
-        LDA     ,S+
-        LSRA
-        LSRA
-        LEAY    A,Y
-        PULS    X
-        LEAS    1,S
-        RTS
-;CODE
 
 : save-jov-oldpos  ( -- )  qjovians @ save-jov-oldpos-n ;
 
@@ -1771,23 +1673,9 @@ VARIABLE jov-moved               \ flag: did any Jovian move this frame?
 
 
 \ Per-Jovian tick threshold from genome (lower = faster)
-\ speed_modifier (byte 1, bits 5-4) + pilot_skill (byte 0, bits 2-0)
-\ threshold = 10 - (speed + skill), clamped [2, 8]
-: jov-threshold  ( i -- n )
-  4 * JOV-GENOME +               \ genome addr
-  DUP 1 + C@ 4 RSHIFT 3 AND     \ speed_modifier (0-3)
-  SWAP C@ 7 AND                  \ pilot_skill (0-7)
-  + 10 SWAP -                    \ 10 - (speed + skill)
-  DUP 2 < IF DROP 2 THEN
-  DUP 8 > IF DROP 8 THEN ;
-
-: jov-avoid-dist  ( -- n )  \ star avoidance radius from pilot skill
-  jbg-i @ 4 * JOV-GENOME + C@ 7 AND  \ pilot_skill 0-7
-  6 + ;                                \ 6 (dumb) to 13 (ace)
-
-\ jov-blocked? inlined into apply-intent CODE word (#241).
-\ Dummy so any stale reference compiles (not called at runtime).
-: jov-blocked?  ( x y i -- flag )  DROP 2DROP 0 ;
+\ jov-threshold removed (#166) — inlined into tick-jovians-inner CODE.
+\ jov-avoid-dist removed (#243) — inlined into jov-gravity-pull CODE.
+\ jov-blocked? removed (#241) — inlined into apply-intent CODE.
 
 \ ── apply-intent CODE word (#241) ─────────────────────────────────────
 \ ( i -- )  Read JOV-INTENT[i], apply 3-tier obstacle fallback, write
@@ -1901,7 +1789,7 @@ CODE apply-intent
         LDA     ,X
         ANDA    #7
         ADDA    #6              ; A = avoid_dist
-        STA     ,-S             ; S+0=avoid, S+1=cx, S+2=cy
+        PSHS    A               ; S+0=avoid, S+1=cx, S+2=cy
 
         ; -- Stars --
         LDB     $80B0           ; nstars
@@ -1956,7 +1844,7 @@ CODE apply-intent
         LDA     $80B1
         BEQ     @cclr
         LDB     #0              ; j
-@cjlp   CMPB    10,S            ; j == i? (S+10=i with avoid+cx+cy pushed)
+@cjlp   CMPB    9,S             ; j == i? (S+9=i; LBSR ret is 2 bytes not 3)
         BEQ     @cjnx
         PSHS    B
         LDX     #$8056
@@ -2307,48 +2195,381 @@ CODE jov-flee   \ ( i -- )  write flee intent to JOV-INTENT
 
 VARIABLE detect-timer              \ frame counter for detection rolls
 
-\ Tick all Jovians — AI think when tick counter fires
+\ jov-threshold removed (#166) — inlined into tick-jovians-inner CODE.
+
+\ ── tick-jovians-inner CODE word (#166) ───────────────────────────────
+\ ( -- mask )  Tick all alive+aware Jovians.  For each:
+\   increment JOV-TICK, compare to threshold (inlined from genome).
+\   If threshold fires: reset tick to 0, set bit i in mask.
+\   Otherwise: store incremented tick.
+\ Returns 3-bit mask of Jovians that need think/flee dispatch.
+CODE tick-jovians-inner
+        PSHS    X               ; save IP
+        CLRA
+        PSHS    A               ; S+0 = mask (0)
+        LDA     $80B1           ; njovians
+        LBEQ    @done
+        CLRB                    ; B = i
+@lp     PSHS    B               ; S+0=i, S+1=mask
+        ; Check alive
+        LDX     #$8056          ; JOV-DMG
+        ABX
+        TST     ,X
+        BEQ     @nx
+        ; Check aware (JOV-STATE != 0)
+        LDB     ,S              ; i
+        LDX     #$80BE          ; JOV-STATE
+        ABX
+        TST     ,X
+        BEQ     @nx
+        ; Increment tick
+        LDB     ,S              ; i
+        LDX     #$80C2          ; JOV-TICK
+        ABX
+        LDA     ,X              ; current tick
+        INCA                    ; tick + 1
+        ; Compute threshold from genome (inline jov-threshold)
+        ; threshold = 10 - (pilot_skill[0..2] + speed_mod[byte1 >> 4 & 3])
+        ; clamped to 2..8
+        PSHS    A               ; S+0=newtick, S+1=i, S+2=mask
+        LDB     1,S             ; i
+        LDA     #4
+        MUL                     ; D = i*4 (result in B since i<4)
+        LDY     #$80CE          ; JOV-GENOME
+        LEAY    B,Y
+        LDA     ,Y              ; byte 0
+        ANDA    #7              ; pilot_skill (0-7)
+        LDB     1,Y             ; byte 1
+        LSRB
+        LSRB
+        LSRB
+        LSRB
+        ANDB    #3              ; speed_modifier (0-3)
+        PSHS    A
+        ADDB    ,S+             ; B = skill + speed
+        LDA     #10
+        PSHS    B
+        SUBA    ,S+             ; A = 10 - (skill + speed) = threshold
+        CMPA    #2              ; clamp low
+        BHS     @cl
+        LDA     #2
+@cl     CMPA    #9              ; clamp high (> 8 -> 8)
+        BLO     @ch
+        LDA     #8
+@ch     ; A = threshold, S+0=newtick, S+1=i, S+2=mask
+        LDB     ,S+             ; B = newtick; S+0=i, S+1=mask
+        ; tick < threshold?
+        PSHS    A               ; save threshold
+        CMPB    ,S+             ; newtick vs threshold
+        LBHS    @tfire          ; newtick >= threshold: fire
+        LBRA    @tick           ; newtick < threshold: store new tick
+@tfire  ; Threshold fired: reset tick, set mask bit
+        LDX     #$80C2          ; JOV-TICK
+        ABX
+        CLR     ,X              ; JOV-TICK[i] = 0
+        ; Set bit i in mask: 1 << i via shift
+        LDB     ,S              ; i (0, 1, or 2)
+        LDA     #1
+        BRA     @shft
+@shlp   LSLA
+@shft   DECB
+        BPL     @shlp
+        ORA     1,S             ; mask |= bit
+        STA     1,S
+        BRA     @nx
+@tick   ; Store incremented tick
+        LDA     ,S              ; i
+        LDX     #$80C2          ; JOV-TICK
+        LEAX    A,X
+        STB     ,X              ; JOV-TICK[i] = newtick
+@nx     PULS    B               ; pop i; S+0=mask
+        INCB
+        CMPB    $80B1
+        BLO     @lp
+@done   PULS    A               ; A = mask
+        TFR     A,B
+        CLRA                    ; D = 0:mask (16-bit)
+        LEAU    -2,U
+        STD     ,U              ; push mask
+        PULS    X               ; restore IP
+        ;NEXT
+;CODE
+
+\ Dispatch think/flee for Jovians whose threshold fired.
+\ Timers for detection and emotion decay.
 : tick-jovians  ( -- )
-  qjovians @ ?DUP IF 0 DO
-    I jbg-i !
-    JOV-DMG jbg-i @ + C@ IF
-      JOV-STATE jbg-i @ + C@ IF   \ aware: think + move
-        JOV-TICK jbg-i @ + C@ 1 + DUP I jov-threshold < IF
-          JOV-TICK jbg-i @ + C!
-        ELSE
-          DROP 0 JOV-TICK jbg-i @ + C!
-          JOV-STATE jbg-i @ + C@ 2 = IF
-            jbg-i @ jov-flee  jbg-i @ apply-intent
-          ELSE
-            jbg-i @ qbase @ jov-think
-            jbg-i @ apply-intent
-          THEN
-        THEN
+  tick-jovians-inner
+  3 0 DO
+    DUP 1 AND IF
+      I jbg-i !
+      JOV-STATE I + C@ 2 = IF
+        I jov-flee  I apply-intent
+      ELSE
+        I qbase @ jov-think
+        I apply-intent
       THEN
     THEN
-  LOOP THEN
-  \ Detection: every 30 frames, roll for idle Jovians
-  detect-timer @ 1 + DUP DETECT-RATE < IF
+    1 RSHIFT
+  LOOP DROP
+  detect-timer @ 1 + DUP 15 < IF
     detect-timer !
   ELSE
     DROP 0 detect-timer !
     jov-detect-tick
   THEN
-  \ Emotion decay: every 120 frames, drift toward baseline
-  emotion-timer @ 1 + DUP EMOTION-DECAY-RATE < IF
+  emotion-timer @ 1 + DUP 60 < IF
     emotion-timer !
   ELSE
     DROP 0 emotion-timer !
     jov-emotion-decay-all
   THEN ;
 
-\ ── Jovian gravity (black holes + stars pull/kill Jovians) ────────────
-\ Applies every frame after tick-jovians.  Uses sg-sx/sg-sy as scratch.
-\ Reuses grav-tick from player gravity for frame timing.
+\ ── Jovian gravity — split into contact + pull CODE words (#243) ──────
+\ jov-contact: CODE word, scans all alive Jovians for contact kills
+\   (mdist < 3 to any star or black hole).  Returns index of first
+\   Jovian to kill, or -1 if none.  Runs every frame (safety-critical).
+\ jov-gravity-pull: CODE word, applies 1px drift toward nearby stars
+\   and black hole, gated by grav-tick & 3 = 0.  Odd frames only.
+\ jov-contact-check: Forth wrapper, loops jov-contact + jov-kill.
 
-\ Pull one Jovian (index in jbg-i) toward (sg-sx, sg-sy) by 1px
-: jov-pull  ( -- )
-  JOV-POS jbg-i @ 2 * + sg-sx @ sg-sy @ jov-moved xy-pull ;
+\ ── jov-contact CODE word ────────────────────────────────────────────
+\ ( -- idx | -1 )  Scan all alive Jovians for obstacle contact.
+\ Returns index of first Jovian with mdist < 3 to any star or black hole.
+\ Returns -1 if no contact.  Caller handles the kill in Forth.
+CODE jov-contact
+        PSHS    X               ; save IP
+        LDA     $80B1           ; njovians (QCOUNTS shadow)
+        BEQ     @none
+        CLRB                    ; B = i (Jovian index)
+@lp     PSHS    B               ; save i
+        LDX     #$8056          ; JOV-DMG
+        ABX
+        TST     ,X
+        BEQ     @nx             ; dead, skip
+
+        ; Get Jovian position addr -> X
+        LDB     ,S              ; i
+        ASLB                    ; i*2
+        LDX     #$804A          ; JOV-POS
+        ABX                     ; X = &JOV-POS[i]
+
+        ; -- Check black hole --
+        LDA     $80B3           ; hasbhole
+        BEQ     @stars
+        ; mdist(JOV-POS[i], BHOLE-POS)
+        LDA     ,X              ; jov_x
+        SUBA    $8052           ; - bhole_x
+        BCC     @bh1
+        NEGA
+@bh1    TFR     A,B
+        LDA     1,X             ; jov_y
+        SUBA    $8053           ; - bhole_y
+        BCC     @bh2
+        NEGA
+@bh2    PSHS    B
+        ADDA    ,S+             ; A = mdist
+        CMPA    #3
+        BLO     @hit            ; contact!
+
+        ; -- Check stars --
+@stars  LDB     $80B0           ; nstars
+        BEQ     @nx
+        LDY     #$8040          ; STAR-POS
+@slp    PSHS    B               ; save star counter
+        LDA     ,X              ; jov_x
+        SUBA    ,Y              ; - star_x
+        BCC     @s1
+        NEGA
+@s1     TFR     A,B
+        LDA     1,X             ; jov_y
+        SUBA    1,Y             ; - star_y
+        BCC     @s2
+        NEGA
+@s2     PSHS    B
+        ADDA    ,S+             ; A = mdist
+        CMPA    #3
+        BLO     @shit           ; star contact!
+        LEAY    2,Y             ; next star
+        LDB     ,S+             ; pop star counter
+        DECB
+        BNE     @slp
+        BRA     @nx
+
+@shit   LEAS    1,S             ; pop star counter
+@hit    LDB     ,S+             ; pop i = kill index
+        CLRA
+        LEAU    -2,U            ; push result
+        STD     ,U
+        PULS    X
+        ;NEXT
+
+@nx     PULS    B               ; restore i
+        INCB
+        CMPB    $80B1
+        BLO     @lp
+@none   LDD     #$FFFF          ; -1 = no contact
+        LEAU    -2,U
+        STD     ,U
+        PULS    X
+        ;NEXT
+;CODE
+
+\ Forth wrapper: loop jov-contact + jov-kill until no more contacts
+: jov-contact-check  ( -- )
+  BEGIN jov-contact DUP 0 < IF DROP EXIT THEN
+    jbg-i ! jov-kill
+  AGAIN ;
+
+\ ── jov-gravity-pull CODE word ───────────────────────────────────────
+\ ( -- )  Apply gravity pull toward stars and black hole for all alive
+\ Jovians.  Gated: entire word skips if grav-tick & 3 != 0.
+\ Inlines pilot avoid_dist from genome.  Sets jov-moved if any moved.
+CODE jov-gravity-pull
+        PSHS    X               ; save IP
+        ; Gate: skip entirely if not a qualifying frame
+        LDA     FVAR_grav_tick+1 ; low byte of grav-tick
+        ANDA    #3
+        LBNE    @done
+
+        LDA     $80B1           ; njovians
+        LBEQ    @done
+        CLRB                    ; B = i
+@lp     PSHS    B               ; save i
+        LDX     #$8056          ; JOV-DMG
+        ABX
+        TST     ,X
+        LBEQ    @nx             ; dead, skip
+
+        ; Get Jovian pos addr -> Y (preserved across pulls)
+        LDB     ,S              ; i
+        ASLB
+        LDY     #$804A          ; JOV-POS
+        LEAY    B,Y             ; Y = &JOV-POS[i]
+
+        ; Compute avoid_dist from genome: pilot_skill & 7 + 6
+        LDB     ,S              ; i
+        LDA     #4
+        MUL                     ; D = i*4 (in B since i<3)
+        LDX     #$80CE          ; JOV-GENOME
+        ABX
+        LDA     ,X
+        ANDA    #7
+        ADDA    #6              ; A = avoid_dist (6..13)
+        PSHS    A               ; S+0=avoid, S+1=i
+
+        ; -- Black hole pull --
+        LDA     $80B3           ; hasbhole
+        BEQ     @sp
+        ; mdist to bhole
+        LDA     ,Y              ; jov_x
+        SUBA    $8052
+        BCC     @bp1
+        NEGA
+@bp1    TFR     A,B
+        LDA     1,Y             ; jov_y
+        SUBA    $8053
+        BCC     @bp2
+        NEGA
+@bp2    PSHS    B
+        ADDA    ,S+             ; A = mdist
+        CMPA    #20
+        BHS     @sp             ; outside well, no pull
+        ; Pull toward bhole
+        LDA     $8052           ; bhole_x = tx
+        LDB     $8053           ; bhole_y = ty
+        LBSR    @pull
+
+        ; -- Star pull --
+@sp     LDB     $80B0           ; nstars
+        LBEQ    @nx2
+        LDX     #$8040          ; STAR-POS
+@splp   PSHS    B               ; save star counter
+        ; S: cnt(0) avoid(1) i(2)
+        ; mdist to this star
+        LDA     ,Y              ; jov_x
+        SUBA    ,X              ; - star_x
+        BCC     @sp1
+        NEGA
+@sp1    TFR     A,B
+        LDA     1,Y             ; jov_y
+        SUBA    1,X             ; - star_y
+        BCC     @sp2
+        NEGA
+@sp2    PSHS    B
+        ADDA    ,S+             ; A = mdist
+        ; Skip contact range (handled by jov-contact)
+        CMPA    #3
+        BLO     @snx            ; contact range, skip (jov-contact handles)
+        ; Check avoid_dist: if dist >= avoid_dist, no pull
+        CMPA    1,S             ; vs avoid_dist
+        BHS     @snx            ; outside avoidance zone, no pull
+        ; Distance tiers
+        CMPA    #6
+        BLO     @spull          ; close: always pull
+        ; Far (6..avoid_dist): only every other qualifying frame
+        LDA     FVAR_grav_tick+1
+        ANDA    #1
+        BNE     @snx            ; skip this qualifying frame
+@spull  PSHS    X               ; save star ptr
+        LDA     ,X              ; star_x = tx
+        LDB     1,X             ; star_y = ty
+        BSR     @pull
+        PULS    X               ; restore star ptr
+@snx    LEAX    2,X             ; next star
+        LDB     ,S+             ; pop star counter
+        DECB
+        BNE     @splp
+
+@nx2    LEAS    1,S             ; pop avoid_dist
+@nx     PULS    B               ; pop i
+        INCB
+        CMPB    $80B1
+        LBLO    @lp
+@done   PULS    X
+        ;NEXT
+
+        ; ── @pull subroutine ────────────────────────────────────
+        ; Pull (Y) toward (A=tx, B=ty) by 1px per axis.
+        ; Sets jov-moved = 1 if any axis moved.  Preserves Y.
+@pull   PSHS    D               ; S+0=tx, S+1=ty
+        ; -- X axis --
+        LDA     ,Y              ; cur_x
+        CMPA    ,S              ; vs tx
+        BEQ     @py
+        BHI     @pxd
+        INCA                    ; move toward (cur < target)
+        BRA     @pxs
+@pxd    DECA                    ; move toward (cur > target)
+@pxs    CMPA    #2              ; clamp lower
+        BHS     @pxnl
+        LDA     #2
+@pxnl   CMPA    #125            ; clamp upper
+        BLS     @pxnh
+        LDA     #125
+@pxnh   STA     ,Y
+        LDD     #1
+        STD     FVAR_jov_moved
+        LDA     ,S              ; reload tx (clobbered by LDD #1)
+@py     ; -- Y axis --
+        LDA     1,Y             ; cur_y
+        CMPA    1,S             ; vs ty
+        BEQ     @pd
+        BHI     @pyd
+        INCA
+        BRA     @pys
+@pyd    DECA
+@pys    CMPA    #2
+        BHS     @pynl
+        LDA     #2
+@pynl   CMPA    #139
+        BLS     @pynh
+        LDA     #139
+@pynh   STA     1,Y
+        LDD     #1
+        STD     FVAR_jov_moved
+@pd     LEAS    2,S             ; pop tx, ty
+        RTS
+;CODE
 
 \ After any kill + explosion, do a full sprite refresh.
 \ Kills corrupt bg-save buffers (beam pixels, explosion debris), so we must:
@@ -2409,50 +2630,8 @@ VARIABLE check-win                \ flag: a kill happened, check win/lose
     THEN
   THEN ;
 
-\ Process gravity for one Jovian
-: jov-gravity-one  ( i -- )
-  jbg-i !
-  JOV-DMG jbg-i @ + C@ IF
-    \ Black hole gravity (gated: full check every 4th frame, contact every frame)
-    qbhole @ IF
-      BHOLE-POS C@ sg-sx !  BHOLE-POS 1 + C@ sg-sy !
-      JOV-POS jbg-i @ 2 * + BHOLE-POS mdist
-      DUP 3 < IF                   \ contact: kill (always check)
-        DROP jov-kill
-      ELSE grav-tick @ 3 AND IF
-        DROP                        \ skip pull calc on 3/4 frames
-      ELSE DUP 20 > IF             \ outside well
-        DROP
-      ELSE 10 > IF                  \ 10-20: pull
-        jov-pull
-      ELSE                          \ <10: pull
-        jov-pull
-      THEN THEN THEN THEN
-    THEN
-    \ Star gravity (only if still alive, skip on non-pull frames)
-    JOV-DMG jbg-i @ + C@ IF
-      grav-tick @ 3 AND 0= IF        \ only check every 4th frame
-        qstars @ ?DUP IF 0 DO
-          STAR-POS I 2 * + C@ sg-sx !
-          STAR-POS I 2 * + 1 + C@ sg-sy !
-          JOV-POS jbg-i @ 2 * + STAR-POS I 2 * + mdist
-          DUP 3 < IF                 \ contact: kill
-            DROP jov-kill
-          ELSE DUP jov-avoid-dist < 0= IF  \ pilot avoiding: no pull
-            DROP
-          ELSE 6 < IF                \ close: always pull
-            jov-pull
-          ELSE                        \ far: every other qualifying frame
-            grav-tick @ 1 AND 0= IF jov-pull THEN
-          THEN THEN THEN
-        LOOP THEN
-      THEN
-    THEN
-  THEN ;
-
-: jov-gravity  ( -- )
-  qjovians @ ?DUP 0= IF EXIT THEN
-  0 DO I jov-gravity-one LOOP ;
+\ jov-gravity-one / jov-gravity / jov-pull removed (#243).
+\ Replaced by jov-contact CODE + jov-gravity-pull CODE above.
 
 \ ── Explosion effects ────────────────────────────────────────────────
 \ Animated expanding ring explosion.  Each frame generates dots along
@@ -2979,7 +3158,7 @@ CODE move-ship
         LDA     #2
         BRA     @spd
 @sp1    LDA     #1
-@spd    STA     ,-S             ; S+0=speed, S+1..2=saved IP
+@spd    PSHS    A               ; S+0=speed, S+1..2=saved IP
 
         ; -- Scan UP: col 3 ($F7), row 3 ($08) --
         LDA     #$F7
@@ -3237,109 +3416,151 @@ CODE collision-scan  ( sx sy array count -- flag )
 
 VARIABLE grav-tick
 
-: gravity-well  ( -- )
-  qbhole @ 0= IF EXIT THEN
-  1 grav-tick +!
-  SHIP-POS BHOLE-POS mdist
-  DUP 6 < IF                   \ <6: inescapable, 2px/frame (always)
-    DROP 2
-  ELSE grav-tick @ 3 AND IF
-    DROP EXIT                   \ skip pull calc on 3/4 frames
-  ELSE 30 > IF
-    EXIT                        \ outside well
-  ELSE
-    1                           \ 6-30: pull 1px on qualifying frames
-  THEN THEN THEN
-  >R 1 moved !
-  SHIP-POS BHOLE-POS C@ BHOLE-POS 1 + C@ R> moved xyn-pull ;
+VARIABLE sg-i                      \ (unused after #242, kept for FVAR stability)
+VARIABLE sg-sx                     \ (unused after #242, kept for FVAR stability)
+VARIABLE sg-sy                     \ (unused after #242, kept for FVAR stability)
 
-\ ── Star gravity (weaker, smaller) ──────────────────────────────────────
-\ 10px radius. Close (<5): pull every 2 frames. Far (5-10): every 4.
+\ ── ship-gravity CODE word (#242) ────────────────────────────────────────
+\ Replaces gravity-well + star-gravity + xyn-pull + xy-pull + star-pull.
+\ ( -- )  Increments grav-tick.  Pulls ship toward black hole (tiered:
+\ <6=2px always, 6-30=1px gated) and stars (<5=1px every qualifying
+\ frame, 5-10=every other).  Sets moved flag if ship position changed.
+\ @pull subroutine: caller pushes step byte, then BSR with A=tx, B=ty.
+CODE ship-gravity
+        PSHS    X               ; save IP
+        ; Increment grav-tick
+        LDD     FVAR_grav_tick
+        ADDD    #1
+        STD     FVAR_grav_tick
 
-VARIABLE sg-i                      \ star gravity loop index
-VARIABLE sg-sx                     \ star x cache
-VARIABLE sg-sy                     \ star y cache
+        LDY     #$8054          ; Y = SHIP-POS (preserved across pulls)
 
-\ Pull byte pair at addr toward (tx,ty) by step px per axis.
-\ Sets the 16-bit cell at flag-addr to 1 if any axis moved.
-CODE xyn-pull  ( addr tx ty step flag-addr -- )
-        PSHS    X
-        LDX     8,U             ; X = addr of (x,y) byte pair
-        LDY     ,U              ; Y = flag-addr
-        LDB     3,U             ; B = step (low byte)
-        ; -- pull X axis --
-        LDA     ,X              ; A = current x
-        CMPA    7,U             ; compare with tx (low byte)
-        BEQ     @xdone
-        BHS     @xdec           ; current > target: decrement
-        PSHS    B               ; save step
-        ADDA    ,S+             ; A += step
-        BRA     @xset
-@xdec   PSHS    A               ; save current
-        TFR     B,A             ; A = step
-        NEGA                    ; A = -step
-        ADDA    ,S+             ; A = current - step
-@xset   CMPA    #2              ; clamp x lower bound
-        BHS     @xnl
-        LDA     #2
-@xnl    CMPA    #125            ; clamp x upper bound
-        BLS     @xnh
-        LDA     #125
-@xnh    STA     ,X
-        LDD     #1
-        STD     ,Y              ; flag = 1
-@xdone  ; -- pull Y axis --
-        LDB     3,U             ; B = step (reload)
-        LDA     1,X             ; A = current y
-        CMPA    5,U             ; compare with ty (low byte)
-        BEQ     @ydone
-        BHS     @ydec
-        PSHS    B
-        ADDA    ,S+
-        BRA     @yset
-@ydec   PSHS    A
-        TFR     B,A
+        ; ── Black hole gravity ──
+        LDA     $80B3           ; hasbhole
+        LBEQ    @stars
+        ; mdist(SHIP-POS, BHOLE-POS)
+        LDA     ,Y              ; ship_x
+        SUBA    $8052           ; - bhole_x
+        BCC     @bm1
         NEGA
-        ADDA    ,S+
-@yset   CMPA    #2              ; clamp y lower bound
-        BHS     @ynl
-        LDA     #2
-@ynl    CMPA    #139            ; clamp y upper bound
-        BLS     @ynh
-        LDA     #139
-@ynh    STA     1,X
-        LDD     #1
-        STD     ,Y              ; flag = 1
-@ydone  LEAU    10,U            ; pop 5 args
-        PULS    X
+@bm1    TFR     A,B
+        LDA     1,Y             ; ship_y
+        SUBA    $8053           ; - bhole_y
+        BCC     @bm2
+        NEGA
+@bm2    PSHS    B
+        ADDA    ,S+             ; A = mdist
+        CMPA    #6
+        BLO     @bclose
+        ; 6-30: gated 1px
+        CMPA    #31
+        BHS     @stars          ; outside well
+        LDA     FVAR_grav_tick+1
+        ANDA    #3
+        BNE     @stars
+        LDB     #1
+        PSHS    B               ; push step=1
+        LDA     $8052
+        LDB     $8053
+        BSR     @pull
+        LEAS    1,S             ; pop step
+        BRA     @stars
+@bclose ; <6: 2px always (inescapable)
+        LDB     #2
+        PSHS    B               ; push step=2
+        LDA     $8052
+        LDB     $8053
+        BSR     @pull
+        LEAS    1,S             ; pop step
+
+        ; ── Star gravity ──
+@stars  LDA     FVAR_grav_tick+1
+        ANDA    #3
+        LBNE    @done           ; skip entirely on 3/4 frames
+        LDB     $80B0           ; nstars
+        LBEQ    @done
+        LDX     #$8040          ; STAR-POS
+@slp    PSHS    B               ; save counter
+        ; mdist(SHIP-POS, star)
+        LDA     ,Y              ; ship_x
+        SUBA    ,X              ; - star_x
+        BCC     @sm1
+        NEGA
+@sm1    TFR     A,B
+        LDA     1,Y             ; ship_y
+        SUBA    1,X             ; - star_y
+        BCC     @sm2
+        NEGA
+@sm2    PSHS    B
+        ADDA    ,S+             ; A = mdist
+        CMPA    #11
+        BHS     @snx            ; >10: outside range
+        CMPA    #5
+        BLO     @spull          ; <5: always pull
+        ; 5-10: every other qualifying frame
+        LDA     FVAR_grav_tick+1
+        ANDA    #1
+        BNE     @snx
+@spull  PSHS    X               ; save star ptr
+        LDB     #1
+        PSHS    B               ; push step=1
+        LDA     ,X              ; star_x = tx
+        LDB     1,X             ; star_y = ty
+        BSR     @pull
+        LEAS    1,S             ; pop step
+        PULS    X               ; restore star ptr
+@snx    LEAX    2,X             ; next star
+        PULS    B               ; restore counter
+        DECB
+        BNE     @slp
+
+@done   PULS    X
         ;NEXT
+
+        ; ── @pull subroutine ────────────────────────────────────
+        ; Pull ship (at Y) toward target by step px per axis.
+        ; Entry: A=tx, B=ty.  Step at 4,S (pushed by caller before BSR).
+        ; Stack: S+0..1=ret addr, S+2=step (caller pushed before BSR)
+        ; ... but after PSHS D: S+0=tx, S+1=ty, S+2..3=ret, S+4=step
+        ; Sets FVAR_moved = 1 if any axis moved.  Preserves Y.
+@pull   PSHS    D               ; S+0=tx, S+1=ty
+        ; -- X axis --
+        LDA     ,Y              ; cur_x
+        CMPA    ,S              ; vs tx
+        BEQ     @py
+        BHI     @pxd
+        ADDA    4,S             ; cur_x + step
+        BRA     @pxs
+@pxd    SUBA    4,S             ; cur_x - step
+@pxs    CMPA    #2
+        BHS     @pxnl
+        LDA     #2
+@pxnl   CMPA    #125
+        BLS     @pxnh
+        LDA     #125
+@pxnh   STA     ,Y
+        LDD     #1
+        STD     FVAR_moved
+@py     ; -- Y axis --
+        LDA     1,Y             ; cur_y
+        CMPA    1,S             ; vs ty
+        BEQ     @pd
+        BHI     @pyd
+        ADDA    4,S             ; cur_y + step
+        BRA     @pys
+@pyd    SUBA    4,S             ; cur_y - step
+@pys    CMPA    #2
+        BHS     @pynl
+        LDA     #2
+@pynl   CMPA    #139
+        BLS     @pynh
+        LDA     #139
+@pynh   STA     1,Y
+        LDD     #1
+        STD     FVAR_moved
+@pd     LEAS    2,S             ; pop tx, ty
+        RTS
 ;CODE
-
-\ Convenience: pull by 1 pixel (common case)
-: xy-pull  ( addr tx ty flag-addr -- )
-  >R 1 R> xyn-pull ;
-
-: star-pull  ( -- )
-  1 moved !
-  SHIP-POS sg-sx @ sg-sy @ moved xy-pull ;
-
-: star-gravity  ( -- )
-  grav-tick @ 3 AND IF EXIT THEN     \ only check on frames 0,4,8... (every 4th)
-  qstars @ ?DUP IF 0 DO
-    I sg-i !
-    STAR-POS sg-i @ 2 * + C@ sg-sx !
-    STAR-POS sg-i @ 2 * + 1 + C@ sg-sy !
-    SHIP-POS STAR-POS sg-i @ 2 * + mdist
-    DUP 10 > IF
-      DROP
-    ELSE
-      5 < IF
-        star-pull                     \ close: always pull (was every 2 frames)
-      ELSE
-        grav-tick @ 1 AND 0= IF star-pull THEN  \ far: every other qualifying frame
-      THEN
-    THEN
-  LOOP THEN ;
 
 \ ══════════════════════════════════════════════════════════════════════════
 \  DOCKING
@@ -4198,14 +4419,15 @@ VARIABLE jnb-result
     THEN
 
     overlay @ 0= IF
+      jov-contact-check               \ every frame: kill Jovians touching stars/bhole (#243)
       frame-tick @ 1 AND 0= IF
         \ ── Even frames: ship physics + AI thinking ──
-        gravity-well star-gravity
+        ship-gravity
         check-collisions
         tick-jovians
       ELSE
-        \ ── Odd frames: Jovian gravity + background tasks ──
-        jov-gravity
+        \ ── Odd frames: gravity pull + background tasks ──
+        jov-gravity-pull               \ gated by grav-tick & 3 internally (#243)
         frame-tick @ 7 AND DUP 1 = IF
           jov-check-regen  check-dock  tick-dock  tick-base-attack
         THEN 5 = IF
@@ -4285,10 +4507,10 @@ VARIABLE jnb-result
       docked @ prev-docked !
       update-cond
     THEN
-    \ ── Win/lose checks (after any kill) ──
+    \ ── Win/lose checks (after any kill, one-shot) ──
     check-win @ IF
+      0 check-win !                  \ clear immediately — don't re-check every frame
       count-jovians 0= IF
-        0 check-win !
         cancel-jbeam cancel-beam
         clear-tactical
         2 3 at-xy  S" ALL " rg-type  gjovians0 @ rg-u.

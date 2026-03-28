@@ -42,24 +42,26 @@ const MAX_CY = 25000;
 
 // Component colors
 const COMPONENTS = [
-  // Pre-VSYNC every-frame breakdown (was single "ef" at 5000cy)
-  { name: 'move-ship',       key: 'ms',    color: '#3377bb' },  // 4x KBD-SCAN + try-move
+  // Pre-VSYNC every-frame breakdown
+  { name: 'move-ship',       key: 'ms',    color: '#3377bb' },  // CODE: 4x KBD-SCAN + try-move
   { name: 'process-key',     key: 'pk',    color: '#5599dd' },  // latch-key + key dispatch
   { name: 'save-ship-pos',   key: 'ssp',   color: '#2266aa' },  // copy ship x,y
   { name: 'tick systems',    key: 'tks',   color: '#4488cc' },  // missile + jbeam + destruct
   { name: 'loop overhead',   key: 'lovr',  color: '#336699' },  // frame-tick, overlay checks
   // Even-frame systems
-  { name: 'Star Gravity',    key: 'sgrv',  color: '#cc8844' },
-  { name: 'Gravity Well',    key: 'gw',    color: '#aa6622' },
+  { name: 'Ship Gravity',    key: 'sgrv',  color: '#cc8844' },  // CODE: merged gravity-well+star-gravity (#242)
   { name: 'Collisions',      key: 'coll',  color: '#66aa44' },
+  { name: 'Tick Jovians',    key: 'tjov',  color: '#dd3333' },  // CODE: tick loop + threshold (#166)
   { name: 'J0 Think',        key: 'j0',    color: '#ff4444' },
   { name: 'J1 Think',        key: 'j1',    color: '#ff6666' },
   { name: 'J2 Think',        key: 'j2',    color: '#ff8888' },
+  // Every-frame contact check (#243)
+  { name: 'Jov Contact',     key: 'jcon',  color: '#ee8800' },
   // Odd-frame systems
-  { name: 'Jov Gravity',     key: 'jgrv',  color: '#cc6600' },
+  { name: 'Jov Grav Pull',   key: 'jgrv',  color: '#cc6600' },  // CODE (#243)
   { name: 'Background',      key: 'bg',    color: '#8866aa' },
-  // Post-VSYNC render breakdown (was single "rnd")
-  { name: 'draw-stars',      key: 'rds',   color: '#44aacc' },  // DO/LOOP 5 stars
+  // Post-VSYNC render breakdown
+  { name: 'draw-stars',      key: 'rds',   color: '#44aacc' },  // CODE: fixed colors (#249)
   { name: 'draw-jovians',    key: 'rdj',   color: '#55bbdd' },  // DO/LOOP 3 Jovians
   { name: 'draw-ship',       key: 'rsh',   color: '#66ccee' },  // spr-draw ship
   { name: 'bg-jov',          key: 'bgj',   color: '#338899' },  // save/restore jov bgs + oldpos
@@ -98,44 +100,44 @@ function buildFrame(f) {
   const anyThink = hasJ0 || hasJ1 || hasJ2;
   const jovMoved = anyThink || (isGrav && !even); // gravity can move Jovians
 
-  // Pre-VSYNC every-frame breakdown (idle path, measured via fc.py --cycles):
-  //   move-ship: 993cy idle CODE word (669cy base + 108cy × 3 Jovians; was 1633cy Forth)
-  //   process-key: 785cy idle (includes latch-key 353cy + key-latch compare)
-  //   save-ship-pos: 472cy exact
-  //   tick systems: 764cy idle (missile 212 + jbeam 340 + destruct 212)
-  //   loop overhead: 429cy (frame-tick +! 103 + 2x overlay check 326)
-  //   Total pre-VSYNC: 3,443cy (#244 move-ship CODE, #247 dedup latch-key)
+  // Pre-VSYNC every-frame breakdown (idle path):
+  //   move-ship CODE: 993cy (669 base + 108×3 Jovians)
+  //   process-key: 785cy (includes latch-key)
+  //   save-ship-pos: 374cy
+  //   tick systems: 764cy (missile + jbeam + destruct idle)
+  //   loop overhead: 429cy (frame-tick +! + overlay checks)
+  //   jov-contact CODE: 300cy every frame (#243)
+  //   ship-gravity CODE: 476cy on grav frames (#242, was 5,776cy)
+  //   tick-jovians-inner CODE: 200cy (#166, was ~4,140cy Forth)
+  //   check-win: one-shot per kill, not every frame (#250)
   return {
-    ms:   993,                              // move-ship CODE (669 + 108×3 Jovians)
-    pk:   785,                              // process-key (idle, includes latch-key)
-    ssp:  374,                              // save-ship-pos (was 472, constants inlined)
+    ms:   993,                              // move-ship CODE
+    pk:   785,                              // process-key (idle)
+    ssp:  374,                              // save-ship-pos
     tks:  764,                              // tick-missile + tick-jbeam + tick-destruct (idle)
     lovr: 429,                              // frame-tick +! + 2x overlay @ 0= IF
-    sgrv: (even && isGrav) ? 3889 : 0,  // star-gravity (was 4183)
-    gw:   (even && isGrav) ? 1887 : 0,  // gravity-well (was 2132)
+    sgrv: (even && isGrav) ? 476 : 0,       // ship-gravity CODE (#242)
     coll: even ? 1000 : 0,
-    j0:   hasJ0 ? 2058 : 0,             // jov-think(689) + apply-intent CODE(1369 typical)
+    tjov: even ? 200 : 0,                   // tick-jovians-inner CODE (#166)
+    j0:   hasJ0 ? 2058 : 0,                 // jov-think(689) + apply-intent CODE(1369)
     j1:   hasJ1 ? 2058 : 0,
     j2:   hasJ2 ? 2058 : 0,
-    jgrv: !even ? (isGrav ? 5000 : 1200) : 0,
+    jcon: 300,                               // jov-contact CODE every frame (#243)
+    jgrv: !even ? (isGrav ? 400 : 30) : 0,  // jov-gravity-pull CODE (#243)
     bg:   hasBG(f) ? 3000 : 0,
-    // Post-VSYNC render breakdown (fc.py --cycles after full inlining):
-    // Full render (jov-moved=1): 7290cy total
-    //   draw-stars: 1840, draw-jovians: 1141, draw-ship: 819
-    //   bg-jov (save+restore+oldpos): 1990, bg-ship (save+restore): 1025
-    //   overhead (conditionals): 475
-    // Ship-only (moved=1): 2447cy total
-    //   draw-ship: 819, bg-ship: 1025, overhead: 603
-    rds:  jovMoved ? 1840 : 0,
+    // Post-VSYNC render breakdown:
+    // Full render (jov-moved=1): ~5,850cy (was 7,290cy)
+    //   draw-stars CODE: 400 (#249, was 1,840), draw-jovians: 1,141
+    //   draw-ship: 819, bg-jov: 871, bg-ship: 1,025, overhead: 475
+    //   post-render: 2,510
+    // Ship-only (moved=1, jov-moved=0): ~4,957cy
+    rds:  jovMoved ? 400 : 0,               // draw-stars CODE (#249, was 1,840)
     rdj:  jovMoved ? 1141 : 0,
-    rsh:  819,                              // draw-ship
-    bgj:  jovMoved ? 871 : 0,              // save CODE(327) + restore CODE(353) + oldpos(191)
-    bgs:  1025,                             // restore(476) + save(549)
-    rovr: jovMoved ? 475 : 603,            // conditional checks (unchanged)
-    // Post-render (traced idle path, all non-render post-VSYNC costs): 2510cy
-    //   overlay check(126) + beam-erase 2x(424) + beam-OR(225)
-    //   + beam-draw 2x(424) + apply-hit(259+212) + panel 3x(714) + check-win(126)
-    post: 2510,
+    rsh:  819,                               // draw-ship
+    bgj:  jovMoved ? 871 : 0,               // save/restore CODE + oldpos
+    bgs:  1025,                              // restore + save ship bg
+    rovr: jovMoved ? 475 : 603,              // conditional checks
+    post: 2510,                              // post-render (#250: check-win one-shot)
   };
 }
 
@@ -258,19 +260,31 @@ legendEl.appendChild(budgetItem);
 
 // Stats
 const avgCycles = totalCycles / FRAMES;
-const effectiveFPS = Math.round(FRAMES / (totalCycles / BUDGET) * 10) / 10;
+// Effective FPS: frames under budget take 1 VSYNC, over-budget frames take 2
+let totalVsyncs = 0;
+for (let f = 0; f < FRAMES; f++) {
+  let fc = 0;
+  for (const comp of COMPONENTS) fc += frames[f][comp.key] || 0;
+  totalVsyncs += Math.ceil(fc / BUDGET);
+}
+const effectiveFPS = Math.round(FRAMES / totalVsyncs * 60 * 10) / 10;
 const statsEl = document.getElementById('stats');
 statsEl.innerHTML = `
   <span class="${overCount ? 'over' : 'ok'}">Frames over budget: ${overCount} of ${FRAMES} (${Math.round(overCount/FRAMES*100)}%)</span><br>
   <span class="ok">Frames under budget: ${FRAMES - overCount} of ${FRAMES} (${Math.round((FRAMES-overCount)/FRAMES*100)}%)</span><br>
   Average cycles/frame: ${Math.round(avgCycles).toLocaleString()}cy
   (${Math.round(avgCycles / BUDGET * 100)}% of budget)<br>
-  Effective FPS (estimated): ~${effectiveFPS} fps<br>
+  Effective FPS: ~${effectiveFPS} fps (over-budget frames drop to 30fps)<br>
   <br>
-  <span style="color:#00ff88">After #215 + #241 + #244 + #245 + #246 + #247 + #248:</span>
+  <span style="color:#00ff88">After #166 + #215 + #241 + #242 + #243 + #244 + #245 + #246 + #247 + #248 + #249 + #250:</span>
+  <code>tick-jovians-inner</code> CODE: tick loop + inlined threshold (200cy; was ~4,140cy Forth).
   <code>apply-intent</code> CODE with inlined <code>jov-blocked?</code> (Think: 2,058cy; was 17,000cy).
   <code>move-ship</code> CODE (993cy; was 1,633cy).
   <code>save/restore-jov-bgs</code> CODE (327+353cy; was 900+899cy).
+  <code>jov-contact</code> CODE (300cy every frame) + <code>jov-gravity-pull</code> CODE (400cy; was 5,000cy).
+  <code>ship-gravity</code> CODE (476cy; was 5,776cy).
+  <code>draw-stars</code> CODE with fixed colors (400cy; was 1,840cy).
+  <code>check-win</code> bug fixed: galaxy scan no longer runs every frame (#250).
   All constants inlined as LIT.
   Note: DO/LOOP and nested-loop costs are fc.py base values (single iteration);
   real multi-iteration costs are higher. Relative comparisons remain valid.
