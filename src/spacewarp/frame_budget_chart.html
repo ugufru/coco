@@ -111,33 +111,34 @@ function buildFrame(f) {
   //   tick-jovians-inner CODE: 200cy (#166, was ~4,140cy Forth)
   //   check-win: one-shot per kill, not every frame (#250)
   return {
-    ms:   993,                              // move-ship CODE
-    pk:   785,                              // process-key (idle)
-    ssp:  374,                              // save-ship-pos
-    tks:  764,                              // tick-missile + tick-jbeam + tick-destruct (idle)
-    lovr: 429,                              // frame-tick +! + 2x overlay @ 0= IF
-    sgrv: (even && isGrav) ? 476 : 0,       // ship-gravity CODE (#242)
-    coll: even ? 1000 : 0,
-    tjov: even ? 200 : 0,                   // tick-jovians-inner CODE (#166)
-    j0:   hasJ0 ? 2058 : 0,                 // jov-think(689) + apply-intent CODE(1369)
-    j1:   hasJ1 ? 2058 : 0,
-    j2:   hasJ2 ? 2058 : 0,
-    jcon: 300,                               // jov-contact CODE every frame (#243)
-    jgrv: !even ? (isGrav ? 400 : 30) : 0,  // jov-gravity-pull CODE (#243)
-    bg:   hasBG(f) ? 3000 : 0,
-    // Post-VSYNC render breakdown:
-    // Full render (jov-moved=1): ~7,067cy
-    //   draw-stars CODE: 400, draw-jovians: 1,141, draw-ship: 819
-    //   bg-jov Forth: 2,088 (save 949 + restore 948 + oldpos 191; #248 reverted)
-    //   bg-ship: 1,025, overhead: 475, post-render: 2,510
+    ms:   993,                              // move-ship CODE(669 base + 108cy × 3 Jovians)
+    pk:   785,                              // process-key (idle path, traced)
+    ssp:  374,                              // save-ship-pos — fc.py: 374cy exact
+    tks:  764,                              // tick-missile(212†) + tick-jbeam(340†) + tick-destruct(212†) idle
+    lovr: 429,                              // frame-tick +!(103†) + 2× overlay check(326†)
+    sgrv: (even && isGrav) ? 476 : 0,       // ship-gravity CODE — fc.py: 473-476cy
+    coll: even ? 1833 : 0,                  // check-collisions — fc.py: 1,833cy
+    tjov: even ? 326 : 0,                   // tick-jovians-inner CODE — fc.py: 324-326cy
+    j0:   hasJ0 ? 1449 : 0,                 // jov-think(689-693) + apply-intent(752-757) — fc.py
+    j1:   hasJ1 ? 1449 : 0,
+    j2:   hasJ2 ? 1449 : 0,
+    jcon: 294,                               // jov-contact CODE — fc.py: 294cy
+    jgrv: !even ? (isGrav ? 494 : 30) : 0,  // jov-gravity-pull CODE — fc.py: 489-494cy
+    bg:   hasBG(f) ? 3000 : 0,              // BG tasks (traced idle paths)
+    // Post-VSYNC render breakdown (fc.py values):
+    // Full render (jov-moved=1):
+    //   draw-stars CODE: 196, draw-jovians-live: 1,151, draw-ship: 819
+    //   bg-jov Forth: 2,000 (save 900 + restore 909 + oldpos 191; #248 reverted)
+    //   bg-ship: 1,025 (restore 476 + save 549)
+    //   overhead: 475†, post-render: 2,510†
     // Ship-only (moved=1, jov-moved=0): ~4,957cy
-    rds:  jovMoved ? 400 : 0,               // draw-stars CODE (#249, was 1,840)
-    rdj:  jovMoved ? 1141 : 0,
-    rsh:  819,                               // draw-ship
-    bgj:  jovMoved ? 2088 : 0,              // save(949) + restore(948) + oldpos(191) — Forth (#248 reverted)
-    bgs:  1025,                              // restore + save ship bg
-    rovr: jovMoved ? 475 : 603,              // conditional checks
-    post: 2510,                              // post-render (#250: check-win one-shot)
+    rds:  jovMoved ? 196 : 0,               // draw-stars CODE — fc.py: 195-196cy
+    rdj:  jovMoved ? 1151 : 0,              // draw-jovians-live — fc.py: 1,151-1,152cy
+    rsh:  819,                               // draw-ship — fc.py: 819-820cy
+    bgj:  jovMoved ? 2000 : 0,              // save(900) + restore(909) + oldpos(191) — fc.py, Forth
+    bgs:  1025,                              // restore(476) + save(549) — fc.py
+    rovr: jovMoved ? 475 : 603,              // conditional checks (traced)
+    post: 2510,                              // post-render (traced idle paths)
   };
 }
 

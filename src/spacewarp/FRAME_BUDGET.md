@@ -161,18 +161,21 @@ Current measured costs after all optimizations (#166, #215, #241-#253).
 
 | Component | Cycles | Derivation |
 |-----------|--------|------------|
-| Every-frame base | 3,645 | move-ship(993) + process-key(785) + save-ship-pos(374) + tick-systems(764) + loop overhead(429) + jov-contact(300) |
-| Ship gravity (grav frames) | 476 | ship-gravity CODE (#242): merged gravity-well + star-gravity |
-| Check collisions | 1,000 | collision-scan CODE(177) + Forth wrapper |
-| Per-Jovian think | 2,058 | jov-think CODE(689) + apply-intent CODE(1,369) |
-| Tick-jovians-inner | 200 | CODE tick loop + inlined threshold (#166) |
-| Jov-gravity-pull (grav frame) | 400 | Per-Jovian star+bhole gravity (#243) |
-| Jov-gravity-pull (non-grav) | 30 | Contact check only |
-| Background slot 1 | 3,000 | jov-check-regen + check-dock + tick-dock + tick-base-attack (typical) |
-| Background slot 5 | 3,000 | tick-stardate + tick-migrate + check-spawn + update-cond (typical) |
-| Full render | 5,948 | draw-stars(400) + draw-jovians(1,141) + draw-ship(819) + bg-jov(2,088: save 949 + restore 948 + oldpos 191 Forth) + bg-ship(1,025) + overhead(475) |
-| Ship-only render | 2,447 | draw-ship(819) + bg-ship(1,025) + overhead(603) |
-| Post-render | 2,510 | panel-checks + apply-beam-hit + tick-beam-draw + tick-jbeam-draw + apply-jbeam-hit + check-win (amortized) |
+| Every-frame base | 3,645 | move-ship CODE(669) + process-key(785†) + save-ship-pos(374) + tick-systems(764†) + loop overhead(429†) + jov-contact CODE(294) |
+| Ship gravity (grav frames) | 476 | ship-gravity CODE(473-476) (#242) |
+| Check collisions | 1,833 | check-collisions(1,833): collision-scan CODE + Forth wrapper |
+| Per-Jovian think | 1,446 | jov-think CODE(689-693) + apply-intent CODE(752-757 base) |
+| Tick-jovians-inner | 326 | tick-jovians-inner CODE(324-326) (#166) |
+| Jov-gravity-pull (grav frame) | 494 | jov-gravity-pull CODE(489-494) (#243) |
+| Jov-gravity-pull (non-grav) | 30 | Early exit on grav-tick gate |
+| Background slot 1 | — | jov-check-regen(1,818) + check-dock(2,790) + tick-dock(7,238†) + tick-base-attack(77,554†). Upper bounds; typical paths much cheaper. |
+| Background slot 5 | — | tick-stardate(19,802†) + tick-migrate(26,321†) + update-cond(13,246†). Upper bounds; typical paths much cheaper. |
+| Full render | 8,458 | draw-stars CODE(196) + draw-jovians-live(1,151) + draw-ship(819) + bg-jov Forth(save 900 + restore 909 + oldpos 191 = 2,000) + bg-ship(restore 476 + save 549 = 1,025) + overhead(475†) + post-render(2,510†) |
+| Ship-only render | 4,957 | draw-ship(819) + bg-ship(1,025) + overhead(603†) + post-render(2,510†) |
+| Post-render | 2,510† | beam-erase 2×(~424†) + beam-draw 2×(~424†) + apply-beam/jbeam(~471†) + panel 3×(~714†) + check-win(~126†) + overlay(~126†) |
+
+†Upper bound or estimated idle-path cost; fc.py reports worst-case branch sums.
+Actual idle-path costs traced manually from primitive timing.
 
 ### 60-Frame Cycle Map
 
@@ -183,15 +186,16 @@ See `frame_budget_chart.html` for the interactive chart.
 | Metric | Current | Before optimization |
 |--------|---------|---------------------|
 | **Budget per frame** | 14,930 cy | 14,930 cy |
-| **Light frame (no thinks, no gravity)** | ~9,800 cy (66%) | ~10,126 cy (68%) |
-| **1 Jovian think** | ~14,700 cy (98%) | ~20,840 cy (140%) |
-| **2 Jovians think** | ~16,750 cy (112%) | ~26,466 cy (177%) |
-| **Gravity even + 1 think** | ~15,200 cy (102%) | ~27,155 cy (182%) |
-| **Gravity even, no think** | ~12,900 cy (86%) | ~16,441 cy (110%) |
+| **Light frame (even, no thinks, no gravity)** | see chart | ~10,126 cy (68%) |
+| **1 Jovian think (even)** | see chart | ~20,840 cy (140%) |
+| **2 Jovians think (even)** | see chart | ~26,466 cy (177%) |
+| **Gravity even + 1 think** | see chart | ~27,155 cy (182%) |
+| **Gravity even, no think** | see chart | ~16,441 cy (110%) |
 | **App size** | 24,080 bytes | 24,501 bytes |
 | **Headroom** | 496 bytes | 75 bytes |
 
-Most frames now fit within the 14,930cy budget.  Only 2-think frames (~16,750cy,
-112%) consistently exceed it — a single dropped VSYNC every few seconds under heavy
-AI load.  This is a dramatic improvement from the pre-optimization state where 29 of
-60 frames (48%) exceeded budget with worst cases at 177-326%.
+See `frame_budget_chart.html` for exact per-frame totals.  Most frames now fit within
+the 14,930cy budget.  The chart uses idle-path costs (manually traced from primitive
+timing) since fc.py reports worst-case branch sums.  Only 2-think even frames
+consistently exceed budget.  This is a dramatic improvement from the pre-optimization
+state where 29 of 60 frames (48%) exceeded budget with worst cases at 177-326%.
