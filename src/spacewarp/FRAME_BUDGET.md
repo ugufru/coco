@@ -177,25 +177,143 @@ Current measured costs after all optimizations (#166, #215, #241-#253).
 †Upper bound or estimated idle-path cost; fc.py reports worst-case branch sums.
 Actual idle-path costs traced manually from primitive timing.
 
-### 60-Frame Cycle Map
+### `apply-intent` Cost Breakdown (CODE word, #241)
 
-See `frame_budget_chart.html` for the interactive chart.
+Inlines full `jov-blocked?` obstacle check as @chk subroutine.  3-tier fallback:
+try (nx,ny), then (nx,cur_y), then (cur_x,ny).  Each tier calls @chk.
 
-### Summary (after all optimizations)
+| Check | Per-item cost | Items | Subtotal |
+|-------|---------------|-------|----------|
+| Star loop | ~77cy/iter | 5 | 385 |
+| Black hole | BSR @cmd (~42cy) + CMPA | 1 | ~50 |
+| Base | BSR @cmd + CMPA | 1 | ~50 |
+| Ship | BSR @cmd + CMPA | 1 | ~50 |
+| Other Jovians | ~116cy/iter | 2 | 232 |
+| Setup + genome lookup + cleanup | | | ~338 |
+| **Total per @chk call (5 stars, 2 Jovians)** | | | **~1,105** |
+
+`apply-intent` calls @chk 1-3 times.  fc.py --cycles base: 752-757cy.
+With loop iterations: ~1,449cy typical (1 @chk call + overhead).
+
+### 60-Frame Cycle Map (Moderate Difficulty)
+
+Scenario: 3 Jovians (thresholds 4/6/3, staggered 0/1/2), 5 stars, black hole,
+base, no active beam/missile.  Budget: **14,930 cy/frame**.
+
+Gravity gated to every 4th even frame (frames 0, 8, 16, 24, 32, 40, 48, 56).
+Background tasks on odd frames: slot 1 at `N AND 7 = 1`, slot 5 at `N AND 7 = 5`.
+jov-contact (294cy) runs every frame.  tick-jovians-inner (326cy) runs on even frames.
+
+Jovian think schedule (tick increments each even frame, thinks when tick ≥ threshold):
+- J0 (threshold 4, start 0): thinks at even frames 6, 14, 22, 30, 38, 46, 54
+- J1 (threshold 6, start 1): thinks at even frames 8, 20, 32, 44, 56
+- J2 (threshold 3, start 2): thinks at even frames 0, 6, 12, 18, 24, 30, 36, 42, 48, 54
+
+Full render (Rnd-F) on even frames when a Jovian thinks (jov-moved=1).
+Ship-only render (Rnd-S) on even frames with no thinks and on most odd frames.
+Gravity odd frames get full render if jov-gravity-pull moves a Jovian.
+
+Component abbreviations: EF=every-frame base(3,645), SGrv=ship-gravity(476),
+Coll=check-collisions(1,833), TJov=tick-jovians-inner(326), J=per-think(1,449),
+JCon=jov-contact(294, included in EF), JGrv=jov-gravity-pull(494/30),
+BG=background(3,000†), Rnd-F=full render(8,458), Rnd-S=ship-only(4,957),
+Post=post-render(included in Rnd).
+
+| Fr | E/O | EF | SGrv | Coll | TJov | J0 | J1 | J2 | JGrv | BG | Rnd | **Total** | |
+|----|-----|----|------|------|------|----|----|----|----|----|----|-----------|---|
+| 0 | E/G | 3645 | 476 | 1833 | 326 | | | 1449 | | | 8458 | **16,187** | **OVER** |
+| 1 | O/G | 3645 | | | | | | | 494 | 3000 | 8458 | **15,597** | **OVER** |
+| 2 | E | 3645 | | 1833 | 326 | | | | | | 4957 | **10,761** | |
+| 3 | O | 3645 | | | | | | | 30 | | 4957 | **8,632** | |
+| 4 | E | 3645 | | 1833 | 326 | | | | | | 4957 | **10,761** | |
+| 5 | O | 3645 | | | | | | | 30 | 3000 | 4957 | **11,632** | |
+| 6 | E | 3645 | | 1833 | 326 | 1449 | | 1449 | | | 8458 | **17,160** | **OVER** |
+| 7 | O | 3645 | | | | | | | 30 | | 4957 | **8,632** | |
+| 8 | E/G | 3645 | 476 | 1833 | 326 | | 1449 | | | | 8458 | **16,187** | **OVER** |
+| 9 | O/G | 3645 | | | | | | | 494 | 3000 | 8458 | **15,597** | **OVER** |
+| 10 | E | 3645 | | 1833 | 326 | | | | | | 4957 | **10,761** | |
+| 11 | O | 3645 | | | | | | | 30 | | 4957 | **8,632** | |
+| 12 | E | 3645 | | 1833 | 326 | | | 1449 | | | 8458 | **15,711** | **OVER** |
+| 13 | O | 3645 | | | | | | | 30 | 3000 | 4957 | **11,632** | |
+| 14 | E | 3645 | | 1833 | 326 | 1449 | | | | | 8458 | **15,711** | **OVER** |
+| 15 | O | 3645 | | | | | | | 30 | | 4957 | **8,632** | |
+| 16 | E/G | 3645 | 476 | 1833 | 326 | | | | | | 4957 | **11,237** | |
+| 17 | O/G | 3645 | | | | | | | 494 | 3000 | 8458 | **15,597** | **OVER** |
+| 18 | E | 3645 | | 1833 | 326 | | | 1449 | | | 8458 | **15,711** | **OVER** |
+| 19 | O | 3645 | | | | | | | 30 | | 4957 | **8,632** | |
+| 20 | E | 3645 | | 1833 | 326 | | 1449 | | | | 8458 | **15,711** | **OVER** |
+| 21 | O | 3645 | | | | | | | 30 | 3000 | 4957 | **11,632** | |
+| 22 | E | 3645 | | 1833 | 326 | 1449 | | | | | 8458 | **15,711** | **OVER** |
+| 23 | O | 3645 | | | | | | | 30 | | 4957 | **8,632** | |
+| 24 | E/G | 3645 | 476 | 1833 | 326 | | | 1449 | | | 8458 | **16,187** | **OVER** |
+| 25 | O/G | 3645 | | | | | | | 494 | 3000 | 8458 | **15,597** | **OVER** |
+| 26 | E | 3645 | | 1833 | 326 | | | | | | 4957 | **10,761** | |
+| 27 | O | 3645 | | | | | | | 30 | | 4957 | **8,632** | |
+| 28 | E | 3645 | | 1833 | 326 | | | | | | 4957 | **10,761** | |
+| 29 | O | 3645 | | | | | | | 30 | 3000 | 4957 | **11,632** | |
+| 30 | E | 3645 | | 1833 | 326 | 1449 | | 1449 | | | 8458 | **17,160** | **OVER** |
+| 31 | O | 3645 | | | | | | | 30 | | 4957 | **8,632** | |
+| 32 | E/G | 3645 | 476 | 1833 | 326 | | 1449 | | | | 8458 | **16,187** | **OVER** |
+| 33 | O/G | 3645 | | | | | | | 494 | 3000 | 8458 | **15,597** | **OVER** |
+| 34 | E | 3645 | | 1833 | 326 | | | | | | 4957 | **10,761** | |
+| 35 | O | 3645 | | | | | | | 30 | | 4957 | **8,632** | |
+| 36 | E | 3645 | | 1833 | 326 | | | 1449 | | | 8458 | **15,711** | **OVER** |
+| 37 | O | 3645 | | | | | | | 30 | 3000 | 4957 | **11,632** | |
+| 38 | E | 3645 | | 1833 | 326 | 1449 | | | | | 8458 | **15,711** | **OVER** |
+| 39 | O | 3645 | | | | | | | 30 | | 4957 | **8,632** | |
+| 40 | E/G | 3645 | 476 | 1833 | 326 | | | | | | 4957 | **11,237** | |
+| 41 | O/G | 3645 | | | | | | | 494 | 3000 | 8458 | **15,597** | **OVER** |
+| 42 | E | 3645 | | 1833 | 326 | | | 1449 | | | 8458 | **15,711** | **OVER** |
+| 43 | O | 3645 | | | | | | | 30 | | 4957 | **8,632** | |
+| 44 | E | 3645 | | 1833 | 326 | | 1449 | | | | 8458 | **15,711** | **OVER** |
+| 45 | O | 3645 | | | | | | | 30 | 3000 | 4957 | **11,632** | |
+| 46 | E | 3645 | | 1833 | 326 | 1449 | | | | | 8458 | **15,711** | **OVER** |
+| 47 | O | 3645 | | | | | | | 30 | | 4957 | **8,632** | |
+| 48 | E/G | 3645 | 476 | 1833 | 326 | | | 1449 | | | 8458 | **16,187** | **OVER** |
+| 49 | O/G | 3645 | | | | | | | 494 | 3000 | 8458 | **15,597** | **OVER** |
+| 50 | E | 3645 | | 1833 | 326 | | | | | | 4957 | **10,761** | |
+| 51 | O | 3645 | | | | | | | 30 | | 4957 | **8,632** | |
+| 52 | E | 3645 | | 1833 | 326 | | | | | | 4957 | **10,761** | |
+| 53 | O | 3645 | | | | | | | 30 | 3000 | 4957 | **11,632** | |
+| 54 | E | 3645 | | 1833 | 326 | 1449 | | 1449 | | | 8458 | **17,160** | **OVER** |
+| 55 | O | 3645 | | | | | | | 30 | | 4957 | **8,632** | |
+| 56 | E/G | 3645 | 476 | 1833 | 326 | | 1449 | | | | 8458 | **16,187** | **OVER** |
+| 57 | O/G | 3645 | | | | | | | 494 | 3000 | 8458 | **15,597** | **OVER** |
+| 58 | E | 3645 | | 1833 | 326 | | | | | | 4957 | **10,761** | |
+| 59 | O | 3645 | | | | | | | 30 | | 4957 | **8,632** | |
+
+Also see `frame_budget_chart.html` for the interactive visual chart.
+
+### Summary (after #166, #215, #241-#253)
 
 | Metric | Current | Before optimization |
 |--------|---------|---------------------|
 | **Budget per frame** | 14,930 cy | 14,930 cy |
-| **Light frame (even, no thinks, no gravity)** | see chart | ~10,126 cy (68%) |
-| **1 Jovian think (even)** | see chart | ~20,840 cy (140%) |
-| **2 Jovians think (even)** | see chart | ~26,466 cy (177%) |
-| **Gravity even + 1 think** | see chart | ~27,155 cy (182%) |
-| **Gravity even, no think** | see chart | ~16,441 cy (110%) |
+| **Light frame (even, no thinks, no gravity)** | 10,761 cy (72%) | 10,126 cy (68%) |
+| **1 Jovian think (even)** | 15,711 cy (105%) | 20,840 cy (140%) |
+| **2 Jovians think (frame 6, 30, 54)** | 17,160 cy (115%) | 26,466 cy (177%) |
+| **Gravity even + 1 think** | 16,187 cy (108%) | 27,155 cy (182%) |
+| **Gravity even, no think** | 11,237 cy (75%) | 16,441 cy (110%) |
+| **Gravity odd + BG** | 15,597 cy (104%) | 22,214 cy (149%) |
+| **Gravity odd, no BG** | 12,597 cy (84%) | 19,214 cy (129%) |
+| **Frames over budget** | **22 of 60 (37%)** | 29 of 60 (48%) |
+| **Frames under budget** | 38 of 60 (63%) | 31 of 60 (52%) |
 | **App size** | 24,080 bytes | 24,501 bytes |
 | **Headroom** | 496 bytes | 75 bytes |
 
-See `frame_budget_chart.html` for exact per-frame totals.  Most frames now fit within
-the 14,930cy budget.  The chart uses idle-path costs (manually traced from primitive
-timing) since fc.py reports worst-case branch sums.  Only 2-think even frames
-consistently exceed budget.  This is a dramatic improvement from the pre-optimization
-state where 29 of 60 frames (48%) exceeded budget with worst cases at 177-326%.
+Worst-case frames dropped from 177% to 115% of budget.  The game no longer drops
+2+ frames on a single think.  Over-budget frames fit in 2 VSYNC periods (~33ms).
+
+### Remaining Bottlenecks
+
+1. **Full render (8,458cy)**: The dominant cost on think frames.  bg-jov Forth
+   (save 900 + restore 909 + oldpos 191 = 2,000cy) is the largest sub-component.
+   Converting to CODE (#248, needs @bgcalc debug) would save ~1,200cy.
+
+2. **Gravity odd + BG (15,597cy)**: jov-gravity-pull(494) + BG tasks(3,000†) +
+   full render(8,458) + EF(3,645).  BG tasks are upper bounds; typical paths
+   are much cheaper but occasionally spike.
+
+3. **1-think frames (15,711cy, 105%)**: Just over budget.  Deferring 2nd think
+   to next frame (1-think-per-frame cap) would eliminate 2-think frames entirely,
+   but lwasm branch range issues prevented implementation.  Revisit.
