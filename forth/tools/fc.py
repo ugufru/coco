@@ -527,7 +527,7 @@ def assemble_code_words(code_defs, symbols, var_addrs=None):
 
 # ── Constant inlining ─────────────────────────────────────────────────────────
 
-MAX_INLINE_REFS = 3   # inline constants referenced at most this many times
+MAX_INLINE_REFS = 999  # inline all constants (each ref: 80cy→31cy, +2 bytes)
 
 def inline_constants(definitions, main_thread):
     """Replace low-reference CONSTANT words with inline LIT values.

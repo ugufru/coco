@@ -108,34 +108,34 @@ function buildFrame(f) {
   return {
     ms:   993,                              // move-ship CODE (669 + 108×3 Jovians)
     pk:   785,                              // process-key (idle, includes latch-key)
-    ssp:  472,                              // save-ship-pos (exact)
+    ssp:  374,                              // save-ship-pos (was 472, constants inlined)
     tks:  764,                              // tick-missile + tick-jbeam + tick-destruct (idle)
     lovr: 429,                              // frame-tick +! + 2x overlay @ 0= IF
-    sgrv: (even && isGrav) ? 4183 : 0,
-    gw:   (even && isGrav) ? 2132 : 0,
+    sgrv: (even && isGrav) ? 3889 : 0,  // star-gravity (was 4183)
+    gw:   (even && isGrav) ? 1887 : 0,  // gravity-well (was 2132)
     coll: even ? 1000 : 0,
-    j0:   hasJ0 ? 5626 : 0,
-    j1:   hasJ1 ? 5626 : 0,
-    j2:   hasJ2 ? 5626 : 0,
+    j0:   hasJ0 ? 5577 : 0,             // jov-think(689) + apply-intent(4888)
+    j1:   hasJ1 ? 5577 : 0,
+    j2:   hasJ2 ? 5577 : 0,
     jgrv: !even ? (isGrav ? 5000 : 1200) : 0,
     bg:   hasBG(f) ? 3000 : 0,
-    // Post-VSYNC render breakdown (measured via primitive cycle costs):
-    // Full render (jov-moved=1): 7732cy total
-    //   draw-stars: 1938, draw-jovians: 1190, draw-ship: 918
-    //   bg-jov (save+restore+oldpos): 2088, bg-ship (save+restore): 1123
+    // Post-VSYNC render breakdown (fc.py --cycles after full inlining):
+    // Full render (jov-moved=1): 7290cy total
+    //   draw-stars: 1840, draw-jovians: 1141, draw-ship: 819
+    //   bg-jov (save+restore+oldpos): 1990, bg-ship (save+restore): 1025
     //   overhead (conditionals): 475
-    // Ship-only (moved=1): 2644cy total
-    //   draw-ship: 918, bg-ship: 1123, overhead: 603
-    rds:  jovMoved ? 1938 : 0,
-    rdj:  jovMoved ? 1190 : 0,
-    rsh:  918,                              // always (ship always redrawn)
-    bgj:  jovMoved ? 2088 : 0,             // restore(948) + save(949) + oldpos(191)
-    bgs:  1123,                             // restore(476) + save(647)
-    rovr: jovMoved ? 475 : 603,            // conditional checks (more in ship-only path)
-    // Post-render (measured idle): 1693cy (#247 removed redundant latch-key)
-    //   tick-beam/jbeam-draw(2x212) + apply-beam/jbeam-hit(259+212)
-    //   + panel checks(672) + check-win(126)
-    post: 1693,
+    // Ship-only (moved=1): 2447cy total
+    //   draw-ship: 819, bg-ship: 1025, overhead: 603
+    rds:  jovMoved ? 1840 : 0,
+    rdj:  jovMoved ? 1141 : 0,
+    rsh:  819,                              // draw-ship (was 918)
+    bgj:  jovMoved ? 1990 : 0,             // restore(899) + save(900) + oldpos(191)
+    bgs:  1025,                             // restore(476) + save(549)
+    rovr: jovMoved ? 475 : 603,            // conditional checks (unchanged)
+    // Post-render (traced idle path, all non-render post-VSYNC costs): 2510cy
+    //   overlay check(126) + beam-erase 2x(424) + beam-OR(225)
+    //   + beam-draw 2x(424) + apply-hit(259+212) + panel 3x(714) + check-win(126)
+    post: 2510,
   };
 }
 
@@ -267,14 +267,14 @@ statsEl.innerHTML = `
   (${Math.round(avgCycles / BUDGET * 100)}% of budget)<br>
   Effective FPS (estimated): ~${effectiveFPS} fps<br>
   <br>
-  <span style="color:#00ff88">After #215 + #244 + #245 + #247:</span>
+  <span style="color:#00ff88">After #215 + #244 + #245 + #246 + #247:</span>
   <code>jov-blocked?</code> CODE (1,105cy; was 13,800cy).
-  <code>move-ship</code> CODE (993cy; was 1,633cy) — inlines keyboard scan,
-  try-move, ship-on-base?, ship-jov-blocked?.
-  Low-ref constants inlined as LIT (23 constants, saved 262 bytes).
-  Redundant <code>latch-key</code> removed (3x&rarr;1x, saved 706cy/frame).
-  Pre-VSYNC: 3,443cy.  Render: 7,732cy full / 2,644cy ship-only.  Post: 1,693cy.
-  All costs measured via <code>fc.py --cycles</code>.
+  <code>move-ship</code> CODE (993cy; was 1,633cy).
+  All constants inlined as LIT (80cy&rarr;31cy per ref).
+  Redundant <code>latch-key</code> removed (3x&rarr;1x).
+  Pre-VSYNC: 3,345cy.  Render: 7,290cy full / 2,447cy ship-only.  Post: 2,510cy.
+  Post corrected: now includes beam-erase(424), overlay check(126), beam-OR(225)
+  that were previously uncounted. All costs from <code>fc.py --cycles</code>.
 `;
 </script>
 
