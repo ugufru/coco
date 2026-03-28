@@ -777,15 +777,164 @@ CODE save-jov-oldpos-n   \ ( n -- )  copy JOV-POS to JOV-OLDX/Y for n Jovians
         ;NEXT
 ;CODE
 
-: save-jov-bgs  ( -- )
-  qjovians @ ?DUP IF 0 DO
-    JOV-DMG I + C@ IF I jov-bg-xy bg-save-7 THEN
-  LOOP THEN ;
+\ save-jov-bgs / restore-jov-bgs / save-jov-oldpos — CODE + Forth (#248)
+\ save/restore converted to CODE with inline bg copy loops.
+\ @bgcalc computes buf(X) + VRAM(Y) from j(B) and pos ptr(Y).
 
-: restore-jov-bgs  ( -- )
-  qjovians @ ?DUP IF 0 DO
-    JOV-DMG I + C@ IF I jov-bg-old-xy bg-restore-7 THEN
-  LOOP THEN ;
+CODE save-jov-bgs  ( -- )
+        PSHS    X               ; save IP
+        LDA     $80B1           ; njovians
+        BEQ     @done
+        CLRB
+@lp     PSHS    B               ; save j
+        LDX     #$8056          ; JOV-DMG
+        ABX
+        TST     ,X
+        BEQ     @nx
+        LDB     ,S              ; j
+        ; Y = &JOV-POS[j] (current position)
+        ASLB
+        LDY     #$804A
+        LEAY    B,Y
+        LDB     ,S              ; j (for @bgcalc)
+        LBSR    @bgcalc         ; X=buf, Y=VRAM
+        LDB     #7
+@sr     LDA     ,Y
+        STA     ,X+
+        LDA     1,Y
+        STA     ,X+
+        LDA     2,Y
+        STA     ,X+
+        LDA     3,Y
+        STA     ,X+
+        LEAY    32,Y
+        DECB
+        BNE     @sr
+@nx     PULS    B
+        INCB
+        CMPB    $80B1
+        BLO     @lp
+@done   PULS    X
+        ;NEXT
+
+        ; ── @bgcalc: bg buffer (X) + VRAM addr (Y) from j and pos ──
+        ; Input: B = j, Y = ptr to (pos_x, pos_y) byte pair
+        ; Output: X = bg buf addr, Y = VRAM start addr
+        ; Clobbers: A, D
+@bgcalc PSHS    B               ; save j
+        LDA     #28
+        MUL                     ; D = j*28
+        ADDD    #$80F0          ; JOV-BG0
+        PSHS    D               ; save buf; S+0..1=buf, S+2=j
+        ; sprite header = JOV-SPR0 + j*23
+        LDA     2,S             ; j
+        LDB     #23
+        MUL
+        ADDD    #$8200
+        TFR     D,X             ; X = spr header (temp)
+        ; screen_x = pos_x - width/2
+        LDA     ,Y              ; pos_x
+        LDB     ,X              ; spr width
+        LSRB
+        PSHS    B               ; save w/2
+        SUBA    ,S+             ; A = screen_x
+        PSHS    A               ; save sx; S+0=sx, S+1..2=buf, S+3=j
+        ; screen_y = pos_y - height/2
+        LDA     1,Y             ; pos_y
+        LDB     1,X             ; spr height
+        LSRB
+        PSHS    B               ; save h/2
+        SUBA    ,S+             ; A = screen_y
+        ; VRAM = RGVRAM + screen_y*32 + screen_x/4
+        LDB     #32
+        MUL                     ; D = screen_y * 32
+        ADDD    VAR_RGVRAM
+        TFR     D,Y             ; Y = row base
+        LDA     ,S+             ; A = screen_x; pop sx
+        LSRA
+        LSRA                    ; A = screen_x / 4
+        LEAY    A,Y             ; Y = VRAM addr
+        PULS    X               ; X = buf addr; pop buf
+        LEAS    1,S             ; pop j
+        RTS
+;CODE
+
+CODE restore-jov-bgs  ( -- )
+        PSHS    X
+        LDA     $80B1
+        BEQ     @done
+        CLRB
+@lp     PSHS    B
+        LDX     #$8056
+        ABX
+        TST     ,X
+        BEQ     @nx
+        LDB     ,S              ; j
+        ; Build (oldx, oldy) pair on stack, point Y at it
+        LDX     #$80C6          ; JOV-OLDX
+        ABX
+        LDA     ,X              ; oldx
+        LDX     #$80C9          ; JOV-OLDY
+        ABX
+        LDB     ,X              ; oldy
+        PSHS    D               ; S+0=oldx, S+1=oldy
+        LEAY    ,S              ; Y = ptr to (oldx, oldy)
+        LDB     2,S             ; j (shifted +2)
+        LBSR    @bgcalc         ; X=buf, Y=VRAM
+        LEAS    2,S             ; pop temp pair
+        LDB     #7
+@rr     LDA     ,X+
+        STA     ,Y
+        LDA     ,X+
+        STA     1,Y
+        LDA     ,X+
+        STA     2,Y
+        LDA     ,X+
+        STA     3,Y
+        LEAY    32,Y
+        DECB
+        BNE     @rr
+@nx     PULS    B
+        INCB
+        CMPB    $80B1
+        BLO     @lp
+@done   PULS    X
+        ;NEXT
+
+        ; Duplicate @bgcalc (can't share across CODE words)
+@bgcalc PSHS    B
+        LDA     #28
+        MUL
+        ADDD    #$80F0
+        PSHS    D
+        LDA     2,S
+        LDB     #23
+        MUL
+        ADDD    #$8200
+        TFR     D,X
+        LDA     ,Y
+        LDB     ,X
+        LSRB
+        PSHS    B
+        SUBA    ,S+
+        PSHS    A
+        LDA     1,Y
+        LDB     1,X
+        LSRB
+        PSHS    B
+        SUBA    ,S+
+        LDB     #32
+        MUL
+        ADDD    VAR_RGVRAM
+        TFR     D,Y
+        LDA     ,S+
+        LSRA
+        LSRA
+        LEAY    A,Y
+        PULS    X
+        LEAS    1,S
+        RTS
+;CODE
 
 : save-jov-oldpos  ( -- )  qjovians @ save-jov-oldpos-n ;
 

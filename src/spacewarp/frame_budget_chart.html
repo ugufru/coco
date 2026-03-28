@@ -128,8 +128,8 @@ function buildFrame(f) {
     //   draw-ship: 819, bg-ship: 1025, overhead: 603
     rds:  jovMoved ? 1840 : 0,
     rdj:  jovMoved ? 1141 : 0,
-    rsh:  819,                              // draw-ship (was 918)
-    bgj:  jovMoved ? 1990 : 0,             // restore(899) + save(900) + oldpos(191)
+    rsh:  819,                              // draw-ship
+    bgj:  jovMoved ? 871 : 0,              // save CODE(327) + restore CODE(353) + oldpos(191)
     bgs:  1025,                             // restore(476) + save(549)
     rovr: jovMoved ? 475 : 603,            // conditional checks (unchanged)
     // Post-render (traced idle path, all non-render post-VSYNC costs): 2510cy
@@ -267,13 +267,13 @@ statsEl.innerHTML = `
   (${Math.round(avgCycles / BUDGET * 100)}% of budget)<br>
   Effective FPS (estimated): ~${effectiveFPS} fps<br>
   <br>
-  <span style="color:#00ff88">After #215 + #241 + #244 + #245 + #246 + #247:</span>
-  <code>apply-intent</code> CODE with inlined <code>jov-blocked?</code>
-  (1,369cy typical; was 5,577cy). Think: 2,058cy (was 17,000cy original).
+  <span style="color:#00ff88">After #215 + #241 + #244 + #245 + #246 + #247 + #248:</span>
+  <code>apply-intent</code> CODE with inlined <code>jov-blocked?</code> (Think: 2,058cy; was 17,000cy).
   <code>move-ship</code> CODE (993cy; was 1,633cy).
+  <code>save/restore-jov-bgs</code> CODE (327+353cy; was 900+899cy).
   All constants inlined as LIT.
-  Pre-VSYNC: 3,345cy.  Render: 7,290cy full / 2,447cy ship-only.  Post: 2,510cy.
-  All costs from <code>fc.py --cycles</code> + traced idle paths.
+  Note: DO/LOOP and nested-loop costs are fc.py base values (single iteration);
+  real multi-iteration costs are higher. Relative comparisons remain valid.
 `;
 </script>
 
