@@ -126,15 +126,15 @@ function buildFrame(f) {
     jgrv: !even ? (isGrav ? 400 : 30) : 0,  // jov-gravity-pull CODE (#243)
     bg:   hasBG(f) ? 3000 : 0,
     // Post-VSYNC render breakdown:
-    // Full render (jov-moved=1): ~5,850cy (was 7,290cy)
-    //   draw-stars CODE: 400 (#249, was 1,840), draw-jovians: 1,141
-    //   draw-ship: 819, bg-jov: 871, bg-ship: 1,025, overhead: 475
-    //   post-render: 2,510
+    // Full render (jov-moved=1): ~7,067cy
+    //   draw-stars CODE: 400, draw-jovians: 1,141, draw-ship: 819
+    //   bg-jov Forth: 2,088 (save 949 + restore 948 + oldpos 191; #248 reverted)
+    //   bg-ship: 1,025, overhead: 475, post-render: 2,510
     // Ship-only (moved=1, jov-moved=0): ~4,957cy
     rds:  jovMoved ? 400 : 0,               // draw-stars CODE (#249, was 1,840)
     rdj:  jovMoved ? 1141 : 0,
     rsh:  819,                               // draw-ship
-    bgj:  jovMoved ? 871 : 0,               // save/restore CODE + oldpos
+    bgj:  jovMoved ? 2088 : 0,              // save(949) + restore(948) + oldpos(191) — Forth (#248 reverted)
     bgs:  1025,                              // restore + save ship bg
     rovr: jovMoved ? 475 : 603,              // conditional checks
     post: 2510,                              // post-render (#250: check-win one-shot)
@@ -280,7 +280,7 @@ statsEl.innerHTML = `
   <code>tick-jovians-inner</code> CODE: tick loop + inlined threshold (200cy; was ~4,140cy Forth).
   <code>apply-intent</code> CODE with inlined <code>jov-blocked?</code> (Think: 2,058cy; was 17,000cy).
   <code>move-ship</code> CODE (993cy; was 1,633cy).
-  <code>save/restore-jov-bgs</code> CODE (327+353cy; was 900+899cy).
+  <code>save/restore-jov-bgs</code> reverted to Forth (949+948cy; #248 CODE had rendering bug).
   <code>jov-contact</code> CODE (300cy every frame) + <code>jov-gravity-pull</code> CODE (400cy; was 5,000cy).
   <code>ship-gravity</code> CODE (476cy; was 5,776cy).
   <code>draw-stars</code> CODE with fixed colors (400cy; was 1,840cy).
