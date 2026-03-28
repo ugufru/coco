@@ -98,15 +98,15 @@ function buildFrame(f) {
   const anyThink = hasJ0 || hasJ1 || hasJ2;
   const jovMoved = anyThink || (isGrav && !even); // gravity can move Jovians
 
-  // Pre-VSYNC every-frame breakdown (idle path, measured via primitive costs):
-  //   move-ship: 1633cy idle (4x KBD-SCAN + Forth overhead, no keys held)
+  // Pre-VSYNC every-frame breakdown (idle path, measured via fc.py --cycles):
+  //   move-ship: 993cy idle CODE word (669cy base + 108cy × 3 Jovians; was 1633cy Forth)
   //   process-key: 785cy idle (includes latch-key 353cy + key-latch compare)
   //   save-ship-pos: 472cy exact
   //   tick systems: 764cy idle (missile 212 + jbeam 340 + destruct 212)
   //   loop overhead: 429cy (frame-tick +! 103 + 2x overlay check 326)
-  //   Total pre-VSYNC: 4,083cy (#247 removed 2 redundant latch-key calls, -706cy)
+  //   Total pre-VSYNC: 3,443cy (#244 move-ship CODE, #247 dedup latch-key)
   return {
-    ms:   1633,                             // move-ship (idle, no keys held)
+    ms:   993,                              // move-ship CODE (669 + 108×3 Jovians)
     pk:   785,                              // process-key (idle, includes latch-key)
     ssp:  472,                              // save-ship-pos (exact)
     tks:  764,                              // tick-missile + tick-jbeam + tick-destruct (idle)
@@ -267,12 +267,14 @@ statsEl.innerHTML = `
   (${Math.round(avgCycles / BUDGET * 100)}% of budget)<br>
   Effective FPS (estimated): ~${effectiveFPS} fps<br>
   <br>
-  <span style="color:#00ff88">After #215 + #245 + #247:</span>
-  <code>jov-blocked?</code> CODE word (1,105cy; was 13,800cy Forth).
+  <span style="color:#00ff88">After #215 + #244 + #245 + #247:</span>
+  <code>jov-blocked?</code> CODE (1,105cy; was 13,800cy).
+  <code>move-ship</code> CODE (993cy; was 1,633cy) — inlines keyboard scan,
+  try-move, ship-on-base?, ship-jov-blocked?.
   Low-ref constants inlined as LIT (23 constants, saved 262 bytes).
-  Redundant <code>latch-key</code> calls removed (3x&rarr;1x, saved 706cy/frame).
-  Pre-VSYNC: 4,083cy.  Render: 7,732cy full / 2,644cy ship-only.  Post: 1,693cy.
-  All costs measured via <code>fc.py --cycles</code> + traced idle-path primitive timing.
+  Redundant <code>latch-key</code> removed (3x&rarr;1x, saved 706cy/frame).
+  Pre-VSYNC: 3,443cy.  Render: 7,732cy full / 2,644cy ship-only.  Post: 1,693cy.
+  All costs measured via <code>fc.py --cycles</code>.
 `;
 </script>
 
