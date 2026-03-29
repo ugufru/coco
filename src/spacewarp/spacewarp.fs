@@ -1670,6 +1670,7 @@ VARIABLE migrate-timer
   LOOP THEN ;
 
 VARIABLE jov-moved               \ flag: did any Jovian move this frame?
+VARIABLE think-slot              \ 0-2: whose turn to think this even frame
 
 \ ── Jovian AI (genome-driven) ──────────────────────────────────────────
 \ jov-think CODE word computes intent (proposed position + flags) from
@@ -2206,44 +2207,48 @@ VARIABLE detect-timer              \ frame counter for detection rolls
 
 \ jov-threshold removed (#166) — inlined into tick-jovians-inner CODE.
 
-\ ── tick-jovians-inner CODE word (#166) ───────────────────────────────
-\ ( -- mask )  Tick all alive+aware Jovians.  For each:
-\   increment JOV-TICK, compare to threshold (inlined from genome).
-\   If threshold fires: reset tick to 0, set bit i in mask.
-\   Otherwise: store incremented tick.
-\ Returns 3-bit mask of Jovians that need think/flee dispatch.
+\ ── tick-jovians-inner CODE word (slot-based scheduling) ─────────────
+\ ( -- mask )  Slot-based think scheduling.  Each even frame, advance
+\   think-slot (0->1->2->0..) wrapping at njovians.  Only the Jovian at
+\   that slot is considered.  If alive+aware, increment its skip counter
+\   (JOV-TICK).  Compute skip factor from genome:
+\     skip = (12 - (pilot_skill + speed_mod)) >> 1, clamped [1,6]
+\   If counter >= skip: fire (reset counter, return mask bit).
+\   Otherwise: return 0.  At most 1 Jovian thinks per even frame.
 CODE tick-jovians-inner
         PSHS    X               ; save IP
-        CLRA
-        PSHS    A               ; S+0 = mask (0)
+        ; -- Any Jovians? --
         LDA     $80B1           ; njovians
-        LBEQ    @done
-        CLRB                    ; B = i
-@lp     PSHS    B               ; S+0=i, S+1=mask
-        ; Check alive
+        BEQ     @zero
+        ; -- Advance slot: (slot + 1) % njovians --
+        LDB     FVAR_think_slot+1   ; current slot (low byte)
+        INCB
+        PSHS    A               ; push njovians
+        CMPB    ,S+             ; slot vs njovians (pop)
+        BLO     @w1
+        CLRB
+@w1     STB     FVAR_think_slot+1   ; B = i (this frame's Jovian)
+        ; -- Alive? JOV-DMG[i] > 0 --
         LDX     #$8056          ; JOV-DMG
         ABX
         TST     ,X
-        BEQ     @nx
-        ; Check aware (JOV-STATE != 0)
-        LDB     ,S              ; i
+        BEQ     @zero
+        ; -- Aware? JOV-STATE[i] != 0 --
+        LDB     FVAR_think_slot+1
         LDX     #$80BE          ; JOV-STATE
         ABX
         TST     ,X
-        BEQ     @nx
-        ; Increment tick
-        LDB     ,S              ; i
-        LDX     #$80C2          ; JOV-TICK
-        ABX
-        LDA     ,X              ; current tick
-        INCA                    ; tick + 1
-        ; Compute threshold from genome (inline jov-threshold)
-        ; threshold = 10 - (pilot_skill[0..2] + speed_mod[byte1 >> 4 & 3])
-        ; clamped to 2..8
-        PSHS    A               ; S+0=newtick, S+1=i, S+2=mask
-        LDB     1,S             ; i
+        BEQ     @zero
+        ; -- Advance skip counter: JOV-TICK[i] += 1 --
+        LDB     FVAR_think_slot+1
+        LDX     #$80C2          ; JOV-TICK (repurposed as skip counter)
+        ABX                     ; X = &JOV-TICK[i]
+        INC     ,X
+        ; -- Compute skip factor from genome --
+        ; skip = (12 - (skill + speed_mod)) >> 1, min 1
+        LDB     FVAR_think_slot+1
         LDA     #4
-        MUL                     ; D = i*4 (result in B since i<4)
+        MUL                     ; D = i*4 (in B since i<4)
         LDY     #$80CE          ; JOV-GENOME
         LEAY    B,Y
         LDA     ,Y              ; byte 0
@@ -2253,52 +2258,32 @@ CODE tick-jovians-inner
         LSRB
         LSRB
         LSRB
-        ANDB    #3              ; speed_modifier (0-3)
+        ANDB    #3              ; speed_mod (0-3)
         PSHS    A
-        ADDB    ,S+             ; B = skill + speed
-        LDA     #10
+        ADDB    ,S+             ; B = skill + speed (0-10)
+        LDA     #12
         PSHS    B
-        SUBA    ,S+             ; A = 10 - (skill + speed) = threshold
-        CMPA    #2              ; clamp low
-        BHS     @cl
-        LDA     #2
-@cl     CMPA    #9              ; clamp high (> 8 -> 8)
-        BLO     @ch
-        LDA     #8
-@ch     ; A = threshold, S+0=newtick, S+1=i, S+2=mask
-        LDB     ,S+             ; B = newtick; S+0=i, S+1=mask
-        ; tick < threshold?
-        PSHS    A               ; save threshold
-        CMPB    ,S+             ; newtick vs threshold
-        LBHS    @tfire          ; newtick >= threshold: fire
-        LBRA    @tick           ; newtick < threshold: store new tick
-@tfire  ; Threshold fired: reset tick, set mask bit
-        LDX     #$80C2          ; JOV-TICK
-        ABX
+        SUBA    ,S+             ; A = 12 - sum (2..12)
+        LSRA                    ; A = skip factor (1..6)
+        BNE     @c1
+        LDA     #1              ; clamp min (safety)
+@c1     ; -- Fire if counter >= skip --
+        CMPA    ,X              ; skip vs counter (X = &JOV-TICK[i])
+        BHI     @zero           ; counter < skip: not yet
+        ; -- Fire: reset counter, build mask --
         CLR     ,X              ; JOV-TICK[i] = 0
-        ; Set bit i in mask: 1 << i via shift
-        LDB     ,S              ; i (0, 1, or 2)
+        LDB     FVAR_think_slot+1   ; i (0, 1, or 2)
         LDA     #1
-        BRA     @shft
-@shlp   LSLA
-@shft   DECB
-        BPL     @shlp
-        ORA     1,S             ; mask |= bit
-        STA     1,S
-        BRA     @nx
-@tick   ; Store incremented tick
-        LDA     ,S              ; i
-        LDX     #$80C2          ; JOV-TICK
-        LEAX    A,X
-        STB     ,X              ; JOV-TICK[i] = newtick
-@nx     PULS    B               ; pop i; S+0=mask
-        INCB
-        CMPB    $80B1
-        BLO     @lp
-@done   PULS    A               ; A = mask
+        BRA     @sh
+@sl     LSLA
+@sh     DECB
+        BPL     @sl             ; A = 1 << i
         TFR     A,B
-        CLRA                    ; D = 0:mask (16-bit)
-        LEAU    -2,U
+        CLRA                    ; D = 0:mask
+        BRA     @push
+@zero   CLRA
+        CLRB                    ; D = 0
+@push   LEAU    -2,U
         STD     ,U              ; push mask
         PULS    X               ; restore IP
         ;NEXT
@@ -4034,7 +4019,7 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
   THEN
   draw-panel
   0 docked !  0 prev-docked !
-  0 jov-moved !  0 base-attack !
+  0 jov-moved !  0 base-attack !  0 think-slot !
   jbeam-cooldown jbeam-cool !
   0 msl-dirty ! ;
 
@@ -4406,7 +4391,7 @@ VARIABLE jnb-result
   0 msl-active !  0 msl-dirty !
   0 docked !  0 prev-docked !  0 death-cause !
   0 sd-active !  0 base-attack !
-  0 jov-moved !  0 spawn-pending !  0 migrate-timer !  -1 prev-cond !  0 overlay !
+  0 jov-moved !  0 spawn-pending !  0 migrate-timer !  -1 prev-cond !  0 overlay !  0 think-slot !
   0 frame-tick !
   0 check-win !
   100 prev-energy !
@@ -4432,10 +4417,10 @@ VARIABLE jnb-result
       frame-tick @ 1 AND 0= IF
         \ ── Even frames: ship physics + AI thinking ──
         ship-gravity
-        check-collisions
         tick-jovians
       ELSE
-        \ ── Odd frames: gravity pull + background tasks ──
+        \ ── Odd frames: collisions + gravity pull + background tasks ──
+        check-collisions               \ ship vs star/bhole (1-frame delay OK)
         jov-gravity-pull               \ gated by grav-tick & 3 internally (#243)
         frame-tick @ 7 AND DUP 1 = IF
           jov-check-regen  check-dock  tick-dock  tick-base-attack

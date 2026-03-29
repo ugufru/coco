@@ -1241,9 +1241,13 @@
 <!-- jov-blocked? removed (inlined into apply-intent CODE #241) -->
 <circle cx="553.9" cy="839.3" r="6.0" fill="hsl(229, 71%, 46%)" fill-opacity="0.71" stroke="hsl(229, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="553.9" y="839.3" class="node-label" font-size="7.0">base-attack</text>
-<!-- tick-jovians-inner CODE (#166) -->
+<!-- tick-jovians-inner CODE (slot-based scheduling) -->
 <circle cx="554.2" cy="995.4" r="12" fill="hsl(30, 90%, 55%)" fill-opacity="0.75" stroke="hsl(30, 90%, 55%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="554.2" y="995.4" class="node-label" font-size="8.0">tick-jovians-inner</text>
+<!-- think-slot VARIABLE (slot-based scheduling) -->
+<circle cx="530" cy="1020" r="5" fill="hsl(210, 60%, 55%)" fill-opacity="0.75" stroke="hsl(210, 60%, 55%)" stroke-width="1" stroke-opacity="0.4"/>
+<text x="530" y="1020" class="node-label" font-size="7.0">think-slot</text>
+<line x1="530" y1="1020" x2="554.2" y2="995.4" stroke="hsl(210, 60%, 55%)" stroke-width="0.5" stroke-opacity="0.3"/>
 <!-- jov-contact CODE (#243) -->
 <circle cx="830" cy="970" r="12" fill="hsl(30, 90%, 55%)" fill-opacity="0.75" stroke="hsl(30, 90%, 55%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="830" y="970" class="node-label" font-size="9.0">jov-contact</text>
@@ -1890,5 +1894,5 @@
 <text x="1018" y="1262" class="node-label" font-size="8.0">try-move</text>
 
 <text x="1200.0" y="35" text-anchor="middle" fill="#ccc" font-size="24" font-weight="700">SPACE WARP — Architecture Map</text>
-<text x="1200.0" y="58" text-anchor="middle" fill="#666" font-size="13">469 words · 24,080 bytes · node size = byte count · color = connectivity (red=high, blue=low)</text>
+<text x="1200.0" y="58" text-anchor="middle" fill="#666" font-size="13">470 words · 24,066 bytes · node size = byte count · color = connectivity (red=high, blue=low)</text>
 </svg>

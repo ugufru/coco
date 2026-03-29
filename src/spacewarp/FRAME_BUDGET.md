@@ -77,7 +77,7 @@ Assembly CODE words bypass ITC overhead — their costs are exact:
 | `beam-restore-slice` | 280 | Beam segment erase |
 | `spr-erase-box` | 242 | Sprite erase |
 | `plot-dots` | 242 | Explosion dots |
-| `tick-jovians-inner` | 200 | Tick loop + inlined threshold (#166) |
+| `tick-jovians-inner` | 254 | Slot-based scheduling; 254=path sum, actual ~110-140/call |
 | `jov-flee` | 201 | Flee movement calc |
 | `rg-char` | 188 | Character draw (8-line loop) |
 | `collision-scan` | 177 | Star/bhole collision loop |
@@ -106,20 +106,22 @@ the dominant cost, not the primitive operations.
 
 ## Jitter Sources
 
-1. **Even vs odd frames**: Even frames do physics+AI, odd frames do gravity+BG.
+1. **Even vs odd frames**: Even frames do physics+AI, odd frames do collisions+gravity+BG.
+   check-collisions (1,833cy) moved to odd frames to balance load.
 
-2. **Jovian think frequency**: At level 9, think thresholds are 2-3 (vs 4-6 at
-   moderate levels).  All 3 Jovians can think on the same even frame, each adding
-   ~2,058cy (jov-think 689 + apply-intent 1,369).
+2. **Jovian think frequency**: Slot-based scheduling assigns each even frame to
+   exactly one Jovian (`think-slot` rotates 0→1→2→0...).  The genome-derived skip
+   factor (1-6) controls how many of its slots each Jovian actually uses.  At most
+   1 Jovian thinks per even frame — zero collisions by construction.
 
-3. **Rendering path**: Full redraw (jov-moved) costs ~5,948cy.  Ship-only render
-   costs ~2,447cy.
+3. **Rendering path**: Full redraw (jov-moved) costs ~8,458cy.  Ship-only render
+   costs ~4,957cy.  A think that moves a Jovian triggers full render (+3,501cy).
 
 ## Completed Optimizations
 
 | # | What | Before | After | Savings |
 |---|------|--------|-------|---------|
-| #166 | `tick-jovians-inner` CODE | ~4,140cy Forth | 200cy | 3,940cy |
+| #166 | `tick-jovians-inner` CODE (slot-based rewrite) | 200cy (old CODE) | ~110-140cy | 60-90cy/frame + eliminates 2-think frames |
 | #215 | `jov-blocked?` CODE (inlined into #241) | ~13,800cy Forth | inlined | -- |
 | #241 | `apply-intent` CODE (inlines jov-blocked?) | ~4,937cy Forth | 1,369cy | 3,568cy/think |
 | #242 | `ship-gravity` CODE (merges gravity-well + star-gravity) | 5,776cy | 476cy | 5,300cy/grav |
@@ -141,8 +143,10 @@ Also fixed: #251 `apply-intent` CMPB 10,S→9,S (Jovians were frozen since #241)
 |------|-------|
 | #188 Sound | Feature, not optimization |
 | #181 Emotion edge cases | Behavioral tuning |
-| 2-think frames (~16,750cy) | Over budget (112%), acceptable |
 | Background slots | Typical-path costs already reasonable (~3,000cy) |
+
+Note: 2-think frames are eliminated by slot-based scheduling.  Peak even frame
+is now 1-think (~15,550cy = 104%), uniform at level 10.
 
 ## Measurement
 
@@ -163,9 +167,10 @@ Current measured costs after all optimizations (#166, #215, #241-#253).
 |-----------|--------|------------|
 | Every-frame base | 3,645 | move-ship CODE(669) + process-key(785†) + save-ship-pos(374) + tick-systems(764†) + loop overhead(429†) + jov-contact CODE(294) |
 | Ship gravity (grav frames) | 476 | ship-gravity CODE(473-476) (#242) |
-| Check collisions | 1,833 | check-collisions(1,833): collision-scan CODE + Forth wrapper |
+| Check collisions (odd frames) | 1,833 | check-collisions(1,833): collision-scan CODE + Forth wrapper. Moved to odd frames to balance even-frame think load. |
 | Per-Jovian think | 1,446 | jov-think CODE(689-693) + apply-intent CODE(752-757 base) |
-| Tick-jovians-inner | 326 | tick-jovians-inner CODE(324-326) (#166) |
+| Tick-jovians-inner (fire) | ~140 | Slot-based: advance slot + alive/aware + skip counter + genome → fire + mask |
+| Tick-jovians-inner (skip) | ~110 | Slot-based: advance slot + alive/aware + skip counter → no fire |
 | Jov-gravity-pull (grav frame) | 494 | jov-gravity-pull CODE(489-494) (#243) |
 | Jov-gravity-pull (non-grav) | 30 | Early exit on grav-tick gate |
 | Background slot 1 | 1,360† | jov-check-regen(~500†) + check-dock(~300†) + tick-dock(~30† not docked) + tick-base-attack(~500†). fc.py upper bounds: 1,818 + 2,790 + 7,238 + 77,554. |
@@ -195,113 +200,117 @@ try (nx,ny), then (nx,cur_y), then (cur_x,ny).  Each tier calls @chk.
 `apply-intent` calls @chk 1-3 times.  fc.py --cycles base: 752-757cy.
 With loop iterations: ~1,449cy typical (1 @chk call + overhead).
 
-### 60-Frame Cycle Map (Moderate Difficulty)
+### Slot-Based Think Scheduling
 
-Scenario: 3 Jovians (thresholds 4/6/3, staggered 0/1/2), 5 stars, black hole,
-base, no active beam/missile.  Budget: **14,930 cy/frame**.
+The old threshold system incremented per-Jovian tick counters each even frame,
+firing when tick >= threshold.  With fast thresholds (2-3), multiple Jovians could
+fire on the same frame, causing 2-think spikes at 17,160cy (115%).
+
+The new slot-based system assigns each even frame to exactly one Jovian via a
+rotating `think-slot` counter (0→1→2→0...).  A genome-derived **skip factor**
+(1-6) controls how many of its turns each Jovian actually uses:
+
+```
+skip = (12 - (pilot_skill + speed_mod)) >> 1, clamped [1, 6]
+```
+
+| Sum (skill+speed) | Skip | Interval (even frames) | Thinks/sec | Reaction |
+|-------------------|------|----------------------|-----------|----------|
+| 10 (genius) | 1 | 3 | 10.0 | 100ms |
+| 8 | 2 | 6 | 5.0 | 200ms |
+| 6 | 3 | 9 | 3.33 | 300ms |
+| 4 | 4 | 12 | 2.5 | 400ms |
+| 2 | 5 | 15 | 2.0 | 500ms |
+| 0 (dullest) | 6 | 18 | 1.67 | 600ms |
+
+**Zero collisions by construction**: at most 1 Jovian is ever considered per frame.
+
+### 60-Frame Cycle Map (Level 10 — Slot-Based)
+
+Scenario: 3 Jovians (all skip=1), 5 stars, black hole, base, no active beam/missile.
+Budget: **14,930 cy/frame**.  think-slot starts at 0, stagger counters 0/1/2.
+
+With skip=1, every Jovian fires on every slot.  Slot rotation: J1, J2, J0, J1, J2, J0...
+Every even frame has exactly 1 think.  No 2-think frames ever.
 
 Gravity gated to every 4th even frame (frames 0, 8, 16, 24, 32, 40, 48, 56).
 Background tasks on odd frames: slot 1 at `N AND 7 = 1`, slot 5 at `N AND 7 = 5`.
-jov-contact (294cy) runs every frame.  tick-jovians-inner (326cy) runs on even frames.
-
-Jovian think schedule (tick increments each even frame, thinks when tick ≥ threshold):
-- J0 (threshold 4, start 0): thinks at even frames 6, 14, 22, 30, 38, 46, 54
-- J1 (threshold 6, start 1): thinks at even frames 8, 20, 32, 44, 56
-- J2 (threshold 3, start 2): thinks at even frames 0, 6, 12, 18, 24, 30, 36, 42, 48, 54
-
-Full render (Rnd-F) on even frames when a Jovian thinks (jov-moved=1).
-Ship-only render (Rnd-S) on even frames with no thinks and on most odd frames.
-Gravity odd frames get full render if jov-gravity-pull moves a Jovian.
+jov-contact (294cy) included in EF.  tick-jovians-inner (~165cy†) runs on even frames.
 
 Component abbreviations: EF=every-frame base(3,645), SGrv=ship-gravity(476),
-Coll=check-collisions(1,833), TJov=tick-jovians-inner(326), J=per-think(1,449),
-JCon=jov-contact(294, included in EF), JGrv=jov-gravity-pull(494/30),
-BG=background(slot1: 1,360†, slot5: 1,230†), Rnd-F=full render(8,458), Rnd-S=ship-only(4,957),
-Post=post-render(included in Rnd).
+Coll=check-collisions(1,833, odd frames only),
+TJov=tick-jovians-inner(~140 fire/~110 skip), J=per-think(1,449),
+JGrv=jov-gravity-pull(494/30), BG=background(slot1: 1,360†, slot5: 1,230†),
+Rnd-F=full render(8,458), Rnd-S=ship-only(4,957).
 
-| Fr | E/O | EF | SGrv | Coll | TJov | J0 | J1 | J2 | JGrv | BG | Rnd | **Total** | |
-|----|-----|----|------|------|------|----|----|----|----|----|----|-----------|---|
-| 0 | E/G | 3645 | 476 | 1833 | 326 |  |  | 1449 |  |  | 8458 | **16,187** | **OVER** |
-| 1 | O/G | 3645 |  |  |  |  |  |  | 494 | 1360 | 8458 | **13,957** | |
-| 2 | E | 3645 |  | 1833 | 326 |  |  |  |  |  | 4957 | **10,761** | |
-| 3 | O | 3645 |  |  |  |  |  |  | 30 |  | 4957 | **8,632** | |
-| 4 | E | 3645 |  | 1833 | 326 |  |  |  |  |  | 4957 | **10,761** | |
-| 5 | O | 3645 |  |  |  |  |  |  | 30 | 1230 | 4957 | **9,862** | |
-| 6 | E | 3645 |  | 1833 | 326 | 1449 |  | 1449 |  |  | 8458 | **17,160** | **OVER** |
-| 7 | O | 3645 |  |  |  |  |  |  | 30 |  | 4957 | **8,632** | |
-| 8 | E/G | 3645 | 476 | 1833 | 326 |  | 1449 |  |  |  | 8458 | **16,187** | **OVER** |
-| 9 | O/G | 3645 |  |  |  |  |  |  | 494 | 1360 | 8458 | **13,957** | |
-| 10 | E | 3645 |  | 1833 | 326 |  |  |  |  |  | 4957 | **10,761** | |
-| 11 | O | 3645 |  |  |  |  |  |  | 30 |  | 4957 | **8,632** | |
-| 12 | E | 3645 |  | 1833 | 326 |  |  | 1449 |  |  | 8458 | **15,711** | **OVER** |
-| 13 | O | 3645 |  |  |  |  |  |  | 30 | 1230 | 4957 | **9,862** | |
-| 14 | E | 3645 |  | 1833 | 326 | 1449 |  |  |  |  | 8458 | **15,711** | **OVER** |
-| 15 | O | 3645 |  |  |  |  |  |  | 30 |  | 4957 | **8,632** | |
-| 16 | E/G | 3645 | 476 | 1833 | 326 |  |  |  |  |  | 4957 | **11,237** | |
-| 17 | O/G | 3645 |  |  |  |  |  |  | 494 | 1360 | 8458 | **13,957** | |
-| 18 | E | 3645 |  | 1833 | 326 |  |  | 1449 |  |  | 8458 | **15,711** | **OVER** |
-| 19 | O | 3645 |  |  |  |  |  |  | 30 |  | 4957 | **8,632** | |
-| 20 | E | 3645 |  | 1833 | 326 |  | 1449 |  |  |  | 8458 | **15,711** | **OVER** |
-| 21 | O | 3645 |  |  |  |  |  |  | 30 | 1230 | 4957 | **9,862** | |
-| 22 | E | 3645 |  | 1833 | 326 | 1449 |  |  |  |  | 8458 | **15,711** | **OVER** |
-| 23 | O | 3645 |  |  |  |  |  |  | 30 |  | 4957 | **8,632** | |
-| 24 | E/G | 3645 | 476 | 1833 | 326 |  |  | 1449 |  |  | 8458 | **16,187** | **OVER** |
-| 25 | O/G | 3645 |  |  |  |  |  |  | 494 | 1360 | 8458 | **13,957** | |
-| 26 | E | 3645 |  | 1833 | 326 |  |  |  |  |  | 4957 | **10,761** | |
-| 27 | O | 3645 |  |  |  |  |  |  | 30 |  | 4957 | **8,632** | |
-| 28 | E | 3645 |  | 1833 | 326 |  |  |  |  |  | 4957 | **10,761** | |
-| 29 | O | 3645 |  |  |  |  |  |  | 30 | 1230 | 4957 | **9,862** | |
-| 30 | E | 3645 |  | 1833 | 326 | 1449 |  | 1449 |  |  | 8458 | **17,160** | **OVER** |
-| 31 | O | 3645 |  |  |  |  |  |  | 30 |  | 4957 | **8,632** | |
-| 32 | E/G | 3645 | 476 | 1833 | 326 |  | 1449 |  |  |  | 8458 | **16,187** | **OVER** |
-| 33 | O/G | 3645 |  |  |  |  |  |  | 494 | 1360 | 8458 | **13,957** | |
-| 34 | E | 3645 |  | 1833 | 326 |  |  |  |  |  | 4957 | **10,761** | |
-| 35 | O | 3645 |  |  |  |  |  |  | 30 |  | 4957 | **8,632** | |
-| 36 | E | 3645 |  | 1833 | 326 |  |  | 1449 |  |  | 8458 | **15,711** | **OVER** |
-| 37 | O | 3645 |  |  |  |  |  |  | 30 | 1230 | 4957 | **9,862** | |
-| 38 | E | 3645 |  | 1833 | 326 | 1449 |  |  |  |  | 8458 | **15,711** | **OVER** |
-| 39 | O | 3645 |  |  |  |  |  |  | 30 |  | 4957 | **8,632** | |
-| 40 | E/G | 3645 | 476 | 1833 | 326 |  |  |  |  |  | 4957 | **11,237** | |
-| 41 | O/G | 3645 |  |  |  |  |  |  | 494 | 1360 | 8458 | **13,957** | |
-| 42 | E | 3645 |  | 1833 | 326 |  |  | 1449 |  |  | 8458 | **15,711** | **OVER** |
-| 43 | O | 3645 |  |  |  |  |  |  | 30 |  | 4957 | **8,632** | |
-| 44 | E | 3645 |  | 1833 | 326 |  | 1449 |  |  |  | 8458 | **15,711** | **OVER** |
-| 45 | O | 3645 |  |  |  |  |  |  | 30 | 1230 | 4957 | **9,862** | |
-| 46 | E | 3645 |  | 1833 | 326 | 1449 |  |  |  |  | 8458 | **15,711** | **OVER** |
-| 47 | O | 3645 |  |  |  |  |  |  | 30 |  | 4957 | **8,632** | |
-| 48 | E/G | 3645 | 476 | 1833 | 326 |  |  | 1449 |  |  | 8458 | **16,187** | **OVER** |
-| 49 | O/G | 3645 |  |  |  |  |  |  | 494 | 1360 | 8458 | **13,957** | |
-| 50 | E | 3645 |  | 1833 | 326 |  |  |  |  |  | 4957 | **10,761** | |
-| 51 | O | 3645 |  |  |  |  |  |  | 30 |  | 4957 | **8,632** | |
-| 52 | E | 3645 |  | 1833 | 326 |  |  |  |  |  | 4957 | **10,761** | |
-| 53 | O | 3645 |  |  |  |  |  |  | 30 | 1230 | 4957 | **9,862** | |
-| 54 | E | 3645 |  | 1833 | 326 | 1449 |  | 1449 |  |  | 8458 | **17,160** | **OVER** |
-| 55 | O | 3645 |  |  |  |  |  |  | 30 |  | 4957 | **8,632** | |
-| 56 | E/G | 3645 | 476 | 1833 | 326 |  | 1449 |  |  |  | 8458 | **16,187** | **OVER** |
-| 57 | O/G | 3645 |  |  |  |  |  |  | 494 | 1360 | 8458 | **13,957** | |
-| 58 | E | 3645 |  | 1833 | 326 |  |  |  |  |  | 4957 | **10,761** | |
-| 59 | O | 3645 |  |  |  |  |  |  | 30 |  | 4957 | **8,632** | |
+| Fr | E/O | EF | SGrv | TJov | Think | Coll | JGrv | BG | Rnd | **Total** | |
+|----|-----|----|------|------|-------|------|------|----|-----|-----------|---|
+| 0 | E/G | 3645 | 476 | 140 | J1 1449 |  |  |  | 8458 | **14,168** | |
+| 1 | O/G | 3645 |  |  |  | 1833 | 494 | 1360 | 8458 | **15,790** | **OVER** |
+| 2 | E | 3645 |  | 140 | J2 1449 |  |  |  | 8458 | **13,692** | |
+| 3 | O | 3645 |  |  |  | 1833 | 30 |  | 4957 | **10,465** | |
+| 4 | E | 3645 |  | 140 | J0 1449 |  |  |  | 8458 | **13,692** | |
+| 5 | O | 3645 |  |  |  | 1833 | 30 | 1230 | 4957 | **11,695** | |
+| 6 | E | 3645 |  | 140 | J1 1449 |  |  |  | 8458 | **13,692** | |
+| 7 | O | 3645 |  |  |  | 1833 | 30 |  | 4957 | **10,465** | |
+| 8 | E/G | 3645 | 476 | 140 | J2 1449 |  |  |  | 8458 | **14,168** | |
+| 9 | O/G | 3645 |  |  |  | 1833 | 494 | 1360 | 8458 | **15,790** | **OVER** |
+| 10-15 | | (repeats: E=13,692 / O=10,465 or 11,695) | | | | | | | | |
+| 16 | E/G | 3645 | 476 | 140 | J0 1449 |  |  |  | 8458 | **14,168** | |
+| 17 | O/G | 3645 |  |  |  | 1833 | 494 | 1360 | 8458 | **15,790** | **OVER** |
+| 18-23 | | (repeats) | | | | | | | | |
+| 24 | E/G | 3645 | 476 | 140 | J1 1449 |  |  |  | 8458 | **14,168** | |
+| 25 | O/G | 3645 |  |  |  | 1833 | 494 | 1360 | 8458 | **15,790** | **OVER** |
+| 26-55 | | (repeats 8-frame pattern) | | | | | | | | |
+| 56 | E/G | 3645 | 476 | 140 | J2 1449 |  |  |  | 8458 | **14,168** | |
+| 57 | O/G | 3645 |  |  |  | 1833 | 494 | 1360 | 8458 | **15,790** | **OVER** |
+| 58 | E | 3645 |  | 140 | J0 1449 |  |  |  | 8458 | **13,692** | |
+| 59 | O | 3645 |  |  |  | 1833 | 30 |  | 4957 | **10,465** | |
+
+Key observation: **all even frames under budget**.  Moving check-collisions to
+odd frames shifts 1,833cy off the critical think path.  Only the 8 gravity+BG1
+odd frames (1, 9, 17, 25, 33, 41, 49, 57) exceed budget at 15,790cy (106%).
+
 Also see `frame_budget_chart.html` for the interactive visual chart.
 
-### Summary (after #166, #215, #241-#253)
+### Summary (slot-based scheduling, after #166, #215, #241-#253)
 
-| Metric | Current | Before optimization |
-|--------|---------|---------------------|
-| **Budget per frame** | 14,930 cy | 14,930 cy |
-| **Light frame (even, no thinks, no gravity)** | 10,761 cy (72%) | 10,126 cy (68%) |
-| **1 Jovian think (even)** | 15,711 cy (105%) | 20,840 cy (140%) |
-| **2 Jovians think (frame 6, 30, 54)** | 17,160 cy (115%) | 26,466 cy (177%) |
-| **Gravity even + 1 think** | 16,187 cy (108%) | 27,155 cy (182%) |
-| **Gravity even, no think** | 11,237 cy (75%) | 16,441 cy (110%) |
-| **Gravity odd + BG1** | 13,957 cy (93%) | 22,214 cy (149%) |
-| **Gravity odd, no BG** | 12,597 cy (84%) | 19,214 cy (129%) |
-| **Frames over budget** | **19 of 60 (32%)** | 29 of 60 (48%) |
-| **Frames under budget** | 41 of 60 (68%) | 31 of 60 (52%) |
-| **App size** | 24,080 bytes | 24,501 bytes |
-| **Headroom** | 496 bytes | 75 bytes |
+| Metric | Slot-based | Old threshold | Before optimization |
+|--------|-----------|---------------|---------------------|
+| **Budget per frame** | 14,930 cy | 14,930 cy | 14,930 cy |
+| **Even, 1 think, no gravity** | 13,692 cy (92%) | 15,711 cy (105%) | 20,840 cy (140%) |
+| **Even, 1 think + gravity** | 14,168 cy (95%) | 16,187 cy (108%) | 27,155 cy (182%) |
+| **2 Jovians think (eliminated)** | — | 17,160 cy (115%) | 26,466 cy (177%) |
+| **Even, no think (skip > 1)** | 8,712 cy (58%) | 10,761 cy (72%) | 10,126 cy (68%) |
+| **Gravity odd + BG1 + Coll** | 15,790 cy (106%) | 13,957 cy (93%) | 22,214 cy (149%) |
+| **Light odd + Coll** | 10,465 cy (70%) | 8,632 cy (58%) | — |
+| **Frames over budget (L10)** | **8 of 60 (13%)** | 19-30 of 60 | 29 of 60 (48%) |
+| **Peak frame cost** | **15,790 cy (106%)** | 17,160 cy (115%) | 27,155 cy (182%) |
+| **Jitter (peak - trough, even)** | 476 cy (gravity only) | 6,399 cy | 17,029 cy |
 
-Worst-case frames dropped from 177% to 115% of budget.  The game no longer drops
-2+ frames on a single think.  Over-budget frames fit in 2 VSYNC periods (~33ms).
+tick-jovians-inner measured at 254cy by `fc.py --cycles` (path sum / upper bound).
+Actual execution: ~140cy (fire path) / ~110cy (skip path), no loop.
+
+**Key improvement**: At level 10, jitter between even frames drops from 6,399cy
+(the swing between 10,761 and 17,160) to just 476cy (the gravity cost on every
+4th even frame).  All even frames have nearly identical cost.
+
+At moderate difficulty (mixed skip factors), some even frames skip their Jovian's
+turn, producing a mix of 15,550cy and 10,545cy frames — but never exceeding
+15,550cy.  The ceiling is hard-capped at 1 think per even frame.
+
+### Think Frequency by Difficulty Level
+
+| Level | Skill bias | Speed bias | Typical sum | Skip | Thinks/sec | Reaction |
+|-------|-----------|-----------|-------------|------|-----------|----------|
+| 1 | +0 | +0 | 3-5 | 4-5 | 2.0-2.5 | 400-500ms |
+| 3 | +1 | +0 | 4-6 | 3-4 | 2.5-3.3 | 300-400ms |
+| 5 | +2 | +1 | 5-8 | 2-4 | 2.5-5.0 | 200-400ms |
+| 7 | +3 | +2 | 7-9 | 1-3 | 3.3-10.0 | 100-300ms |
+| 10 | +4 | +3 | 9-10 | 1 | 10.0 | 100ms |
+
+6:1 range (1.67-10.0 thinks/sec) vs old 4:1 range (3.75-15.0 thinks/sec).
+Dumb Jovians are genuinely sluggish; smart ones are still snappy.
 
 ### Remaining Bottlenecks
 
@@ -309,10 +318,9 @@ Worst-case frames dropped from 177% to 115% of budget.  The game no longer drops
    (save 900 + restore 909 + oldpos 191 = 2,000cy) is the largest sub-component.
    Converting to CODE (#248, needs @bgcalc debug) would save ~1,200cy.
 
-2. **Gravity odd + BG (15,597cy)**: jov-gravity-pull(494) + BG tasks(3,000†) +
-   full render(8,458) + EF(3,645).  BG tasks are upper bounds; typical paths
-   are much cheaper but occasionally spike.
+2. **Gravity odd + BG + Coll (15,790cy, 106%)**: jov-gravity-pull(494) +
+   BG tasks(1,360†) + check-collisions(1,833) + full render(8,458) + EF(3,645).
+   The only frames over budget.  8 of 60 frames (13%).
 
-3. **1-think frames (15,711cy, 105%)**: Just over budget.  Deferring 2nd think
-   to next frame (1-think-per-frame cap) would eliminate 2-think frames entirely,
-   but lwasm branch range issues prevented implementation.  Revisit.
+3. **Even think frames now under budget**: 13,692cy (92%) without gravity,
+   14,168cy (95%) with.  Moving check-collisions to odd frames freed 1,833cy.

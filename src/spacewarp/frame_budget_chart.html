@@ -20,7 +20,7 @@
 <body>
 
 <h1>Space Warp — 60-Frame Cycle Map (1 Second @ 60fps)</h1>
-<h2>Moderate difficulty: 3 Jovians (thresholds 4/6/3), 5 stars, black hole, base</h2>
+<h2>Level 10: 3 Jovians (slot-based, skip=1), 5 stars, black hole, base</h2>
 
 <div class="chart-container">
   <canvas id="chart" width="1200" height="500"></canvas>
@@ -51,7 +51,7 @@ const COMPONENTS = [
   // Even-frame systems
   { name: 'Ship Gravity',    key: 'sgrv',  color: '#cc8844' },  // CODE: merged gravity-well+star-gravity (#242)
   { name: 'Collisions',      key: 'coll',  color: '#66aa44' },
-  { name: 'Tick Jovians',    key: 'tjov',  color: '#dd3333' },  // CODE: tick loop + threshold (#166)
+  { name: 'Tick Jovians',    key: 'tjov',  color: '#dd3333' },  // CODE: slot-based scheduling
   { name: 'J0 Think',        key: 'j0',    color: '#ff4444' },
   { name: 'J1 Think',        key: 'j1',    color: '#ff6666' },
   { name: 'J2 Think',        key: 'j2',    color: '#ff8888' },
@@ -70,13 +70,15 @@ const COMPONENTS = [
   { name: 'Post-Render',     key: 'post',  color: '#668899' },
 ];
 
-// Jovian think schedule
-// J0 (threshold 4, start 0): thinks at even frames 6, 14, 22, 30, 38, 46, 54
-// J1 (threshold 6, start 1): thinks at even frames 8, 20, 32, 44, 56
-// J2 (threshold 3, start 2): thinks at even frames 0, 6, 12, 18, 24, 30, 36, 42, 48, 54
-const J0_FRAMES = new Set([6, 14, 22, 30, 38, 46, 54]);
-const J1_FRAMES = new Set([8, 20, 32, 44, 56]);
-const J2_FRAMES = new Set([0, 6, 12, 18, 24, 30, 36, 42, 48, 54]);
+// Jovian think schedule (slot-based, skip=1 at level 10)
+// think-slot starts at 0, advances each even frame: 0->1->2->0
+// Slot 1=J1, 2=J2, 0(wrap)=J0.  Pattern: J1, J2, J0, J1, J2, J0...
+// J0: even frames 4, 10, 16, 22, 28, 34, 40, 46, 52, 58
+// J1: even frames 0, 6, 12, 18, 24, 30, 36, 42, 48, 54
+// J2: even frames 2, 8, 14, 20, 26, 32, 38, 44, 50, 56
+const J0_FRAMES = new Set([4, 10, 16, 22, 28, 34, 40, 46, 52, 58]);
+const J1_FRAMES = new Set([0, 6, 12, 18, 24, 30, 36, 42, 48, 54]);
+const J2_FRAMES = new Set([2, 8, 14, 20, 26, 32, 38, 44, 50, 56]);
 
 // Gravity frames (grav-tick MOD 4 = 0, even frames 0, 8, 16, 24, 32, 40, 48, 56)
 const GRAV_EVEN = new Set([0, 8, 16, 24, 32, 40, 48, 56]);
@@ -108,7 +110,7 @@ function buildFrame(f) {
   //   loop overhead: 429cy (frame-tick +! + overlay checks)
   //   jov-contact CODE: 300cy every frame (#243)
   //   ship-gravity CODE: 476cy on grav frames (#242, was 5,776cy)
-  //   tick-jovians-inner CODE: 200cy (#166, was ~4,140cy Forth)
+  //   tick-jovians-inner CODE: ~140cy fire / ~110cy skip (slot-based)
   //   check-win: one-shot per kill, not every frame (#250)
   return {
     ms:   993,                              // move-ship CODE(669 base + 108cy × 3 Jovians)
@@ -117,8 +119,8 @@ function buildFrame(f) {
     tks:  764,                              // tick-missile(212†) + tick-jbeam(340†) + tick-destruct(212†) idle
     lovr: 429,                              // frame-tick +!(103†) + 2× overlay check(326†)
     sgrv: (even && isGrav) ? 476 : 0,       // ship-gravity CODE — fc.py: 473-476cy
-    coll: even ? 1833 : 0,                  // check-collisions — fc.py: 1,833cy
-    tjov: even ? 326 : 0,                   // tick-jovians-inner CODE — fc.py: 324-326cy
+    coll: !even ? 1833 : 0,                  // check-collisions — moved to odd frames
+    tjov: even ? (anyThink ? 140 : 110) : 0,   // tick-jovians-inner CODE (slot-based: ~140 fire, ~110 skip)
     j0:   hasJ0 ? 1449 : 0,                 // jov-think(689-693) + apply-intent(752-757) — fc.py
     j1:   hasJ1 ? 1449 : 0,
     j2:   hasJ2 ? 1449 : 0,
