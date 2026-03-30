@@ -2829,6 +2829,7 @@ CODE prox-dmg  ( cx cy radius damage count -- killmask )
 
 VARIABLE jbeam-cool               \ frames until next fire allowed
 VARIABLE jbeam-hit-ship            \ 1 = bolt will hit player ship
+VARIABLE jbeam-pending             \ 0=none, >0=raw trace count awaiting resolve
 5 CONSTANT JBEAM-DMG              \ energy damage to player per hit
 20 CONSTANT JBEAM-SYS-DMG         \ system damage per hit (out of 100)
 
@@ -2837,88 +2838,217 @@ VARIABLE jbeam-hit-ship            \ 1 = bolt will hit player ship
 : jbeam-cooldown  ( -- n )
   150 glevel @ 14 * - DUP 24 < IF DROP 24 THEN ;
 
-: clamp-jbeam  ( -- )
-  jbeam-x1 @ 1 max 125 min jbeam-x1 !
-  jbeam-y1 @ 1 max 141 min jbeam-y1 !
-  jbeam-x2 @ 1 max 126 min jbeam-x2 !
-  jbeam-y2 @ 1 max 142 min jbeam-y2 ! ;
+CODE clamp-jbeam   \ ( -- )  Clamp jbeam x1/y1/x2/y2 to screen bounds
+        PSHS    X
+        ; x1: [1, 125]
+        LDD     FVAR_jbeam_x1
+        CMPD    #1
+        BGE     @x1h
+        LDD     #1
+@x1h    CMPD    #125
+        BLE     @x1ok
+        LDD     #125
+@x1ok   STD     FVAR_jbeam_x1
+        ; y1: [1, 141]
+        LDD     FVAR_jbeam_y1
+        CMPD    #1
+        BGE     @y1h
+        LDD     #1
+@y1h    CMPD    #141
+        BLE     @y1ok
+        LDD     #141
+@y1ok   STD     FVAR_jbeam_y1
+        ; x2: [1, 126]
+        LDD     FVAR_jbeam_x2
+        CMPD    #1
+        BGE     @x2h
+        LDD     #1
+@x2h    CMPD    #126
+        BLE     @x2ok
+        LDD     #126
+@x2ok   STD     FVAR_jbeam_x2
+        ; y2: [1, 142]
+        LDD     FVAR_jbeam_y2
+        CMPD    #1
+        BGE     @y2h
+        LDD     #1
+@y2h    CMPD    #142
+        BLE     @y2ok
+        LDD     #142
+@y2ok   STD     FVAR_jbeam_y2
+        PULS    X
+        ;NEXT
+;CODE
 
 \ Check if player ship bbox overlaps any pixel in the Jovian beam path
-\ Ship sprite is 7x5 centered at SHIP-POS: x±3, y±2
-VARIABLE jbhit-flag
+\ Ship sprite is 7x5 centered at SHIP-POS: x+-3, y+-2
+CODE jbeam-ship-hit?   \ ( -- flag )
+        PSHS    X
+        LDD     FVAR_jbeam_total
+        BEQ     @nohit          ; no pixels -> 0
+        TFR     D,Y             ; Y = count
+        LDX     #$8474          ; JBEAM-PATH
+        LDA     $8054           ; SHIP-POS x
+        LDB     $8055           ; SHIP-POS y
+        PSHS    D               ; S+0=ship_x, S+1=ship_y
+@lp     LDA     ,X              ; pixel_x
+        SUBA    ,S              ; pixel_x - ship_x
+        BCC     @xp
+        NEGA                    ; abs
+@xp     CMPA    #4
+        BHS     @nx             ; |dx| >= 4, skip
+        LDA     1,X             ; pixel_y
+        SUBA    1,S             ; pixel_y - ship_y
+        BCC     @yp
+        NEGA
+@yp     CMPA    #3
+        BHS     @nx             ; |dy| >= 3, skip
+        ; Hit!
+        LEAS    2,S             ; pop ship pos
+        LDD     #1
+        BRA     @push
+@nx     LEAX    3,X             ; next pixel (3 bytes/entry)
+        LEAY    -1,Y
+        BNE     @lp
+        LEAS    2,S             ; pop ship pos
+@nohit  CLRA
+        CLRB
+@push   LEAU    -2,U
+        STD     ,U
+        PULS    X
+        ;NEXT
+;CODE
 
-: jbeam-ship-hit?  ( -- flag )
-  0 jbhit-flag !
-  jbeam-total @ ?DUP 0= IF 0 EXIT THEN
-  0 DO
-    jbhit-flag @ 0= IF
-      JBEAM-PATH I 3 * + C@
-      SHIP-POS C@ - abs 4 < IF
-        JBEAM-PATH I 3 * + 1 + C@
-        SHIP-POS 1 + C@ - abs 3 < IF
-          1 jbhit-flag !
-        THEN
-      THEN
-    THEN
-  LOOP jbhit-flag @ ;
-
-\ Pick a random living Jovian: attack, or idle + in range
+\ Pick a random living Jovian: attack state, or idle + in detect range.
+\ Returns index (0-2) or -1 if none found.  Picks first match from a
+\ random starting index, wrapping around.  Inlines jov-detect? logic:
+\   detect_range = (pilot_skill + emotion) * 4
+\   dist = mdist(JOV-POS[i], SHIP-POS)
+\   detect if range > dist
 VARIABLE pj-result
-: pick-jovian  ( -- i|-1 )
-  -1 pj-result !
-  qjovians @ ?DUP 0= IF -1 EXIT THEN
-  rnd                             \ random starting index
-  qjovians @ 0 DO
-    DUP JOV-DMG + C@ IF           \ alive?
-      DUP JOV-STATE + C@ DUP 1 = IF  \ attack state?
-        DROP
-        pj-result @ 0 < IF DUP pj-result ! THEN
-      ELSE 0= IF                     \ idle state?
-        DUP jov-detect? IF           \ player in detection range?
-          pj-result @ 0 < IF DUP pj-result ! THEN
-        THEN
-      THEN THEN
-    THEN
-    1 + DUP qjovians @ < 0= IF DROP 0 THEN  \ wrap
-  LOOP DROP
-  pj-result @ ;
+CODE pick-jovian   \ ( -- i|-1 )
+        PSHS    X
+        LDA     $80B1           ; njovians
+        BEQ     @none
+        ; Random start: (seed low byte) mod njovians
+        LDB     FVAR_seed+1     ; low byte of seed
+        ANDB    #$03            ; 0-3
+        PSHS    A
+        CMPB    ,S+             ; B >= njovians?
+        BLO     @rok
+        CLRB
+@rok    ; A = njovians (loop count), B = start index
+        PSHS    A               ; S+0 = remaining count
+@lp     PSHS    B               ; S+0=i, S+1=count
+        ; -- Alive? JOV-DMG[i] > 0 --
+        LDX     #$8056
+        ABX
+        TST     ,X
+        BEQ     @nx
+        ; -- State: JOV-STATE[i] --
+        LDB     ,S              ; i
+        LDX     #$80BE
+        ABX
+        LDA     ,X              ; A = state
+        CMPA    #1              ; attack?
+        BEQ     @found
+        TSTA                    ; idle (0)?
+        BNE     @nx
+        ; -- Inline jov-detect? --
+        ; range = (pilot_skill + emotion) * 4
+        LDB     ,S              ; i
+        LDA     #4
+        MUL                     ; B = i*4
+        LDX     #$80CE          ; JOV-GENOME
+        ABX
+        LDA     ,X              ; byte 0
+        ANDA    #7              ; pilot_skill (0-7)
+        LDB     3,X             ; byte 3
+        LSRB
+        LSRB
+        LSRB
+        LSRB                    ; emotion (0-15)
+        PSHS    A
+        ADDB    ,S+             ; B = skill + emotion
+        ASLB
+        ASLB                    ; B = detect range
+        ; mdist(JOV-POS[i], SHIP-POS)
+        PSHS    B               ; S+0=range, S+1=i, S+2=count
+        LDB     1,S             ; i
+        ASLB
+        LDX     #$804A          ; JOV-POS
+        ABX
+        LDA     ,X              ; jov_x
+        SUBA    $8054           ; - ship_x
+        BCC     @d1
+        NEGA
+@d1     LDB     1,X             ; jov_y
+        SUBB    $8055           ; - ship_y
+        BCC     @d2
+        NEGB
+@d2     PSHS    A
+        ADDB    ,S+             ; B = mdist
+        LDA     ,S+             ; A = range (pop); S+0=i, S+1=count
+        PSHS    B
+        CMPA    ,S+             ; range - dist
+        BLS     @nx             ; range <= dist: not detected
+        ; -- Found (attack or detected idle) --
+@found  LDB     ,S              ; i
+        STB     FVAR_pj_result+1  ; save for cooldown scaling
+        LEAS    2,S             ; pop i + count
+        CLRA                    ; D = 0:i
+        BRA     @push
+@nx     PULS    B               ; pop i; S+0=count
+        INCB
+        CMPB    $80B1           ; >= njovians?
+        BLO     @nw
+        CLRB
+@nw     DEC     ,S              ; count--
+        BNE     @lp
+        LEAS    1,S             ; pop count
+@none   LDD     #$FFFF          ; -1
+@push   LEAU    -2,U
+        STD     ,U
+        PULS    X
+        ;NEXT
+;CODE
 
-\ Fire a red beam from Jovian i toward the player
-: fire-jbeam  ( i target -- )
-  \ Cancel any active Jovian beam first
+\ ── fire-jbeam split: trace (phase 1) + resolve (phase 2) ──────────────
+\ Phase 1: cancel old beam, compute direction, trace path into buffer.
+\   Stores raw trace count in jbeam-pending (>0 = awaiting resolve).
+\   jbeam-total stays 0 so no bolt animation starts yet.
+\   Sets cooldown immediately so the timer starts ticking.
+: fire-jbeam-trace  ( i target -- )
   cancel-jbeam
   SWAP
-  \ Get Jovian position
   2 * JOV-POS + DUP C@ jbeam-x1 !
   1 + C@ jbeam-y1 !
-  \ Direction from Jovian to target (dx, dy scaled ×4)
   DUP C@ jbeam-x1 @ - 4 *
   SWAP 1 + C@ jbeam-y1 @ - 4 *
-  \ Endpoint: Jovian pos + direction
   OVER jbeam-x1 @ + jbeam-x2 !
   DUP  jbeam-y1 @ + jbeam-y2 !
-  \ Offset origin 5px along direction (use sign of dx/dy)
   SWAP DUP 0= IF DROP ELSE 0 < IF -5 ELSE 5 THEN jbeam-x1 @ + jbeam-x1 ! THEN
   DUP 0= IF DROP ELSE 0 < IF -5 ELSE 5 THEN jbeam-y1 @ + jbeam-y1 ! THEN
   clamp-jbeam
-  \ Trace path into buffer
   jbeam-x1 @ jbeam-y1 @ jbeam-x2 @ jbeam-y2 @ JBEAM-PATH beam-trace
-  jbeam-total !
-  \ Truncate at first non-black pixel (star, sprite, border)
-  JBEAM-PATH jbeam-total @ beam-find-obstacle jbeam-total !
-  \ Check if beam passes through player ship
-  jbeam-ship-hit? jbeam-hit-ship !
-  \ Start bolt animation
-  0 jbeam-head !  0 jbeam-tail !
-  \ Reset cooldown, scaled by emotion of firing Jovian
-  \ Rage (15) = 60% cooldown, neutral (8) = 100%, fear (0) = 140%
-  \ Formula: cooldown * (140 - emotion*~5) / 100
+  jbeam-pending !
   jbeam-cooldown
   pj-result @ DUP 0 < 0= IF
-    jov-emo@ 5 * 140 SWAP -    \ scale factor: 140 at fear, 65 at rage
-    * 100 /MOD SWAP DROP            \ apply percentage
+    jov-emo@ 5 * 140 SWAP -
+    * 100 /MOD SWAP DROP
   ELSE DROP THEN
   jbeam-cool ! ;
+
+\ Phase 2: truncate at obstacles, check ship hit, start bolt animation.
+: fire-jbeam-resolve  ( -- )
+  JBEAM-PATH jbeam-pending @ beam-find-obstacle jbeam-total !
+  jbeam-ship-hit? jbeam-hit-ship !
+  0 jbeam-head !  0 jbeam-tail !
+  0 jbeam-pending ! ;
+
+\ Synchronous fire (both phases at once) — used by tick-base-attack
+: fire-jbeam  ( i target -- )
+  fire-jbeam-trace fire-jbeam-resolve ;
 
 \ Jovian beam tick: erase tail
 : tick-jbeam-erase  ( -- )
@@ -2985,15 +3115,18 @@ VARIABLE pj-result
   pj-result @ DUP 0 < 0= IF 1 SWAP jov-emotion-stim ELSE DROP THEN
   0 jbeam-hit-ship ! ;
 
-\ Tick: cooldown toward next shot, maybe fire
+\ Tick: resolve pending beam, or cooldown toward next shot.
+\ Phase 1 (trace) and phase 2 (resolve) run on consecutive frames.
 : tick-jbeam  ( -- )
-  jbeam-cool @ ?DUP IF
-    1 - jbeam-cool !
+  jbeam-pending @ IF
+    fire-jbeam-resolve
   ELSE
-    \ Cooldown expired — fire if any Jovians alive, not docked,
-    \ and no base attack in progress (Jovians busy with base)
-    docked @ 0= base-attack @ 0= AND IF
-      pick-jovian DUP 0 < IF DROP ELSE SHIP-POS fire-jbeam THEN
+    jbeam-cool @ ?DUP IF
+      1 - jbeam-cool !
+    ELSE
+      docked @ 0= base-attack @ 0= AND IF
+        pick-jovian DUP 0 < IF DROP ELSE SHIP-POS fire-jbeam-trace THEN
+      THEN
     THEN
   THEN ;
 
@@ -3701,20 +3834,73 @@ VARIABLE bchk-hitpx                \ pixel index where hit was found
     THEN
   THEN ;
 
-: beam-check-path-hits  ( buf count -- hit-idx | -1 )
-  -1 beam-hit-idx !
-  -1 bchk-hitpx !
-  ?DUP 0= IF DROP -1 EXIT THEN
-  SWAP bchk-buf !                  \ save buf base
-  0 DO
-    beam-hit-idx @ 0 < IF         \ only check until first hit
-      I bchk-px !
-      qjovians @ ?DUP IF 0 DO
-        I beam-check-one-jov
-      LOOP THEN
-    THEN
-  LOOP
-  beam-hit-idx @ ;
+\ Walk path buffer, check each pixel against Jovian bounding boxes.
+\ Returns Jovian index of first hit, or -1.  Stores hit pixel index
+\ to bchk-hitpx for beam truncation.
+CODE beam-check-path-hits   \ ( buf count -- hit-idx|-1 )
+        PSHS    X
+        LDD     ,U              ; count
+        LDX     2,U             ; buf
+        LEAU    4,U             ; pop 2 args
+        CMPD    #0
+        BEQ     @nohit
+        LDA     $80B1           ; njovians
+        BEQ     @nohit
+        ; Stack: njovians, pixel_count(16)
+        PSHS    D               ; S+0..1 = pixel count
+        LDA     $80B1
+        PSHS    A               ; S+0=njovians, S+1..2=count
+        CLR     FVAR_bchk_hitpx
+        CLR     FVAR_bchk_hitpx+1   ; pixel_idx = 0
+@plp    ; -- outer: iterate pixels --
+        CLRA                    ; A = j (Jovian index)
+@jlp    PSHS    A               ; save j; S+0=j, S+1=njov, S+2..3=count
+        ; alive? JOV-DMG[j]
+        LDY     #$8056
+        LEAY    A,Y
+        TST     ,Y
+        BEQ     @jnx
+        ; bbox check: |pixel_x - jov_x| < 4 AND |pixel_y - jov_y| < 3
+        LDA     ,S              ; j
+        ASLA                    ; j*2
+        LDY     #$804A          ; JOV-POS
+        LEAY    A,Y
+        LDA     ,X              ; pixel_x
+        SUBA    ,Y              ; - jov_x
+        BCC     @cx
+        NEGA
+@cx     CMPA    #4
+        BHS     @jnx
+        LDA     1,X             ; pixel_y
+        SUBA    1,Y             ; - jov_y
+        BCC     @cy
+        NEGA
+@cy     CMPA    #3
+        BHS     @jnx
+        ; HIT! j = ,S
+        LDB     ,S              ; j = hit Jovian
+        LEAS    4,S             ; pop j + njov + count
+        CLRA                    ; D = 0:j (positive = hit)
+        BRA     @push
+@jnx    PULS    A               ; restore j
+        INCA
+        CMPA    ,S              ; >= njovians?
+        BLO     @jlp
+        ; No hit at this pixel, advance
+        LEAX    3,X             ; next pixel entry
+        INC     FVAR_bchk_hitpx+1   ; pixel_idx++
+        ; Decrement count
+        LDD     1,S             ; pixel_count (16-bit)
+        SUBD    #1
+        STD     1,S
+        BNE     @plp
+        LEAS    3,S             ; pop njov + count
+@nohit  LDD     #$FFFF          ; -1 (no hit)
+@push   LEAU    -2,U
+        STD     ,U
+        PULS    X
+        ;NEXT
+;CODE
 
 \ ── Clamp beam coordinates to tactical view ──────────────────────────
 
@@ -3723,21 +3909,68 @@ VARIABLE bchk-hitpx                \ pixel index where hit was found
 VARIABLE bfo-hit
 VARIABLE bfo-found
 
-: beam-find-obstacle  ( buf count -- index )
-  DUP bfo-hit !  0 bfo-found !
-  0 DO
-    bfo-found @ 0= IF
-      DUP I 3 * + 2 + C@ IF
-        I bfo-hit !  1 bfo-found !
-      THEN
-    THEN
-  LOOP DROP  bfo-hit @ ;
+\ Scan path buffer for first non-black saved pixel (obstacle).
+\ Returns index of first obstacle, or count if path is clear.
+CODE beam-find-obstacle   \ ( buf count -- index )
+        PSHS    X
+        LDD     ,U              ; count
+        LDX     2,U             ; buf
+        LEAU    4,U             ; pop 2 args
+        CMPD    #0
+        BEQ     @push           ; count=0 -> return 0
+        TFR     D,Y             ; Y = remaining
+        CLRA
+        CLRB                    ; D = 0 (pixel index)
+@lp     TST     2,X             ; saved_color byte (3rd byte of entry)
+        BNE     @push           ; non-zero = obstacle found, D = index
+        LEAX    3,X             ; next entry
+        ADDD    #1              ; index++
+        LEAY    -1,Y
+        BNE     @lp
+        ; No obstacle: D = count (iterated all)
+@push   LEAU    -2,U
+        STD     ,U
+        PULS    X
+        ;NEXT
+;CODE
 
-: clamp-beam  ( -- )
-  beam-x1 @ 1 max 125 min beam-x1 !
-  beam-y1 @ 1 max 141 min beam-y1 !
-  beam-x2 @ 1 max 126 min beam-x2 !
-  beam-y2 @ 1 max 142 min beam-y2 ! ;
+CODE clamp-beam   \ ( -- )  Clamp beam x1/y1/x2/y2 to screen bounds
+        PSHS    X
+        LDD     FVAR_beam_x1
+        CMPD    #1
+        BGE     @x1h
+        LDD     #1
+@x1h    CMPD    #125
+        BLE     @x1ok
+        LDD     #125
+@x1ok   STD     FVAR_beam_x1
+        LDD     FVAR_beam_y1
+        CMPD    #1
+        BGE     @y1h
+        LDD     #1
+@y1h    CMPD    #141
+        BLE     @y1ok
+        LDD     #141
+@y1ok   STD     FVAR_beam_y1
+        LDD     FVAR_beam_x2
+        CMPD    #1
+        BGE     @x2h
+        LDD     #1
+@x2h    CMPD    #126
+        BLE     @x2ok
+        LDD     #126
+@x2ok   STD     FVAR_beam_x2
+        LDD     FVAR_beam_y2
+        CMPD    #1
+        BGE     @y2h
+        LDD     #1
+@y2h    CMPD    #142
+        BLE     @y2ok
+        LDD     #142
+@y2ok   STD     FVAR_beam_y2
+        PULS    X
+        ;NEXT
+;CODE
 
 \ ── Cancel a beam (erase any visible pixels) ──────────────────────────
 
@@ -4387,7 +4620,7 @@ VARIABLE jnb-result
   draw-panel
   0 cmd-state !  0 prev-key !  0 key-latch !
   0 beam-total !  -1 beam-hit-idx !
-  0 jbeam-total !  0 jbeam-hit-ship !  jbeam-cooldown jbeam-cool !
+  0 jbeam-total !  0 jbeam-hit-ship !  0 jbeam-pending !  jbeam-cooldown jbeam-cool !
   0 msl-active !  0 msl-dirty !
   0 docked !  0 prev-docked !  0 death-cause !
   0 sd-active !  0 base-attack !
@@ -4422,7 +4655,7 @@ VARIABLE jnb-result
         \ ── Odd frames: collisions + gravity pull + background tasks ──
         check-collisions               \ ship vs star/bhole (1-frame delay OK)
         jov-gravity-pull               \ gated by grav-tick & 3 internally (#243)
-        frame-tick @ 7 AND DUP 1 = IF
+        frame-tick @ 7 AND DUP 3 = IF
           jov-check-regen  check-dock  tick-dock  tick-base-attack
         THEN 5 = IF
           tick-stardate  tick-migrate  check-spawn  update-cond
