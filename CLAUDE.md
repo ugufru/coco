@@ -61,43 +61,13 @@ The constraints aren't obstacles — they're the whole point. A 64K ceiling and 
 - **On-device workflow** — assembling on the CoCo itself (rather than cross-compiling) is a first-class design goal
 - **Non-destructive delivery** — cartridge can be removed to restore a stock CoCo at any time
 
-## CoCo Keyboard Matrix
+## Technical Reference
 
-The `forth/lib/keyboard.fs` file has the matrix layout WRONG. The source of truth is `forth/kernel/kernel.asm` KEY_TABLE (~line 763).
-
-Each key has its own column — keys are NOT grouped by column as keyboard.fs claims.
-
-| Key | Column strobe | Row bit |
-|-----|---------------|---------|
-| UP  | `$F7` | `$08` |
-| DN  | `$EF` | `$08` |
-| LT  | `$DF` | `$08` |
-| RT  | `$BF` | `$08` |
-
-Arrow keys: all row `$08`, each in a separate column. Number keys 0–9: columns `$FE`–`$DF`, all row `$10`.
-
-## Confusable Addresses
-
-These addresses are 6 bytes apart and have been mixed up in CODE words, causing real bugs:
-
-| Address | Constant | Contents |
-|---------|----------|----------|
-| `$8050` | `BASE-POS` | Base x, y (2 bytes) |
-| `$8054` | `SHIP-POS` | Ship x, y (2 bytes) |
-| `$8056` | `JOV-DMG`  | Jovian health, 3 bytes (one per Jovian) |
-
-## fc.py Gotchas
-
-- **EXIT inside IF/THEN may miscompile** — avoid using EXIT inside IF blocks in fc.py Forth
-- **ASCII-only in CODE blocks** — Unicode characters (arrows, em dashes) in CODE block comments break lwasm
-- **Blank lines in CODE blocks** — `preprocess_asm` strips blank lines from CODE blocks due to an lwasm local label quirk
-- **fc.py lacks BEGIN/WHILE/REPEAT** — only BEGIN/AGAIN and BEGIN/UNTIL are supported
-
-## 6809 Additional Gotchas
-
-- **D register byte order**: For 8-bit values used with ADDD, the value goes in B (low byte), not A (high byte). `CLRA` + `LDB value` → `ADDD`.
-- **Pre-decrement by 1 is illegal for stores**: `STA ,-S` and `CLR ,-S` are undefined on the 6809. Use `PSHS A` instead.
-- **No CMPA B instruction**: Cannot directly compare two 8-bit registers. Push one to the stack first: `PSHS B` + `CMPA ,S+`.
+- **Keyboard matrix**: `forth/lib/keyboard.fs` (corrected layout + full matrix table)
+- **6809 / lwasm gotchas**: `forth/kernel/README.md` (section: "6809 / lwasm Gotchas for CODE Words")
+- **fc.py limitations**: `forth/tools/fc.py` docstring (known limitations section)
+- **Memory map**: `forth/kernel/README.md` (section: "Memory map")
+- **Game data addresses**: `src/spacewarp/spacewarp.fs` CONSTANT declarations near top of file
 
 ## Issue Workflow
 

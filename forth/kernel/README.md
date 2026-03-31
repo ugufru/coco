@@ -329,6 +329,17 @@ xroar -machine coco2bus -ram 64 \
 The `-ram 64` flag is required — the kernel uses all-RAM mode to run from
 `$8000`.
 
+## 6809 / lwasm Gotchas for CODE Words
+
+These have caused real bugs in this project:
+
+- **Pre-decrement by 1 is illegal for stores**: `STA ,-S` and `CLR ,-S` are undefined on the 6809. Use `PSHS A` instead.
+- **D register byte order**: For 8-bit values used with 16-bit ops (ADDD, STD), the value goes in B (low byte). Always `CLRA` + `LDB value` before `ADDD`.
+- **No direct register-to-register compare**: `CMPA B` is not a valid instruction. Push one register first: `PSHS B` + `CMPA ,S+`.
+- **Don't load D before a conditional branch**: `LDD #0` clobbers the N/Z/V flags set by the preceding CMPD/SUBD. Branch on flags first, then load the result.
+- **Pre-decrement size**: `,-U` (postbyte $C2) is a 1-byte pre-decrement — wrong for 16-bit stack push. Use `,--U` (postbyte $C3) for 2-byte pre-decrement: `STD ,--U`.
+- **Readable stack pop**: Use `LDD ,U` + `LEAU 2,U` instead of `LDD ,U++` for explicit, readable data stack pops.
+
 ## Testing with XRoar
 
 Requires [XRoar](https://www.6809.org.uk/xroar/) (`brew install xroar`) and

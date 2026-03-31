@@ -19,6 +19,14 @@ Supported Forth syntax:
     WORD            reference to a defined word or kernel primitive
     \               line comment
     ( ... )         block comment
+
+Known limitations:
+    - EXIT inside IF/THEN may miscompile — avoid using EXIT inside IF blocks
+    - BEGIN/WHILE/REPEAT is not supported — only BEGIN/AGAIN and BEGIN/UNTIL
+    - CODE block comments must be ASCII only — Unicode (arrows, em dashes)
+      will cause lwasm assembly errors
+    - Blank lines inside CODE blocks are stripped by preprocess_asm to work
+      around an lwasm local label scoping quirk
 """
 
 import argparse
