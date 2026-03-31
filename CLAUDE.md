@@ -61,13 +61,19 @@ The constraints aren't obstacles — they're the whole point. A 64K ceiling and 
 - **On-device workflow** — assembling on the CoCo itself (rather than cross-compiling) is a first-class design goal
 - **Non-destructive delivery** — cartridge can be removed to restore a stock CoCo at any time
 
-## Technical Reference
+## Documentation Structure
 
-- **Keyboard matrix**: `forth/lib/keyboard.fs` (corrected layout + full matrix table)
-- **6809 / lwasm gotchas**: `forth/kernel/README.md` (section: "6809 / lwasm Gotchas for CODE Words")
-- **fc.py limitations**: `forth/tools/fc.py` docstring (known limitations section)
-- **Memory map**: `forth/kernel/README.md` (section: "Memory map")
-- **Game data addresses**: `src/spacewarp/spacewarp.fs` CONSTANT declarations near top of file
+Official documentation is HTML (`docs/`), not markdown. Markdown files are working notes for orientation.
+
+- **`docs/tutorial.html`** — Getting Started tutorial (13 chapters), table of contents, entry point
+- **`docs/reference.html`** — Language reference: kernel primitives, compiler directives, library words, memory map
+- **`docs/00-about-forth.html` through `13-onto-your-coco.html`** — Tutorial chapters
+
+Markdown working notes:
+- **`forth/kernel/README.md`** — Kernel architecture, primitives, memory map, 6809 gotchas
+- **`forth/tools/README.md`** — fc.py compiler pipeline and CODE word syntax
+- **`src/spacewarp/SPEC.md`** — Game architecture and data structures
+- **`src/spacewarp/FRAME_BUDGET.md`** — Cycle accounting and optimization history
 
 ## Issue Workflow
 

@@ -13,7 +13,7 @@ For openers use `height:100%; object-fit:cover` instead of `height:auto`.
 
 ---
 
-## Cover (index.html)
+## Cover (tutorial.html)
 
 | File | Type | Done |
 |------|------|------|

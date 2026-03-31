@@ -637,41 +637,46 @@
           </tr>
         </table>
 
-        <p>Column constants select a group of 8 keys:</p>
+        <p>Each key has its own column. Keys that appear to be in a &ldquo;group&rdquo;
+        (arrows, digits) actually share a <em>row</em> bit, not a column.
+        Source of truth: <code>kernel.asm</code> KEY_TABLE.</p>
+
+        <p>Column constants &mdash; each selects one column of the keyboard matrix:</p>
         <table class="ref-table">
           <tr>
             <th style="width:110px">Constant</th>
             <th style="width:80px">Value</th>
-            <th>Keys</th>
+            <th>Keys (rows 0&ndash;6)</th>
           </tr>
-          <tr><td class="word-name">KB-C0</td><td><code>$FE</code></td><td>@ A B C D E F G</td></tr>
-          <tr><td class="word-name">KB-C1</td><td><code>$FD</code></td><td>H I J K L M N O</td></tr>
-          <tr><td class="word-name">KB-C2</td><td><code>$FB</code></td><td>P Q R S T U V W</td></tr>
-          <tr><td class="word-name">KB-C3</td><td><code>$F7</code></td><td>X Y Z UP DN LT RT SPC</td></tr>
-          <tr><td class="word-name">KB-C4</td><td><code>$EF</code></td><td>0 1 2 3 4 5 6 7</td></tr>
-          <tr><td class="word-name">KB-C5</td><td><code>$DF</code></td><td>8 9 : ; , - . /</td></tr>
-          <tr><td class="word-name">KB-C6</td><td><code>$BF</code></td><td>ENTER CLEAR BREAK ALT CTRL SHIFT F1 F2</td></tr>
+          <tr><td class="word-name">KB-C0</td><td><code>$FE</code></td><td>@  H  P  X  0  8  ENT</td></tr>
+          <tr><td class="word-name">KB-C1</td><td><code>$FD</code></td><td>A  I  Q  Y  1  9  CLR</td></tr>
+          <tr><td class="word-name">KB-C2</td><td><code>$FB</code></td><td>B  J  R  Z  2  :  BRK</td></tr>
+          <tr><td class="word-name">KB-C3</td><td><code>$F7</code></td><td>C  K  S  UP 3  ;  ALT</td></tr>
+          <tr><td class="word-name">KB-C4</td><td><code>$EF</code></td><td>D  L  T  DN 4  ,  CTL</td></tr>
+          <tr><td class="word-name">KB-C5</td><td><code>$DF</code></td><td>E  M  U  LT 5  -  SHF</td></tr>
+          <tr><td class="word-name">KB-C6</td><td><code>$BF</code></td><td>F  N  V  RT 6  .  F1</td></tr>
+          <tr><td class="word-name">KB-C7</td><td><code>$7F</code></td><td>G  O  W  SP 7  /  F2</td></tr>
         </table>
 
-        <p>Row constants select one key within a column:</p>
+        <p>Row constants &mdash; select one row across all columns:</p>
         <table class="ref-table">
           <tr>
             <th style="width:110px">Constant</th>
             <th style="width:80px">Value</th>
-            <th>Row position</th>
+            <th>Keys across columns 0&ndash;7</th>
           </tr>
-          <tr><td class="word-name">KB-R0</td><td><code>$01</code></td><td>Row 0: @ H P X 0 8 ENTER</td></tr>
-          <tr><td class="word-name">KB-R1</td><td><code>$02</code></td><td>Row 1: A I Q Y 1 9 CLEAR</td></tr>
-          <tr><td class="word-name">KB-R2</td><td><code>$04</code></td><td>Row 2: B J R Z 2 : BREAK</td></tr>
-          <tr><td class="word-name">KB-R3</td><td><code>$08</code></td><td>Row 3: C K S UP 3 ; ALT</td></tr>
-          <tr><td class="word-name">KB-R4</td><td><code>$10</code></td><td>Row 4: D L T DN 4 , CTRL</td></tr>
-          <tr><td class="word-name">KB-R5</td><td><code>$20</code></td><td>Row 5: E M U LT 5 - SHIFT</td></tr>
-          <tr><td class="word-name">KB-R6</td><td><code>$40</code></td><td>Row 6: F N V RT 6 . F1</td></tr>
-          <tr><td class="word-name">KB-R7</td><td><code>$80</code></td><td>Row 7: G O W SPC 7 / F2</td></tr>
+          <tr><td class="word-name">KB-R0</td><td><code>$01</code></td><td>@  A  B  C  D  E  F  G</td></tr>
+          <tr><td class="word-name">KB-R1</td><td><code>$02</code></td><td>H  I  J  K  L  M  N  O</td></tr>
+          <tr><td class="word-name">KB-R2</td><td><code>$04</code></td><td>P  Q  R  S  T  U  V  W</td></tr>
+          <tr><td class="word-name">KB-R3</td><td><code>$08</code></td><td>X  Y  Z  UP DN LT RT SP &mdash; all arrows share this row</td></tr>
+          <tr><td class="word-name">KB-R4</td><td><code>$10</code></td><td>0  1  2  3  4  5  6  7 &mdash; all digits share this row</td></tr>
+          <tr><td class="word-name">KB-R5</td><td><code>$20</code></td><td>8  9  :  ;  ,  -  .  /</td></tr>
+          <tr><td class="word-name">KB-R6</td><td><code>$40</code></td><td>ENT CLR BRK ALT CTL SHF F1  F2</td></tr>
+          <tr><td class="word-name">KB-R7</td><td><code>$80</code></td><td>(joystick comparator &mdash; not a keyboard row)</td></tr>
         </table>
 
-        <p>Example: test if the 2 key is held:</p>
-<pre class="forth">KB-C4 KB-R2 KEY-HELD?</pre>
+        <p>Example: test if the UP arrow is held:</p>
+<pre class="forth">KB-C3 KB-R3 KEY-HELD?</pre>
       </div>
 
       <!-- datawrite.fs -->
@@ -842,18 +847,283 @@
         </table>
       </div>
 
+      <!-- rg-pixel.fs -->
+      <div class="ref-section">
+        <h3>RG6 Artifact-Color Pixels</h3>
+        <p class="lib-path">INCLUDE lib/vdg.fs<br>INCLUDE lib/rg-pixel.fs</p>
+        <p>Artifact-color pixel drawing in RG6 mode (256&times;192, 1 bit/pixel).
+        Adjacent pixel pairs produce NTSC artifact colors: 00=black,
+        01=blue, 10=red/orange, 11=white. This library addresses
+        128&times;192 artifact pixels at 2 bits each.</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">rg-init</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Switch to RG6 mode, build lookup tables, clear screen to black. Call once at startup.</td>
+          </tr>
+          <tr>
+            <td class="word-name">rg-pcls</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Clear entire screen to black.</td>
+          </tr>
+          <tr>
+            <td class="word-name">rg-pset</td>
+            <td class="stack-effect">( x y color -- )</td>
+            <td>Plot one artifact pixel. x: 0&ndash;127, y: 0&ndash;191. Color: 0=black, 1=blue, 2=red, 3=white. <em>CODE word.</em></td>
+          </tr>
+          <tr>
+            <td class="word-name">rg-pget</td>
+            <td class="stack-effect">( x y -- raw )</td>
+            <td>Read the raw 2-bit value at an artifact pixel.</td>
+          </tr>
+          <tr>
+            <td class="word-name">rg-hline</td>
+            <td class="stack-effect">( x1 x2 y color -- )</td>
+            <td>Horizontal line from x1 to x2 (inclusive) at row y.</td>
+          </tr>
+          <tr>
+            <td class="word-name">rg-line</td>
+            <td class="stack-effect">( x1 y1 x2 y2 color -- )</td>
+            <td>Bresenham line drawing in all 8 octants. <em>CODE word.</em></td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- sprite.fs -->
+      <div class="ref-section">
+        <h3>Software Sprites</h3>
+        <p class="lib-path">INCLUDE lib/rg-pixel.fs<br>INCLUDE lib/sprite.fs</p>
+        <p>Sprite data format: byte 0 = width (artifact pixels), byte 1 = height (rows),
+        followed by row data at 2 bits per pixel, 4 pixels per byte. Color 0 is transparent.</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">spr-w</td>
+            <td class="stack-effect">( addr -- width )</td>
+            <td>Get sprite width from header.</td>
+          </tr>
+          <tr>
+            <td class="word-name">spr-h</td>
+            <td class="stack-effect">( addr -- height )</td>
+            <td>Get sprite height from header.</td>
+          </tr>
+          <tr>
+            <td class="word-name">spr-draw</td>
+            <td class="stack-effect">( addr x y -- )</td>
+            <td>Draw sprite at (x,y). Color 0 pixels are transparent. <em>CODE word.</em></td>
+          </tr>
+          <tr>
+            <td class="word-name">spr-erase-box</td>
+            <td class="stack-effect">( addr x y -- )</td>
+            <td>Erase sprite bounding box to black. <em>CODE word.</em></td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- screen.fs additions -->
+      <div class="ref-section">
+        <h3>HSYNC Beam Tracking</h3>
+        <p class="lib-path">INCLUDE lib/screen.fs</p>
+        <p>After calling <code>vsync</code>, these words count HSYNC pulses to
+        synchronize VRAM writes with the CRT beam position, eliminating sprite flicker.</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">wait-past-row</td>
+            <td class="stack-effect">( row -- )</td>
+            <td>Wait until the beam has passed the given display row (0&ndash;191). Adds a 70-line blanking offset internally. ~20 cycles per line. <em>CODE word.</em></td>
+          </tr>
+          <tr>
+            <td class="word-name">count-blanking</td>
+            <td class="stack-effect">( -- n )</td>
+            <td>Diagnostic: wait for VSYNC then count 100 HSYNC pulses. Returns 100 (confirms timing). <em>CODE word.</em></td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- beam.fs -->
+      <div class="ref-section">
+        <h3>Beam Weapon Animation</h3>
+        <p class="lib-path">INCLUDE lib/rg-pixel.fs<br>INCLUDE lib/beam.fs</p>
+        <p>Traces a line path, saves the background pixels, then animates a
+        bolt traveling along the path. Buffer format: 3 bytes per pixel
+        (x, y, saved_color).</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">beam-trace</td>
+            <td class="stack-effect">( x1 y1 x2 y2 buf -- count )</td>
+            <td>Walk a Bresenham line, recording (x, y, saved_color) triplets without drawing. Returns pixel count. <em>CODE word.</em></td>
+          </tr>
+          <tr>
+            <td class="word-name">beam-draw-slice</td>
+            <td class="stack-effect">( buf start count color -- )</td>
+            <td>Draw <em>count</em> pixels from buffer at index <em>start</em>, all in the given color. <em>CODE word.</em></td>
+          </tr>
+          <tr>
+            <td class="word-name">beam-restore-slice</td>
+            <td class="stack-effect">( buf start count -- )</td>
+            <td>Restore <em>count</em> pixels from buffer at index <em>start</em> using saved background colors. <em>CODE word.</em></td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- trig.fs -->
+      <div class="ref-section">
+        <h3>Trigonometry</h3>
+        <p class="lib-path">INCLUDE lib/datawrite.fs<br>INCLUDE lib/trig.fs</p>
+        <p>Lookup-table sine/cosine with 1-degree resolution. Values are
+        signed fixed-point (&minus;127 to +127, representing &minus;1.0 to +1.0).</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">init-sin</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Build the 91-entry sine table at <code>$86CC</code>. Call once at startup before using sin/cos.</td>
+          </tr>
+          <tr>
+            <td class="word-name">sin</td>
+            <td class="stack-effect">( angle -- value )</td>
+            <td>Sine of angle (0&ndash;360&deg;). Returns &minus;127 to +127.</td>
+          </tr>
+          <tr>
+            <td class="word-name">cos</td>
+            <td class="stack-effect">( angle -- value )</td>
+            <td>Cosine of angle (0&ndash;360&deg;). Returns &minus;127 to +127.</td>
+          </tr>
+          <tr>
+            <td class="word-name">angle-dx</td>
+            <td class="stack-effect">( angle length -- dx )</td>
+            <td>X displacement: length &times; cos(angle) / 128.</td>
+          </tr>
+          <tr>
+            <td class="word-name">angle-dy</td>
+            <td class="stack-effect">( angle length -- dy )</td>
+            <td>Y displacement: &minus;length &times; sin(angle) / 128. Negative = up on screen.</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- sound.fs -->
+      <div class="ref-section">
+        <h3>Sound Effects</h3>
+        <p class="lib-path">INCLUDE lib/sound.fs</p>
+        <p>Square-wave and noise generation via the CoCo&rsquo;s 6-bit DAC.
+        Sound routines live in the bootstrap area and switch ROM mode
+        on/off automatically.</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">snd-tone</td>
+            <td class="stack-effect">( pitch duration -- )</td>
+            <td>Square wave: lower pitch = higher frequency. <em>CODE word.</em></td>
+          </tr>
+          <tr>
+            <td class="word-name">snd-noise</td>
+            <td class="stack-effect">( duration -- )</td>
+            <td>White noise burst. <em>CODE word.</em></td>
+          </tr>
+          <tr>
+            <td class="word-name">snd-beep</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Short beep.</td>
+          </tr>
+          <tr>
+            <td class="word-name">snd-zap</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Rising zap (two ascending tones).</td>
+          </tr>
+          <tr>
+            <td class="word-name">snd-boom</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Explosion noise burst.</td>
+          </tr>
+          <tr>
+            <td class="word-name">snd-chirp</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Short chirp (two tones).</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- dac.fs -->
+      <div class="ref-section">
+        <h3>Joystick / DAC</h3>
+        <p class="lib-path">INCLUDE lib/dac.fs</p>
+        <p>Read analog joystick axes via the CoCo&rsquo;s 6-bit DAC
+        successive-approximation method.</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">joy-x</td>
+            <td class="stack-effect">( -- 0..63 )</td>
+            <td>Read right joystick X axis.</td>
+          </tr>
+          <tr>
+            <td class="word-name">joy-y</td>
+            <td class="stack-effect">( -- 0..63 )</td>
+            <td>Read right joystick Y axis.</td>
+          </tr>
+          <tr>
+            <td class="word-name">joy-fire?</td>
+            <td class="stack-effect">( -- flag )</td>
+            <td>Check right fire button.</td>
+          </tr>
+          <tr>
+            <td class="word-name">joy-fire-l?</td>
+            <td class="stack-effect">( -- flag )</td>
+            <td>Check left fire button.</td>
+          </tr>
+          <tr>
+            <td class="word-name">joy-sample</td>
+            <td class="stack-effect">( -- 0..63 )</td>
+            <td>Run 6-bit successive approximation on the currently selected axis.</td>
+          </tr>
+        </table>
+      </div>
+
       <!-- ================================================================== -->
       <h2>Memory Map</h2>
       <!-- ================================================================== -->
 
+      <p>Default layout (text mode, tutorials):</p>
       <table class="ref-table">
         <tr>
           <th style="width:160px">Address</th>
           <th>Contents</th>
         </tr>
         <tr>
-          <td class="word-name">$0050&ndash;$0057</td>
-          <td>Kernel variables (cursor, key state)</td>
+          <td class="word-name">$0050&ndash;$0082</td>
+          <td>Kernel variables (cursor, key state, line/sprite scratch, text config)</td>
         </tr>
         <tr>
           <td class="word-name">$0400&ndash;$05FF</td>
@@ -864,10 +1134,6 @@
           <td>Kernel code begins (DOCOL, DOVAR, CFA table, primitives, START)</td>
         </tr>
         <tr>
-          <td class="word-name">$1013&ndash;$10B4</td>
-          <td>CFA table &mdash; 51 entries &times; 2 bytes (includes DOVAR data blocks)</td>
-        </tr>
-        <tr>
           <td class="word-name">$2000</td>
           <td>Application load address (APP_BASE) &mdash; cross-compiled Forth thread</td>
         </tr>
@@ -876,16 +1142,48 @@
           <td>Font data (if <code>init-font</code> is called) &mdash; 37 glyphs &times; 7 bytes</td>
         </tr>
         <tr>
-          <td class="word-name">$7CE0&ndash;$7CEF</td>
-          <td>CG expand table (if <code>init-expand</code> is called) &mdash; 16 bytes</td>
-        </tr>
-        <tr>
           <td class="word-name">$7E00</td>
           <td>Data stack base (U register, grows downward)</td>
         </tr>
         <tr>
           <td class="word-name">$7FFE</td>
           <td>Return stack init (S register, grows downward)</td>
+        </tr>
+      </table>
+
+      <p>All-RAM layout (graphics mode, Space Warp):</p>
+      <table class="ref-table">
+        <tr>
+          <th style="width:160px">Address</th>
+          <th>Contents</th>
+        </tr>
+        <tr>
+          <td class="word-name">$0050&ndash;$0082</td>
+          <td>Kernel variables</td>
+        </tr>
+        <tr>
+          <td class="word-name">$0600&ndash;$1DFF</td>
+          <td>Video RAM &mdash; RG6 mode (256&times;192, 6144 bytes)</td>
+        </tr>
+        <tr>
+          <td class="word-name">$0E00</td>
+          <td>Bootstrap (copies staged kernel to $E000, enables all-RAM via <code>STA $FFDF</code>)</td>
+        </tr>
+        <tr>
+          <td class="word-name">$2000</td>
+          <td>Application code (APP_BASE)</td>
+        </tr>
+        <tr>
+          <td class="word-name">$8000+</td>
+          <td>Game data region (all-RAM, above ROM shadow)</td>
+        </tr>
+        <tr>
+          <td class="word-name">$DE00</td>
+          <td>Data stack base (U register, grows downward)</td>
+        </tr>
+        <tr>
+          <td class="word-name">$E000</td>
+          <td>Kernel code (final location, all-RAM mode) / Return stack init (S, grows down from $DFFF)</td>
         </tr>
       </table>
 
@@ -909,7 +1207,7 @@
     </div>
 
     <div class="nav">
-      <a href="index.html">&larr; Table of Contents</a>
+      <a href="tutorial.html">&larr; Table of Contents</a>
       <span class="spacer"></span>
     </div>
 

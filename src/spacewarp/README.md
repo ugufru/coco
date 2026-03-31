@@ -136,6 +136,9 @@ make run                       # launch in XRoar emulator
 
 - [USERGUIDE.md](USERGUIDE.md) — complete gameplay guide
 - [SPEC.md](SPEC.md) — technical specification and architecture
+- [FRAME_BUDGET.md](FRAME_BUDGET.md) — CPU cycle accounting and optimization history
+- [AI_DIVERSITY_STRATEGY.md](AI_DIVERSITY_STRATEGY.md) — Jovian genome system design
+- [MARKETING.md](MARKETING.md) — elevator pitch
 
 ## References
 
