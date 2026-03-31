@@ -3236,6 +3236,7 @@ CODE pick-jovian   \ ( -- i|-1 )
 : fire-jbeam-resolve  ( -- )
   JBEAM-PATH jbeam-pending @ beam-find-obstacle jbeam-total !
   jbeam-ship-hit? jbeam-hit-ship !
+  JBEAM-PATH jbeam-total @ beam-scrub-sprites
   0 jbeam-head !  0 jbeam-tail !
   0 jbeam-pending ! ;
 
@@ -4182,6 +4183,57 @@ CODE clamp-beam   \ ( -- )  Clamp beam x1/y1/x2/y2 to screen bounds
   THEN
   0 jbeam-total ! ;
 
+\ ── beam-scrub-pos ( buf count cx cy -- ) ─────────────────────────────
+\ Zero saved_color for beam pixels within ±4 of cx and ±3 of cy.
+\ Buffer format: 3 bytes per pixel (x, y, saved_color).
+CODE beam-scrub-pos
+        PSHS    X
+        LDD     4,U             ; D = count
+        BEQ     @done
+        TFR     D,Y             ; Y = count
+        LDX     6,U             ; X = buf
+        ; Compute bounds from cx, cy
+        LDA     3,U             ; cx
+        SUBA    #4
+        PSHS    A               ; S+0 = x_min
+        ADDA    #8
+        PSHS    A               ; S+0 = x_max, S+1 = x_min
+        LDA     1,U             ; cy
+        SUBA    #3
+        PSHS    A               ; S+0 = y_min
+        ADDA    #6
+        PSHS    A               ; S+0 = y_max, S+1 = y_min, S+2 = x_max, S+3 = x_min
+        LEAU    8,U             ; pop 4 args
+@lp     LDA     ,X              ; pixel x
+        CMPA    3,S             ; < x_min?
+        BLO     @skip
+        CMPA    2,S             ; > x_max?
+        BHI     @skip
+        LDA     1,X             ; pixel y
+        CMPA    1,S             ; < y_min?
+        BLO     @skip
+        CMPA    ,S              ; > y_max?
+        BHI     @skip
+        CLR     2,X             ; zero saved_color
+@skip   LEAX    3,X             ; next pixel
+        LEAY    -1,Y
+        BNE     @lp
+        LEAS    4,S             ; pop bounds
+@done   PULS    X
+        ;NEXT
+;CODE
+
+\ ── beam-scrub-sprites ( buf count -- ) ──────────────────────────────
+\ Scrub saved_color for all dynamic sprites: ship + living Jovians.
+: beam-scrub-sprites  ( buf count -- )
+  2DUP SHIP-POS C@ SHIP-POS 1 + C@ beam-scrub-pos
+  qjovians @ ?DUP IF 0 DO
+    JOV-DMG I + C@ IF
+      2DUP JOV-POS I 2 * + C@ JOV-POS I 2 * + 1 + C@ beam-scrub-pos
+    THEN
+  LOOP THEN
+  2DROP ;
+
 \ ── Fire maser ─────────────────────────────────────────────────────────
 \ Trace path, detect hits, start bolt animation.
 
@@ -4212,6 +4264,8 @@ CODE clamp-beam   \ ( -- )  Clamp beam x1/y1/x2/y2 to screen bounds
   ELSE
     DROP  -1 beam-hit-idx !
   THEN
+  \ Scrub sprite pixels from saved backgrounds (after obstacle/hit detection)
+  BEAM-PATH beam-total @ beam-scrub-sprites
   \ Start bolt animation
   0 beam-head !  0 beam-tail !
   \ Firing reveals player + emotion reaction
@@ -4867,10 +4921,10 @@ VARIABLE jnb-result
       THEN
     ELSE
 
-    \ ── LAYER 2: Erase beam tails (restore saved pixels) ──
+    \ ── LAYER 2: Erase beam tails (paint black + redraw stars) ──
     tick-jbeam-erase
     tick-beam-erase
-    beam-total @ jbeam-total @ OR IF 1 moved ! THEN
+    beam-total @ jbeam-total @ OR IF 1 moved !  draw-stars THEN
 
     \ ── LAYER 1: Sprite rendering (split cycle) ──
     jov-moved @ IF
