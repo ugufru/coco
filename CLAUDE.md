@@ -61,6 +61,61 @@ The constraints aren't obstacles — they're the whole point. A 64K ceiling and 
 - **On-device workflow** — assembling on the CoCo itself (rather than cross-compiling) is a first-class design goal
 - **Non-destructive delivery** — cartridge can be removed to restore a stock CoCo at any time
 
+## CoCo Keyboard Matrix
+
+The `forth/lib/keyboard.fs` file has the matrix layout WRONG. The source of truth is `forth/kernel/kernel.asm` KEY_TABLE (~line 763).
+
+Each key has its own column — keys are NOT grouped by column as keyboard.fs claims.
+
+| Key | Column strobe | Row bit |
+|-----|---------------|---------|
+| UP  | `$F7` | `$08` |
+| DN  | `$EF` | `$08` |
+| LT  | `$DF` | `$08` |
+| RT  | `$BF` | `$08` |
+
+Arrow keys: all row `$08`, each in a separate column. Number keys 0–9: columns `$FE`–`$DF`, all row `$10`.
+
+## Confusable Addresses
+
+These addresses are 6 bytes apart and have been mixed up in CODE words, causing real bugs:
+
+| Address | Constant | Contents |
+|---------|----------|----------|
+| `$8050` | `BASE-POS` | Base x, y (2 bytes) |
+| `$8054` | `SHIP-POS` | Ship x, y (2 bytes) |
+| `$8056` | `JOV-DMG`  | Jovian health, 3 bytes (one per Jovian) |
+
+## fc.py Gotchas
+
+- **EXIT inside IF/THEN may miscompile** — avoid using EXIT inside IF blocks in fc.py Forth
+- **ASCII-only in CODE blocks** — Unicode characters (arrows, em dashes) in CODE block comments break lwasm
+- **Blank lines in CODE blocks** — `preprocess_asm` strips blank lines from CODE blocks due to an lwasm local label quirk
+- **fc.py lacks BEGIN/WHILE/REPEAT** — only BEGIN/AGAIN and BEGIN/UNTIL are supported
+
+## 6809 Additional Gotchas
+
+- **D register byte order**: For 8-bit values used with ADDD, the value goes in B (low byte), not A (high byte). `CLRA` + `LDB value` → `ADDD`.
+- **Pre-decrement by 1 is illegal for stores**: `STA ,-S` and `CLR ,-S` are undefined on the 6809. Use `PSHS A` instead.
+- **No CMPA B instruction**: Cannot directly compare two 8-bit registers. Push one to the stack first: `PSHS B` + `CMPA ,S+`.
+
+## Issue Workflow
+
+- Issues are tracked in `issues.jsonl` at project root, NOT GitHub
+- **Create the issue BEFORE starting work** — never retroactively. Each distinct change (bug fix, kernel enhancement, new demo, CODE conversion) gets its own issue.
+- Issues must be tested before resolved, resolved before push
+- No pushing until v1.0 — public repo, keep commits local until Space Warp is complete
+
+## Development Workflow
+
+- Kill XRoar before relaunching: `pkill -9 xroar` before `make run`
+- Never spam-launch XRoar — one launch, check result, wait
+- Auto-launch XRoar for testing: pkill, build, and run automatically when ready to test
+- Write theoretical analysis first, then implement, then re-measure
+- Measure cycle counts, don't estimate — use `fc.py --cycles` and exact hardware constants
+- Check app binary size after adding code — it can overflow into VRAM or data region
+- Don't pause unless judgement, visual, or physical feedback is needed
+
 ## Access Boundaries
 
 Only read, write, or execute files within these directories:
