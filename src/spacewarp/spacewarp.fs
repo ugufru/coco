@@ -232,8 +232,8 @@ $8EB4 CONSTANT MOOD-GRID        \ 64 bytes: mood per sector
 \ Returns x in 4-123, y in 4-139 (away from borders).
 
 
-: rnd-x  ( -- x )  116 rnd 5 + ;    \ 5-120
-: rnd-y  ( -- y )  130 rnd 5 + ;    \ 5-134
+: rnd-x  ( -- x )  128 rnd 5 + ;    \ 5-132 (128 is power-of-2)
+: rnd-y  ( -- y )  128 rnd 5 + ;    \ 5-132 (was 130, not power-of-2!)
 
 \ ── Galaxy generation ────────────────────────────────────────────────────
 \ Single-pass generation: iterate all 64 quadrants, roll dice for each.
@@ -434,6 +434,12 @@ VARIABLE tcy
     THEN
   LOOP ;
 
+\ ── Shared string words (dedup #268) ──
+: s-destroyed  S" DESTROYED" rg-type ;
+: s-again      S" AGAIN?" rg-type ;
+: s-upsys      S" THE UP SYSTEM" rg-type ;
+: s-command    S" COMMAND" rg-type ;
+
 : draw-panel  ( -- )
   clear-panel
 
@@ -451,7 +457,7 @@ VARIABLE tcy
   17 17 at-xy  S" SHIELDS" rg-type  pshields @ 32 rg-u.r
 
   \ Row 18: COMMAND prompt
-  17 18 at-xy  S" COMMAND" rg-type ;
+  17 18 at-xy  s-command ;
 
 \ Quick-update just the energy value (avoids full panel redraw)
 : update-energy  ( -- )
@@ -1618,7 +1624,11 @@ VARIABLE spawn-pending                \ deferred spawn dir+1, or 0
 
 : do-spawn  ( dir -- )
   find-free-slot DUP -1 = IF 2DROP ELSE
-    SWAP set-edge-pos                 \ ( slot )
+    SWAP DUP set-edge-pos             \ first attempt
+    sp-x @ SHIP-POS C@ - abs
+    sp-y @ SHIP-POS 1 + C@ - abs + 10 < IF
+      DUP set-edge-pos               \ retry once if too close
+    THEN DROP                         \ ( slot )
     DUP sp-x @ SWAP 2 * JOV-POS + C!    \ store x
     DUP sp-y @ SWAP 2 * JOV-POS + 1 + C!  \ store y
     DUP 100 SWAP JOV-DMG + C!        \ full health
@@ -3956,7 +3966,7 @@ VARIABLE cmd-digits               \ number of digits entered
 : draw-cmd-prompt  ( -- )
   clear-cmd-area
   17 18 at-xy
-  S" COMMAND" rg-type ;
+  s-command ;
 
 \ ══════════════════════════════════════════════════════════════════════════
 \  BEAM SYSTEM — Pixel-save/restore for artifact-free rendering
@@ -4008,25 +4018,10 @@ VARIABLE jbeam-y2
 \ After tracing, walk the path buffer and check each pixel against
 \ live Jovian bounding boxes (7×5 sprite: x±3, y±2).
 
-VARIABLE hc-i                      \ hit-check loop variable
 
 VARIABLE bchk-buf                  \ path buffer base for hit check
 VARIABLE bchk-px                   \ pixel index being checked
 VARIABLE bchk-hitpx                \ pixel index where hit was found
-
-: beam-check-one-jov  ( jov-idx -- )
-  hc-i !
-  JOV-DMG hc-i @ + C@ 0= IF EXIT THEN  \ dead, skip
-  beam-hit-idx @ 0 < 0= IF EXIT THEN    \ already found a hit
-  \ Check bbox: |px - jx| <= 3 AND |py - jy| <= 2
-  bchk-buf @ bchk-px @ 3 * + C@
-  JOV-POS hc-i @ 2 * + C@ - abs 4 < IF
-    bchk-buf @ bchk-px @ 3 * + 1 + C@
-    JOV-POS hc-i @ 2 * + 1 + C@ - abs 3 < IF
-      hc-i @ beam-hit-idx !
-      bchk-px @ bchk-hitpx !      \ record pixel index of hit
-    THEN
-  THEN ;
 
 \ Walk path buffer, check each pixel against Jovian bounding boxes.
 \ Returns Jovian index of first hit, or -1.  Stores hit pixel index
@@ -4529,7 +4524,7 @@ VARIABLE sd-cancel                    \ cancel sequence progress (0-3)
   cancel-jbeam cancel-beam
   cancel-msl
   0 17 at-xy  14 0 DO $20 rg-emit LOOP
-  0 17 at-xy  S" DESTROYED" rg-type
+  0 17 at-xy  s-destroyed
   restore-ship-bg
   SHIP-POS C@ SHIP-POS 1 + C@
   explode-destruct
@@ -4537,7 +4532,7 @@ VARIABLE sd-cancel                    \ cancel sequence progress (0-3)
   clear-tactical
   draw-border draw-stars draw-storm-stars draw-event-horizon
   draw-base draw-jovians-live
-  0 17 at-xy  S" DESTROYED" rg-type
+  0 17 at-xy  s-destroyed
   2 death-cause !
   0 penergy ! ;
 
@@ -4600,6 +4595,16 @@ VARIABLE overlay                  \ 0=tactical, 1=damage, 2=scan
   2 12 at-xy  S" DEFLECTORS" rg-type      pdmg-defl @ 28 rg-u.r
   2 13 at-xy  S" MASERS" rg-type          pdmg-masr @ 28 rg-u.r ;
 
+\ Overwrite just the changing values (no clear, no flicker) (#231)
+: update-damage  ( -- )
+  2 2 at-xy  count-jovians rg-u.  S"  " rg-type
+  2 4 at-xy  count-bases rg-u.    S"  " rg-type
+  9 tcy !  pdmg-ion @  28 rg-u.r
+  10 tcy !  pdmg-warp @ 28 rg-u.r
+  11 tcy !  pdmg-scan @ 28 rg-u.r
+  12 tcy !  pdmg-defl @ 28 rg-u.r
+  13 tcy !  pdmg-masr @ 28 rg-u.r ;
+
 : do-damage-report  ( -- )
   draw-damage 1 overlay ! ;
 
@@ -4638,9 +4643,15 @@ VARIABLE sg-row                   \ scan grid: outer loop row
   draw-scan 2 overlay ! ;
 
 : exec-command  ( -- )
-  cmd-num @ 1 = IF do-damage-report THEN
-  cmd-num @ 2 = IF do-warp THEN
-  cmd-num @ 3 = IF do-scan THEN
+  cmd-num @ 1 = IF
+    overlay @ 1 = IF dismiss-overlay ELSE do-damage-report THEN
+  THEN
+  cmd-num @ 2 = IF
+    0 overlay ! do-warp
+  THEN
+  cmd-num @ 3 = IF
+    overlay @ 2 = IF dismiss-overlay ELSE do-scan THEN
+  THEN
   cmd-num @ 4 = IF
     cmd-val @ DUP 100 > IF DROP 100 THEN
     DUP pdmg-defl @ > IF DROP pdmg-defl @ THEN pshields !
@@ -4654,9 +4665,13 @@ VARIABLE sg-row                   \ scan grid: outer loop row
 
 : cmd-start  ( cmd -- )
   cmd-num !
-  \ Commands 1, 3: immediate (no parameter)
+  \ Commands 1, 3: immediate (station toggle)
   cmd-num @ 1 = IF exec-command EXIT THEN
   cmd-num @ 3 = IF exec-command EXIT THEN
+  \ Commands 5, 6, 7: return to tactical first (need viewport)
+  overlay @ IF
+    cmd-num @ 5 < 0= IF dismiss-overlay THEN
+  THEN
   \ Others: clear area once, show "N? ", start digit collection
   1 cmd-state !
   0 cmd-val !  0 cmd-digits !
@@ -4722,7 +4737,6 @@ VARIABLE key-latch                \ latched keypress (survives between polls)
   ELSE
     DUP prev-key !
     ?DUP IF
-      overlay @ IF DROP dismiss-overlay EXIT THEN
       DUP sd-active @ IF sd-check-key ELSE DROP THEN
       cmd-state @ IF process-cmd-input ELSE process-idle THEN
     THEN
@@ -4899,25 +4913,28 @@ VARIABLE jnb-result
         ship-gravity
         tick-jovians
       ELSE
-        \ ── Odd frames: collisions + gravity pull + background tasks ──
+        \ ── Odd frames: collisions + gravity pull ──
         check-collisions               \ ship vs star/bhole (1-frame delay OK)
         jov-gravity-pull               \ gated by grav-tick & 3 internally (#243)
-        frame-tick @ 7 AND DUP 3 = IF
-          jov-check-regen  check-dock  tick-dock  tick-base-attack
-        THEN 5 = IF
-          tick-stardate  tick-migrate  check-spawn  update-cond
-        THEN
       THEN
-      tick-destruct
     THEN
+    \ ── Background tasks: run even during overlays (#232) ──
+    frame-tick @ 1 AND IF
+      frame-tick @ 7 AND DUP 3 = IF
+        jov-check-regen  check-dock  tick-dock  tick-base-attack
+      THEN 5 = IF
+        tick-stardate  tick-migrate  check-spawn  update-cond
+      THEN
+    THEN
+    tick-destruct
 
     VSYNC
     overlay @ 0= IF max-draw-y wait-past-row THEN
 
     overlay @ IF
-      \ Overlay active: update damage display live if showing damage
+      \ Overlay active: refresh values ~1/sec without clearing (#231)
       overlay @ 1 = IF
-        frame-tick @ 15 AND 0= IF draw-damage THEN
+        frame-tick @ 63 AND 0= IF update-damage THEN
       THEN
     ELSE
 
@@ -4990,8 +5007,8 @@ VARIABLE jnb-result
         clear-tactical
         2 3 at-xy  S" ALL " rg-type  gjovians0 @ rg-u.
         S"  JOVIANS" rg-type
-        2 5 at-xy  S" DESTROYED" rg-type
-        2 8 at-xy  S" THE UP SYSTEM" rg-type
+        2 5 at-xy  s-destroyed
+        2 8 at-xy  s-upsys
         2 10 at-xy S" IS SAVED" rg-type
         \ Rating: stardates / level → lower is better
         2 13 at-xy S" RATING  " rg-type
@@ -5001,7 +5018,7 @@ VARIABLE jnb-result
         DUP 7 < IF DROP S" CAPTAIN" ELSE
         DROP S" ENSIGN"
         THEN THEN THEN rg-type
-        0 18 at-xy S" AGAIN?" rg-type
+        0 18 at-xy s-again
         KEY DROP
         main EXIT
       THEN
@@ -5009,10 +5026,10 @@ VARIABLE jnb-result
         cancel-jbeam cancel-beam
         clear-tactical
         2 3 at-xy  S" ALL BASES" rg-type
-        2 5 at-xy  S" DESTROYED" rg-type
-        2 8 at-xy  S" THE UP SYSTEM" rg-type
+        2 5 at-xy  s-destroyed
+        2 8 at-xy  s-upsys
         2 10 at-xy S" WILL FALL" rg-type
-        0 18 at-xy S" AGAIN?" rg-type
+        0 18 at-xy s-again
         KEY DROP
         main EXIT
       THEN
@@ -5036,10 +5053,10 @@ VARIABLE jnb-result
         \ Self-destruct — explosion already happened
         2DROP
         0 17 at-xy
-        S" DESTROYED" rg-type
+        s-destroyed
       ELSE
         \ Energy depleted or star collision — ship explodes
-        0 17 at-xy  S" DESTROYED" rg-type
+        0 17 at-xy  s-destroyed
         restore-ship-bg
         explode-ship
         clear-tactical
@@ -5048,7 +5065,7 @@ VARIABLE jnb-result
       THEN THEN
       \ AGAIN? prompt — any key restarts
       0 18 at-xy
-      S" AGAIN?" rg-type
+      s-again
       KEY DROP
       main EXIT
     THEN
