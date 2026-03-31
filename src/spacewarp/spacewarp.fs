@@ -759,7 +759,9 @@ CODE jov-bg-xy   \ ( i -- bg x y )
         LSRB
         NEGB
         ADDB    A,X             ; pos_x - width/2
-        CLRA
+        BCS     @xok
+        CLRB                    ; clamp underflow to 0
+@xok    CLRA
         STD     2,U
         LDA     ,S+             ; i*2
         INCA
@@ -767,7 +769,9 @@ CODE jov-bg-xy   \ ( i -- bg x y )
         LSRB
         NEGB
         ADDB    A,X             ; pos_y - height/2
-        CLRA
+        BCS     @yok
+        CLRB                    ; clamp underflow to 0
+@yok    CLRA
         STD     ,U
         PULS    X
         ;NEXT
@@ -834,20 +838,209 @@ CODE save-jov-oldpos-n   \ ( n -- )  copy JOV-POS to JOV-OLDX/Y for n Jovians
         ;NEXT
 ;CODE
 
-\ save-jov-bgs / restore-jov-bgs — Forth calling proven CODE helpers
-: save-jov-bgs  ( -- )
-  qjovians @ ?DUP IF 0 DO
-    JOV-DMG I + C@ IF I jov-bg-xy bg-save-7 THEN
-  LOOP THEN ;
+\ save-jov-bgs / restore-jov-bgs — CODE with inline bg calc + clamp
+\ Iterates living Jovians, computes centered screen coords from JOV-POS,
+\ saves/restores 4x7 VRAM bytes to/from per-Jovian bg buffers.
 
-: restore-jov-bgs  ( -- )
-  qjovians @ ?DUP IF 0 DO
-    JOV-DMG I + C@ IF I jov-bg-old-xy bg-restore-7 THEN
-  LOOP THEN ;
+CODE save-jov-bgs   \ ( -- )
+        PSHS    X
+        LDA     $80B1           ; njovians
+        TSTA
+        LBEQ    @sdone
+        CLRB                    ; B = j (Jovian index)
+@sloop  PSHS    D               ; S+0=A(count) S+1=B(j)
+        ; alive check: JOV-DMG[j]
+        LDX     #$8056          ; JOV-DMG
+        LDA     B,X
+        BEQ     @snext
+        ; buf = j * 28 + JOV-BG0
+        LDA     1,S             ; j
+        LDB     #28
+        MUL
+        ADDD    #$80F0
+        PSHS    D               ; S+0..1=buf
+        ; sprite header = j * 23 + JOV-SPR0
+        LDA     3,S             ; j
+        LDB     #23
+        MUL
+        ADDD    #$8200
+        TFR     D,Y             ; Y = spr header
+        ; screen_x = JOV-POS[j*2] - width/2
+        LDA     3,S             ; j
+        ASLA                    ; j*2
+        LDX     #$804A          ; JOV-POS
+        LDB     ,Y              ; width
+        LSRB
+        NEGB
+        ADDB    A,X             ; pos_x - width/2
+        BCS     @sxok
+        CLRB
+@sxok   PSHS    B               ; S+0=sx
+        ; screen_y = JOV-POS[j*2+1] - height/2
+        INCA                    ; j*2+1
+        LDB     1,Y             ; height
+        LSRB
+        NEGB
+        ADDB    A,X             ; pos_y - height/2
+        BCS     @syok
+        CLRB
+@syok   ; VRAM addr = RGVRAM + sy*32 + sx/4
+        LDA     #32
+        MUL                     ; D = sy * 32
+        ADDD    VAR_RGVRAM
+        TFR     D,Y             ; Y = row base
+        LDA     ,S+             ; A = sx, pop
+        LSRA
+        LSRA                    ; A = sx/4
+        LEAY    A,Y             ; Y = VRAM addr
+        LDX     ,S++            ; X = buf, pop
+        ; save 4x7
+        LDB     #7
+@srow   LDA     ,Y
+        STA     ,X+
+        LDA     1,Y
+        STA     ,X+
+        LDA     2,Y
+        STA     ,X+
+        LDA     3,Y
+        STA     ,X+
+        LEAY    32,Y
+        DECB
+        BNE     @srow
+@snext  PULS    D
+        INCB                    ; next j
+        DECA                    ; count--
+        BNE     @sloop
+@sdone  PULS    X
+        ;NEXT
+;CODE
+
+CODE restore-jov-bgs   \ ( -- )
+        PSHS    X
+        LDA     $80B1           ; njovians
+        TSTA
+        LBEQ    @rdone
+        CLRB                    ; B = j
+@rloop  PSHS    D               ; S+0=A(count) S+1=B(j)
+        ; alive check
+        LDX     #$8056          ; JOV-DMG
+        LDA     B,X
+        BEQ     @rnext
+        ; buf = j * 28 + JOV-BG0
+        LDA     1,S             ; j
+        LDB     #28
+        MUL
+        ADDD    #$80F0
+        PSHS    D               ; S+0..1=buf
+        ; sprite header = j * 23 + JOV-SPR0
+        LDA     3,S             ; j
+        LDB     #23
+        MUL
+        ADDD    #$8200
+        TFR     D,Y             ; Y = spr header
+        ; oldx = JOV-OLDX[j] - width/2
+        LDA     3,S             ; j
+        LDX     #$80C6          ; JOV-OLDX
+        LDB     ,Y              ; width
+        LSRB
+        NEGB
+        ADDB    A,X             ; oldx - width/2
+        BCS     @rxok
+        CLRB
+@rxok   PSHS    B               ; S+0=sx
+        ; oldy = JOV-OLDY[j] - height/2
+        LDX     #$80C9          ; JOV-OLDY
+        LDB     1,Y             ; height
+        LSRB
+        NEGB
+        ADDB    A,X             ; oldy - height/2
+        BCS     @ryok
+        CLRB
+@ryok   ; VRAM addr
+        LDA     #32
+        MUL
+        ADDD    VAR_RGVRAM
+        TFR     D,Y
+        LDA     ,S+             ; sx, pop
+        LSRA
+        LSRA
+        LEAY    A,Y
+        LDX     ,S++            ; buf, pop
+        ; restore 4x7
+        LDB     #7
+@rrow   LDA     ,X+
+        STA     ,Y
+        LDA     ,X+
+        STA     1,Y
+        LDA     ,X+
+        STA     2,Y
+        LDA     ,X+
+        STA     3,Y
+        LEAY    32,Y
+        DECB
+        BNE     @rrow
+@rnext  PULS    D
+        INCB
+        DECA
+        BNE     @rloop
+@rdone  PULS    X
+        ;NEXT
+;CODE
 
 
 
 : save-jov-oldpos  ( -- )  qjovians @ save-jov-oldpos-n ;
+
+\ max-draw-y ( -- max )  Highest Y across ship + living Jovians (old + new)
+\ Used by HSYNC beam-chasing: wait for beam to pass this row before drawing.
+CODE max-draw-y
+        PSHS    X
+        ; Start with ship Y and old ship Y
+        LDA     $8055           ; SHIP-POS+1 (ship y)
+        LDB     FVAR_old_sy+1   ; old-sy (low byte)
+        PSHS    B
+        CMPA    ,S+             ; compare A with old-sy
+        BHS     @s1
+        TFR     B,A
+@s1     ; Check living Jovians: current Y and old Y
+        LDB     $80B1           ; njovians
+        TSTB
+        BEQ     @sdone
+        PSHS    A               ; S+0=max, save across loop
+        CLRB                    ; j = 0
+@jlp    LDX     #$8056          ; JOV-DMG
+        TST     B,X             ; alive?
+        BEQ     @jnxt
+        ; JOV-POS y = $804A + j*2 + 1
+        PSHS    B               ; save j
+        ASLB                    ; j*2
+        INCB                    ; j*2+1
+        LDX     #$804A          ; JOV-POS
+        LDA     B,X             ; JOV-POS[j*2+1] = current y
+        CMPA    1,S             ; compare with max (below saved j on stack)
+        BLS     @j2
+        STA     1,S             ; update max
+@j2     LDB     ,S              ; j (original)
+        LDX     #$80C9          ; JOV-OLDY
+        LDA     B,X             ; JOV-OLDY[j]
+        CMPA    1,S             ; compare with max
+        BLS     @j3
+        STA     1,S             ; update max
+@j3     PULS    B               ; restore j
+@jnxt   INCB
+        CMPB    $80B1           ; j vs njovians
+        BNE     @jlp
+        PULS    A               ; A = max
+@sdone  ; A = max Y; add sprite height margin (+7)
+        ADDA    #7
+        BCC     @noc
+        LDA     #191            ; clamp to screen bottom
+@noc    CLRB
+        EXG     A,B             ; D = 0:maxY (big-endian 16-bit)
+        STD     ,--U            ; push result
+        PULS    X
+        ;NEXT
+;CODE
 
 : draw-jovians-live  ( -- )
   qjovians @ ?DUP IF 0 DO
@@ -4665,6 +4858,7 @@ VARIABLE jnb-result
     THEN
 
     VSYNC
+    overlay @ 0= IF max-draw-y wait-past-row THEN
 
     overlay @ IF
       \ Overlay active: update damage display live if showing damage

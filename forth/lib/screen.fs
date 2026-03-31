@@ -6,9 +6,16 @@
 \ vsync waits for the VDG vertical sync signal (60 Hz).
 \ PIA0 CB1 flag ($FF03 bit 7) is set by VDG; reading $FF02 clears it.
 
-: vsync  ( -- )
-  BEGIN  $FF03 C@ $80 AND  UNTIL
-  $FF02 C@ DROP ;
+\ vsync ( -- )  Wait for vertical sync.  CODE word for tight detection.
+\ Polls PIA0 CRB ($FF03) bit 7, clears flag by reading $FF02.
+CODE vsync
+        PSHS    X
+@poll   LDA     $FF03           ; bit 7 = VSYNC flag
+        BPL     @poll           ; loop until set
+        LDA     $FF02           ; clear flag
+        PULS    X
+        ;NEXT
+;CODE
 
 \ wait-past-row ( row -- )
 \ After VSYNC, poll HSYNC to wait until the beam has passed the given
@@ -20,13 +27,14 @@ CODE wait-past-row
         PSHS    X
         LDB     1,U             ; row (0-191)
         LEAU    2,U             ; pop arg
-        ADDB    #35             ; add top blanking lines
-        BEQ     @done           ; 0 lines to wait (shouldn't happen)
+        ADDB    #70             ; add full blanking interval (VSYNC to row 0)
+        BEQ     @done
+        LDA     $FF00           ; clear any stale HSYNC flag first
 @wt     LDA     $FF01           ; check HSYNC flag (bit 7)
-        BPL     @wt             ; not set yet — keep polling
-        LDA     $FF00           ; clear flag (read PIA0-A data)
+        BPL     @wt             ; not set yet
+        LDA     $FF00           ; clear flag
         DECB
-        BNE     @wt             ; count down
+        BNE     @wt
 @done   PULS    X
         ;NEXT
 ;CODE
