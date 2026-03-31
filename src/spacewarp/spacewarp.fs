@@ -231,8 +231,8 @@ $8EB4 CONSTANT MOOD-GRID        \ 64 bytes: mood per sector
 \ Returns x in 4-123, y in 4-139 (away from borders).
 
 
-: rnd-x  ( -- x )  128 rnd 5 + ;    \ 5-132 (128 is power-of-2)
-: rnd-y  ( -- y )  128 rnd 5 + ;    \ 5-132 (was 130, not power-of-2!)
+: rnd-x  ( -- x )  64 rnd 30 + ;     \ 30-93 (x: 128px wide viewport)
+: rnd-y  ( -- y )  128 rnd 8 + ;     \ 8-135 (y: 144px tall viewport)
 
 \ ── Galaxy generation ────────────────────────────────────────────────────
 \ Single-pass generation: iterate all 64 quadrants, roll dice for each.
@@ -4825,18 +4825,6 @@ VARIABLE jnb-result
     \ ── Apply deferred hit damage ──
     apply-beam-hit
     apply-jbeam-hit
-    penergy @ prev-energy @ <> IF
-      penergy @ prev-energy !
-      update-energy
-    THEN
-    pmissiles @ prev-missiles @ <> IF
-      pmissiles @ prev-missiles !
-      update-missiles
-    THEN
-    docked @ prev-docked @ <> IF
-      docked @ prev-docked !
-      update-cond
-    THEN
     \ ── Win/lose checks (after any kill, one-shot) ──
     check-win @ IF
       0 check-win !                  \ clear immediately — don't re-check every frame
@@ -4908,6 +4896,19 @@ VARIABLE jnb-result
       main EXIT
     THEN
     THEN                          \ close overlay IF/ELSE
+    \ ── Panel updates: run even during overlays ──
+    penergy @ prev-energy @ <> IF
+      penergy @ prev-energy !
+      update-energy
+    THEN
+    pmissiles @ prev-missiles @ <> IF
+      pmissiles @ prev-missiles !
+      update-missiles
+    THEN
+    docked @ prev-docked @ <> IF
+      docked @ prev-docked !
+      update-cond
+    THEN
   AGAIN ;
 
 main
