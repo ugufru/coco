@@ -220,7 +220,6 @@ $80E4 CONSTANT JOV-SPRWORK      \ 12 bytes: scratch for sprite gen
 $8EB4 CONSTANT MOOD-GRID        \ 64 bytes: mood per sector
 
 : jov-spr  ( i -- addr )  23 * JOV-SPR0 + ;
-: jov-bg  ( i -- addr )  28 * JOV-BG0 + ;
 
 \ Dynamic centering offsets from sprite header
 : jov-draw-dx  ( i -- dx )  jov-spr C@ 1 RSHIFT ;
@@ -534,11 +533,6 @@ CODE draw-stars
         ;NEXT
 ;CODE
 
-: draw-jovians  ( -- )
-  qjovians @ ?DUP IF 0 DO
-    I jov-spr-xy spr-draw
-  LOOP THEN ;
-
 : draw-base  ( -- )
   qbase @ IF
     SPR-BASE
@@ -636,67 +630,6 @@ $806E CONSTANT MSL-BG                \ 20-byte save buffer
 : restore-msl-bg  ( -- )
   MSL-BG msl-px @ 1 - msl-py @ 1 - bg-restore ;
 
-\ ── Flicker-free Jovian background save/restore ─────────────────────────
-\ 4x7 bg save/restore for variable-height Jovian sprites.
-
-CODE bg-save-7   \ ( buf x y -- )  save 4x7 VRAM bytes to buf
-        PSHS    X
-        LDA     1,U             ; A = y
-        LDB     #32
-        MUL                     ; D = y * 32
-        ADDD    VAR_RGVRAM      ; D = row base
-        TFR     D,Y             ; Y = row base
-        LDA     3,U             ; A = x
-        LSRA
-        LSRA                    ; A = x / 4
-        LEAY    A,Y             ; Y = first byte to save
-        LDX     4,U             ; X = buffer address
-        LEAU    6,U             ; pop 3 args
-        LDB     #7
-@row    LDA     ,Y
-        STA     ,X+
-        LDA     1,Y
-        STA     ,X+
-        LDA     2,Y
-        STA     ,X+
-        LDA     3,Y
-        STA     ,X+
-        LEAY    32,Y            ; next VRAM row
-        DECB
-        BNE     @row
-        PULS    X
-        ;NEXT
-;CODE
-
-CODE bg-restore-7  \ ( buf x y -- )  restore 4x7 VRAM bytes from buf
-        PSHS    X
-        LDA     1,U             ; A = y
-        LDB     #32
-        MUL
-        ADDD    VAR_RGVRAM
-        TFR     D,Y
-        LDA     3,U
-        LSRA
-        LSRA
-        LEAY    A,Y
-        LDX     4,U
-        LEAU    6,U
-        LDB     #7
-@row    LDA     ,X+
-        STA     ,Y
-        LDA     ,X+
-        STA     1,Y
-        LDA     ,X+
-        STA     2,Y
-        LDA     ,X+
-        STA     3,Y
-        LEAY    32,Y
-        DECB
-        BNE     @row
-        PULS    X
-        ;NEXT
-;CODE
-
 VARIABLE jbg-i
 
 \ CODE helpers: compute sprite/bg addr + centered (x,y) for Jovian i.
@@ -736,91 +669,6 @@ CODE jov-spr-xy   \ ( i -- spr x y )
         CLRB                    ; clamp underflow to 0
 @yok    CLRA
         STD     ,U              ; y
-        PULS    X
-        ;NEXT
-;CODE
-
-CODE jov-bg-xy   \ ( i -- bg x y )
-        PSHS    X               ; save IP
-        LDA     1,U             ; A = i
-        LEAU    -4,U            ; grow stack by 2 cells
-        PSHS    A               ; save i
-        ; bg addr = i * 28 + JOV-BG0
-        LDB     #28
-        MUL
-        ADDD    #$80F0          ; JOV-BG0
-        STD     4,U             ; bg addr
-        ; sprite header for centering: i * 23 + JOV-SPR0
-        LDA     ,S+             ; i
-        PSHS    A               ; save i again
-        LDB     #23
-        MUL
-        ADDD    #$8200          ; JOV-SPR0
-        TFR     D,Y             ; Y = spr header
-        LDA     ,S+             ; i
-        ASLA                    ; i*2
-        PSHS    A               ; save i*2
-        LDX     #$804A          ; JOV-POS
-        LDB     ,Y              ; width
-        LSRB
-        NEGB
-        ADDB    A,X             ; pos_x - width/2
-        BCS     @xok
-        CLRB                    ; clamp underflow to 0
-@xok    CLRA
-        STD     2,U
-        LDA     ,S+             ; i*2
-        INCA
-        LDB     1,Y             ; height
-        LSRB
-        NEGB
-        ADDB    A,X             ; pos_y - height/2
-        BCS     @yok
-        CLRB                    ; clamp underflow to 0
-@yok    CLRA
-        STD     ,U
-        PULS    X
-        ;NEXT
-;CODE
-
-CODE jov-bg-old-xy   \ ( i -- bg oldx oldy )
-        PSHS    X               ; save IP
-        LDA     1,U             ; A = i
-        LEAU    -4,U
-        PSHS    A               ; save i
-        LDB     #28
-        MUL
-        ADDD    #$80F0          ; JOV-BG0
-        STD     4,U             ; bg addr
-        LDA     ,S+             ; i
-        PSHS    A
-        LDB     #23
-        MUL
-        ADDD    #$8200          ; JOV-SPR0
-        TFR     D,Y             ; Y = spr header (for width/height)
-        LDA     ,S+             ; i
-        PSHS    A               ; save i
-        ; oldx = JOV-OLDX[i] - width/2
-        LDX     #$80C6          ; JOV-OLDX
-        LDB     ,Y              ; width
-        LSRB
-        NEGB
-        ADDB    A,X             ; OLDX[i] - width/2
-        BCS     @xok
-        CLRB
-@xok    CLRA
-        STD     2,U
-        ; oldy = JOV-OLDY[i] - height/2
-        LDA     ,S+             ; i
-        LDX     #$80C9          ; JOV-OLDY
-        LDB     1,Y             ; height
-        LSRB
-        NEGB
-        ADDB    A,X             ; OLDY[i] - height/2
-        BCS     @yok
-        CLRB
-@yok    CLRA
-        STD     ,U
         PULS    X
         ;NEXT
 ;CODE
@@ -3747,9 +3595,6 @@ CODE collision-scan  ( sx sy array count -- flag )
 
 VARIABLE grav-tick
 
-VARIABLE sg-i                      \ (unused after #242, kept for FVAR stability)
-VARIABLE sg-sx                     \ (unused after #242, kept for FVAR stability)
-VARIABLE sg-sy                     \ (unused after #242, kept for FVAR stability)
 
 \ ── ship-gravity CODE word (#242) ────────────────────────────────────────
 \ Replaces gravity-well + star-gravity + xyn-pull + xy-pull + star-pull.
@@ -4019,8 +3864,6 @@ VARIABLE jbeam-y2
 \ live Jovian bounding boxes (7×5 sprite: x±3, y±2).
 
 
-VARIABLE bchk-buf                  \ path buffer base for hit check
-VARIABLE bchk-px                   \ pixel index being checked
 VARIABLE bchk-hitpx                \ pixel index where hit was found
 
 \ Walk path buffer, check each pixel against Jovian bounding boxes.
@@ -4094,10 +3937,6 @@ CODE beam-check-path-hits   \ ( buf count -- hit-idx|-1 )
 \ ── Clamp beam coordinates to tactical view ──────────────────────────
 
 \ Scan path buffer for first non-black pixel (obstacle)
-\ Returns index of first obstacle, or count if path is clear
-VARIABLE bfo-hit
-VARIABLE bfo-found
-
 \ Scan path buffer for first non-black saved pixel (obstacle).
 \ Returns index of first obstacle, or count if path is clear.
 CODE beam-find-obstacle   \ ( buf count -- index )
@@ -4362,7 +4201,6 @@ VARIABLE msl-active              \ nonzero = missile in flight
 : msl-scrx  ( -- x )  msl-x @ 7 RSHIFT ;
 : msl-scry  ( -- y )  msl-y @ 7 RSHIFT ;
 
-: msl-erase  ( -- )  restore-msl-bg ;
 : msl-kill  ( -- )  \ deactivate missile + trigger full redraw
   msl-active @ IF
     SPR-MSL1 msl-px @ 1 - msl-py @ 1 - spr-erase-box
