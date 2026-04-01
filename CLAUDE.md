@@ -2,6 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## IMPORTANT: No Memory Files
+Do NOT use the `~/.claude/projects/*/memory/` system. Do not create MEMORY.md or any files in the memory directory. All persistent knowledge belongs in THIS file (CLAUDE.md) and nowhere else.
+
 ## Project Overview
 
 What if the TRS-80 Color Computer had shipped with real developer tools instead of a cramped BASIC prompt? That's the question driving **CoCo Renovation** — a from-scratch development environment delivered on a ROM cartridge, giving the CoCo the toolchain it deserved in 1982 but never got. The real hardware runs. Only the software gets an upgrade.
@@ -132,10 +135,10 @@ Do not access, search, or modify files outside these paths. If a task appears to
 CoCo Renovation — on-device Forth development environment for the TRS-80 Color Computer.
 Primary doc: `COCO_RENOVATION.md`. Tech reference: `coco_technical_reference.pdf`.
 
-## Current State (2026-03-30)
+## Current State (2026-04-01)
 Tutorial series, calculator, Getting Started ch1–13: all COMPLETE.
 Space Warp: core gameplay complete, nearing v1.0.
-App size: 24,569 bytes, headroom 7 bytes. Data at $8000+, font at $6000.
+App size: 24,502 bytes, headroom 74 bytes. Data at $8000+, font at $9000.
 Budget: 14,930cy/frame. Slot-based think scheduling (3 Jovians, skip 1-6).
 HSYNC beam-chasing (#262): after VSYNC, wait for beam to pass sprites before VRAM writes.
 Beam system (#259): paint-black erase + draw-stars redraw + beam-scrub-sprites.
