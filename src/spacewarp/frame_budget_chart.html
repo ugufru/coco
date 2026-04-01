@@ -85,12 +85,12 @@ const GRAV_EVEN = new Set([0, 8, 16, 24, 32, 40, 48, 56]);
 // Odd gravity frames
 const GRAV_ODD = new Set([1, 9, 17, 25, 33, 41, 49, 57]);
 
-// BG slot 1: odd frames where N AND 7 = 1
-// BG slot 5: odd frames where N AND 7 = 5
+// BG slot 1: odd frames where N AND 7 = 7 (#284, moved from 3 to avoid gravity collision)
+// BG slot 2: odd frames where N AND 7 = 5
 function hasBG(frame) {
   if (frame % 2 === 0) return false;
   const slot = frame & 7;
-  return slot === 1 || slot === 5;
+  return slot === 7 || slot === 5;
 }
 
 function buildFrame(f) {
@@ -289,6 +289,11 @@ statsEl.innerHTML = `
   <code>draw-stars</code> CODE with fixed colors (400cy; was 1,840cy).
   <code>check-win</code> bug fixed: galaxy scan no longer runs every frame (#250).
   All constants inlined as LIT.
+  <br><br>
+  <span style="color:#00ff88">BG slot rebalance (#284):</span>
+  Moved BG slot 1 from <code>AND 7 = 3</code> to <code>AND 7 = 7</code>, separating it from
+  gravity frames. Peak odd frame drops from 15,790cy (106%) to 14,430cy (97%).
+  <strong>Zero over-budget frames.</strong>
   <br><br>
   <span style="color:#00ff88">Size optimizations (#268, #280-#283):</span>
   String dedup (~161b), <code>cancel-beams</code> (6b), <code>draw-backdrop</code> (18b),

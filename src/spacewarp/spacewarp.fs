@@ -4783,7 +4783,7 @@ VARIABLE jnb-result
     THEN
     \ ── Background tasks: run even during overlays (#232) ──
     frame-tick @ 1 AND IF
-      frame-tick @ 7 AND DUP 3 = IF
+      frame-tick @ 7 AND DUP 7 = IF
         jov-check-regen  check-dock  tick-dock  tick-base-attack
       THEN 5 = IF
         tick-stardate  tick-migrate  check-spawn  update-cond

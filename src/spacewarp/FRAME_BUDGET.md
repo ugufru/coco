@@ -185,8 +185,8 @@ Current measured costs after all optimizations (#166, #215, #241-#253).
 | Tick-jovians-inner (skip) | ~110 | Slot-based: advance slot + alive/aware + skip counter → no fire |
 | Jov-gravity-pull (grav frame) | 494 | jov-gravity-pull CODE(489-494) (#243) |
 | Jov-gravity-pull (non-grav) | 30 | Early exit on grav-tick gate |
-| Background slot 1 | 1,360† | jov-check-regen(~500†) + check-dock(~300†) + tick-dock(~30† not docked) + tick-base-attack(~500†). fc.py upper bounds: 1,818 + 2,790 + 7,238 + 77,554. |
-| Background slot 5 | 1,230† | tick-stardate(~200† not firing) + tick-migrate(~200† not firing) + check-spawn(~30†) + update-cond(~800†). fc.py upper bounds: 19,802 + 26,321 + 13,246. |
+| Background slot 1 (`AND 7 = 7`) | 1,360† | jov-check-regen(~500†) + check-dock(~300†) + tick-dock(~30† not docked) + tick-base-attack(~500†). Moved from `= 3` to `= 7` to avoid gravity collision (#284). |
+| Background slot 2 (`AND 7 = 5`) | 1,230† | tick-stardate(~200† not firing) + tick-migrate(~200† not firing) + check-spawn(~30†) + update-cond(~800†). |
 | Full render | 8,458 | draw-stars CODE(196) + draw-jovians-live(1,151) + draw-ship(819) + bg-jov Forth(save 900 + restore 909 + oldpos 191 = 2,000) + bg-ship(restore 476 + save 549 = 1,025) + overhead(475†) + post-render(2,510†) |
 | Ship-only render | 4,957 | draw-ship(819) + bg-ship(1,025) + overhead(603†) + post-render(2,510†) |
 | Post-render | 2,510† | beam-erase 2×(~424†) + beam-draw 2×(~424†) + apply-beam/jbeam(~471†) + panel 3×(~714†) + check-win(~126†) + overlay(~126†) |
@@ -246,66 +246,67 @@ With skip=1, every Jovian fires on every slot.  Slot rotation: J1, J2, J0, J1, J
 Every even frame has exactly 1 think.  No 2-think frames ever.
 
 Gravity gated to every 4th even frame (frames 0, 8, 16, 24, 32, 40, 48, 56).
-Background tasks on odd frames: slot 1 at `N AND 7 = 1`, slot 5 at `N AND 7 = 5`.
+Background tasks on odd frames: slot 1 at `N AND 7 = 7` (#284), slot 2 at `N AND 7 = 5`.
+BG slot 1 moved from `= 3` to `= 7` to avoid collision with gravity frames (#284).
 jov-contact (294cy) included in EF.  tick-jovians-inner (~165cy†) runs on even frames.
 
 Component abbreviations: EF=every-frame base(3,645), SGrv=ship-gravity(476),
 Coll=check-collisions(1,833, odd frames only),
 TJov=tick-jovians-inner(~140 fire/~110 skip), J=per-think(1,449),
-JGrv=jov-gravity-pull(494/30), BG=background(slot1: 1,360†, slot5: 1,230†),
+JGrv=jov-gravity-pull(494/30), BG=background(slot1: 1,360†, slot2: 1,230†),
 Rnd-F=full render(8,458), Rnd-S=ship-only(4,957).
 
 | Fr | E/O | EF | SGrv | TJov | Think | Coll | JGrv | BG | Rnd | **Total** | |
 |----|-----|----|------|------|-------|------|------|----|-----|-----------|---|
 | 0 | E/G | 3645 | 476 | 140 | J1 1449 |  |  |  | 8458 | **14,168** | |
-| 1 | O/G | 3645 |  |  |  | 1833 | 494 | 1360 | 8458 | **15,790** | **OVER** |
+| 1 | O/G | 3645 |  |  |  | 1833 | 494 |  | 8458 | **14,430** | |
 | 2 | E | 3645 |  | 140 | J2 1449 |  |  |  | 8458 | **13,692** | |
 | 3 | O | 3645 |  |  |  | 1833 | 30 |  | 4957 | **10,465** | |
 | 4 | E | 3645 |  | 140 | J0 1449 |  |  |  | 8458 | **13,692** | |
 | 5 | O | 3645 |  |  |  | 1833 | 30 | 1230 | 4957 | **11,695** | |
 | 6 | E | 3645 |  | 140 | J1 1449 |  |  |  | 8458 | **13,692** | |
-| 7 | O | 3645 |  |  |  | 1833 | 30 |  | 4957 | **10,465** | |
+| 7 | O | 3645 |  |  |  | 1833 | 30 | 1360 | 4957 | **11,825** | |
 | 8 | E/G | 3645 | 476 | 140 | J2 1449 |  |  |  | 8458 | **14,168** | |
-| 9 | O/G | 3645 |  |  |  | 1833 | 494 | 1360 | 8458 | **15,790** | **OVER** |
-| 10-15 | | (repeats: E=13,692 / O=10,465 or 11,695) | | | | | | | | |
+| 9 | O/G | 3645 |  |  |  | 1833 | 494 |  | 8458 | **14,430** | |
+| 10-15 | | (repeats: E=13,692 / O=10,465 or 11,695 or 11,825) | | | | | | | | |
 | 16 | E/G | 3645 | 476 | 140 | J0 1449 |  |  |  | 8458 | **14,168** | |
-| 17 | O/G | 3645 |  |  |  | 1833 | 494 | 1360 | 8458 | **15,790** | **OVER** |
+| 17 | O/G | 3645 |  |  |  | 1833 | 494 |  | 8458 | **14,430** | |
 | 18-23 | | (repeats) | | | | | | | | |
 | 24 | E/G | 3645 | 476 | 140 | J1 1449 |  |  |  | 8458 | **14,168** | |
-| 25 | O/G | 3645 |  |  |  | 1833 | 494 | 1360 | 8458 | **15,790** | **OVER** |
+| 25 | O/G | 3645 |  |  |  | 1833 | 494 |  | 8458 | **14,430** | |
 | 26-55 | | (repeats 8-frame pattern) | | | | | | | | |
 | 56 | E/G | 3645 | 476 | 140 | J2 1449 |  |  |  | 8458 | **14,168** | |
-| 57 | O/G | 3645 |  |  |  | 1833 | 494 | 1360 | 8458 | **15,790** | **OVER** |
+| 57 | O/G | 3645 |  |  |  | 1833 | 494 |  | 8458 | **14,430** | |
 | 58 | E | 3645 |  | 140 | J0 1449 |  |  |  | 8458 | **13,692** | |
 | 59 | O | 3645 |  |  |  | 1833 | 30 |  | 4957 | **10,465** | |
 
-Key observation: **all even frames under budget**.  Moving check-collisions to
-odd frames shifts 1,833cy off the critical think path.  Only the 8 gravity+BG1
-odd frames (1, 9, 17, 25, 33, 41, 49, 57) exceed budget at 15,790cy (106%).
+Key observation: **all frames under budget**.  Moving BG slot 1 from `AND 7 = 3`
+to `AND 7 = 7` (#284) separates it from gravity frames.  Gravity odd frames
+(1, 9, 17, ...) drop from 15,790cy to 14,430cy.  BG1 moves to non-gravity odd
+frames (7, 15, 23, ...) at 11,825cy.  **Zero over-budget frames.**
 
 Also see `frame_budget_chart.html` for the interactive visual chart.
 
-### Summary (slot-based scheduling, after #166, #215, #241-#253)
+### Summary (slot-based scheduling, after #166, #215, #241-#253, #284)
 
-| Metric | Slot-based | Old threshold | Before optimization |
-|--------|-----------|---------------|---------------------|
+| Metric | Current | Old slot-based | Before optimization |
+|--------|---------|---------------|---------------------|
 | **Budget per frame** | 14,930 cy | 14,930 cy | 14,930 cy |
-| **Even, 1 think, no gravity** | 13,692 cy (92%) | 15,711 cy (105%) | 20,840 cy (140%) |
-| **Even, 1 think + gravity** | 14,168 cy (95%) | 16,187 cy (108%) | 27,155 cy (182%) |
-| **2 Jovians think (eliminated)** | — | 17,160 cy (115%) | 26,466 cy (177%) |
-| **Even, no think (skip > 1)** | 8,712 cy (58%) | 10,761 cy (72%) | 10,126 cy (68%) |
-| **Gravity odd + BG1 + Coll** | 15,790 cy (106%) | 13,957 cy (93%) | 22,214 cy (149%) |
-| **Light odd + Coll** | 10,465 cy (70%) | 8,632 cy (58%) | — |
-| **Frames over budget (L10)** | **8 of 60 (13%)** | 19-30 of 60 | 29 of 60 (48%) |
-| **Peak frame cost** | **15,790 cy (106%)** | 17,160 cy (115%) | 27,155 cy (182%) |
-| **Jitter (peak - trough, even)** | 476 cy (gravity only) | 6,399 cy | 17,029 cy |
+| **Even, 1 think, no gravity** | 13,692 cy (92%) | 13,692 cy (92%) | 20,840 cy (140%) |
+| **Even, 1 think + gravity** | 14,168 cy (95%) | 14,168 cy (95%) | 27,155 cy (182%) |
+| **Gravity odd + Coll** | 14,430 cy (97%) | 15,790 cy (106%) | 22,214 cy (149%) |
+| **BG1 odd + Coll** | 11,825 cy (79%) | — | — |
+| **Light odd + Coll** | 10,465 cy (70%) | 10,465 cy (70%) | — |
+| **Frames over budget (L10)** | **0 of 60 (0%)** | 8 of 60 (13%) | 29 of 60 (48%) |
+| **Peak frame cost** | **14,430 cy (97%)** | 15,790 cy (106%) | 27,155 cy (182%) |
+| **Jitter (peak - trough, even)** | 476 cy (gravity only) | 476 cy | 17,029 cy |
 
 tick-jovians-inner measured at 254cy by `fc.py --cycles` (path sum / upper bound).
 Actual execution: ~140cy (fire path) / ~110cy (skip path), no loop.
 
-**Key improvement**: At level 10, jitter between even frames drops from 6,399cy
-(the swing between 10,761 and 17,160) to just 476cy (the gravity cost on every
-4th even frame).  All even frames have nearly identical cost.
+**Key improvement**: Moving BG slot 1 from `AND 7 = 3` to `AND 7 = 7` (#284)
+eliminates all over-budget frames.  The gravity odd frames no longer collide
+with background tasks.  Peak frame drops from 15,790cy (106%) to 14,430cy (97%).
 
 At moderate difficulty (mixed skip factors), some even frames skip their Jovian's
 turn, producing a mix of 15,550cy and 10,545cy frames — but never exceeding
