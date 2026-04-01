@@ -143,6 +143,10 @@ VARIABLE pdmg-scan             \ scanner damage
 VARIABLE pdmg-defl             \ deflector damage
 VARIABLE pdmg-masr             \ maser damage
 
+: here@  pcol @ prow @ ;
+: 0max  DUP 0 < IF DROP 0 THEN ;
+: 1max  DUP 1 < IF DROP 1 THEN ;
+
 \ ── Expanded quadrant state ──────────────────────────────────────────────
 \ When the player enters a quadrant, we expand it into object arrays.
 \ Max 5 stars, 3 jovians, 1 base, 1 black hole.
@@ -958,7 +962,7 @@ CODE max-draw-y
   2 *  8 +                     \ map 0-7 → 8-22, center at neutral
   DUP 15 > IF DROP 15 THEN    \ clamp to 0-15
   4 LSHIFT                     \ emotion in hi nibble
-  pcol @ prow @ + $0F AND     \ origin = sector hash (0-15)
+  here@ + $0F AND     \ origin = sector hash (0-15)
   OR
   SWAP 3 + C! ;                \ store byte 3
 
@@ -1301,11 +1305,11 @@ CODE gen-jov-sprite   \ ( i -- )
   LOOP THEN
   DUP 0= IF 2DROP EXIT THEN       \ no living Jovians, keep old mood
   /MOD SWAP DROP                   \ average
-  pcol @ prow @ mood-addr C! ;
+  here@ mood-addr C! ;
 
 \ Load mood into spawned Jovians: bias starting emotion from mood byte
 : mood-load  ( -- )
-  pcol @ prow @ mood-addr C@       \ mood 0-15
+  here@ mood-addr C@       \ mood 0-15
   DUP 8 = IF DROP EXIT THEN       \ neutral, no bias needed
   8 -                              \ delta from neutral (-8 to +7)
   qjovians @ ?DUP IF 0 DO
@@ -1559,7 +1563,7 @@ VARIABLE reinf-found                  \ flag: found a source
         \ Mood-based chance: mood/16 probability (hot = more likely)
         2DUP mood-addr C@ 1 +         \ mood+1 (1-16)
         16 rnd < IF                   \ roll under mood → reinforce
-          pcol @ prow @               \ ( acol arow pcol prow = sc sr dc dr )
+          here@               \ ( acol arow pcol prow = sc sr dc dr )
           migrate-jovian IF
             1 reinf-found !
           THEN
@@ -2629,7 +2633,7 @@ CODE jov-gravity-pull
 : refresh-after-kill  ( -- )
   cancel-beam cancel-jbeam cancel-msl
   clear-tactical
-  draw-border draw-stars draw-storm-stars draw-event-horizon
+  draw-backdrop
   draw-base
   save-jov-oldpos
   save-jov-bgs
@@ -2644,7 +2648,7 @@ CODE jov-gravity-pull
     1 - do-spawn
     0 spawn-pending !
     1 jov-moved !
-    cancel-jbeam cancel-beam
+    cancel-beams
     cancel-msl
     refresh-after-kill
   THEN ;
@@ -2703,14 +2707,14 @@ VARIABLE expl-total                   \ total accumulated dots so far
 \ Generate one ring dot: random angle, jittered radius from center
 \ Buffer index offset by expl-total so dots accumulate across frames
 : ring-dot  ( i radius -- )
-  8 rnd 4 - +  DUP 1 < IF DROP 1 THEN  rd-rad !
+  8 rnd 4 - +  1max  rd-rad !
   64 rnd 6 *  rd-ang !
   expl-total @ + 2 * EXPLBUF +        \ buf-addr (offset by accumulated)
   rd-ang @ rd-rad @ angle-dx expl-cx @ +
-  DUP 1 < IF DROP 1 THEN  DUP 126 > IF DROP 126 THEN
+  1max  DUP 126 > IF DROP 126 THEN
   OVER C!                             \ store x
   rd-ang @ rd-rad @ angle-dy expl-cy @ +
-  DUP 1 < IF DROP 1 THEN  DUP 142 > IF DROP 142 THEN
+  1max  DUP 142 > IF DROP 142 THEN
   SWAP 1 + C! ;                       \ store y
 
 \ Fill explosion buffer with ring dots at given radius
@@ -2853,7 +2857,7 @@ CODE prox-dmg  ( cx cy radius damage count -- killmask )
   SHIP-POS C@ expl-cx @ - abs
   SHIP-POS 1 + C@ expl-cy @ - abs +
   expl-dmgrad @ < IF
-    penergy @ expl-dmgamt @ 1 RSHIFT - DUP 0 < IF DROP 0 THEN penergy !
+    penergy @ expl-dmgamt @ 1 RSHIFT - 0max penergy !
   THEN
   \ Chain-explode any proximity-killed Jovians (no further chain)
   ?DUP IF
@@ -3150,11 +3154,11 @@ CODE pick-jovian   \ ( -- i|-1 )
   jbeam-head @ jbeam-total @ < IF EXIT THEN  \ not there yet
   \ Energy damage scaled by shields
   JBEAM-DMG 300 pshields @ 2 * - * 300 /MOD SWAP DROP
-  DUP 1 < IF DROP 1 THEN
-  penergy @ SWAP - DUP 0 < IF DROP 0 THEN penergy !
+  1max
+  penergy @ SWAP - 0max penergy !
   \ System damage scaled by shields
   JBEAM-SYS-DMG 300 pshields @ 2 * - * 300 /MOD SWAP DROP
-  DUP 1 < IF DROP 1 THEN
+  1max
   \ Pick random system (0-4), reduce its level
   5 rnd DUP 0= IF DROP pdmg-ion
   ELSE DUP 1 = IF DROP pdmg-warp
@@ -3162,7 +3166,7 @@ CODE pick-jovian   \ ( -- i|-1 )
   ELSE DUP 3 = IF DROP pdmg-defl
   ELSE DROP pdmg-masr
   THEN THEN THEN THEN
-  SWAP NEGATE OVER @ + DUP 0 < IF DROP 0 THEN SWAP !
+  SWAP NEGATE OVER @ + 0max SWAP !
   \ Confidence boost to the shooter
   pj-result @ DUP 0 < 0= IF 1 SWAP jov-emotion-stim ELSE DROP THEN
   0 jbeam-hit-ship ! ;
@@ -3201,7 +3205,7 @@ VARIABLE fs-tmp
 
 : gen-storm-stars  ( -- )
   0 fstar-count !
-  pcol @ prow @ gal@ q-storm? 0= IF EXIT THEN
+  here@ gal@ q-storm? 0= IF EXIT THEN
   qstars @ 3 * ?DUP IF 0 DO
     rnd-x rnd-y                  \ ( x y )
     2DUP in-grav-well? IF
@@ -3259,7 +3263,7 @@ VARIABLE sp-r2
 : gen-event-horizon  ( -- )
   0 spiral-count !
   qbhole @ 0= IF EXIT THEN
-  pcol @ prow @ gal@ q-storm? 0= IF EXIT THEN
+  here@ gal@ q-storm? 0= IF EXIT THEN
   0 gen-spiral-arm
   90 gen-spiral-arm
   180 gen-spiral-arm
@@ -3270,9 +3274,11 @@ VARIABLE sp-r2
     SPIRAL-POS spiral-count @ 1 plot-dots
   THEN ;
 
+: draw-backdrop  draw-border draw-stars draw-storm-stars draw-event-horizon ;
+
 : draw-quadrant  ( -- )
   gen-storm-stars gen-event-horizon
-  draw-border draw-stars draw-storm-stars draw-event-horizon
+  draw-backdrop
   draw-base
   gen-genomes init-jovian-ai
   mood-load                        \ seed emotions from quadrant mood
@@ -3299,7 +3305,7 @@ VARIABLE prev-docked              \ last displayed dock state
 10 CONSTANT MASER-COST            \ energy per maser fire
 
 : use-energy  ( cost -- )
-  penergy @ SWAP - DUP 0 < IF DROP 0 THEN penergy ! ;
+  penergy @ SWAP - 0max penergy ! ;
 
 VARIABLE was-near-base
 
@@ -3861,7 +3867,7 @@ VARIABLE jbeam-y2
 : maser-dmg  ( -- n )
   pdmg-masr @ 30 * 100 /MOD SWAP DROP
   300 pshields @ 2 * - * 300 /MOD SWAP DROP
-  DUP 1 < IF DROP 1 THEN ;
+  1max ;
 
 \ ── Bbox hit detection (during beam-trace) ────────────────────────────
 \ After tracing, walk the path buffer and check each pixel against
@@ -4021,6 +4027,8 @@ CODE clamp-beam   \ ( -- )  Clamp beam x1/y1/x2/y2 to screen bounds
   THEN
   0 jbeam-total ! ;
 
+: cancel-beams  cancel-jbeam cancel-beam ;
+
 \ ── beam-scrub-pos ( buf count cx cy -- ) ─────────────────────────────
 \ Zero saved_color for beam pixels within ±4 of cx and ±3 of cy.
 \ Buffer format: 3 bytes per pixel (x, y, saved_color).
@@ -4165,7 +4173,7 @@ CODE beam-scrub-pos
   beam-head @ beam-total @ < IF EXIT THEN
   \ Apply damage
   JOV-DMG beam-hit-idx @ + C@
-  maser-dmg - DUP 0 < IF DROP 0 THEN
+  maser-dmg - 0max
   JOV-DMG beam-hit-idx @ + C!
   beam-hit-idx @ jov-flee-check
   \ If dead, cancel beams, explode, refresh
@@ -4316,12 +4324,12 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
   0 qjovians @ ?DUP IF 0 DO
     JOV-DMG I + C@ IF 1 + THEN
   LOOP THEN
-  pcol @ prow @ gal@ $FC AND OR  \ replace low 2 bits with living count
-  pcol @ prow @ gal!
+  here@ gal@ $FC AND OR  \ replace low 2 bits with living count
+  here@ gal!
   \ Save mood before leaving quadrant
   mood-save
   \ Clear beams and missile
-  cancel-jbeam cancel-beam
+  cancel-beams
   cancel-msl
   \ Expand new quadrant and redraw
   rg-pcls
@@ -4363,7 +4371,7 @@ VARIABLE sd-cancel                    \ cancel sequence progress (0-3)
 \ Detonate: explode ship with proximity damage
 : sd-detonate  ( -- )
   0 sd-active !
-  cancel-jbeam cancel-beam
+  cancel-beams
   cancel-msl
   0 17 at-xy  14 0 DO $20 rg-emit LOOP
   0 17 at-xy  s-destroyed
@@ -4372,7 +4380,7 @@ VARIABLE sd-cancel                    \ cancel sequence progress (0-3)
   explode-destruct
   proximity-damage
   clear-tactical
-  draw-border draw-stars draw-storm-stars draw-event-horizon
+  draw-backdrop
   draw-base draw-jovians-live
   0 17 at-xy  s-destroyed
   2 death-cause !
@@ -4414,7 +4422,7 @@ VARIABLE sd-cancel                    \ cancel sequence progress (0-3)
 : count-jovians  ( -- n )
   0  64 0 DO GALAXY I + C@ q-jovians + LOOP
   \ Adjust for current quadrant: subtract packed count, add living count
-  pcol @ prow @ gal@ q-jovians -
+  here@ gal@ q-jovians -
   qjovians @ ?DUP IF 0 DO
     JOV-DMG I + C@ IF 1 + THEN
   LOOP THEN ;
@@ -4657,7 +4665,7 @@ VARIABLE key-latch                \ latched keypress (survives between polls)
 \ At 180 frames (~3 seconds) the base is destroyed.
 
 : destroy-base  ( -- )
-  cancel-jbeam cancel-beam
+  cancel-beams
   \ Cancel active missile
   msl-active @ IF
     SPR-MSL1 msl-px @ 1 - msl-py @ 1 - spr-erase-box
@@ -4668,7 +4676,7 @@ VARIABLE key-latch                \ latched keypress (survives between polls)
   \ Clear quadrant state
   0 qbase !  0 QCOUNTS 2 + C!
   \ Clear base bit in galaxy byte
-  pcol @ prow @ gal@ $FB AND pcol @ prow @ gal!
+  here@ gal@ $FB AND here@ gal!
   \ Explode at base position
   BASE-POS C@ BASE-POS 1 + C@ explode-base
   refresh-after-kill
@@ -4846,7 +4854,7 @@ VARIABLE jnb-result
     check-win @ IF
       0 check-win !                  \ clear immediately — don't re-check every frame
       count-jovians 0= IF
-        cancel-jbeam cancel-beam
+        cancel-beams
         clear-tactical
         2 3 at-xy  S" ALL " rg-type  gjovians0 @ rg-u.
         S"  JOVIANS" rg-type
@@ -4866,7 +4874,7 @@ VARIABLE jnb-result
         main EXIT
       THEN
       count-bases 0= IF
-        cancel-jbeam cancel-beam
+        cancel-beams
         clear-tactical
         2 3 at-xy  S" ALL BASES" rg-type
         2 5 at-xy  s-destroyed
@@ -4880,14 +4888,14 @@ VARIABLE jnb-result
 
     \ ── Death check: energy depleted ──
     penergy @ 0= IF
-      cancel-jbeam cancel-beam
+      cancel-beams
       SHIP-POS C@ SHIP-POS 1 + C@
       0 17 at-xy  14 0 DO $20 rg-emit LOOP
       death-cause @ 1 = IF
         \ Black hole — ship vanishes, no explosion
         restore-ship-bg
         clear-tactical
-        draw-border draw-stars draw-storm-stars draw-event-horizon
+        draw-backdrop
         draw-base draw-jovians-live
         2DROP
         0 17 at-xy
@@ -4903,7 +4911,7 @@ VARIABLE jnb-result
         restore-ship-bg
         explode-ship
         clear-tactical
-        draw-border draw-stars draw-storm-stars draw-event-horizon
+        draw-backdrop
         draw-base draw-jovians-live
       THEN THEN
       \ AGAIN? prompt — any key restarts
