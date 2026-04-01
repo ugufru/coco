@@ -99,3 +99,129 @@ Only read, write, or execute files within these directories:
 - `~/.claude/` — Claude Code config and memory
 
 Do not access, search, or modify files outside these paths. If a task appears to require files elsewhere, ask first.
+
+
+# CoCo Project Reference
+
+## User
+- Collaboration style — how we work best together
+
+## Feedback
+- Issues are in issues.jsonl, not GitHub
+- Issue workflow rules — must exist before work, tested before resolved, resolved before push
+- EXIT inside IF may miscompile — avoid EXIT inside IF/THEN in fc.py Forth
+- App binary can overflow into VRAM — check sizes after adding code
+- No pushing until v1.0 — public repo, keep commits local until Space Warp is complete
+- Always track issues — create before starting, update during, never batch at end
+- Create issues before work — never retroactively; separate issues for distinct changes
+- Kill XRoar before relaunching — pkill xroar before make run
+- Video-capture no longer works for screenshots — only captures webcam, not XRoar
+- Use screen-capture MCP for XRoar testing — capture XRoar window to debug crashes and visual anomalies
+- Never spam-launch XRoar — one launch, check result, wait
+- SAM all-RAM register is $FFDF — $FFDF sets TY, $FFDE clears (even=clear, odd=set)
+- Auto-launch XRoar for testing — pkill, build, and run automatically when ready to test
+- Access boundaries — only access files in project root and ~/.claude/
+- D register byte order — 8-bit values for ADDD go in B (low), not A (high)
+- Accurate cycle calculations — measure, don't estimate; use fc.py --cycles and exact hardware constants
+- Pre-decrement by 1 illegal for stores — STA ,-S / CLR ,-S undefined; use PSHS A instead
+- Update docs before code — write theoretical analysis first, then implement, then re-measure
+- Development archives for blog — screenshot diary in archives/ for storytelling
+- Autonomous workflow — don't pause unless judgement/visual/physical feedback needed
+
+## Project
+CoCo Renovation — on-device Forth development environment for the TRS-80 Color Computer.
+Primary doc: `COCO_RENOVATION.md`. Tech reference: `coco_technical_reference.pdf`.
+
+## Current State (2026-03-30)
+Tutorial series, calculator, Getting Started ch1–13: all COMPLETE.
+Space Warp: core gameplay complete, nearing v1.0.
+App size: 24,569 bytes, headroom 7 bytes. Data at $8000+, font at $6000.
+Budget: 14,930cy/frame. Slot-based think scheduling (3 Jovians, skip 1-6).
+HSYNC beam-chasing (#262): after VSYNC, wait for beam to pass sprites before VRAM writes.
+Beam system (#259): paint-black erase + draw-stars redraw + beam-scrub-sprites.
+Bounce demo (src/bounce/): HSYNC testbed, 4 balls, mode switching, font HUD.
+fc.py: inline_constants(), FVAR_* EQU export. Lacks BEGIN/WHILE/REPEAT.
+fc.py quirks: preprocess_asm strips blank CODE block lines; ASCII-only comments.
+
+## Getting Started — Layout
+- `getting-started/style.css` — landscape format, max-width: 1100px
+- Chapter opener uses CSS grid (2-col): illustration right (260px), label+title left, green bar spans full width at bottom
+- Mobile ≤640px reverts to flex-column with illustration full-width on top
+- Horizontal padding throughout: 64px
+
+## Getting Started — Adding Real Images to Illustration Placeholders
+Images live in `getting-started/images/`. To replace a placeholder `div.illustration`:
+1. Container div: add `style="width:Xpx; height:auto; padding:0; border:none; background:none;"`
+   - opener: ~220px, aside: ~220px, small: ~200px (all landscape images need more width than defaults)
+2. `<img>` tag: `style="width:100%; height:auto; display:block;"` + descriptive `alt` text
+3. If a `.rule-box` immediately follows a floated illustration, add `style="overflow:hidden"` to
+   prevent its border from bleeding under the float.
+
+## Key Files
+- `forth/kernel/kernel.asm` — 6809 Forth executor, assembles with lwasm
+- `forth/kernel/Makefile` — `make` builds, `make run` launches XRoar
+- `forth/tools/fc.py` — Forth cross-compiler (Forth source → DECB binary)
+- `forth/hello/hello.fs` — Hello World source
+
+## XRoar Setup
+- Machine: `coco2bus` (CoCo 2, NTSC)
+- ROMs: `~/.xroar/roms/bas12.rom` + `~/.xroar/roms/extbas11.rom`
+- Run: `xroar -machine coco2bus -bas bas12.rom -extbas extbas11.rom -run build/combined.bin`
+
+## Memory Map (current, 2026-03-23)
+- `$0050–$0082` — Kernel variables (direct page, 51 bytes)
+- `$0600–$1FFF` — RG6 VRAM (6144 bytes, set by rg-init after boot)
+- `$0E00` — Bootstrap (copies staged kernel to $E000, enables all-RAM)
+- `$1000` — Staged kernel (DECB load addr; copied to $E000 at boot)
+- `$2000–$7FF9` — App code (24,569 bytes, 7 bytes headroom to $8000)
+- `$8000–$8EF4` — Game data (all-RAM region, see spacewarp.fs CONSTANTs)
+- `$8050` — BASE-POS (2 bytes: x, y) — NOT $8056!
+- `$8054` — SHIP-POS (2 bytes: x, y)
+- `$8056` — JOV-DMG (3 bytes, one per Jovian) — NOT $8050!
+- `$80B0–$80B3` — QCOUNTS shadow bytes (nstars, njovians, hasbase, hasbhole) for CODE word access
+- `$9000–$91D8` — Font glyphs (59 glyphs × 8 bytes, all-RAM region)
+- `$DE00` — Data stack base (U, grows down)
+- `$E000` — Return stack init (S, grows down from $DFFF)
+- `$E000–$E869` — Kernel code (final location, all-RAM mode, 53 primitives + DOVAR data)
+- `$E86A–$FEFF` — Static data / kernel growth (~5.7K)
+- fc.py remaps kernel DECB records from $E000+ to $1000 (staging)
+- All-RAM mode via `STA $FFDF` (NOT $FFDE — $FFDF sets TY, $FFDE clears)
+- **Headroom**: App ends $7FF9, data starts $8000 — 7 bytes free
+- Data relocated from $75xx–$7Exx to $8000+ all-RAM region (commit 68e10b9)
+
+## Architecture
+- Threading: ITC (Indirect Threaded Code)
+- X = IP, U = DSP, S = RSP, Y = scratch
+- Kernel at $E000 (all-RAM mode); bootstrap at $0E00 copies staged kernel from $1000
+- App at $2000 is cross-compiled Forth; combined into single DECB binary
+- VRAM at $0600 (set by rg-init); app is contiguous (no --hole needed)
+
+## CoCo Keyboard Matrix
+Each key has its OWN column — keys are NOT grouped by column as keyboard.fs claims.
+Arrow keys: UP=$F7/$08, DN=$EF/$08, LT=$DF/$08, RT=$BF/$08 (all row $08, separate columns).
+Number 0-9: columns $FE-$DF, all row $10.
+Source of truth: kernel.asm KEY_TABLE (line ~763), NOT forth/lib/keyboard.fs.
+
+## 6809 / lwasm Gotchas
+- `,-U` (postbyte $C2) = **1-byte** pre-decrement — WRONG for 16-bit stack push
+- `,--U` (postbyte $C3) = **2-byte** pre-decrement — correct; use `STD ,--U` to push
+- Use `LDD ,U` + `LEAU 2,U` instead of `LDD ,U++` for explicit, readable stack pop
+
+## 6809 Comparison Primitive Pattern
+Do NOT load D before a conditional branch — `LDD #0` clobbers N/Z/V set by CMPD/SUBD.
+Branch on flags first, then load result.
+
+## DO/LOOP Implementation Notes
+- IR: `('do',)` + `('label', name)` (label AFTER do, pointing to first body word)
+- `do_counter` is global across all definitions — do NOT reset it inside `:`
+- LOOP offset = label_addr − (offset_cell_addr + 2); negative = branch back
+- Return stack during loop: TOS=index, NOS=limit (both 16-bit)
+
+## Reference
+- Architecture SVG — how to update the Space Warp mind map
+- [AI Diversity Strategy](src/spacewarp/AI_DIVERSITY_STRATEGY.md) — Jovian genome system spec (issues #172–#179)
+- XRoar interaction — osascript keystroke injection, game controls, testing loop
+
+## ASCII → VDG Encoding
+`screen_byte = $40 | (ascii & $3F)`
+For uppercase A-Z: screen_byte == ascii (no change needed).

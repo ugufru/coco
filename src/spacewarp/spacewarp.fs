@@ -3808,6 +3808,10 @@ VARIABLE cmd-digits               \ number of digits entered
 : clear-cmd-area  ( -- )
   17 18 at-xy  15 0 DO  $20 rg-emit  LOOP ;
 
+\ Show rejection feedback in command area (#238)
+: cmd-reject  ( addr len -- )
+  clear-cmd-area  17 18 at-xy  rg-type  2 cmd-state ! ;
+
 : draw-cmd-prompt  ( -- )
   clear-cmd-area
   17 18 at-xy
@@ -4495,9 +4499,16 @@ VARIABLE sg-row                   \ scan grid: outer loop row
     DUP pdmg-defl @ > IF DROP pdmg-defl @ THEN pshields !
     draw-panel
   THEN
-  cmd-num @ 5 = IF cmd-val @ fire-maser THEN
-  cmd-num @ 6 = IF cmd-val @ fire-missile THEN
+  cmd-num @ 5 = IF
+    penergy @ 2 > IF cmd-val @ fire-maser
+    ELSE S" NO ENERGY" cmd-reject THEN
+  THEN
+  cmd-num @ 6 = IF
+    pmissiles @ IF cmd-val @ fire-missile
+    ELSE S" NO MISSILES" cmd-reject THEN
+  THEN
   cmd-num @ 7 = IF do-destruct THEN
+  cmd-state @ 2 = IF 0 cmd-state ! EXIT THEN  \ feedback shown, keep it
   0 cmd-state !
   sd-active @ 0= IF draw-cmd-prompt THEN ;
 
@@ -4510,21 +4521,27 @@ VARIABLE sg-row                   \ scan grid: outer loop row
   overlay @ IF
     cmd-num @ 5 < 0= IF dismiss-overlay THEN
   THEN
-  \ Others: clear area once, show "N? ", start digit collection
+  \ Others: show command name, start digit collection
   1 cmd-state !
   0 cmd-val !  0 cmd-digits !
   clear-cmd-area
   17 18 at-xy
-  cmd-num @ CHAR 0 + rg-emit
-  CHAR ? rg-emit ;
+  cmd-num @ 2 = IF S" WARP?" rg-type EXIT THEN
+  cmd-num @ 4 = IF S" SHLD?" rg-type EXIT THEN
+  cmd-num @ 5 = IF S" MASR?" rg-type EXIT THEN
+  cmd-num @ 6 = IF S" MISS?" rg-type EXIT THEN
+  S" DEST?" rg-type ;
 
 : cmd-add-digit  ( digit -- )
   cmd-digits @ 3 < IF
     DUP cmd-val @ 10 * + cmd-val !
     1 cmd-digits +!
-    \ Position cursor explicitly: col 18 + digit count, row 18
-    cmd-digits @ 18 + 18 at-xy
+    \ Position cursor after command name prompt
+    cmd-digits @ 21 + 18 at-xy
     CHAR 0 + rg-emit
+    \ Auto-execute: warp after 2 digits (#235), destruct after 3 (#236)
+    cmd-num @ 2 = cmd-digits @ 2 = AND IF exec-command THEN
+    cmd-num @ 7 = cmd-digits @ 3 = AND IF exec-command THEN
   ELSE
     DROP
   THEN ;
