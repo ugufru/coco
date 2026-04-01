@@ -137,12 +137,24 @@ Also fixed: #251 `apply-intent` CMPB 10,S→9,S (Jovians were frozen since #241)
 #252 Sprite coordinate underflow clamping (BCS/CLRB).
 #253 Two STA ,-S → PSHS A fixes.
 
+## Size Optimizations
+
+| # | What | Savings |
+|---|------|---------|
+| #268 | Deduplicate repeated string literals | ~161 bytes |
+| #280 | Factor `cancel-jbeam cancel-beam` → `cancel-beams` (7 sites) | 6 bytes |
+| #281 | Factor backdrop redraw sequence → `draw-backdrop` (5 sites) | 18 bytes |
+| #282 | Factor `pcol @ prow @` → `here@` (12 sites) | 54 bytes |
+| #283 | Factor clamp patterns → `0max` / `1max` (11 sites) | 132 bytes |
+
+App size: 24,292 bytes at $2000. Headroom to $8000: **284 bytes**.
+
 ## Remaining Targets
 
 | Area | Notes |
 |------|-------|
-| #188 Sound | Feature, not optimization |
-| #181 Emotion edge cases | Behavioral tuning |
+| #188 Sound | Feature, not optimization (blocked by all-RAM mode) |
+| #279 | Factor remaining repeated code patterns | Space recovery |
 | Background slots | Typical-path costs already reasonable (~3,000cy) |
 
 Note: 2-think frames are eliminated by slot-based scheduling.  Peak even frame

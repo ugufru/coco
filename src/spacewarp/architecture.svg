@@ -1064,6 +1064,8 @@
 <text x="792.3" y="1527.5" class="node-label" font-size="7.0">pcol</text>
 <circle cx="807.3" cy="1421.7" r="6.0" fill="hsl(216, 72%, 46%)" fill-opacity="0.73" stroke="hsl(216, 72%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="807.3" y="1421.7" class="node-label" font-size="7.0">prow</text>
+<circle cx="800.0" cy="1474.0" r="8.0" fill="hsl(216, 72%, 46%)" fill-opacity="0.73" stroke="hsl(216, 72%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
+<text x="800.0" y="1474.0" class="node-label" font-size="8.0">here@</text>
 <circle cx="747.5" cy="1427.6" r="6.0" fill="hsl(205, 73%, 47%)" fill-opacity="0.74" stroke="hsl(205, 73%, 47%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="747.5" y="1427.6" class="node-label" font-size="7.0">penergy</text>
 <circle cx="716.2" cy="1480.8" r="6.0" fill="hsl(227, 71%, 46%)" fill-opacity="0.72" stroke="hsl(227, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
@@ -1182,6 +1184,8 @@
 <text x="543.3" y="655.9" class="node-label" font-size="8.9">update-missiles</text>
 <circle cx="572.7" cy="766.8" r="17.4" fill="hsl(229, 71%, 46%)" fill-opacity="0.71" stroke="hsl(229, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="572.7" y="766.8" class="node-label" font-size="12.0">draw-border</text>
+<circle cx="572.7" cy="792.0" r="12.0" fill="hsl(229, 71%, 46%)" fill-opacity="0.71" stroke="hsl(229, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
+<text x="572.7" y="792.0" class="node-label" font-size="9.5">draw-backdrop</text>
 <circle cx="739.1" cy="1314.5" r="15.9" fill="hsl(219, 72%, 46%)" fill-opacity="0.73" stroke="hsl(219, 72%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="739.1" y="1314.5" class="node-label" font-size="11.1">draw-stars</text>
 <circle cx="1802.4" cy="775.1" r="16.9" fill="hsl(227, 71%, 46%)" fill-opacity="0.72" stroke="hsl(227, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
@@ -1226,18 +1230,6 @@
 <text x="1493.2" y="407.3" class="node-label" font-size="12.0">init-jovian-ai</text>
 <circle cx="466.0" cy="1143.4" r="6.0" fill="hsl(229, 71%, 46%)" fill-opacity="0.71" stroke="hsl(229, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="466.0" y="1143.4" class="node-label" font-size="7.0">jov-moved</text>
-<circle cx="587.7" cy="1037.3" r="6.0" fill="hsl(235, 70%, 45%)" fill-opacity="0.71" stroke="hsl(235, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="587.7" y="1037.3" class="node-label" font-size="7.0">hc-jx</text>
-<circle cx="542.5" cy="1111.7" r="6.0" fill="hsl(235, 70%, 45%)" fill-opacity="0.71" stroke="hsl(235, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="542.5" y="1111.7" class="node-label" font-size="7.0">hc-jy</text>
-<circle cx="468.4" cy="1055.3" r="6.0" fill="hsl(237, 70%, 45%)" fill-opacity="0.70" stroke="hsl(237, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="468.4" y="1055.3" class="node-label" font-size="7.0">jtk-nx</text>
-<circle cx="542.4" cy="1079.7" r="6.0" fill="hsl(237, 70%, 45%)" fill-opacity="0.70" stroke="hsl(237, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="542.4" y="1079.7" class="node-label" font-size="7.0">jtk-ny</text>
-<circle cx="582.9" cy="1124.2" r="12.0" fill="hsl(229, 71%, 46%)" fill-opacity="0.71" stroke="hsl(229, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="582.9" y="1124.2" class="node-label" font-size="8.4">jov-dist</text>
-<circle cx="514.3" cy="1093.8" r="6.0" fill="hsl(237, 70%, 45%)" fill-opacity="0.70" stroke="hsl(237, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="514.3" y="1093.8" class="node-label" font-size="7.0">jblk</text>
 <!-- jov-blocked? removed (inlined into apply-intent CODE #241) -->
 <circle cx="553.9" cy="839.3" r="6.0" fill="hsl(229, 71%, 46%)" fill-opacity="0.71" stroke="hsl(229, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="553.9" y="839.3" class="node-label" font-size="7.0">base-attack</text>
@@ -1326,8 +1318,6 @@
 <text x="1300.1" y="1608.9" class="node-label" font-size="8.6">jbeam-cooldown</text>
 <circle cx="1389.2" cy="1553.6" r="23.1" fill="hsl(227, 71%, 46%)" fill-opacity="0.72" stroke="hsl(227, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1389.2" y="1553.6" class="node-label" font-size="12.0">clamp-jbeam</text>
-<circle cx="1566.3" cy="358.7" r="6.0" fill="hsl(237, 70%, 45%)" fill-opacity="0.70" stroke="hsl(237, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="1566.3" y="358.7" class="node-label" font-size="7.0">jbhit-flag</text>
 <circle cx="1053.2" cy="1500.3" r="20.7" fill="hsl(224, 71%, 46%)" fill-opacity="0.72" stroke="hsl(224, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1053.2" y="1500.3" class="node-label" font-size="10.0">jbeam-ship-hit?</text>
 <circle cx="1664.1" cy="270.3" r="6.0" fill="hsl(237, 70%, 45%)" fill-opacity="0.70" stroke="hsl(237, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
@@ -1386,12 +1376,8 @@
 <text x="864.6" y="1507.1" class="node-label" font-size="9.7">ship-dx</text>
 <circle cx="828.4" cy="1477.4" r="6.7" fill="hsl(235, 70%, 45%)" fill-opacity="0.71" stroke="hsl(235, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="828.4" y="1477.4" class="node-label" font-size="7.0">ship-dy</text>
-<circle cx="1297.6" cy="1565.0" r="6.7" fill="hsl(237, 70%, 45%)" fill-opacity="0.70" stroke="hsl(237, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="1297.6" y="1565.0" class="node-label" font-size="7.0">maser-cost</text>
 <circle cx="807.9" cy="1351.0" r="11.7" fill="hsl(227, 71%, 46%)" fill-opacity="0.72" stroke="hsl(227, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="807.9" y="1351.0" class="node-label" font-size="8.2">use-energy</text>
-<circle cx="884.2" cy="1441.1" r="15.5" fill="hsl(227, 71%, 46%)" fill-opacity="0.72" stroke="hsl(227, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="884.2" y="1441.1" class="node-label" font-size="10.9">ship-on-base?</text>
 <circle cx="1649.0" cy="415.1" r="6.0" fill="hsl(237, 70%, 45%)" fill-opacity="0.70" stroke="hsl(237, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1649.0" y="415.1" class="node-label" font-size="7.0">was-near-base</text>
 <circle cx="998.5" cy="1238.0" r="35.3" fill="hsl(203, 73%, 47%)" fill-opacity="0.75" stroke="hsl(203, 73%, 47%)" stroke-width="1.5" stroke-opacity="0.6"/>
@@ -1403,12 +1389,6 @@
 <!-- ship-gravity CODE (#242) -->
 <circle cx="1327" cy="742" r="14" fill="hsl(30, 90%, 55%)" fill-opacity="0.75" stroke="hsl(30, 90%, 55%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1327" y="742" class="node-label" font-size="9.0">ship-gravity</text>
-<circle cx="1669.8" cy="391.4" r="6.0" fill="hsl(237, 70%, 45%)" fill-opacity="0.70" stroke="hsl(237, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="1669.8" y="391.4" class="node-label" font-size="7.0">sg-i</text>
-<circle cx="1710.9" cy="337.2" r="6.0" fill="hsl(227, 71%, 46%)" fill-opacity="0.72" stroke="hsl(227, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="1710.9" y="337.2" class="node-label" font-size="7.0">sg-sx</text>
-<circle cx="1582.7" cy="419.5" r="6.0" fill="hsl(227, 71%, 46%)" fill-opacity="0.72" stroke="hsl(227, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="1582.7" y="419.5" class="node-label" font-size="7.0">sg-sy</text>
 <!-- star-pull + star-gravity removed (#242, merged into ship-gravity CODE) -->
 <circle cx="760.1" cy="322.4" r="9.7" fill="hsl(232, 71%, 46%)" fill-opacity="0.71" stroke="hsl(232, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="760.1" y="322.4" class="node-label" font-size="7.0">do-dock</text>
@@ -1474,22 +1454,14 @@
 <text x="1179.1" y="1617.8" class="node-label" font-size="7.0">bolt-speed</text>
 <circle cx="1318.0" cy="1518.3" r="15.5" fill="hsl(232, 71%, 46%)" fill-opacity="0.71" stroke="hsl(232, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1318.0" y="1518.3" class="node-label" font-size="10.9">maser-dmg</text>
-<circle cx="1657.3" cy="362.5" r="6.0" fill="hsl(237, 70%, 45%)" fill-opacity="0.70" stroke="hsl(237, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="1657.3" y="362.5" class="node-label" font-size="7.0">hc-i</text>
 <circle cx="1168.7" cy="1586.8" r="6.0" fill="hsl(235, 70%, 45%)" fill-opacity="0.71" stroke="hsl(235, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1168.7" y="1586.8" class="node-label" font-size="7.0">bchk-buf</text>
 <circle cx="1159.6" cy="1661.1" r="6.0" fill="hsl(235, 70%, 45%)" fill-opacity="0.71" stroke="hsl(235, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1159.6" y="1661.1" class="node-label" font-size="7.0">bchk-px</text>
 <circle cx="1188.9" cy="1562.6" r="6.0" fill="hsl(232, 71%, 46%)" fill-opacity="0.71" stroke="hsl(232, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1188.9" y="1562.6" class="node-label" font-size="7.0">bchk-hitpx</text>
-<circle cx="1286.0" cy="1446.9" r="22.4" fill="hsl(216, 72%, 46%)" fill-opacity="0.73" stroke="hsl(216, 72%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="1286.0" y="1446.9" class="node-label" font-size="9.5">beam-check-one-jov</text>
 <circle cx="1096.6" cy="1400.4" r="18.3" fill="hsl(221, 72%, 46%)" fill-opacity="0.72" stroke="hsl(221, 72%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1096.6" y="1400.4" class="node-label" font-size="9.0">beam-check-path-hits</text>
-<circle cx="1143.6" cy="1567.8" r="6.0" fill="hsl(237, 70%, 45%)" fill-opacity="0.70" stroke="hsl(237, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="1143.6" y="1567.8" class="node-label" font-size="7.0">bfo-hit</text>
-<circle cx="1188.7" cy="1649.1" r="6.0" fill="hsl(237, 70%, 45%)" fill-opacity="0.70" stroke="hsl(237, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="1188.7" y="1649.1" class="node-label" font-size="7.0">bfo-found</text>
 <circle cx="1202.5" cy="1424.1" r="16.7" fill="hsl(229, 71%, 46%)" fill-opacity="0.71" stroke="hsl(229, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1202.5" y="1424.1" class="node-label" font-size="9.5">beam-find-obstacle</text>
 <circle cx="1138.1" cy="1474.0" r="23.1" fill="hsl(227, 71%, 46%)" fill-opacity="0.72" stroke="hsl(227, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
@@ -1498,6 +1470,8 @@
 <text x="1221.1" y="1487.7" class="node-label" font-size="10.2">cancel-beam</text>
 <circle cx="1257.1" cy="1538.8" r="14.6" fill="hsl(211, 72%, 47%)" fill-opacity="0.74" stroke="hsl(211, 72%, 47%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1257.1" y="1538.8" class="node-label" font-size="10.2">cancel-jbeam</text>
+<circle cx="1239.1" cy="1513.2" r="12.0" fill="hsl(211, 72%, 47%)" fill-opacity="0.74" stroke="hsl(211, 72%, 47%)" stroke-width="1.5" stroke-opacity="0.6"/>
+<text x="1239.1" y="1513.2" class="node-label" font-size="9.5">cancel-beams</text>
 <circle cx="1090.2" cy="1312.9" r="24.9" fill="hsl(181, 75%, 49%)" fill-opacity="0.77" stroke="hsl(181, 75%, 49%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1090.2" y="1312.9" class="node-label" font-size="12.0">fire-maser</text>
 <circle cx="1253.9" cy="1361.4" r="22.8" fill="hsl(216, 72%, 46%)" fill-opacity="0.73" stroke="hsl(216, 72%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
@@ -1524,16 +1498,12 @@
 <text x="1033.2" y="271.4" class="node-label" font-size="7.0">msl-active</text>
 <circle cx="949.1" cy="221.3" r="6.7" fill="hsl(237, 70%, 45%)" fill-opacity="0.70" stroke="hsl(237, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="949.1" y="221.3" class="node-label" font-size="7.0">msl-speed</text>
-<circle cx="967.5" cy="326.3" r="6.7" fill="hsl(237, 70%, 45%)" fill-opacity="0.70" stroke="hsl(237, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="967.5" y="326.3" class="node-label" font-size="7.0">msl-cost</text>
 <circle cx="930.4" cy="308.6" r="10.6" fill="hsl(227, 71%, 46%)" fill-opacity="0.72" stroke="hsl(227, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="930.4" y="308.6" class="node-label" font-size="7.5">msl-spr</text>
 <circle cx="1013.9" cy="302.0" r="8.6" fill="hsl(221, 72%, 46%)" fill-opacity="0.72" stroke="hsl(221, 72%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1013.9" y="302.0" class="node-label" font-size="7.0">msl-scrx</text>
 <circle cx="974.9" cy="289.6" r="8.6" fill="hsl(221, 72%, 46%)" fill-opacity="0.72" stroke="hsl(221, 72%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="974.9" y="289.6" class="node-label" font-size="7.0">msl-scry</text>
-<circle cx="977.9" cy="243.8" r="6.7" fill="hsl(229, 71%, 46%)" fill-opacity="0.71" stroke="hsl(229, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
-<text x="977.9" y="243.8" class="node-label" font-size="7.0">msl-erase</text>
 <circle cx="1027.2" cy="426.0" r="16.4" fill="hsl(232, 71%, 46%)" fill-opacity="0.71" stroke="hsl(232, 71%, 46%)" stroke-width="1.5" stroke-opacity="0.6"/>
 <text x="1027.2" y="426.0" class="node-label" font-size="11.5">msl-oob?</text>
 <circle cx="1009.8" cy="232.8" r="6.0" fill="hsl(237, 70%, 45%)" fill-opacity="0.70" stroke="hsl(237, 70%, 45%)" stroke-width="1.5" stroke-opacity="0.6"/>
@@ -1670,8 +1640,6 @@
 <text x="320" y="1135" class="node-label" font-size="6.5">jov-emotion-decay-all</text>
 <circle cx="290" cy="1100" r="4" fill="hsl(240, 71%, 46%)" fill-opacity="0.85" filter="url(#glow)"/>
 <text x="290" y="1100" class="node-label" font-size="7">emotion-timer</text>
-<circle cx="260" cy="1120" r="4" fill="hsl(240, 71%, 46%)" fill-opacity="0.85" filter="url(#glow)"/>
-<text x="260" y="1120" class="node-label" font-size="7">emotion-decay-rate</text>
 <!-- Group C: Detection/awareness -->
 <circle cx="420" cy="980" r="7" fill="hsl(215, 71%, 46%)" fill-opacity="0.85" filter="url(#glow)"/>
 <text x="420" y="980" class="node-label" font-size="8">jov-player-dist</text>
@@ -1687,8 +1655,6 @@
 <text x="510" y="1010" class="node-label" font-size="10">jov-detect-tick</text>
 <circle cx="430" cy="1020" r="4" fill="hsl(240, 71%, 46%)" fill-opacity="0.85" filter="url(#glow)"/>
 <text x="430" y="1020" class="node-label" font-size="7">detect-timer</text>
-<circle cx="400" cy="1010" r="4" fill="hsl(240, 71%, 46%)" fill-opacity="0.85" filter="url(#glow)"/>
-<text x="400" y="1010" class="node-label" font-size="7">detect-rate</text>
 <!-- Group D: Mood persistence -->
 <circle cx="720" cy="1400" r="5" fill="hsl(240, 71%, 46%)" fill-opacity="0.85" filter="url(#glow)"/>
 <text x="720" y="1400" class="node-label" font-size="7">mood-grid</text>
@@ -1704,8 +1670,6 @@
 <text x="820" y="1370" class="node-label" font-size="10">tick-stardate</text>
 <circle cx="850" cy="1400" r="4" fill="hsl(240, 71%, 46%)" fill-opacity="0.85" filter="url(#glow)"/>
 <text x="850" y="1400" class="node-label" font-size="7">stardate-timer</text>
-<circle cx="850" cy="1430" r="4" fill="hsl(240, 71%, 46%)" fill-opacity="0.85" filter="url(#glow)"/>
-<text x="850" y="1430" class="node-label" font-size="7">stardate-frames</text>
 <!-- Group E: Sprite generation -->
 <circle cx="1780" cy="1010" r="7" fill="hsl(215, 71%, 46%)" fill-opacity="0.85" filter="url(#glow)"/>
 <text x="1780" y="1010" class="node-label" font-size="9">jov-spr</text>
@@ -1735,6 +1699,11 @@
 <text x="1720" y="990" class="node-label" font-size="10">bg-save-7</text>
 <rect x="1712.0" y="1012.0" width="16.0" height="16.0" fill="hsl(200, 71%, 46%)" fill-opacity="0.85" filter="url(#glow)" rx="2"/>
 <text x="1720" y="1020" class="node-label" font-size="10">bg-restore-7</text>
+<!-- Utility words (factored patterns) -->
+<circle cx="1640" cy="370" r="6" fill="hsl(200, 71%, 46%)" fill-opacity="0.85" filter="url(#glow)"/>
+<text x="1640" y="370" class="node-label" font-size="7">0max</text>
+<circle cx="1680" cy="370" r="6" fill="hsl(200, 71%, 46%)" fill-opacity="0.85" filter="url(#glow)"/>
+<text x="1680" y="370" class="node-label" font-size="7">1max</text>
 <!-- Group F: Misc new words -->
 <rect x="681.0" y="431.0" width="18.0" height="18.0" fill="hsl(195, 71%, 46%)" fill-opacity="0.85" filter="url(#glow)" rx="2"/>
 <text x="690" y="440" class="node-label" font-size="10">collision-scan</text>
@@ -1823,7 +1792,6 @@
 <text x="868.1" y="1623.8" class="node-label" font-size="8.0">find-hottest</text>
 <text x="913.1" y="1623.8" class="node-label" font-size="8.0">pick-calm-source</text>
 <text x="958.1" y="1623.8" class="node-label" font-size="8.0">tick-migration</text>
-<text x="1003.1" y="1623.8" class="node-label" font-size="8.0">migrate-frames</text>
 <text x="1048.1" y="1623.8" class="node-label" font-size="8.0">tick-migrate</text>
 <text x="1093.1" y="1623.8" class="node-label" font-size="8.0">check-spawn</text>
 <text x="828.1" y="1663.8" class="node-label" font-size="7.0">mg-sc</text>
@@ -1867,7 +1835,6 @@
 <text x="628.2" y="700.0" class="node-label" font-size="8.0">update-cond</text>
 <text x="593.5" y="761.7" class="node-label" font-size="8.0">check-sos</text>
 <text x="534.5" y="742.1" class="node-label" font-size="7.0">prev-cond</text>
-<text x="856.5" y="1449.5" class="node-label" font-size="8.0">ship-jov-blocked?</text>
 <text x="581.4" y="862.2" class="node-label" font-size="8.0">check-spawn</text>
 <text x="571.4" y="917.2" class="node-label" font-size="7.0">frame-tick</text>
 <!-- New words added 2026-03-26 -->

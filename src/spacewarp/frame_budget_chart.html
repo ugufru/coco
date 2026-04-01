@@ -289,9 +289,12 @@ statsEl.innerHTML = `
   <code>draw-stars</code> CODE with fixed colors (400cy; was 1,840cy).
   <code>check-win</code> bug fixed: galaxy scan no longer runs every frame (#250).
   All constants inlined as LIT.
-  #251: <code>apply-intent</code> CMPB 10,S→9,S fix (Jovians were frozen).
-  #252: Sprite coordinate underflow clamping (BCS/CLRB).
-  #253: Two STA ,-S → PSHS A fixes.
+  <br><br>
+  <span style="color:#00ff88">Size optimizations (#268, #280-#283):</span>
+  String dedup (~161b), <code>cancel-beams</code> (6b), <code>draw-backdrop</code> (18b),
+  <code>here@</code> (54b), <code>0max</code>/<code>1max</code> (132b).
+  App: 24,292 bytes, headroom 284 bytes.
+  <br><br>
   Note: DO/LOOP and nested-loop costs are fc.py base values (single iteration);
   real multi-iteration costs are higher. Relative comparisons remain valid.
 `;
