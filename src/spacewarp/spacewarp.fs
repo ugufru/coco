@@ -315,6 +315,8 @@ VARIABLE gq-tmp                \ temp for building quadrant byte
     rnd-y STAR-POS I 2 * + 1 + C!
   LOOP THEN
 
+  \ Clear all Jovian health (prevent stale data in unused slots)
+  0 JOV-DMG C!  0 JOV-DMG 1 + C!  0 JOV-DMG 2 + C!
   \ Generate jovian positions
   qjovians @ ?DUP IF 0 DO
     rnd-x JOV-POS I 2 * + C!
@@ -463,16 +465,12 @@ VARIABLE tcy
   17 18 at-xy  s-command ;
 
 \ Quick-update just the energy value (avoids full panel redraw)
-: update-energy  ( -- )
-  16 tcy !
-  29 tcx !  $20 rg-emit  $20 rg-emit  $20 rg-emit
-  penergy @ 32 rg-u.r ;
+\ Clear 3 chars and print right-justified value at (col,row)
+: panel-val  ( val row -- )
+  tcy !  29 tcx !  $20 rg-emit  $20 rg-emit  $20 rg-emit  32 rg-u.r ;
 
-\ Quick-update just the missiles value
-: update-missiles  ( -- )
-  15 tcy !
-  30 tcx !  $20 rg-emit  $20 rg-emit
-  pmissiles @ 32 rg-u.r ;
+: update-energy   penergy @ 16 panel-val ;
+: update-missiles pmissiles @ 15 panel-val ;
 
 \ ══════════════════════════════════════════════════════════════════════════
 \  TACTICAL VIEW DRAWING
@@ -628,11 +626,13 @@ CODE bg-restore  \ ( buf x y -- )  restore 4×5 VRAM bytes from buf
 \ Missile background buffer
 $806E CONSTANT MSL-BG                \ 20-byte save buffer
 
+: msl-coords  ( -- x y )  msl-px @ 1 - msl-py @ 1 - ;
+
 : save-msl-bg  ( -- )
   MSL-BG msl-scrx 1 - msl-scry 1 - bg-save ;
 
 : restore-msl-bg  ( -- )
-  MSL-BG msl-px @ 1 - msl-py @ 1 - bg-restore ;
+  MSL-BG msl-coords bg-restore ;
 
 VARIABLE jbg-i
 
@@ -2631,7 +2631,7 @@ CODE jov-gravity-pull
   rv @ 4608 0 FILL ;              \ clear rows 0-143 (144 * 32 bytes)
 
 : refresh-after-kill  ( -- )
-  cancel-beam cancel-jbeam cancel-msl
+  cancel-beams msl-kill
   clear-tactical
   draw-backdrop
   draw-base
@@ -2647,9 +2647,6 @@ CODE jov-gravity-pull
   spawn-pending @ ?DUP IF
     1 - do-spawn
     0 spawn-pending !
-    1 jov-moved !
-    cancel-beams
-    cancel-msl
     refresh-after-kill
   THEN ;
 
@@ -2857,7 +2854,7 @@ CODE prox-dmg  ( cx cy radius damage count -- killmask )
   SHIP-POS C@ expl-cx @ - abs
   SHIP-POS 1 + C@ expl-cy @ - abs +
   expl-dmgrad @ < IF
-    penergy @ expl-dmgamt @ 1 RSHIFT - 0max penergy !
+    expl-dmgamt @ take-damage
   THEN
   \ Chain-explode any proximity-killed Jovians (no further chain)
   ?DUP IF
@@ -2885,8 +2882,7 @@ CODE prox-dmg  ( cx cy radius damage count -- killmask )
 VARIABLE jbeam-cool               \ frames until next fire allowed
 VARIABLE jbeam-hit-ship            \ 1 = bolt will hit player ship
 VARIABLE jbeam-pending             \ 0=none, >0=raw trace count awaiting resolve
-5 CONSTANT JBEAM-DMG              \ energy damage to player per hit
-20 CONSTANT JBEAM-SYS-DMG         \ system damage per hit (out of 100)
+75 CONSTANT JBEAM-DMG              \ damage to shields/systems per hit
 
 \ Fire cooldown: 150 - (level * 14), min 24 frames
 \ Level 1: ~136 frames (2.3s), Level 5: ~80 frames (1.3s), Level 9: ~24 frames (0.4s)
@@ -2942,7 +2938,7 @@ CODE jbeam-ship-hit?   \ ( -- flag )
         LDD     FVAR_jbeam_total
         BEQ     @nohit          ; no pixels -> 0
         TFR     D,Y             ; Y = count
-        LDX     #$8474          ; JBEAM-PATH
+        LDX     #$89CC          ; JBEAM-PATH
         LDA     $8054           ; SHIP-POS x
         LDB     $8055           ; SHIP-POS y
         PSHS    D               ; S+0=ship_x, S+1=ship_y
@@ -3096,9 +3092,10 @@ CODE pick-jovian   \ ( -- i|-1 )
 
 \ Phase 2: truncate at obstacles, check ship hit, start bolt animation.
 : fire-jbeam-resolve  ( -- )
-  JBEAM-PATH jbeam-pending @ beam-find-obstacle jbeam-total !
-  jbeam-ship-hit? jbeam-hit-ship !
-  JBEAM-PATH jbeam-total @ beam-scrub-sprites
+  jbeam-pending @ jbeam-total !
+  jbeam-ship-hit? jbeam-hit-ship !       \ check hit on full trace
+  JBEAM-PATH jbeam-total @ beam-find-obstacle jbeam-total !  \ truncate at ship/obstacles
+  JBEAM-PATH jbeam-total @ beam-scrub-sprites  \ scrub for clean erase
   0 jbeam-head !  0 jbeam-tail !
   0 jbeam-pending ! ;
 
@@ -3146,27 +3143,42 @@ CODE pick-jovian   \ ( -- i|-1 )
     THEN
   THEN ;
 
+\ ── Damage helpers (shield redesign #293) ────────────────────────────
+\ Pick random system addr.
+: rnd-system  ( -- addr )
+  8 rnd DUP 4 > IF 5 - THEN
+  DUP 0= IF DROP pdmg-ion ELSE
+  DUP 1 = IF DROP pdmg-warp ELSE
+  DUP 2 = IF DROP pdmg-scan ELSE
+  3 = IF pdmg-defl ELSE pdmg-masr
+  THEN THEN THEN THEN ;
+
+\ Hit one random system; overflow to another.
+: damage-system  ( dmg -- )
+  rnd-system DUP @ ROT - DUP 0 < IF
+    NEGATE SWAP 0 SWAP !           \ to 0, overflow remains
+    rnd-system SWAP NEGATE OVER @ + 0max SWAP !
+  ELSE SWAP ! THEN ;
+
+\ Apply damage: shields absorb first, overflow to random system.
+: take-damage  ( dmg -- )
+  pshields @ IF
+    DROP 25 pshields @ OVER < IF
+      \ Shields fail
+      DROP 0 pshields !
+    ELSE
+      \ Shields hold
+      NEGATE pshields +!
+    THEN
+  ELSE
+    damage-system
+  THEN ;
+
 \ Apply Jovian beam damage when bolt reaches end
-\ Shields reduce incoming damage: absorbed = shields * 2/3.
-\ damage_taken = base * (300 - shields*2) / 300, minimum 1.
 : apply-jbeam-hit  ( -- )
   jbeam-hit-ship @ 0= IF EXIT THEN
   jbeam-head @ jbeam-total @ < IF EXIT THEN  \ not there yet
-  \ Energy damage scaled by shields
-  JBEAM-DMG 300 pshields @ 2 * - * 300 /MOD SWAP DROP
-  1max
-  penergy @ SWAP - 0max penergy !
-  \ System damage scaled by shields
-  JBEAM-SYS-DMG 300 pshields @ 2 * - * 300 /MOD SWAP DROP
-  1max
-  \ Pick random system (0-4), reduce its level
-  5 rnd DUP 0= IF DROP pdmg-ion
-  ELSE DUP 1 = IF DROP pdmg-warp
-  ELSE DUP 2 = IF DROP pdmg-scan
-  ELSE DUP 3 = IF DROP pdmg-defl
-  ELSE DROP pdmg-masr
-  THEN THEN THEN THEN
-  SWAP NEGATE OVER @ + 0max SWAP !
+  JBEAM-DMG take-damage
   \ Confidence boost to the shooter
   pj-result @ DUP 0 < 0= IF 1 SWAP jov-emotion-stim ELSE DROP THEN
   0 jbeam-hit-ship ! ;
@@ -3301,11 +3313,34 @@ VARIABLE frame-tick               \ main loop frame counter
 VARIABLE move-count               \ counts moves; energy charged every 4th
 VARIABLE prev-energy              \ last displayed energy (for dirty check)
 VARIABLE prev-missiles            \ last displayed missile count
+VARIABLE prev-shields             \ last displayed shield level
 VARIABLE prev-docked              \ last displayed dock state
 10 CONSTANT MASER-COST            \ energy per maser fire
 
 : use-energy  ( cost -- )
   penergy @ SWAP - 0max penergy ! ;
+
+\ ── Energy tick: passive regen (#226) + shield drain (#227) ──────────
+\ Called every frame. Regen: +1 every 32 frames (undocked).
+\ Drain: every 16 frames, 1 if shields<50, 2 if shields>=50.
+\ Repair first damaged system found (+5%). Returns 1 if repaired.
+: repair-any  ( -- flag )
+  pdmg-ion  @ 100 < IF 5 pdmg-ion  +! 1 EXIT THEN
+  pdmg-warp @ 100 < IF 5 pdmg-warp +! 1 EXIT THEN
+  pdmg-scan @ 100 < IF 5 pdmg-scan +! 1 EXIT THEN
+  pdmg-defl @ 100 < IF 5 pdmg-defl +! 1 EXIT THEN
+  pdmg-masr @ 100 < IF 5 pdmg-masr +! 1 EXIT THEN
+  0 ;
+
+: tick-energy  ( -- )
+  docked @ IF EXIT THEN
+  frame-tick @ 31 AND 0= IF
+    penergy @ IF
+      repair-any IF -1 penergy +!
+      ELSE penergy @ 100 < IF 1 penergy +! THEN
+      THEN
+    ELSE 1 penergy ! THEN
+  THEN ;
 
 VARIABLE was-near-base
 
@@ -3574,21 +3609,22 @@ CODE collision-scan  ( sx sy array count -- flag )
         ;NEXT
 ;CODE
 
+: ship-xy  ( -- x y )  SHIP-POS C@ SHIP-POS 1 + C@ ;
+
 : check-collisions  ( -- )
   moved @ 0= IF EXIT THEN
   \ Star collision: within 3px = destroyed
   qstars @ ?DUP IF
-    >R SHIP-POS C@ SHIP-POS 1 + C@ STAR-POS R>
+    >R ship-xy STAR-POS R>
     collision-scan IF
-      0 penergy !
+      3 death-cause !
     THEN
   THEN
   \ Black hole collision: within 3px = vanish instantly
   qbhole @ IF
-    SHIP-POS C@ SHIP-POS 1 + C@ BHOLE-POS 1
+    ship-xy BHOLE-POS 1
     collision-scan IF
       1 death-cause !
-      0 penergy !
     THEN
   THEN ;
 
@@ -3767,7 +3803,6 @@ VARIABLE dock-tick
 
 : tick-dock  ( -- )
   docked @ 0= IF EXIT THEN
-  penergy @ 100 = IF EXIT THEN
   1 dock-tick +!
   penergy @ 20 < IF                    \ 0-19%: +4 every frame
     4 penergy +!
@@ -3834,8 +3869,8 @@ VARIABLE cmd-digits               \ number of digits entered
 \ ── Path buffers (in free RAM $821C+) ──────────────────────────────────
 \ 3 bytes per pixel × 200 max pixels = 600 bytes each
 
-$821C CONSTANT BEAM-PATH           \ player maser path buffer (600 bytes)
-$8474 CONSTANT JBEAM-PATH          \ Jovian beam path buffer (600 bytes)
+$8774 CONSTANT BEAM-PATH           \ player maser path buffer (600 bytes)
+$89CC CONSTANT JBEAM-PATH          \ Jovian beam path buffer (600 bytes)
 
 \ ── Beam state variables ───────────────────────────────────────────────
 \ Per-beam: total pixel count, head index, tail index, hit info
@@ -3862,12 +3897,8 @@ VARIABLE jbeam-y2
 
 \ ── Maser damage ──────────────────────────────────────────────────────
 \ Scales with maser system health: 30 at 100%, 3 at 10%.
-\ Shields reduce output: loss = shields * 2/3 (50% shields = 1/3 loss,
-\ 100% shields = 2/3 loss).  Formula: base * (300 - shields*2) / 300.
 : maser-dmg  ( -- n )
-  pdmg-masr @ 30 * 100 /MOD SWAP DROP
-  300 pshields @ 2 * - * 300 /MOD SWAP DROP
-  1max ;
+  pdmg-masr @ 30 * 100 /MOD SWAP DROP ;
 
 \ ── Bbox hit detection (during beam-trace) ────────────────────────────
 \ After tracing, walk the path buffer and check each pixel against
@@ -4021,6 +4052,7 @@ CODE clamp-beam   \ ( -- )  Clamp beam x1/y1/x2/y2 to screen bounds
   0 beam-total ! ;
 
 : cancel-jbeam  ( -- )
+  0 jbeam-pending !
   jbeam-total @ 0= IF EXIT THEN
   jbeam-tail @ jbeam-head @ < IF
     JBEAM-PATH jbeam-tail @ jbeam-head @ jbeam-tail @ - 0 beam-draw-slice
@@ -4072,7 +4104,7 @@ CODE beam-scrub-pos
 \ ── beam-scrub-sprites ( buf count -- ) ──────────────────────────────
 \ Scrub saved_color for all dynamic sprites: ship + living Jovians.
 : beam-scrub-sprites  ( buf count -- )
-  2DUP SHIP-POS C@ SHIP-POS 1 + C@ beam-scrub-pos
+  2DUP ship-xy beam-scrub-pos
   qjovians @ ?DUP IF 0 DO
     JOV-DMG I + C@ IF
       2DUP JOV-POS I 2 * + C@ JOV-POS I 2 * + 1 + C@ beam-scrub-pos
@@ -4213,12 +4245,13 @@ VARIABLE msl-active              \ nonzero = missile in flight
 : msl-scrx  ( -- x )  msl-x @ 7 RSHIFT ;
 : msl-scry  ( -- y )  msl-y @ 7 RSHIFT ;
 
+: erase-msl  SPR-MSL1 msl-coords spr-erase-box ;
+
 : msl-kill  ( -- )  \ deactivate missile + trigger full redraw
   msl-active @ IF
-    SPR-MSL1 msl-px @ 1 - msl-py @ 1 - spr-erase-box
+    erase-msl
     0 msl-active !  1 jov-moved !
   THEN ;
-: cancel-msl  ( -- )  msl-kill ;
 
 : msl-oob?  ( -- flag )
   msl-scrx 3 < IF 1 EXIT THEN
@@ -4330,7 +4363,7 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
   mood-save
   \ Clear beams and missile
   cancel-beams
-  cancel-msl
+  msl-kill
   \ Expand new quadrant and redraw
   rg-pcls
   SWAP expand-quadrant
@@ -4371,12 +4404,13 @@ VARIABLE sd-cancel                    \ cancel sequence progress (0-3)
 \ Detonate: explode ship with proximity damage
 : sd-detonate  ( -- )
   0 sd-active !
+  overlay @ IF dismiss-overlay THEN
   cancel-beams
-  cancel-msl
+  msl-kill
   0 17 at-xy  14 0 DO $20 rg-emit LOOP
   0 17 at-xy  s-destroyed
   restore-ship-bg
-  SHIP-POS C@ SHIP-POS 1 + C@
+  ship-xy
   explode-destruct
   proximity-damage
   clear-tactical
@@ -4504,8 +4538,18 @@ VARIABLE sg-row                   \ scan grid: outer loop row
   THEN
   cmd-num @ 4 = IF
     cmd-val @ DUP 100 > IF DROP 100 THEN
-    DUP pdmg-defl @ > IF DROP pdmg-defl @ THEN pshields !
-    draw-panel
+    DUP pdmg-defl @ > IF DROP pdmg-defl @ THEN  \ deflector cap (#296)
+    DUP pshields @ > IF                          \ raising shields
+      DUP 25 < IF DROP 25 THEN                  \ minimum 25%
+      DUP 5 /MOD SWAP DROP 20 +                 \ cost = 20 + level/5
+      DUP penergy @ > IF
+        2DROP S" NO ENERGY" cmd-reject
+      ELSE
+        use-energy pshields !  draw-panel
+      THEN
+    ELSE                                         \ lowering: free
+      pshields !  draw-panel
+    THEN
   THEN
   cmd-num @ 5 = IF
     penergy @ 2 > IF cmd-val @ fire-maser
@@ -4668,7 +4712,7 @@ VARIABLE key-latch                \ latched keypress (survives between polls)
   cancel-beams
   \ Cancel active missile
   msl-active @ IF
-    SPR-MSL1 msl-px @ 1 - msl-py @ 1 - spr-erase-box
+    erase-msl
     0 msl-active !
   THEN
   \ Erase base sprite
@@ -4709,6 +4753,8 @@ VARIABLE jnb-result
       \ Fire beam at base every 60 frames
       60 /MOD SWAP DROP 0= IF
         jbeam-cool @ 0= IF BASE-POS fire-jbeam
+          \ Ship intercepted? Reset timer — player is protecting base
+          jbeam-hit-ship @ IF 0 base-attack ! THEN
         ELSE DROP THEN
       ELSE DROP THEN
     THEN
@@ -4753,6 +4799,7 @@ VARIABLE jnb-result
   0 check-win !
   100 prev-energy !
   10 prev-missiles !
+  0 prev-shields !
 
   \ Game loop
   BEGIN
@@ -4789,6 +4836,7 @@ VARIABLE jnb-result
         tick-stardate  tick-migrate  check-spawn  update-cond
       THEN
     THEN
+    tick-energy
     tick-destruct
 
     VSYNC
@@ -4810,7 +4858,7 @@ VARIABLE jnb-result
     jov-moved @ IF
       \ Full cycle: ship + Jovians + stars
       msl-active @ IF
-        SPR-MSL1 msl-px @ 1 - msl-py @ 1 - spr-erase-box
+        erase-msl
       THEN
       restore-ship-bg
       restore-jov-bgs
@@ -4824,13 +4872,13 @@ VARIABLE jnb-result
         0 msl-dirty !
       THEN
       msl-active @ IF
-        msl-spr msl-px @ 1 - msl-py @ 1 - spr-draw
+        msl-spr msl-coords spr-draw
       THEN
       0 jov-moved !
     ELSE moved @ msl-dirty @ OR IF
       \ Ship/missile only: skip Jovian bg ops + stars
       msl-active @ IF
-        SPR-MSL1 msl-px @ 1 - msl-py @ 1 - spr-erase-box
+        erase-msl
       THEN
       restore-ship-bg
       save-ship-bg draw-ship
@@ -4839,7 +4887,7 @@ VARIABLE jnb-result
         0 msl-dirty !
       THEN
       msl-active @ IF
-        msl-spr msl-px @ 1 - msl-py @ 1 - spr-draw
+        msl-spr msl-coords spr-draw
       THEN
     THEN THEN
 
@@ -4886,10 +4934,12 @@ VARIABLE jnb-result
       THEN
     THEN
 
-    \ ── Death check: energy depleted ──
-    penergy @ 0= IF
+    \ ── Death check: environmental or all-systems-zero ──
+    death-cause @
+    pdmg-ion @ pdmg-warp @ OR pdmg-scan @ OR pdmg-defl @ OR pdmg-masr @ OR
+    0= OR IF
       cancel-beams
-      SHIP-POS C@ SHIP-POS 1 + C@
+      ship-xy
       0 17 at-xy  14 0 DO $20 rg-emit LOOP
       death-cause @ 1 = IF
         \ Black hole — ship vanishes, no explosion
@@ -4906,7 +4956,7 @@ VARIABLE jnb-result
         0 17 at-xy
         s-destroyed
       ELSE
-        \ Energy depleted or star collision — ship explodes
+        \ Star collision or all systems failed — ship explodes
         0 17 at-xy  s-destroyed
         restore-ship-bg
         explode-ship
@@ -4929,6 +4979,10 @@ VARIABLE jnb-result
     pmissiles @ prev-missiles @ <> IF
       pmissiles @ prev-missiles !
       update-missiles
+    THEN
+    pshields @ prev-shields @ <> IF
+      pshields @ prev-shields !
+      pshields @ 17 panel-val
     THEN
     docked @ prev-docked @ <> IF
       docked @ prev-docked !
