@@ -192,21 +192,31 @@ objects:
 
 ### Ship Systems
 
-Five systems, each with a damage percentage (100% = fully operational, 0% = destroyed):
+Five systems, each with health (100% = fully operational, 0% = destroyed). All 5 at 0% = ship destroyed.
 
-| System | Key | Effect when damaged |
-|--------|-----|-------------------|
-| Ion engines | Arrow keys | Slower movement, eventually inoperable |
-| Hyperdrive | 2 | Cannot warp to other quadrants |
-| Scanners | 3 | Long range scan shows partial/no data |
-| Deflectors | 4 | Maximum shield energy reduced |
-| Masers | 5 | Reduced damage output |
+| System | Key | Effect when damaged | At 0% |
+|--------|-----|-------------------|-------|
+| Ion engines | Arrow keys | (Not yet implemented) | (#307: should disable movement) |
+| Hyperdrive | 2 | < 50%: 50% chance of misjump | Cannot warp |
+| Scanners | 3 | (Not yet implemented) | (#310: should garble/blank scanner) |
+| Deflectors | 4 | Caps max shield level | Cannot raise shields |
+| Masers | 5 | Damage scales linearly (30 at 100%, 0 at 0%) | Cannot damage enemies |
 
 ### Energy Model
 
-- **Ship energy** — depleted by movement, firing masers, taking hits. Recharged by docking.
-- **Deflector energy** — set as percentage (0-100%). Higher shields absorb more damage but reduce maser power. 50% shields = 1/3 maser loss. 100% shields = 2/3 maser loss.
+- **Ship energy** (0-100) — depleted by raising shields, firing masers, warp, and system repairs. Recharged passively (+1 every 32 frames) and by docking.
+- **Passive regen** — +1 energy per 32 frames (~1.9/sec). Diverted to system repair first (1 energy = 5% repair to worst system). Only accumulates when all systems are at 100%.
 - **Triton missiles** — finite supply (10 at start), replenished only by docking. One-hit kill at any range.
+
+### Shield Model
+
+Shields are a strength pool (0-100%) that degrades under fire, not a static setting.
+
+- **Raising shields**: Command 4, costs 20 + level/5 energy (25% = 25 energy, 100% = 40 energy). Minimum level 25%. Deflector health caps max level.
+- **Lowering shields**: Free (command 4, enter 0 or any lower value).
+- **Damage absorption**: Shields take 25 damage per hit (~4 hits from 100% to failure). No system damage while shields hold.
+- **Shield failure**: At 0%, shields must be re-raised manually (costs energy again). All incoming damage goes directly to systems.
+- **No passive drain**: Shields stay at their level until hit or lowered. The cost is upfront activation, not maintenance.
 
 ### Time
 
@@ -296,6 +306,13 @@ their path. After `beam-trace` computes the full Bresenham line,
 non-zero saved pixel color and truncates the beam total there. This means
 beams are blocked by stars, sprites, the border, and any other visible
 object.
+
+**Jovian beam hit detection order** (`fire-jbeam-resolve`):
+1. Check ship hit on the full unscrubbed trace (`jbeam-ship-hit?`)
+2. Truncate at first non-black pixel (`beam-find-obstacle`) — beam stops at ship sprite
+3. Scrub sprite pixels from truncated path (`beam-scrub-sprites`) — for clean erase
+
+This order ensures the beam visually stops at the ship while still detecting the hit. The ship sprite pixels act as the natural obstacle that terminates the beam.
 
 Beam erase plots black (color 0) at beam pixel positions instead of
 restoring saved pixel values. This eliminates stale-pixel artifacts when
@@ -395,13 +412,18 @@ ship center).
 
 ### Damage
 
-When a Jovian beam hits the player:
+When a Jovian beam hits the player (JBEAM-DMG = 75):
 
-- **Energy damage**: 5 points subtracted from `penergy` (clamped to 0)
-- **System damage**: A random system (ion engines, hyperdrive, scanners,
-  deflectors, or masers) takes 20 points of damage (out of 100)
+- **Shields up**: Shields absorb the hit, losing 25 points per hit. No system damage while shields hold. On shield failure (shields reach 0), shields drop and must be re-raised.
+- **Shields down**: Full 75 damage to a random system. If the target system has less than 75 health, it goes to 0 and the remainder overflows to a second random system. One unshielded hit can damage two systems.
+- **Death condition**: All 5 systems at 0% = ship destroyed. Energy can reach 0 without death.
+- **System selection**: `8 rnd DUP 4 > IF 5 - THEN` maps 0-7 into 0-4 (slightly biased toward ion/warp/scan).
 
 Jovians do not fire while the player is docked.
+
+### Ship Protection of Starbases
+
+When the player ship intercepts a Jovian beam aimed at a starbase (ship is between the Jovian and the base), the beam stops at the ship sprite, the ship takes damage, and the base-attack timer resets. The player can protect bases by physically shielding them — a classic Trek tactic with real cost (shield/system damage).
 
 ### Data Structures
 
@@ -421,9 +443,11 @@ MOOD-GRID   64 bytes  (8×8 quadrant mood persistence)
 
 ### Base Attack
 
-When a living Jovian is within 10px Manhattan distance of the base
-(`jov-near-base?`), a frame counter (`base-attack`) increments. When it
-reaches the threshold, the base is destroyed:
+When a living Jovian is within 30px Manhattan distance of the base
+(`jov-near-base?`), a frame counter (`base-attack`) increments. Every 60
+frames, the Jovian fires a beam at the base. If the player ship intercepts
+the beam, the timer resets. When it reaches 180 frames (~3 sec uninterrupted),
+the base is destroyed:
 
 1. Active beams and missiles are cancelled
 2. The base sprite is erased and the galaxy byte is updated (base bit cleared)
@@ -448,6 +472,10 @@ If all bases are destroyed, the game is lost.
 
 ### Not Yet Implemented
 
+- Shield bleedthrough below 40% (#306)
+- Ion engines at 0% disables movement (#307)
+- Non-linear repair: no passive repair below 25% (#309)
+- Scanner degradation at low health (#310)
 - Handedness-based obstacle routing (#213)
 - Sound effects (#188)
 - Inter-quadrant Jovian movement (#160)
@@ -484,9 +512,10 @@ Self-destruct is state-driven and runs inside the game loop (non-blocking).
 ## Docking
 
 Move the Endever directly above or below a starbase to dock. Docking:
-- Fully repairs all five ship systems
+- Rapidly recharges energy (tiered: +4/frame at low, +1/4 frames at high)
+- Repairs all five ship systems (+2%/frame each, ~0.8 sec to full)
 - Replenishes triton missiles to 10
-- Restores ship energy to 100%
+- Shields are NOT auto-raised — player must re-raise manually after docking
 - Takes time (stardates pass during docking)
 
 ## Future Enhancements
@@ -539,8 +568,9 @@ $0050–$0082   Kernel scratch variables (direct page, 51 bytes)
 $0600–$1FFF   RG6 VRAM (6144 bytes, set by rg-init after boot)
 $0E00         Bootstrap (copies staged kernel to $E000, enables all-RAM)
 $1000         Staged kernel (DECB load addr; copied to $E000 at boot)
-$2000–$7FE8   Application code (~24K compiled Forth, 24261 bytes)
-$8000–$8EF4   Game data (all-RAM region — galaxy, sprites, AI, beams, mood, etc.)
+$2000–$7FF7   Application code (~24K compiled Forth, 24551 bytes, 9 bytes headroom)
+$8000–$8EF4   Game data (all-RAM region — galaxy, sprites, AI, mood, etc.)
+$8774–$8C23   Beam path buffers (BEAM-PATH 600b + JBEAM-PATH 600b)
 $9000–$91D8   Font glyphs (59 × 8 bytes, all-RAM region)
 $DE00         Data stack base (U register, grows downward)
 $E000–$E869   Kernel code (59 primitives + DOVAR data, all-RAM mode)

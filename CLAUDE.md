@@ -130,21 +130,57 @@ Do not access, search, or modify files outside these paths. If a task appears to
 - Update docs before code — write theoretical analysis first, then implement, then re-measure
 - Development archives for blog — screenshot diary in archives/ for storytelling
 - Autonomous workflow — don't pause unless judgement/visual/physical feedback needed
+- rnd only works with powers of 2 — `5 rnd` produces only 0 or 4 due to AND masking; use `8 rnd` and remap (#276, #302)
+- App binary overflow into data region — at $8000 boundary, even 1 byte over corrupts GALAXY; always verify $2000+size < $8000
 
 ## Project
 CoCo Renovation — on-device Forth development environment for the TRS-80 Color Computer.
 Primary doc: `COCO_RENOVATION.md`. Tech reference: `coco_technical_reference.pdf`.
 
-## Current State (2026-04-01)
+## Current State (2026-04-03)
 Tutorial series, calculator, Getting Started ch1–13: all COMPLETE.
-Space Warp: core gameplay complete, nearing v1.0.
-App size: 24,502 bytes, headroom 74 bytes. Data at $8000+, font at $9000.
+Space Warp: core gameplay complete, shield/damage redesign in progress, targeting v1.0 release April 15.
+App size: 24,551 bytes, headroom 9 bytes. Data at $8000+, font at $9000.
 Budget: 14,930cy/frame. Slot-based think scheduling (3 Jovians, skip 1-6).
 HSYNC beam-chasing (#262): after VSYNC, wait for beam to pass sprites before VRAM writes.
 Beam system (#259): paint-black erase + draw-stars redraw + beam-scrub-sprites.
 Bounce demo (src/bounce/): HSYNC testbed, 4 balls, mode switching, font HUD.
 fc.py: inline_constants(), FVAR_* EQU export. Lacks BEGIN/WHILE/REPEAT.
 fc.py quirks: preprocess_asm strips blank CODE block lines; ASCII-only comments.
+
+## Shield / Damage / Energy Model (2026-04-03)
+Trek-style shield system — shields absorb damage, degrade under fire, cost energy to raise.
+
+**Shields:**
+- Raised via command 4 (25-100%). Cost: 20 + level/5 energy (25%=25, 100%=40).
+- Lowering shields (including to 0%) is free.
+- Shields take 25 damage per hit (~4 hits to deplete from 100%).
+- Deflector system health (pdmg-defl) caps max shield level.
+- Shields at 0% must be re-raised manually (costs energy again).
+
+**Damage (Jovian beam):**
+- JBEAM-DMG = 75 per hit. Shields up: shields absorb (no system damage). Shields down: damage hits a random system with overflow to a second system if the first is depleted.
+- All 5 systems can be hit (8 rnd DUP 4 > IF 5 - THEN — slightly biased but functional).
+- Ship can intercept beams aimed at starbase, resetting the base-attack timer.
+- Jovian beam scrub order: check ship hit on full trace, then truncate at obstacles, then scrub sprites.
+
+**Energy & Repair:**
+- Passive regen: +1 energy every 32 frames (~1.9/sec) when not docked.
+- If energy > 0 and a system is damaged: repair +5% to first damaged system, costs 1 energy.
+- If energy > 0 and all systems healthy: energy accumulates.
+- If energy = 0: slow regen to 1, then spent on next repair tick.
+- Docking: fast energy recharge + system repair (+2/frame each).
+
+**Death condition:**
+- All 5 systems at 0% = ship destroyed (not energy depletion).
+- Energy can reach 0 without death — ship is just powerless.
+- Star collision (death-cause=3), black hole (1), self-destruct (2) remain instant death.
+
+**Deferred (need bytes):**
+- #306: Shield bleedthrough below 40%
+- #307: Ion engines at 0% disables movement
+- #309: Non-linear repair (no passive repair below 25%)
+- #310: Scanner degradation at low health
 
 ## Getting Started — Layout
 - `getting-started/style.css` — landscape format, max-width: 1100px
@@ -176,7 +212,7 @@ Images live in `getting-started/images/`. To replace a placeholder `div.illustra
 - `$0600–$1FFF` — RG6 VRAM (6144 bytes, set by rg-init after boot)
 - `$0E00` — Bootstrap (copies staged kernel to $E000, enables all-RAM)
 - `$1000` — Staged kernel (DECB load addr; copied to $E000 at boot)
-- `$2000–$7FF9` — App code (24,569 bytes, 7 bytes headroom to $8000)
+- `$2000–$7FF7` — App code (24,551 bytes, 9 bytes headroom to $8000)
 - `$8000–$8EF4` — Game data (all-RAM region, see spacewarp.fs CONSTANTs)
 - `$8050` — BASE-POS (2 bytes: x, y) — NOT $8056!
 - `$8054` — SHIP-POS (2 bytes: x, y)
@@ -189,7 +225,9 @@ Images live in `getting-started/images/`. To replace a placeholder `div.illustra
 - `$E86A–$FEFF` — Static data / kernel growth (~5.7K)
 - fc.py remaps kernel DECB records from $E000+ to $1000 (staging)
 - All-RAM mode via `STA $FFDF` (NOT $FFDE — $FFDF sets TY, $FFDE clears)
-- **Headroom**: App ends $7FF9, data starts $8000 — 7 bytes free
+- `$8774–$89CB` — BEAM-PATH (player maser, 600 bytes)
+- `$89CC–$8C23` — JBEAM-PATH (Jovian beam, 600 bytes)
+- **Headroom**: App ends $7FF7, data starts $8000 — 9 bytes free
 - Data relocated from $75xx–$7Exx to $8000+ all-RAM region (commit 68e10b9)
 
 ## Architecture
@@ -223,6 +261,7 @@ Branch on flags first, then load result.
 ## Reference
 - Architecture SVG — how to update the Space Warp mind map
 - [AI Diversity Strategy](src/spacewarp/AI_DIVERSITY_STRATEGY.md) — Jovian genome system spec (issues #172–#179)
+- [Star Trek Tactical Manual](/Users/paul/github/startrek/html/) — Shield/damage/repair design reference (parts 04, 05, 06, 11 most relevant)
 - XRoar interaction — osascript keystroke injection, game controls, testing loop
 
 ## ASCII → VDG Encoding
