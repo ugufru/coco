@@ -1568,6 +1568,705 @@ CODE_COUNT_BLANKING
         LDY     ,X++
         JMP     [,Y]
 
+;;; ─── rg-pset ( x y color -- ) ──────────────────────────────────────────────
+CFA_RG_PSET     FDB     CODE_RG_PSET
+CODE_RG_PSET
+        LDA     5,U
+        LDB     3,U
+        PSHS    A
+        LDA     #32
+        MUL
+        ADDD    VAR_RGVRAM
+        TFR     D,Y
+        LDA     ,S
+        LSRA
+        LSRA
+        LEAY    A,Y
+        LDA     ,S+
+        ANDA    #$03
+        ASLA
+        NEGA
+        ADDA    #6
+        PSHS    A
+        LDA     1,U
+        ANDA    #$03
+        LDB     ,S
+        BEQ     @ns
+@sh     ASLA
+        DECB
+        BNE     @sh
+@ns     PSHS    A
+        LDA     #$03
+        LDB     1,S
+        BEQ     @nm
+@sm     ASLA
+        DECB
+        BNE     @sm
+@nm     COMA
+        ANDA    ,Y
+        ORA     ,S
+        STA     ,Y
+        LEAS    2,S
+        LEAU    6,U
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── rg-line ( x1 y1 x2 y2 color -- ) ────────────────────────────────────
+CFA_RG_LINE     FDB     CODE_RG_LINE
+CODE_RG_LINE
+        PSHS    X
+        LDA     1,U
+        STA     VAR_LINE_COL
+        LDA     5,U
+        STA     VAR_LINE_X2
+        LDA     3,U
+        STA     VAR_LINE_Y2
+        LDA     9,U
+        STA     VAR_LINE_CX
+        LDA     7,U
+        STA     VAR_LINE_CY
+        LEAU    10,U
+        CLRA
+        LDB     VAR_LINE_CX
+        PSHS    D
+        CLRA
+        LDB     VAR_LINE_X2
+        SUBD    ,S++
+        BPL     @sx_p
+        COMA
+        COMB
+        ADDD    #1
+        STB     VAR_LINE_DX
+        LDA     #$FF
+        STA     VAR_LINE_SX
+        BRA     @sx_d
+@sx_p   STB     VAR_LINE_DX
+        LDA     #$01
+        STA     VAR_LINE_SX
+@sx_d   CLRA
+        LDB     VAR_LINE_CY
+        PSHS    D
+        CLRA
+        LDB     VAR_LINE_Y2
+        SUBD    ,S++
+        BPL     @sy_p
+        COMA
+        COMB
+        ADDD    #1
+        STB     VAR_LINE_DY
+        LDA     #$FF
+        STA     VAR_LINE_SY
+        BRA     @sy_d
+@sy_p   STB     VAR_LINE_DY
+        LDA     #$01
+        STA     VAR_LINE_SY
+@sy_d   CLRA
+        LDB     VAR_LINE_DX
+        STD     VAR_LINE_ERR
+        CLRA
+        LDB     VAR_LINE_DY
+        PSHS    D
+        LDD     VAR_LINE_ERR
+        SUBD    ,S++
+        STD     VAR_LINE_ERR
+@loop   LDA     VAR_LINE_CY
+        LDB     #32
+        MUL
+        ADDD    VAR_RGVRAM
+        TFR     D,Y
+        LDA     VAR_LINE_CX
+        LSRA
+        LSRA
+        LEAY    A,Y
+        LDA     VAR_LINE_CX
+        ANDA    #$03
+        ASLA
+        NEGA
+        ADDA    #6
+        PSHS    A
+        LDA     VAR_LINE_COL
+        ANDA    #$03
+        LDB     ,S
+        BEQ     @ns
+@sh     ASLA
+        DECB
+        BNE     @sh
+@ns     PSHS    A
+        LDA     #$03
+        LDB     1,S
+        BEQ     @nm
+@sm     ASLA
+        DECB
+        BNE     @sm
+@nm     COMA
+        ANDA    ,Y
+        ORA     ,S
+        STA     ,Y
+        LEAS    2,S
+        LDA     VAR_LINE_CX
+        CMPA    VAR_LINE_X2
+        BNE     @step
+        LDA     VAR_LINE_CY
+        CMPA    VAR_LINE_Y2
+        BEQ     @done
+@step   LDD     VAR_LINE_ERR
+        ASLB
+        ROLA
+        STD     VAR_LINE_E2
+        CLRA
+        LDB     VAR_LINE_DY
+        COMA
+        COMB
+        ADDD    #1
+        CMPD    VAR_LINE_E2
+        BGE     @nosx
+        CLRA
+        LDB     VAR_LINE_DY
+        PSHS    D
+        LDD     VAR_LINE_ERR
+        SUBD    ,S++
+        STD     VAR_LINE_ERR
+        LDA     VAR_LINE_CX
+        ADDA    VAR_LINE_SX
+        STA     VAR_LINE_CX
+@nosx   CLRA
+        LDB     VAR_LINE_DX
+        CMPD    VAR_LINE_E2
+        BLE     @nosy
+        CLRA
+        LDB     VAR_LINE_DX
+        ADDD    VAR_LINE_ERR
+        STD     VAR_LINE_ERR
+        LDA     VAR_LINE_CY
+        ADDA    VAR_LINE_SY
+        STA     VAR_LINE_CY
+@nosy   LBRA    @loop
+@done   PULS    X
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── spr-draw ( addr x y -- ) ─────────────────────────────────────────────
+CFA_SPR_DRAW    FDB     CODE_SPR_DRAW
+CODE_SPR_DRAW
+        PSHS    X
+        LDA     3,U
+        STA     VAR_SPR_SX
+        LDA     1,U
+        STA     VAR_SPR_SY
+        LDY     4,U
+        LEAU    6,U
+        LDA     ,Y
+        STA     VAR_SPR_W
+        LDA     1,Y
+        STA     VAR_SPR_H
+        LEAY    2,Y
+        STY     VAR_SPR_SA
+        LDA     VAR_SPR_W
+        ADDA    #3
+        LSRA
+        LSRA
+        STA     VAR_SPR_BPR
+        CLR     VAR_SPR_ROW
+@row    LDA     VAR_SPR_SY
+        ADDA    VAR_SPR_ROW
+        LDB     #32
+        MUL
+        ADDD    VAR_RGVRAM
+        STD     VAR_SPR_VROW
+        LDA     VAR_SPR_ROW
+        LDB     VAR_SPR_BPR
+        MUL
+        ADDD    VAR_SPR_SA
+        STD     VAR_SPR_SRC
+        CLR     VAR_SPR_COL
+@col    LDA     VAR_SPR_COL
+        LSRA
+        LSRA
+        LDY     VAR_SPR_SRC
+        LDA     A,Y
+        LDB     VAR_SPR_COL
+        ANDB    #$03
+        ASLB
+        NEGB
+        ADDB    #6
+        STB     VAR_SPR_SHIFT
+        TSTB
+        BEQ     @nosr
+@sr     LSRA
+        DECB
+        BNE     @sr
+@nosr   ANDA    #$03
+        BEQ     @skip
+        PSHS    A
+        LDA     VAR_SPR_SX
+        ADDA    VAR_SPR_COL
+        PSHS    A
+        LSRA
+        LSRA
+        LDY     VAR_SPR_VROW
+        LEAY    A,Y
+        LDA     ,S+
+        ANDA    #$03
+        ASLA
+        NEGA
+        ADDA    #6
+        LDB     ,S
+        TSTA
+        BEQ     @ncs
+@csh    ASLB
+        DECA
+        BNE     @csh
+@ncs    STB     ,S
+        LDA     VAR_SPR_SX
+        ADDA    VAR_SPR_COL
+        ANDA    #$03
+        ASLA
+        NEGA
+        ADDA    #6
+        LDB     #$03
+        TSTA
+        BEQ     @nms
+@msh    ASLB
+        DECA
+        BNE     @msh
+@nms    COMB
+        ANDB    ,Y
+        ORB     ,S+
+        STB     ,Y
+@skip   INC     VAR_SPR_COL
+        LDA     VAR_SPR_COL
+        CMPA    VAR_SPR_W
+        BNE     @col
+        INC     VAR_SPR_ROW
+        LDA     VAR_SPR_ROW
+        CMPA    VAR_SPR_H
+        LBNE    @row
+        PULS    X
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── spr-erase-box ( addr x y -- ) ────────────────────────────────────────
+CFA_SPR_ERASE_BOX FDB   CODE_SPR_ERASE_BOX
+CODE_SPR_ERASE_BOX
+        PSHS    X
+        LDA     3,U
+        STA     VAR_SPR_SX
+        LDA     1,U
+        STA     VAR_SPR_SY
+        LDY     4,U
+        LEAU    6,U
+        LDA     ,Y
+        STA     VAR_SPR_W
+        LDA     1,Y
+        STA     VAR_SPR_H
+        CLR     VAR_SPR_ROW
+@row    LDA     VAR_SPR_SY
+        ADDA    VAR_SPR_ROW
+        LDB     #32
+        MUL
+        ADDD    VAR_RGVRAM
+        STD     VAR_SPR_VROW
+        CLR     VAR_SPR_COL
+@col    LDA     VAR_SPR_SX
+        ADDA    VAR_SPR_COL
+        PSHS    A
+        LSRA
+        LSRA
+        LDY     VAR_SPR_VROW
+        LEAY    A,Y
+        LDA     ,S+
+        ANDA    #$03
+        ASLA
+        NEGA
+        ADDA    #6
+        LDB     #$03
+        TSTA
+        BEQ     @nms
+@msh    ASLB
+        DECA
+        BNE     @msh
+@nms    COMB
+        ANDB    ,Y
+        STB     ,Y
+        INC     VAR_SPR_COL
+        LDA     VAR_SPR_COL
+        CMPA    VAR_SPR_W
+        BNE     @col
+        INC     VAR_SPR_ROW
+        LDA     VAR_SPR_ROW
+        CMPA    VAR_SPR_H
+        LBNE    @row
+        PULS    X
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── rg-char ( char cx cy -- ) ────────────────────────────────────────────
+CFA_RG_CHAR     FDB     CODE_RG_CHAR
+CODE_RG_CHAR
+        PSHS    X
+        LDA     1,U
+        LDB     VAR_RGROWH
+        MUL
+        TFR     B,A
+        LDB     VAR_RGBPR
+        MUL
+        ADDB    3,U
+        ADCA    #0
+        ADDD    VAR_RGVRAM
+        PSHS    D
+        LDA     5,U
+        CMPA    VAR_RGCHARMIN
+        BHS     @over
+        LDA     VAR_RGCHARMIN
+@over   SUBA    VAR_RGCHARMIN
+        LDB     VAR_RGGLYPHSZ
+        MUL
+        ADDD    VAR_RGFONT
+        TFR     D,Y
+        LDB     VAR_RGNROWS
+        LDX     ,S++
+@copy   LDA     ,Y+
+        STA     ,X
+        LDA     VAR_RGBPR
+        LEAX    A,X
+        DECB
+        BNE     @copy
+        LEAU    6,U
+        PULS    X
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── beam-trace ( x1 y1 x2 y2 buf -- count ) ─────────────────────────────
+CFA_BEAM_TRACE  FDB     CODE_BEAM_TRACE
+CODE_BEAM_TRACE
+        PSHS    X
+        LDD     ,U
+        STD     VAR_BEAM_BUF
+        LDA     5,U
+        STA     VAR_LINE_X2
+        LDA     3,U
+        STA     VAR_LINE_Y2
+        LDA     9,U
+        STA     VAR_LINE_CX
+        LDA     7,U
+        STA     VAR_LINE_CY
+        LEAU    10,U
+        LDD     #0
+        STD     VAR_BEAM_CNT
+        CLRA
+        LDB     VAR_LINE_CX
+        PSHS    D
+        CLRA
+        LDB     VAR_LINE_X2
+        SUBD    ,S++
+        BPL     @sx_p
+        COMA
+        COMB
+        ADDD    #1
+        STB     VAR_LINE_DX
+        LDA     #$FF
+        STA     VAR_LINE_SX
+        BRA     @sx_d
+@sx_p   STB     VAR_LINE_DX
+        LDA     #$01
+        STA     VAR_LINE_SX
+@sx_d   CLRA
+        LDB     VAR_LINE_CY
+        PSHS    D
+        CLRA
+        LDB     VAR_LINE_Y2
+        SUBD    ,S++
+        BPL     @sy_p
+        COMA
+        COMB
+        ADDD    #1
+        STB     VAR_LINE_DY
+        LDA     #$FF
+        STA     VAR_LINE_SY
+        BRA     @sy_d
+@sy_p   STB     VAR_LINE_DY
+        LDA     #$01
+        STA     VAR_LINE_SY
+@sy_d   CLRA
+        LDB     VAR_LINE_DX
+        STD     VAR_LINE_ERR
+        CLRA
+        LDB     VAR_LINE_DY
+        PSHS    D
+        LDD     VAR_LINE_ERR
+        SUBD    ,S++
+        STD     VAR_LINE_ERR
+@loop   LDA     VAR_LINE_CY
+        LDB     #32
+        MUL
+        ADDD    VAR_RGVRAM
+        TFR     D,Y
+        LDA     VAR_LINE_CX
+        LSRA
+        LSRA
+        LEAY    A,Y
+        LDA     VAR_LINE_CX
+        ANDA    #$03
+        ASLA
+        NEGA
+        ADDA    #6
+        LDB     ,Y
+        PSHS    A
+        BEQ     @nr
+@rsh    LSRB
+        DECA
+        BNE     @rsh
+@nr     ANDB    #$03
+        LEAS    1,S
+        LDY     VAR_BEAM_BUF
+        LDA     VAR_LINE_CX
+        STA     ,Y+
+        LDA     VAR_LINE_CY
+        STA     ,Y+
+        STB     ,Y+
+        STY     VAR_BEAM_BUF
+        LDD     VAR_BEAM_CNT
+        ADDD    #1
+        STD     VAR_BEAM_CNT
+        CMPD    #200
+        BHS     @done
+        LDA     VAR_LINE_CX
+        CMPA    VAR_LINE_X2
+        BNE     @step
+        LDA     VAR_LINE_CY
+        CMPA    VAR_LINE_Y2
+        BEQ     @done
+@step   LDD     VAR_LINE_ERR
+        ASLB
+        ROLA
+        STD     VAR_LINE_E2
+        CLRA
+        LDB     VAR_LINE_DY
+        COMA
+        COMB
+        ADDD    #1
+        CMPD    VAR_LINE_E2
+        BGE     @nosx
+        CLRA
+        LDB     VAR_LINE_DY
+        PSHS    D
+        LDD     VAR_LINE_ERR
+        SUBD    ,S++
+        STD     VAR_LINE_ERR
+        LDA     VAR_LINE_CX
+        ADDA    VAR_LINE_SX
+        STA     VAR_LINE_CX
+@nosx   CLRA
+        LDB     VAR_LINE_DX
+        CMPD    VAR_LINE_E2
+        BLE     @nosy
+        CLRA
+        LDB     VAR_LINE_DX
+        ADDD    VAR_LINE_ERR
+        STD     VAR_LINE_ERR
+        LDA     VAR_LINE_CY
+        ADDA    VAR_LINE_SY
+        STA     VAR_LINE_CY
+@nosy   LBRA    @loop
+@done   LDD     VAR_BEAM_CNT
+        STD     ,--U
+        PULS    X
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── beam-draw-slice ( buf start count color -- ) ─────────────────────────
+CFA_BEAM_DRAW_SLICE FDB  CODE_BEAM_DRAW_SLICE
+CODE_BEAM_DRAW_SLICE
+        PSHS    X
+        LDA     1,U
+        ANDA    #$03
+        STA     VAR_LINE_COL
+        LDD     2,U
+        STD     VAR_BEAM_CNT
+        LDD     4,U
+        PSHS    D
+        ASLB
+        ROLA
+        ADDD    ,S++
+        ADDD    6,U
+        STD     VAR_BEAM_BUF
+        LEAU    8,U
+        LDD     VAR_BEAM_CNT
+        BEQ     @done
+        LDX     VAR_BEAM_BUF
+@ploop  LDA     ,X
+        LDB     1,X
+        PSHS    X
+        PSHS    A
+        LDA     #32
+        MUL
+        ADDD    VAR_RGVRAM
+        TFR     D,Y
+        LDA     ,S
+        LSRA
+        LSRA
+        LEAY    A,Y
+        LDA     ,S+
+        ANDA    #$03
+        ASLA
+        NEGA
+        ADDA    #6
+        PSHS    A
+        LDA     VAR_LINE_COL
+        LDB     ,S
+        BEQ     @ns
+@sh     ASLA
+        DECB
+        BNE     @sh
+@ns     PSHS    A
+        LDA     #$03
+        LDB     1,S
+        BEQ     @nm
+@sm     ASLA
+        DECB
+        BNE     @sm
+@nm     COMA
+        ANDA    ,Y
+        ORA     ,S
+        STA     ,Y
+        LEAS    2,S
+        PULS    X
+        LEAX    3,X
+        LDD     VAR_BEAM_CNT
+        SUBD    #1
+        STD     VAR_BEAM_CNT
+        BNE     @ploop
+@done   PULS    X
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── beam-restore-slice ( buf start count -- ) ────────────────────────────
+CFA_BEAM_RESTORE_SLICE FDB CODE_BEAM_RESTORE_SLICE
+CODE_BEAM_RESTORE_SLICE
+        PSHS    X
+        LDD     ,U
+        STD     VAR_BEAM_CNT
+        LDD     2,U
+        PSHS    D
+        ASLB
+        ROLA
+        ADDD    ,S++
+        ADDD    4,U
+        STD     VAR_BEAM_BUF
+        LEAU    6,U
+        LDD     VAR_BEAM_CNT
+        BEQ     @done
+        LDX     VAR_BEAM_BUF
+@ploop  LDA     ,X
+        LDB     1,X
+        PSHS    X
+        PSHS    A
+        LDA     #32
+        MUL
+        ADDD    VAR_RGVRAM
+        TFR     D,Y
+        LDA     ,S
+        LSRA
+        LSRA
+        LEAY    A,Y
+        LDA     ,S+
+        ANDA    #$03
+        ASLA
+        NEGA
+        ADDA    #6
+        PSHS    A
+        LDX     1,S
+        LDA     2,X
+        ANDA    #$03
+        LDB     ,S
+        BEQ     @ns
+@sh     ASLA
+        DECB
+        BNE     @sh
+@ns     PSHS    A
+        LDA     #$03
+        LDB     1,S
+        BEQ     @nm
+@sm     ASLA
+        DECB
+        BNE     @sm
+@nm     COMA
+        ANDA    ,Y
+        ORA     ,S
+        STA     ,Y
+        LEAS    2,S
+        PULS    X
+        LEAX    3,X
+        LDD     VAR_BEAM_CNT
+        SUBD    #1
+        STD     VAR_BEAM_CNT
+        BNE     @ploop
+@done   PULS    X
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── beam-find-obstacle ( buf count -- index ) ────────────────────────────
+CFA_BEAM_FIND_OBSTACLE FDB CODE_BEAM_FIND_OBSTACLE
+CODE_BEAM_FIND_OBSTACLE
+        PSHS    X
+        LDD     ,U
+        LDX     2,U
+        LEAU    4,U
+        CMPD    #0
+        BEQ     @push
+        TFR     D,Y
+        CLRA
+        CLRB
+@lp     TST     2,X
+        BNE     @push
+        LEAX    3,X
+        ADDD    #1
+        LEAY    -1,Y
+        BNE     @lp
+@push   LEAU    -2,U
+        STD     ,U
+        PULS    X
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── beam-scrub-pos ( buf count cx cy -- ) ────────────────────────────────
+CFA_BEAM_SCRUB_POS FDB  CODE_BEAM_SCRUB_POS
+CODE_BEAM_SCRUB_POS
+        PSHS    X
+        LDD     4,U
+        BEQ     @done
+        TFR     D,Y
+        LDX     6,U
+        LDA     3,U
+        SUBA    #4
+        PSHS    A
+        ADDA    #8
+        PSHS    A
+        LDA     1,U
+        SUBA    #3
+        PSHS    A
+        ADDA    #6
+        PSHS    A
+        LEAU    8,U
+@lp     LDA     ,X
+        CMPA    3,S
+        BLO     @skip
+        CMPA    2,S
+        BHI     @skip
+        LDA     1,X
+        CMPA    1,S
+        BLO     @skip
+        CMPA    ,S
+        BHI     @skip
+        CLR     2,X
+@skip   LEAX    3,X
+        LEAY    -1,Y
+        BNE     @lp
+        LEAS    4,S
+@done   PULS    X
+        LDY     ,X++
+        JMP     [,Y]
+
 KERN_END                        ; end marker — bootstrap copies $E000..KERN_END-1
 
         END     BOOTSTRAP       ; DECB exec address = BOOTSTRAP ($0E00)

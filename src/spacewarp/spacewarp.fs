@@ -3978,31 +3978,7 @@ CODE beam-check-path-hits   \ ( buf count -- hit-idx|-1 )
 
 \ ── Clamp beam coordinates to tactical view ──────────────────────────
 
-\ Scan path buffer for first non-black pixel (obstacle)
-\ Scan path buffer for first non-black saved pixel (obstacle).
-\ Returns index of first obstacle, or count if path is clear.
-CODE beam-find-obstacle   \ ( buf count -- index )
-        PSHS    X
-        LDD     ,U              ; count
-        LDX     2,U             ; buf
-        LEAU    4,U             ; pop 2 args
-        CMPD    #0
-        BEQ     @push           ; count=0 -> return 0
-        TFR     D,Y             ; Y = remaining
-        CLRA
-        CLRB                    ; D = 0 (pixel index)
-@lp     TST     2,X             ; saved_color byte (3rd byte of entry)
-        BNE     @push           ; non-zero = obstacle found, D = index
-        LEAX    3,X             ; next entry
-        ADDD    #1              ; index++
-        LEAY    -1,Y
-        BNE     @lp
-        ; No obstacle: D = count (iterated all)
-@push   LEAU    -2,U
-        STD     ,U
-        PULS    X
-        ;NEXT
-;CODE
+\ beam-find-obstacle ( buf count -- index )  — kernel primitive
 
 CODE clamp-beam   \ ( -- )  Clamp beam x1/y1/x2/y2 to screen bounds
         PSHS    X
@@ -4061,45 +4037,7 @@ CODE clamp-beam   \ ( -- )  Clamp beam x1/y1/x2/y2 to screen bounds
 
 : cancel-beams  cancel-jbeam cancel-beam ;
 
-\ ── beam-scrub-pos ( buf count cx cy -- ) ─────────────────────────────
-\ Zero saved_color for beam pixels within ±4 of cx and ±3 of cy.
-\ Buffer format: 3 bytes per pixel (x, y, saved_color).
-CODE beam-scrub-pos
-        PSHS    X
-        LDD     4,U             ; D = count
-        BEQ     @done
-        TFR     D,Y             ; Y = count
-        LDX     6,U             ; X = buf
-        ; Compute bounds from cx, cy
-        LDA     3,U             ; cx
-        SUBA    #4
-        PSHS    A               ; S+0 = x_min
-        ADDA    #8
-        PSHS    A               ; S+0 = x_max, S+1 = x_min
-        LDA     1,U             ; cy
-        SUBA    #3
-        PSHS    A               ; S+0 = y_min
-        ADDA    #6
-        PSHS    A               ; S+0 = y_max, S+1 = y_min, S+2 = x_max, S+3 = x_min
-        LEAU    8,U             ; pop 4 args
-@lp     LDA     ,X              ; pixel x
-        CMPA    3,S             ; < x_min?
-        BLO     @skip
-        CMPA    2,S             ; > x_max?
-        BHI     @skip
-        LDA     1,X             ; pixel y
-        CMPA    1,S             ; < y_min?
-        BLO     @skip
-        CMPA    ,S              ; > y_max?
-        BHI     @skip
-        CLR     2,X             ; zero saved_color
-@skip   LEAX    3,X             ; next pixel
-        LEAY    -1,Y
-        BNE     @lp
-        LEAS    4,S             ; pop bounds
-@done   PULS    X
-        ;NEXT
-;CODE
+\ beam-scrub-pos ( buf count cx cy -- )  — kernel primitive
 
 \ ── beam-scrub-sprites ( buf count -- ) ──────────────────────────────
 \ Scrub saved_color for all dynamic sprites: ship + living Jovians.

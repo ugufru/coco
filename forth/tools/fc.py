@@ -114,6 +114,16 @@ def kernel_words(symbols):
         'vsync':       'CFA_VSYNC',
         'wait-past-row': 'CFA_WAIT_PAST_ROW',
         'count-blanking': 'CFA_COUNT_BLANKING',
+        'rg-pset':     'CFA_RG_PSET',
+        'rg-line':     'CFA_RG_LINE',
+        'spr-draw':    'CFA_SPR_DRAW',
+        'spr-erase-box': 'CFA_SPR_ERASE_BOX',
+        'rg-char':     'CFA_RG_CHAR',
+        'beam-trace':  'CFA_BEAM_TRACE',
+        'beam-draw-slice': 'CFA_BEAM_DRAW_SLICE',
+        'beam-restore-slice': 'CFA_BEAM_RESTORE_SLICE',
+        'beam-find-obstacle': 'CFA_BEAM_FIND_OBSTACLE',
+        'beam-scrub-pos': 'CFA_BEAM_SCRUB_POS',
     }
     result = {}
     for forth_name, sym_name in names.items():
