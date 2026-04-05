@@ -457,9 +457,18 @@ VARIABLE tcy
   11 16 at-xy  pcol @ rg-u.  CHAR , rg-emit  prow @ rg-u.
   17 16 at-xy  S" ENERGY" rg-type  penergy @ 32 rg-u.r
 
-  \ Row 17: COND/SOS left, SHIELDS right
+  \ Row 17: COND/SOS left, DEFLECTORS right (#341)
   -1 prev-cond !  update-cond
-  17 17 at-xy  S" SHIELDS" rg-type  pshields @ 32 rg-u.r
+  17 17 at-xy
+  pshields @ IF
+    pdmg-defl @ 100 = IF
+      S" DEFLECTORS   UP" rg-type
+    ELSE
+      S" DEFLECTORS" rg-type  pdmg-defl @ 32 rg-u.r
+    THEN
+  ELSE
+    S" DEFLECTORS DOWN" rg-type
+  THEN
 
   \ Row 18: COMMAND prompt
   17 18 at-xy  s-command ;
@@ -470,6 +479,18 @@ VARIABLE tcy
   tcy !  29 tcx !  $20 rg-emit  $20 rg-emit  $20 rg-emit  32 rg-u.r ;
 
 : update-energy   penergy @ 16 panel-val ;
+
+: update-deflectors  ( -- )
+  17 17 at-xy
+  pshields @ IF
+    pdmg-defl @ 100 = IF
+      S" DEFLECTORS   UP" rg-type
+    ELSE
+      S" DEFLECTORS" rg-type  pdmg-defl @ 32 rg-u.r
+    THEN
+  ELSE
+    S" DEFLECTORS DOWN" rg-type
+  THEN ;
 : update-missiles pmissiles @ 15 panel-val ;
 
 \ ══════════════════════════════════════════════════════════════════════════
@@ -3071,6 +3092,7 @@ CODE pick-jovian   \ ( -- i|-1 )
 \   jbeam-total stays 0 so no bolt animation starts yet.
 \   Sets cooldown immediately so the timer starts ticking.
 : fire-jbeam-trace  ( i target -- )
+  OVER pj-result !                 \ save shooter index (#314)
   cancel-jbeam
   SWAP
   2 * JOV-POS + DUP C@ jbeam-x1 !
@@ -3079,6 +3101,12 @@ CODE pick-jovian   \ ( -- i|-1 )
   SWAP 1 + C@ jbeam-y1 @ - 4 *
   OVER jbeam-x1 @ + jbeam-x2 !
   DUP  jbeam-y1 @ + jbeam-y2 !
+  \ Aim scatter: offset endpoint by (7-pilot_skill) random px (#314)
+  pj-result @ 4 * JOV-GENOME + C@ 7 AND  \ pilot_skill (0-7)
+  7 SWAP - ?DUP IF
+    DUP 8 rnd SWAP 1 RSHIFT - jbeam-x2 +!
+        8 rnd SWAP 1 RSHIFT - jbeam-y2 +!
+  THEN
   SWAP DUP 0= IF DROP ELSE 0 < IF -5 ELSE 5 THEN jbeam-x1 @ + jbeam-x1 ! THEN
   DUP 0= IF DROP ELSE 0 < IF -5 ELSE 5 THEN jbeam-y1 @ + jbeam-y1 ! THEN
   clamp-jbeam
@@ -3155,22 +3183,28 @@ CODE pick-jovian   \ ( -- i|-1 )
   THEN THEN THEN THEN ;
 
 \ Hit one random system; overflow to another.
-: damage-system  ( dmg -- )
+: apply-sys-dmg  ( dmg -- )
   rnd-system DUP @ ROT - DUP 0 < IF
     NEGATE SWAP 0 SWAP !           \ to 0, overflow remains
     rnd-system SWAP NEGATE OVER @ + 0max SWAP !
   ELSE SWAP ! THEN ;
 
-\ Apply damage: shields absorb first, overflow to random system.
+\ Split damage across 2 random systems (#315).
+: damage-system  ( dmg -- )
+  DUP 1 RSHIFT SWAP OVER -        \ ( half remainder )
+  apply-sys-dmg apply-sys-dmg ;
+
+\ Apply damage: deflectors absorb when UP, bleedthrough <40% (#306, #338).
 : take-damage  ( dmg -- )
   pshields @ IF
-    DROP 25 pshields @ OVER < IF
-      \ Shields fail
-      DROP 0 pshields !
-    ELSE
-      \ Shields hold
-      NEGATE pshields +!
+    \ Bleedthrough: deflectors < 40% leaks fraction to systems
+    pdmg-defl @ 40 < IF
+      DUP 40 pdmg-defl @ - * 80 /MOD SWAP DROP
+      ?DUP IF damage-system THEN
     THEN
+    DROP                           \ discard original dmg
+    pdmg-defl @ 15 - 0max pdmg-defl !  \ absorb 15 from deflector health
+    pdmg-defl @ 0= IF 0 pshields ! THEN  \ auto-drop at 0%
   ELSE
     damage-system
   THEN ;
@@ -3324,18 +3358,26 @@ VARIABLE prev-docked              \ last displayed dock state
 \ ── Energy tick: passive regen (#226) + shield drain (#227) ──────────
 \ Called every frame. Regen: +1 every 32 frames (undocked).
 \ Drain: every 16 frames, 1 if shields<50, 2 if shields>=50.
-\ Repair first damaged system found (+5%). Returns 1 if repaired.
+\ Repair one system by +2, capped at 100. Returns 1 if repaired.
+: rep1  ( addr -- flag )
+  DUP @ 100 < IF DUP @ 2 + 100 MIN SWAP ! 1 ELSE DROP 0 THEN ;
+
+\ Repair all damaged systems. Priority depends on deflector state (#340).
 : repair-any  ( -- flag )
-  pdmg-ion  @ 100 < IF 5 pdmg-ion  +! 1 EXIT THEN
-  pdmg-warp @ 100 < IF 5 pdmg-warp +! 1 EXIT THEN
-  pdmg-scan @ 100 < IF 5 pdmg-scan +! 1 EXIT THEN
-  pdmg-defl @ 100 < IF 5 pdmg-defl +! 1 EXIT THEN
-  pdmg-masr @ 100 < IF 5 pdmg-masr +! 1 EXIT THEN
-  0 ;
+  0
+  pshields @ IF
+    pdmg-defl rep1 OR
+    pdmg-ion  rep1 OR  pdmg-warp rep1 OR
+    pdmg-scan rep1 OR  pdmg-masr rep1 OR
+  ELSE
+    pdmg-ion  rep1 OR  pdmg-warp rep1 OR
+    pdmg-scan rep1 OR  pdmg-masr rep1 OR
+    pdmg-defl rep1 OR
+  THEN ;
 
 : tick-energy  ( -- )
   docked @ IF EXIT THEN
-  frame-tick @ 31 AND 0= IF
+  frame-tick @ 15 AND 0= IF
     penergy @ IF
       repair-any IF -1 penergy +!
       ELSE penergy @ 100 < IF 1 penergy +! THEN
@@ -3897,9 +3939,15 @@ VARIABLE jbeam-y2
 20 CONSTANT BOLT-SPEED             \ pixels advanced per frame
 
 \ ── Maser damage ──────────────────────────────────────────────────────
-\ Scales with maser system health: 30 at 100%, 3 at 10%.
+\ Scales with system health AND range (#312).
+\ Base: 50 close (<15px), 30 mid (15-60px), 10 long (>60px).
+\ Then scaled by maser system health (0-100%).
+: maser-base  ( -- n )
+  bchk-hitpx @ 15 < IF 50 ELSE
+  bchk-hitpx @ 60 < IF 30 ELSE 10
+  THEN THEN ;
 : maser-dmg  ( -- n )
-  pdmg-masr @ 30 * 100 /MOD SWAP DROP ;
+  maser-base pdmg-masr @ * 100 /MOD SWAP DROP ;
 
 \ ── Bbox hit detection (during beam-trace) ────────────────────────────
 \ After tracing, walk the path buffer and check each pixel against
@@ -4209,18 +4257,23 @@ VARIABLE msl-got                 \ hit flag
       JOV-DMG msl-hi @ + C@ IF
         JOV-POS msl-hi @ 2 * + C@ msl-scrx - abs 4 <
         JOV-POS msl-hi @ 2 * + 1 + C@ msl-scry - abs 4 < AND IF
-          \ Kill Jovian — erase sprite, explode, full refresh
-          0 JOV-DMG msl-hi @ + C!
-          -1 gjovians +!
-          msl-hi @ jov-spr
-          JOV-POS msl-hi @ 2 * + C@ msl-hi @ jov-draw-dx -
-          JOV-POS msl-hi @ 2 * + 1 + C@ msl-hi @ jov-draw-dy -
-          spr-erase-box
-          JOV-POS msl-hi @ 2 * + C@
-          JOV-POS msl-hi @ 2 * + 1 + C@
-          explode-jovian
-          proximity-damage
-          refresh-after-kill
+          \ Missile hit: 70 damage, not instant kill (#313)
+          JOV-DMG msl-hi @ + C@ 70 - 0max
+          JOV-DMG msl-hi @ + C!
+          msl-hi @ jov-flee-check
+          JOV-DMG msl-hi @ + C@ 0= IF
+            \ Dead — explode + refresh
+            -1 gjovians +!
+            msl-hi @ jov-spr
+            JOV-POS msl-hi @ 2 * + C@ msl-hi @ jov-draw-dx -
+            JOV-POS msl-hi @ 2 * + 1 + C@ msl-hi @ jov-draw-dy -
+            spr-erase-box
+            JOV-POS msl-hi @ 2 * + C@
+            JOV-POS msl-hi @ 2 * + 1 + C@
+            explode-jovian
+            proximity-damage
+            refresh-after-kill
+          THEN
           1 msl-got !
         THEN
       THEN
@@ -4475,18 +4528,20 @@ VARIABLE sg-row                   \ scan grid: outer loop row
     overlay @ 2 = IF dismiss-overlay ELSE do-scan THEN
   THEN
   cmd-num @ 4 = IF
-    cmd-val @ DUP 100 > IF DROP 100 THEN
-    DUP pdmg-defl @ > IF DROP pdmg-defl @ THEN  \ deflector cap (#296)
-    DUP pshields @ > IF                          \ raising shields
-      DUP 25 < IF DROP 25 THEN                  \ minimum 25%
-      DUP 5 /MOD SWAP DROP 20 +                 \ cost = 20 + level/5
-      DUP penergy @ > IF
-        2DROP S" NO ENERGY" cmd-reject
+    pshields @ IF
+      0 pshields !                           \ UP → DOWN (#338)
+    ELSE
+      pdmg-defl @ IF
+        1 pshields !                         \ has health → raise
       ELSE
-        use-energy pshields !  draw-panel
+        pdmg-warp @ 25 < IF                  \ divert warp power (#339)
+          S" NO POWER" cmd-reject
+        ELSE
+          -25 pdmg-warp +!
+          25 pdmg-defl !
+          1 pshields !
+        THEN
       THEN
-    ELSE                                         \ lowering: free
-      pshields !  draw-panel
     THEN
   THEN
   cmd-num @ 5 = IF
@@ -4504,9 +4559,10 @@ VARIABLE sg-row                   \ scan grid: outer loop row
 
 : cmd-start  ( cmd -- )
   cmd-num !
-  \ Commands 1, 3: immediate (station toggle)
+  \ Commands 1, 3, 4: immediate (station toggle / deflector toggle)
   cmd-num @ 1 = IF exec-command EXIT THEN
   cmd-num @ 3 = IF exec-command EXIT THEN
+  cmd-num @ 4 = IF exec-command EXIT THEN
   \ Commands 5, 6, 7: return to tactical first (need viewport)
   overlay @ IF
     cmd-num @ 5 < 0= IF dismiss-overlay THEN
@@ -4909,22 +4965,26 @@ VARIABLE jnb-result
       main EXIT
     THEN
     THEN                          \ close overlay IF/ELSE
-    \ ── Panel updates: run even during overlays ──
-    penergy @ prev-energy @ <> IF
-      penergy @ prev-energy !
-      update-energy
-    THEN
-    pmissiles @ prev-missiles @ <> IF
-      pmissiles @ prev-missiles !
-      update-missiles
-    THEN
-    pshields @ prev-shields @ <> IF
-      pshields @ prev-shields !
-      pshields @ 17 panel-val
-    THEN
-    docked @ prev-docked @ <> IF
-      docked @ prev-docked !
-      update-cond
+    \ ── Panel updates: every 30 frames (~2/sec) ──
+    frame-tick @ 29 AND 0= IF
+      penergy @ prev-energy @ <> IF
+        penergy @ prev-energy !
+        update-energy
+      THEN
+      pmissiles @ prev-missiles @ <> IF
+        pmissiles @ prev-missiles !
+        update-missiles
+      THEN
+      \ Track deflector display: store pdmg-defl when UP, 0 when DOWN
+      pshields @ IF pdmg-defl @ ELSE 0 THEN
+      DUP prev-shields @ <> IF
+        prev-shields !
+        update-deflectors
+      ELSE DROP THEN
+      docked @ prev-docked @ <> IF
+        docked @ prev-docked !
+        update-cond
+      THEN
     THEN
   AGAIN ;
 
