@@ -137,9 +137,9 @@ Do not access, search, or modify files outside these paths. If a task appears to
 CoCo Renovation — on-device Forth development environment for the TRS-80 Color Computer.
 Primary doc: `COCO_RENOVATION.md`. Tech reference: `coco_technical_reference.pdf`.
 
-## Current State (2026-04-03)
+## Current State (2026-04-04)
 Tutorial series, calculator, Getting Started ch1–13: all COMPLETE.
-Space Warp: core gameplay complete, shield/damage redesign in progress, targeting v1.0 release April 15.
+Space Warp: core gameplay complete, combat rebalance in progress, targeting v1.0 release April 15.
 App size: 24,551 bytes, headroom 9 bytes. Data at $8000+, font at $9000.
 Budget: 14,930cy/frame. Slot-based think scheduling (3 Jovians, skip 1-6).
 HSYNC beam-chasing (#262): after VSYNC, wait for beam to pass sprites before VRAM writes.
@@ -147,6 +147,18 @@ Beam system (#259): paint-black erase + draw-stars redraw + beam-scrub-sprites.
 Bounce demo (src/bounce/): HSYNC testbed, 4 balls, mode switching, font HUD.
 fc.py: inline_constants(), FVAR_* EQU export. Lacks BEGIN/WHILE/REPEAT.
 fc.py quirks: preprocess_asm strips blank CODE block lines; ASCII-only comments.
+fc.py entry point: top-level `main` call required at end of .fs file (not just `: main`).
+
+## Combat Rebalance Design (2026-04-04)
+See COMBAT_ANALYSIS.md for full comparison (original Z80 / CoCo / TOS).
+Key findings from TOS analysis ("The Kirk Test"):
+- Masers should be primary weapon (the jab), missiles the finisher (the cross)
+- Shield bleedthrough below 40% creates the TOS dramatic arc
+- Damage spread across 2-3 systems creates "slow rust" attrition
+- Jovian aim scatter by pilot skill makes genome matter in combat
+- Current missiles are OP (one-hit kill + infinite restock = no reason to use masers)
+v1.0 combat sprint: #312 (maser range), #313 (missile nerf), #314 (aim scatter),
+#315 (damage spread), #306 (shield bleedthrough). Needs ~125 bytes; must reclaim ~120 first.
 
 ## Shield / Damage / Energy Model (2026-04-03)
 Trek-style shield system — shields absorb damage, degrade under fire, cost energy to raise.
@@ -181,6 +193,15 @@ Trek-style shield system — shields absorb damage, degrade under fire, cost ene
 - #307: Ion engines at 0% disables movement
 - #309: Non-linear repair (no passive repair below 25%)
 - #310: Scanner degradation at low health
+
+## Sprite Evaluation Tools
+- `src/spacewarp/sprtest.fs` — CoCo test app, renders all 256 seeds on RG6
+- `src/spacewarp/sprite_rater.py` — Mobile "hot or not" web app (no deps, `python3 sprite_rater.py`)
+- `src/spacewarp/gen_sprite_report.py` — Generates SVG sprite catalog HTML
+- `src/spacewarp/sprite_data.py` — Seed descriptions, menace/quality ratings, categories
+- `src/spacewarp/sprite_catalog.html` — Interactive catalog (regenerate with gen_sprite_report.py)
+- `src/spacewarp/SPRITE_RATER.md` — Usage docs for the rater
+- `src/spacewarp/COMBAT_ANALYSIS.md` — Full combat system comparison (Z80/CoCo/TOS)
 
 ## Getting Started — Layout
 - `getting-started/style.css` — landscape format, max-width: 1100px

@@ -19,4 +19,14 @@ run: spacewarp.bin
 kernel:
 	$(MAKE) -C $(KERNEL_DIR)
 
-.PHONY: all run kernel
+sprtest.bin: sprtest.fs $(KERNEL_MAP) $(KERNEL_BIN)
+	mkdir -p build
+	$(FC) sprtest.fs \
+	    --kernel    $(KERNEL_MAP) \
+	    --kernel-bin $(KERNEL_BIN) \
+	    --output    sprtest.bin
+
+sprtest: sprtest.bin
+	xroar -machine coco2bus -ram 64 $(XROAR_ROMS) -tv-type ntsc -tv-input cmp-br -kbd-translate -kbd-bind KP_Enter=pre:enter -run sprtest.bin
+
+.PHONY: all run kernel sprtest

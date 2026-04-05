@@ -200,13 +200,13 @@ Five systems, each with health (100% = fully operational, 0% = destroyed). All 5
 | Hyperdrive | 2 | < 50%: 50% chance of misjump | Cannot warp |
 | Scanners | 3 | (Not yet implemented) | (#310: should garble/blank scanner) |
 | Deflectors | 4 | Caps max shield level | Cannot raise shields |
-| Masers | 5 | Damage scales linearly (30 at 100%, 0 at 0%) | Cannot damage enemies |
+| Masers | 5 | Damage scales linearly (30 at 100%, 0 at 0%). Planned: range-dependent damage (#312) | Cannot damage enemies |
 
 ### Energy Model
 
 - **Ship energy** (0-100) — depleted by raising shields, firing masers, warp, and system repairs. Recharged passively (+1 every 32 frames) and by docking.
 - **Passive regen** — +1 energy per 32 frames (~1.9/sec). Diverted to system repair first (1 energy = 5% repair to worst system). Only accumulates when all systems are at 100%.
-- **Triton missiles** — finite supply (10 at start), replenished only by docking. One-hit kill at any range.
+- **Triton missiles** — finite supply (10 at start), replenished at bases from finite base stockpiles (#318). Currently one-hit kill; planned nerf to 60-80 damage (#313) making them finishers, not primary weapons.
 
 ### Shield Model
 
@@ -214,7 +214,7 @@ Shields are a strength pool (0-100%) that degrades under fire, not a static sett
 
 - **Raising shields**: Command 4, costs 20 + level/5 energy (25% = 25 energy, 100% = 40 energy). Minimum level 25%. Deflector health caps max level.
 - **Lowering shields**: Free (command 4, enter 0 or any lower value).
-- **Damage absorption**: Shields take 25 damage per hit (~4 hits from 100% to failure). No system damage while shields hold.
+- **Damage absorption**: Shields take 25 damage per hit (~4 hits from 100% to failure). Above 40%, full absorption. Below 40%, bleedthrough fraction bypasses to systems (#306).
 - **Shield failure**: At 0%, shields must be re-raised manually (costs energy again). All incoming damage goes directly to systems.
 - **No passive drain**: Shields stay at their level until hit or lowered. The cost is upfront activation, not maintenance.
 
@@ -470,16 +470,33 @@ If all bases are destroyed, the game is lost.
 - CLEAR key cancels command input
 - Beam trace buffer capped at 200 pixels
 
-### Not Yet Implemented
+### Not Yet Implemented — v1.0 Combat Rebalance
 
+- Maser range-dependent damage — devastating close, weak at distance (#312)
+- Missile damage nerf — 60-80, no longer one-hit kill (#313)
+- Jovian aim scatter by pilot skill — dolts miss, aces terrify (#314)
+- Damage spread across 2-3 systems per hit (#315)
 - Shield bleedthrough below 40% (#306)
+
+### Not Yet Implemented — Post-v1.0
+
+- SOS timer system — replace random base destruction (#317)
+- Finite base missile supply (#318)
+- SOS escalation messages (#319)
+- Direct hit bonus — center-distance damage scaling (#316)
+- Spacebar quick-fire masers (#320)
+- Status line micro-reports (#321)
+- Crew count, casualties, and score (#322)
+- Non-linear repair: field repair caps at 50-60% (#309)
+- Friendly fire on starbases (#323)
 - Ion engines at 0% disables movement (#307)
-- Non-linear repair: no passive repair below 25% (#309)
 - Scanner degradation at low health (#310)
+- Smart Jovian missile evasion (#183)
+- Directional Endever sprites (#324)
+- Permanent damage accumulation (#325)
 - Handedness-based obstacle routing (#213)
 - Sound effects (#188)
 - Inter-quadrant Jovian movement (#160)
-- Missile avoidance (#183)
 - Regional character from origin hash (#179)
 
 ## Hyperdrive Energy Cost

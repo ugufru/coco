@@ -1509,6 +1509,65 @@ CLR_LP  STB     ,X+
         LDY     ,X++
         JMP     [,Y]
 
-KERN_END                        ; end marker — bootstrap copies $8000..KERN_END-1
+;;; ─── VSYNC ( -- ) ──────────────────────────────────────────────────────────
+;;; Wait for vertical sync.  Polls PIA0 CRB ($FF03) bit 7, clears by
+;;; reading $FF02.  60 Hz on NTSC.
+
+CFA_VSYNC       FDB     CODE_VSYNC
+CODE_VSYNC
+        PSHS    X
+@poll   LDA     $FF03           ; bit 7 = VSYNC flag
+        BPL     @poll           ; loop until set
+        LDA     $FF02           ; clear flag
+        PULS    X
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── WAIT-PAST-ROW ( row -- ) ─────────────────────────────────────────────
+;;; After VSYNC, poll HSYNC to wait until the beam has passed the given
+;;; display row (0-191).  Blanking offset 70 lines (VSYNC to row 0).
+
+CFA_WAIT_PAST_ROW FDB   CODE_WAIT_PAST_ROW
+CODE_WAIT_PAST_ROW
+        PSHS    X
+        LDB     1,U             ; row (0-191)
+        LEAU    2,U             ; pop arg
+        ADDB    #70             ; add full blanking interval
+        BEQ     @done
+        LDA     $FF00           ; clear stale HSYNC flag
+@wt     LDA     $FF01           ; check HSYNC flag (bit 7)
+        BPL     @wt
+        LDA     $FF00           ; clear flag
+        DECB
+        BNE     @wt
+@done   PULS    X
+        LDY     ,X++
+        JMP     [,Y]
+
+;;; ─── COUNT-BLANKING ( -- n ) ───────────────────────────────────────────────
+;;; Diagnostic: after VSYNC, count 100 HSYNC pulses and return count.
+
+CFA_COUNT_BLANKING FDB  CODE_COUNT_BLANKING
+CODE_COUNT_BLANKING
+        PSHS    X
+@vs     LDA     $FF03           ; poll VSYNC flag
+        BPL     @vs
+        LDA     $FF02           ; clear VSYNC flag
+        CLRA
+        CLRB                    ; D = 0
+        LDY     #100
+@hs     LDA     $FF01           ; check HSYNC
+        BPL     @hs
+        LDA     $FF00           ; clear flag
+        ADDD    #1
+        LEAY    -1,Y
+        BNE     @hs
+        LEAU    -2,U
+        STD     ,U              ; push count
+        PULS    X
+        LDY     ,X++
+        JMP     [,Y]
+
+KERN_END                        ; end marker — bootstrap copies $E000..KERN_END-1
 
         END     BOOTSTRAP       ; DECB exec address = BOOTSTRAP ($0E00)

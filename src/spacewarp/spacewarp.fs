@@ -618,7 +618,8 @@ CODE bg-restore  \ ( buf x y -- )  restore 4×5 VRAM bytes from buf
 ;CODE
 
 : save-ship-bg  ( -- )
-  SHIP-BG SHIP-POS C@ 3 - SHIP-POS 1 + C@ 2 - bg-save ;
+  SHIP-BG SHIP-POS C@ 3 - SHIP-POS 1 + C@ 2 - bg-save
+  jbeam-total @ IF SHIP-BG 20 0 FILL THEN ;
 
 : restore-ship-bg  ( -- )
   SHIP-BG old-sx @ 3 - old-sy @ 2 - bg-restore ;
@@ -4045,7 +4046,6 @@ CODE clamp-beam   \ ( -- )  Clamp beam x1/y1/x2/y2 to screen bounds
 
 : cancel-beam  ( -- )
   beam-total @ 0= IF EXIT THEN
-  \ Restore any currently visible bolt pixels
   beam-tail @ beam-head @ < IF
     BEAM-PATH beam-tail @ beam-head @ beam-tail @ - 0 beam-draw-slice
   THEN
@@ -4849,10 +4849,10 @@ VARIABLE jnb-result
       THEN
     ELSE
 
-    \ ── LAYER 2: Erase beam tails (paint black + redraw stars) ──
+    \ ── LAYER 2: Erase beam tails (paint black) ──
     tick-jbeam-erase
     tick-beam-erase
-    beam-total @ jbeam-total @ OR IF 1 moved !  draw-stars THEN
+    beam-total @ jbeam-total @ OR IF 1 moved ! THEN
 
     \ ── LAYER 1: Sprite rendering (split cycle) ──
     jov-moved @ IF
@@ -4891,7 +4891,7 @@ VARIABLE jnb-result
       THEN
     THEN THEN
 
-    \ ── LAYER 2: Advance beam heads (draw new pixels) ──
+    \ ── LAYER 2b: Advance beam heads (draw new pixels) ──
     tick-beam-draw
     tick-jbeam-draw
 

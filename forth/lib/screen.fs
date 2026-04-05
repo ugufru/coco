@@ -1,74 +1,15 @@
 \ screen.fs — VDG screen utilities and vsync
 \
-\ Provides: vsync, cls-black, cls-green
-\ Requires: kernel primitives C@, AND, DROP, AT
+\ Provides: vsync, wait-past-row, count-blanking, cls-black, cls-green
+\ Requires: kernel primitives (vsync, wait-past-row, count-blanking are
+\           now kernel CODE words; cls-black/cls-green are Forth)
 \
 \ vsync waits for the VDG vertical sync signal (60 Hz).
 \ PIA0 CB1 flag ($FF03 bit 7) is set by VDG; reading $FF02 clears it.
 
-\ vsync ( -- )  Wait for vertical sync.  CODE word for tight detection.
-\ Polls PIA0 CRB ($FF03) bit 7, clears flag by reading $FF02.
-CODE vsync
-        PSHS    X
-@poll   LDA     $FF03           ; bit 7 = VSYNC flag
-        BPL     @poll           ; loop until set
-        LDA     $FF02           ; clear flag
-        PULS    X
-        ;NEXT
-;CODE
-
-\ wait-past-row ( row -- )
-\ After VSYNC, poll HSYNC to wait until the beam has passed the given
-\ display row (0-191).  Adds a blanking offset so row 0 means "beam
-\ just entered the active display area."
-\ Uses: $FF01 bit 7 = HSYNC flag, cleared by reading $FF00.
-\ Cost: ~20cy per line waited.  Row 96 costs ~2,600cy.
-CODE wait-past-row
-        PSHS    X
-        LDB     1,U             ; row (0-191)
-        LEAU    2,U             ; pop arg
-        ADDB    #70             ; add full blanking interval (VSYNC to row 0)
-        BEQ     @done
-        LDA     $FF00           ; clear any stale HSYNC flag first
-@wt     LDA     $FF01           ; check HSYNC flag (bit 7)
-        BPL     @wt             ; not set yet
-        LDA     $FF00           ; clear flag
-        DECB
-        BNE     @wt
-@done   PULS    X
-        ;NEXT
-;CODE
-
-\ count-blanking ( -- n )
-\ Diagnostic: after VSYNC, count HSYNC pulses until we've waited
-\ a fixed number of lines.  Returns the count.  Use to verify
-\ the blanking interval length on real hardware / XRoar.
-\ Waits for VSYNC first, then counts 100 HSYNC pulses (should take
-\ ~6.35ms).  The real diagnostic: call this, then check if VRAM
-\ writes during the first N lines cause tearing.
-CODE count-blanking
-        PSHS    X
-        ; Wait for VSYNC
-@vs     LDA     $FF03           ; poll VSYNC flag
-        BPL     @vs
-        LDA     $FF02           ; clear VSYNC flag
-        ; Now count HSYNC pulses for 100 lines
-        CLRA
-        CLRB                    ; D = 0 (counter)
-        LDY     #100            ; count 100 HSYNC pulses
-@hs     LDA     $FF01           ; check HSYNC flag
-        BPL     @hs
-        LDA     $FF00           ; clear flag
-        ADDD    #1              ; increment counter (always counts to 100)
-        LEAY    -1,Y
-        BNE     @hs
-        ; D = 100 (confirmation that we counted 100 lines)
-        ; The real test: did we see tearing during those 100 lines?
-        LEAU    -2,U
-        STD     ,U              ; push count
-        PULS    X
-        ;NEXT
-;CODE
+\ vsync ( -- )           — kernel primitive
+\ wait-past-row ( row -- ) — kernel primitive
+\ count-blanking ( -- n )  — kernel primitive
 
 : cls-black  ( -- )
   512 0 DO  $80 $0400 I + C!  LOOP ;

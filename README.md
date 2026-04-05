@@ -143,7 +143,47 @@ Open `docs/index.html` in a browser to read it locally.
 
 ## Roadmap
 
-Where this goes next — from software-only to cartridge hardware with a co-processor on the bus.
+### Space Warp v1.0 — April 15, 2026
+
+The flagship application. A real-time space combat game with procedural AI,
+artifact-color graphics, and Trek-inspired tactical depth. Core gameplay is
+complete. The v1.0 sprint focuses on combat balance and dramatic feel.
+
+Design informed by reverse engineering of the original Z80 Space Warp (1979)
+and tactical analysis of Star Trek TOS combat doctrine. Full comparison in
+`src/spacewarp/COMBAT_ANALYSIS.md`.
+
+**v1.0 release targets:**
+1. Fix BEAM-PATH buffer corruption (#290) — game-breaking bug
+2. Reclaim ~120 bytes through code factoring
+3. Combat rebalance (the core gameplay improvement):
+   - Maser range-dependent damage — primary weapon, devastating close (#312)
+   - Missile damage nerf to 60-80 — finisher, not primary (#313)
+   - Jovian aim scatter by pilot skill — genome matters in combat (#314)
+   - Damage spread across 2-3 systems per hit — ship rusts under fire (#315)
+   - Shield bleedthrough below 40% — TOS dramatic arc (#306)
+4. Bug fix: starbase gravity spawn (#233)
+
+**Post-v1.0 combat features** (prioritized):
+- SOS timer system with escalating messages (#317, #319)
+- Finite base missile supply — campaign resource anxiety (#318)
+- Direct hit bonus — center-distance damage scaling (#316)
+- Spacebar quick-fire masers for dogfighting (#320)
+- Status line micro-reports — TOS bridge crew flavor (#321)
+- Crew count, casualties, and score (#322)
+- Non-linear repair — field cap at 50-60%, dock required below 25% (#309)
+- Friendly fire on starbases (#323)
+- Smart Jovian missile evasion (#183)
+- Directional Endever sprites (#324)
+- Permanent damage accumulation (#325)
+
+**Sprite evaluation tools** (complete):
+- Visual tuning harness, SVG catalog, and mobile rater app for evaluating
+  all 256 procedural Jovian sprite patterns. See `src/spacewarp/SPRITE_RATER.md`.
+
+### Platform
+
+Where this goes next — from software-only to cartridge hardware.
 
 - Serial loader — bit-banged via PIA ($FF20/$FF22) for loading bytecode over RS-232
 - ROM cartridge image — kernel + loader burned to flash, bootable from the pak slot

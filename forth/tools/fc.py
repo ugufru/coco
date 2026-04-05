@@ -111,6 +111,9 @@ def kernel_words(symbols):
         'j':        'CFA_J',
         'sprite-data': 'CFA_SPRITE_DATA',
         'font-data':   'CFA_FONT_DATA',
+        'vsync':       'CFA_VSYNC',
+        'wait-past-row': 'CFA_WAIT_PAST_ROW',
+        'count-blanking': 'CFA_COUNT_BLANKING',
     }
     result = {}
     for forth_name, sym_name in names.items():
