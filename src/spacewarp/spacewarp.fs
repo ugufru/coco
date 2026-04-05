@@ -4613,7 +4613,7 @@ VARIABLE key-latch                \ latched keypress (survives between polls)
   S" LEVEL 1-9" rg-type
   \ Version in lower right
   27 18 at-xy
-  S" V0.9" rg-type
+  S" V0.91" rg-type
   \ Read level key (1-9)
   BEGIN KEY DUP CHAR 1 < OVER CHAR 9 > OR IF DROP 0 ELSE 1 THEN UNTIL
   CHAR 0 - glevel ! ;
