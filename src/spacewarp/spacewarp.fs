@@ -1078,7 +1078,7 @@ VARIABLE emotion-timer            \ frame counter for decay
 \ Each Jovian gets a unique sprite from its genome appearance seed.
 \ Shape from seed, color from emotion band, density from origin.
 
-CODE jov-color-band   \ ( emo -- band )  0=fear, 1=neutral, 2=rage
+KCODE jov-color-band   \ ( emo -- band )  0=fear, 1=neutral, 2=rage
         LDA     1,U             ; A = emotion
         CMPA    #5
         BLO     @fear
@@ -1092,7 +1092,7 @@ CODE jov-color-band   \ ( emo -- band )  0=fear, 1=neutral, 2=rage
 @done   CLRA
         STD     ,U              ; replace TOS
         ;NEXT
-;CODE
+;KCODE
 
 \ Generate sprite for Jovian i from its genome (all-in-one CODE word).
 \ Reads appearance seed, computes dimensions + color, generates pixels

@@ -164,7 +164,12 @@ def tokenize(source, base_dir=None):
         if in_code_block:
             stripped = line.strip()
             if stripped.upper() == ';CODE' or stripped.upper().startswith(';CODE '):
-                result.extend(['__CODE__', code_name, '\n'.join(code_lines), '__ENDCODE__'])
+                result.extend([code_tag, code_name, '\n'.join(code_lines), '__ENDCODE__'])
+                in_code_block = False
+                code_name = None
+                code_lines = []
+            elif stripped.upper() == ';KCODE' or stripped.upper().startswith(';KCODE '):
+                result.extend([code_tag, code_name, '\n'.join(code_lines), '__ENDCODE__'])
                 in_code_block = False
                 code_name = None
                 code_lines = []
@@ -193,10 +198,11 @@ def tokenize(source, base_dir=None):
         if not tokens_on_line:
             continue
 
-        # Check for CODE block start
-        if tokens_on_line[0].upper() == 'CODE':
+        # Check for CODE / KCODE block start
+        if tokens_on_line[0].upper() in ('CODE', 'KCODE'):
             if len(tokens_on_line) < 2:
-                raise SyntaxError("CODE requires a word name")
+                raise SyntaxError(f"{tokens_on_line[0]} requires a word name")
+            code_tag = '__CODE__' if tokens_on_line[0].upper() == 'CODE' else '__KCODE__'
             code_name = tokens_on_line[1]
             code_lines = []
             in_code_block = True
@@ -266,7 +272,8 @@ def parse(tokens):
         ('loop_back', name_str)   — 4 bytes; emits CFA_LOOP + signed offset to label
     """
     definitions      = {}   # preserves insertion order (Python 3.7+)
-    code_definitions = {}   # name → raw asm text
+    code_definitions = {}   # name → raw asm text (app-space CODE words)
+    kcode_definitions = {}  # name → raw asm text (kernel-space KCODE words)
     variables        = []   # variable names in declaration order
     main_thread      = []
 
@@ -283,15 +290,18 @@ def parse(tokens):
     while i < len(tokens):
         tok = tokens[i]
 
-        if tok == '__CODE__':
+        if tok in ('__CODE__', '__KCODE__'):
             name = tokens[i + 1].lower()
             asm_text = tokens[i + 2]
             # i+3 is __ENDCODE__
             if name in definitions:
-                raise SyntaxError(f"CODE word {name!r} collides with colon definition")
-            if name in code_definitions:
-                raise SyntaxError(f"Duplicate CODE word: {name!r}")
-            code_definitions[name] = asm_text
+                raise SyntaxError(f"CODE/KCODE word {name!r} collides with colon definition")
+            if name in code_definitions or name in kcode_definitions:
+                raise SyntaxError(f"Duplicate CODE/KCODE word: {name!r}")
+            if tok == '__KCODE__':
+                kcode_definitions[name] = asm_text
+            else:
+                code_definitions[name] = asm_text
             i += 4
             continue
 
@@ -442,7 +452,7 @@ def parse(tokens):
     if current_def is not None:
         raise SyntaxError(f"Unterminated definition: {current_def!r}")
 
-    return definitions, variables, main_thread, code_definitions
+    return definitions, variables, main_thread, code_definitions, kcode_definitions
 
 
 # ── CODE word assembly ────────────────────────────────────────────────────────
@@ -546,6 +556,90 @@ def assemble_code_words(code_defs, symbols, var_addrs=None):
     return code_bytes
 
 
+def assemble_kcode_words(kcode_defs, symbols, var_addrs, kern_end):
+    """Assemble KCODE words into machine code targeted at kernel addresses.
+
+    Each KCODE word is laid out as: CFA (2 bytes, FDB self+2) + machine code.
+    Returns (kcode_bytes, kcode_cfas) where:
+      - kcode_bytes: bytearray to append to kernel binary
+      - kcode_cfas: dict of name → CFA address (in kernel address space)
+    """
+    if not kcode_defs:
+        return bytearray(), {}
+
+    # Build assembly source with EQUs for all symbols
+    asm_parts = ['        PRAGMA  6809', f'        ORG     ${kern_end:04X}', '']
+    for sym_name, addr in sorted(symbols.items()):
+        asm_parts.append(f'{sym_name:20s} EQU     ${addr:04X}')
+    if var_addrs:
+        asm_parts.append('')
+        asm_parts.append('; Forth VARIABLE data-cell addresses')
+        for vname, vaddr in sorted(var_addrs.items()):
+            label = 'FVAR_' + vname.replace('-', '_')
+            asm_parts.append(f'{label:20s} EQU     ${vaddr:04X}')
+    asm_parts.append('')
+
+    # Emit each KCODE word with CFA + machine code
+    cfa_labels = {}
+    for name, asm_text in kcode_defs.items():
+        safe = re.sub(r'[^a-z0-9]', '_', name)
+        cfa_label = f'KCFA_{safe}'
+        code_label = f'KCODE_{safe}'
+        end_label = f'KCODE_{safe}__END'
+        cfa_labels[name] = cfa_label
+
+        asm_parts.append(f'{cfa_label}  FDB     {code_label}')
+        asm_parts.append(f'{code_label}')
+
+        # Process assembly: expand ;NEXT, skip blanks/comments
+        for line in asm_text.split('\n'):
+            stripped = line.strip()
+            if not stripped or (stripped.startswith(';') and not stripped.startswith(';NEXT')):
+                continue
+            if re.match(r'^\s*;NEXT\b', line):
+                asm_parts.append(NEXT_ASM)
+            else:
+                asm_parts.append(line)
+        asm_parts.append(end_label)
+        asm_parts.append('')
+
+    asm_source = '\n'.join(asm_parts)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        asm_file = Path(tmpdir) / 'kcode_words.asm'
+        bin_file = Path(tmpdir) / 'kcode_words.bin'
+        map_file = Path(tmpdir) / 'kcode_words.map'
+        asm_file.write_text(asm_source)
+
+        result = subprocess.run(
+            ['lwasm', '--format=raw', f'--output={bin_file}',
+             f'--map={map_file}', str(asm_file)],
+            capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"lwasm failed assembling KCODE words:\n{result.stderr}\n"
+                f"--- assembly source ---\n{asm_source}")
+
+        raw_bin = bin_file.read_bytes()
+        map_text = map_file.read_text()
+
+        # Parse map to get CFA addresses
+        map_syms = {}
+        for line in map_text.split('\n'):
+            m = re.match(r'Symbol:\s+(\w+)\s+\S+\s+=\s+([0-9A-Fa-f]+)', line)
+            if m:
+                map_syms[m.group(1)] = int(m.group(2), 16)
+
+        kcode_cfas = {}
+        for name, cfa_label in cfa_labels.items():
+            if cfa_label not in map_syms:
+                raise RuntimeError(f"Could not find CFA label for KCODE word {name!r}")
+            kcode_cfas[name] = map_syms[cfa_label]
+
+    return bytearray(raw_bin), kcode_cfas
+
+
 # ── Constant inlining ─────────────────────────────────────────────────────────
 
 MAX_INLINE_REFS = 999  # inline all constants (each ref: 80cy→31cy, +2 bytes)
@@ -628,7 +722,8 @@ def item_size(item):
 
 
 def compile_forth(definitions, variables, main_thread, code_definitions,
-                  symbols, app_base, hole_start=None, hole_end=None):
+                  symbols, app_base, hole_start=None, hole_end=None,
+                  kcode_cfas=None):
     """
     Two-pass compiler.
 
@@ -794,6 +889,8 @@ def compile_forth(definitions, variables, main_thread, code_definitions,
                 emit_word(var_cfa[name])
             elif name in kwords:
                 emit_word(kwords[name])
+            elif kcode_cfas and name in kcode_cfas:
+                emit_word(kcode_cfas[name])
             else:
                 raise ValueError(f"Unknown word: {name!r}")
 
@@ -1479,10 +1576,39 @@ def main():
     src_path             = Path(args.source)
     source               = src_path.read_text()
     tokens               = tokenize(source, base_dir=src_path.parent)
-    defs, variables, main, code_defs = parse(tokens)
+    defs, variables, main, code_defs, kcode_defs = parse(tokens)
     inline_constants(defs, main)
-    code                 = compile_forth(defs, variables, main, code_defs, symbols, app_base,
-                                         hole_start=hole_start, hole_end=hole_end)
+
+    # ── Assemble KCODE words into kernel address space ──
+    kcode_bytes = bytearray()
+    kcode_cfas = {}
+    if kcode_defs:
+        kern_end = symbols.get('KERN_END', 0xEDB0)
+        # KCODE words reference FVAR_* (Forth variable addresses) via EQU labels
+        # in the assembly.  Use dummy addresses for initial assembly — the real
+        # addresses are computed by compile_forth in Pass 1, but KCODE words only
+        # need valid placeholder addresses for lwasm to resolve the EQUs.
+        # We'll re-assemble with real addresses after compile_forth runs.
+        kcode_dummy_vars = {name: 0x4000 + i * 4 for i, name in enumerate(variables)}
+        kcode_bytes, kcode_cfas = assemble_kcode_words(
+            kcode_defs, symbols, kcode_dummy_vars, kern_end)
+
+    code = compile_forth(defs, variables, main, code_defs, symbols, app_base,
+                         hole_start=hole_start, hole_end=hole_end,
+                         kcode_cfas=kcode_cfas)
+
+    # Re-assemble KCODE with real variable addresses
+    if kcode_defs and variables:
+        # compute real FVAR addresses: variables are at end of app code,
+        # each is DOVAR(2) + data(2) = 4 bytes.  The first variable's CFA
+        # is at app_base + len(code) - len(variables)*4.
+        var_base = app_base + len(code) - len(variables) * 4
+        real_vars = {name: var_base + i * 4 + 2  # +2 for data cell (after DOVAR)
+                     for i, name in enumerate(variables)}
+        kcode_bytes, kcode_cfas_new = assemble_kcode_words(
+            kcode_defs, symbols, real_vars, kern_end)
+        # CFAs should be identical since kernel addresses don't change
+        assert kcode_cfas == kcode_cfas_new, "KCODE CFA mismatch after re-assembly"
 
     if args.kernel_bin:
         # Combine kernel + app into one DECB binary.
@@ -1501,6 +1627,31 @@ def main():
             else:
                 staged_records.append((addr, payload))
         kernel_records = staged_records
+
+        # Append KCODE bytes to the staged kernel region
+        if kcode_bytes:
+            kernel_records.append((stage_cursor, bytes(kcode_bytes)))
+            new_kern_end = symbols.get('KERN_END', 0xEDB0) + len(kcode_bytes)
+            stage_cursor += len(kcode_bytes)
+
+            # Patch bootstrap's CMPY #KERN_END operand to include KCODE
+            # The bootstrap has: CMPY #KERN_END (opcode 10 8C xx xx)
+            # Find and patch in the staged records
+            old_end = symbols['KERN_END']
+            old_end_hi = (old_end >> 8) & 0xFF
+            old_end_lo = old_end & 0xFF
+            new_end_hi = (new_kern_end >> 8) & 0xFF
+            new_end_lo = new_kern_end & 0xFF
+            for idx, (addr, payload) in enumerate(kernel_records):
+                payload = bytearray(payload)
+                # Search for CMPY immediate: 10 8C <old_hi> <old_lo>
+                for j in range(len(payload) - 3):
+                    if (payload[j] == 0x10 and payload[j+1] == 0x8C and
+                        payload[j+2] == old_end_hi and payload[j+3] == old_end_lo):
+                        payload[j+2] = new_end_hi
+                        payload[j+3] = new_end_lo
+                        kernel_records[idx] = (addr, bytes(payload))
+                        break
 
         if stage_cursor > app_base:
             sys.exit(f"fc.py: staged kernel ends at ${stage_cursor:04X}, "
@@ -1529,6 +1680,8 @@ def main():
         print(f"  words: {', '.join(defs)}")
     if code_defs:
         print(f"  CODE:  {', '.join(code_defs)}")
+    if kcode_defs:
+        print(f"  KCODE: {', '.join(kcode_defs)} ({len(kcode_bytes)} bytes in kernel space)")
     if variables:
         print(f"  vars:  {', '.join(variables)}")
 
