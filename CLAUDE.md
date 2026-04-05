@@ -140,7 +140,7 @@ Primary doc: `COCO_RENOVATION.md`. Tech reference: `coco_technical_reference.pdf
 ## Current State (2026-04-04)
 Tutorial series, calculator, Getting Started ch1–13: all COMPLETE.
 Space Warp: core gameplay complete, combat rebalance in progress, targeting v1.0 release April 15.
-App size: 24,551 bytes, headroom 9 bytes. Data at $8000+, font at $9000.
+App size: 23,228 bytes, headroom 1,348 bytes. Kernel: 3,504 bytes. Data at $8000+, font at $9000.
 Budget: 14,930cy/frame. Slot-based think scheduling (3 Jovians, skip 1-6).
 HSYNC beam-chasing (#262): after VSYNC, wait for beam to pass sprites before VRAM writes.
 Beam system (#259): paint-black erase + draw-stars redraw + beam-scrub-sprites.
@@ -242,13 +242,13 @@ Images live in `getting-started/images/`. To replace a placeholder `div.illustra
 - `$9000–$91D8` — Font glyphs (59 glyphs × 8 bytes, all-RAM region)
 - `$DE00` — Data stack base (U, grows down)
 - `$E000` — Return stack init (S, grows down from $DFFF)
-- `$E000–$E869` — Kernel code (final location, all-RAM mode, 53 primitives + DOVAR data)
-- `$E86A–$FEFF` — Static data / kernel growth (~5.7K)
+- `$E000–$EDB0` — Kernel code (final location, all-RAM mode, 74 primitives incl. graphics/beam/sprite + DOVAR data)
+- `$EDB0–$FEFF` — Free for kernel growth (~4.4K)
 - fc.py remaps kernel DECB records from $E000+ to $1000 (staging)
 - All-RAM mode via `STA $FFDF` (NOT $FFDE — $FFDF sets TY, $FFDE clears)
 - `$8774–$89CB` — BEAM-PATH (player maser, 600 bytes)
 - `$89CC–$8C23` — JBEAM-PATH (Jovian beam, 600 bytes)
-- **Headroom**: App ends $7FF7, data starts $8000 — 9 bytes free
+- **Headroom**: App ends ~$7AAC, data starts $8000 — ~1,348 bytes free
 - Data relocated from $75xx–$7Exx to $8000+ all-RAM region (commit 68e10b9)
 
 ## Architecture

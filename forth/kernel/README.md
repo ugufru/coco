@@ -178,6 +178,34 @@ processors where Forth fits naturally without compromise.
 | `sprite-data` | `( -- addr )` | Address of kernel sprite FCB data (5 sprites × 12 bytes) |
 | `font-data` | `( -- addr )` | Address of kernel font FCB data (59 glyphs × 8 bytes) |
 
+### Screen sync
+
+| Word | Stack | Description |
+|---|---|---|
+| `VSYNC` | `( -- )` | Wait for vertical sync (60 Hz NTSC) |
+| `WAIT-PAST-ROW` | `( row -- )` | After VSYNC, wait for beam past display row (0-191) |
+| `COUNT-BLANKING` | `( -- n )` | Diagnostic: count 100 HSYNC pulses after VSYNC |
+
+### RG6 graphics
+
+| Word | Stack | Description |
+|---|---|---|
+| `RG-PSET` | `( x y color -- )` | Plot one artifact pixel (color 0-3) |
+| `RG-LINE` | `( x1 y1 x2 y2 color -- )` | Bresenham line, all 8 octants |
+| `RG-CHAR` | `( char cx cy -- )` | Render font glyph at text position |
+| `SPR-DRAW` | `( addr x y -- )` | Draw sprite with transparency |
+| `SPR-ERASE-BOX` | `( addr x y -- )` | Clear sprite bounding box to black |
+
+### Beam system
+
+| Word | Stack | Description |
+|---|---|---|
+| `BEAM-TRACE` | `( x1 y1 x2 y2 buf -- count )` | Bresenham trace with pixel save to buffer |
+| `BEAM-DRAW-SLICE` | `( buf start count color -- )` | Draw buffer slice in given color |
+| `BEAM-RESTORE-SLICE` | `( buf start count -- )` | Restore saved colors from buffer |
+| `BEAM-FIND-OBSTACLE` | `( buf count -- index )` | Find first non-black saved pixel |
+| `BEAM-SCRUB-POS` | `( buf count cx cy -- )` | Zero saved colors within ±4x, ±3y of position |
+
 ### System
 
 | Word | Stack | Description |
@@ -206,8 +234,8 @@ step-by-step walkthrough.
 |---|---|---|---|
 | 1 | `$0050` | 44 B | Kernel variables |
 | 2 | `$0E00` | ~25 B | Bootstrap |
-| 3 | `$1000` | ~2.2K | Staged kernel (remapped from `$E000`) |
-| 4 | `$2000` | ~24K | Application (contiguous, varies by app) |
+| 3 | `$1000` | ~3.5K | Staged kernel (remapped from `$E000`) |
+| 4 | `$2000` | ~23K | Application (contiguous, varies by app) |
 | Exec | `$0E00` | — | Bootstrap entry point |
 
 All DECB records must target the lower 32K (`$0000–$7FFF`) because CLOADM
@@ -261,11 +289,12 @@ $2000–$7FFF   application code (contiguous, ~24K loadable via CLOADM)
 $8000–$DDFF   runtime RAM (24K — variables, tables, buffers; NOT CLOADM-loadable)
 $DE00         data stack base (U, grows downward)
 $E000–$E012   DOCOL, DOVAR entry points (final location)
-$E013–$E0BA   CFA table (61 entries × 2 bytes, includes DOVAR data blocks)
-$E0BB–$E828   primitive machine code + font/sprite FCB data + key table
-$E829–$E868   START: hardware init + app entry
-$E869         KERN_END (end of bootstrap copy range)
-$E869–$FEFF   free RAM for kernel growth / static data (~5.7K)
+$E013–$E0xx   CFA table (74 entries × 2 bytes, includes DOVAR data blocks)
+$E0xx–$E829   primitive machine code + font/sprite FCB data + key table
+$E82A–$E869   START: hardware init + app entry
+$E86A–$EDB0   promoted library primitives (graphics, sprites, beams)
+$EDB0         KERN_END (end of bootstrap copy range)
+$EDB0–$FEFF   free RAM for kernel growth (~4.4K)
 $FF00–$FFFF   I/O registers + hardware vectors (always mapped, never RAM)
 ```
 
@@ -281,12 +310,12 @@ runtime (after the bootstrap enables all-RAM) but cannot hold loaded code.
 | Region | Size | Contents |
 |---|---|---|
 | VRAM | 6K | RG6 display (`$0600–$1FFF`, set by rg-init) |
-| App (loadable) | ~24K | Forth thread + CODE words (`$2000–$7FFF`) |
+| App (loadable) | ~23K | Forth thread + CODE words (`$2000–$7FFF`) |
 | Runtime RAM | 24K | variables, tables, buffers (`$8000–$DDFF`; not CLOADM-loadable) |
 | Data stack | 512B | grows down from `$DE00` |
 | Return stack | 512B | grows down from `$E000` (below kernel) |
-| Kernel code | ~2.2K | primitives, CFA table, font/sprite data, keyboard matrix, startup (`$E000–$E868`) |
-| Post-kernel | ~5.7K | free for kernel growth / static data (`$E869–$FEFF`) |
+| Kernel code | ~3.5K | primitives + graphics/beam/sprite + font/sprite data + startup (`$E000–$EDB0`) |
+| Post-kernel | ~4.4K | free for kernel growth (`$EDB0–$FEFF`) |
 
 ---
 

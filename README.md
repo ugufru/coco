@@ -90,8 +90,10 @@ Space Warp (src/spacewarp/) — a full real-time space combat game with procedur
 | Control flow | 0BRANCH, BRANCH, DO, LOOP, I |
 | Comparison | =, <>, <, >, 0= |
 | Return stack | >R, R>, R@ |
-| Screen | AT |
+| Screen | AT, VSYNC, WAIT-PAST-ROW, COUNT-BLANKING |
 | String | TYPE, COUNT |
+| RG6 graphics | RG-PSET, RG-LINE, RG-CHAR, SPR-DRAW, SPR-ERASE-BOX |
+| Beam system | BEAM-TRACE, BEAM-DRAW-SLICE, BEAM-RESTORE-SLICE, BEAM-FIND-OBSTACLE, BEAM-SCRUB-POS |
 | Spatial | PROX-SCAN, MDIST |
 | Data | sprite-data, font-data |
 | System | HALT |
