@@ -443,40 +443,40 @@ VARIABLE tcy
 : s-destroyed  S" DESTROYED" rg-type ;
 : s-again      S" AGAIN?" rg-type ;
 : s-upsys      S" THE UP SYSTEM" rg-type ;
-: s-command    S" COMMAND" rg-type ;
+: s-command    S" COMMAND? (1-7)" rg-type ;
 
 : draw-panel  ( -- )
   clear-panel
 
   \ Row 15: STARDATE      n  MISSILES      nn
-  0 15 at-xy  S" STARDATE" rg-type  gtime @ 14 rg-u.r
-  17 15 at-xy  S" MISSILES" rg-type  pmissiles @ 32 rg-u.r
+  1 15 at-xy  S" STARDATE" rg-type  gtime @ 15 rg-u.r
+  17 15 at-xy  S" MISSILES" rg-type  pmissiles @ 31 rg-u.r
 
   \ Row 16: QUADRANT    n n  ENERGY       nnn
-  0 16 at-xy  S" QUADRANT" rg-type
-  11 16 at-xy  pcol @ rg-u.  CHAR , rg-emit  prow @ rg-u.
-  17 16 at-xy  S" ENERGY" rg-type  penergy @ 32 rg-u.r
+  1 16 at-xy  S" QUADRANT" rg-type
+  12 16 at-xy  pcol @ rg-u.  CHAR , rg-emit  prow @ rg-u.
+  17 16 at-xy  S" ENERGY" rg-type  penergy @ 31 rg-u.r
 
   \ Row 17: COND/SOS left, DEFLECTORS right (#341)
   -1 prev-cond !  update-cond
   17 17 at-xy
   pshields @ IF
     pdmg-defl @ 100 = IF
-      S" DEFLECTORS   UP" rg-type
+      S" DEFLCTRS    UP" rg-type
     ELSE
-      S" DEFLECTORS" rg-type  pdmg-defl @ 32 rg-u.r
+      S" DEFLCTRS" rg-type  pdmg-defl @ 31 rg-u.r
     THEN
   ELSE
-    S" DEFLECTORS DOWN" rg-type
+    S" DEFLCTRS  DOWN" rg-type
   THEN
 
   \ Row 18: COMMAND prompt
-  17 18 at-xy  s-command ;
+  1 18 at-xy  s-command ;
 
 \ Quick-update just the energy value (avoids full panel redraw)
 \ Clear 3 chars and print right-justified value at (col,row)
 : panel-val  ( val row -- )
-  tcy !  29 tcx !  $20 rg-emit  $20 rg-emit  $20 rg-emit  32 rg-u.r ;
+  tcy !  28 tcx !  $20 rg-emit  $20 rg-emit  $20 rg-emit  31 rg-u.r ;
 
 : update-energy   penergy @ 16 panel-val ;
 
@@ -484,12 +484,12 @@ VARIABLE tcy
   17 17 at-xy
   pshields @ IF
     pdmg-defl @ 100 = IF
-      S" DEFLECTORS   UP" rg-type
+      S" DEFLCTRS    UP" rg-type
     ELSE
-      S" DEFLECTORS" rg-type  pdmg-defl @ 32 rg-u.r
+      S" DEFLCTRS" rg-type  pdmg-defl @ 31 rg-u.r
     THEN
   ELSE
-    S" DEFLECTORS DOWN" rg-type
+    S" DEFLCTRS  DOWN" rg-type
   THEN ;
 : update-missiles pmissiles @ 15 panel-val ;
 
@@ -1366,15 +1366,15 @@ VARIABLE prev-cond
 : update-cond  ( -- )
   cond-state DUP prev-cond @ = IF DROP ELSE
     DUP prev-cond !
-    0 17 at-xy  14 0 DO $20 rg-emit LOOP
-    0 17 at-xy
+    1 17 at-xy  14 0 DO $20 rg-emit LOOP
+    1 17 at-xy
     DUP 4 = IF S" SOS-BASE" rg-type
-      11 17 at-xy sos-col @ rg-u. CHAR , rg-emit sos-row @ rg-u.
+      12 17 at-xy sos-col @ rg-u. CHAR , rg-emit sos-row @ rg-u.
     ELSE S" COND" rg-type
-      DUP 3 = IF 8 17 at-xy S" DOCKED" rg-type ELSE
-      DUP 0 = IF 9 17 at-xy S" GREEN" rg-type ELSE
-      DUP 2 = IF 11 17 at-xy S" RED" rg-type ELSE
-      8 17 at-xy S" YELLOW" rg-type
+      DUP 3 = IF 9 17 at-xy S" DOCKED" rg-type ELSE
+      DUP 0 = IF 10 17 at-xy S" GREEN" rg-type ELSE
+      DUP 2 = IF 12 17 at-xy S" RED" rg-type ELSE
+      9 17 at-xy S" YELLOW" rg-type
       THEN THEN THEN
     THEN DROP
   THEN ;
@@ -3362,18 +3362,17 @@ VARIABLE prev-docked              \ last displayed dock state
 : rep1  ( addr -- flag )
   DUP @ 100 < IF DUP @ 2 + 100 MIN SWAP ! 1 ELSE DROP 0 THEN ;
 
-\ Repair all damaged systems. Priority depends on deflector state (#340).
+\ Repair ONE damaged system per tick. Priority depends on deflector state (#340).
 : repair-any  ( -- flag )
-  0
   pshields @ IF
-    pdmg-defl rep1 OR
-    pdmg-ion  rep1 OR  pdmg-warp rep1 OR
-    pdmg-scan rep1 OR  pdmg-masr rep1 OR
+    pdmg-defl rep1 IF 1 EXIT THEN
+    pdmg-ion  rep1 IF 1 EXIT THEN  pdmg-warp rep1 IF 1 EXIT THEN
+    pdmg-scan rep1 IF 1 EXIT THEN  pdmg-masr rep1 IF 1 EXIT THEN
   ELSE
-    pdmg-ion  rep1 OR  pdmg-warp rep1 OR
-    pdmg-scan rep1 OR  pdmg-masr rep1 OR
-    pdmg-defl rep1 OR
-  THEN ;
+    pdmg-ion  rep1 IF 1 EXIT THEN  pdmg-warp rep1 IF 1 EXIT THEN
+    pdmg-scan rep1 IF 1 EXIT THEN  pdmg-masr rep1 IF 1 EXIT THEN
+    pdmg-defl rep1 IF 1 EXIT THEN
+  THEN 0 ;
 
 : tick-energy  ( -- )
   docked @ IF EXIT THEN
@@ -3410,8 +3409,9 @@ CODE move-ship
         STD     FVAR_was_near_base  ; big-endian: 0:result
 
         ; -- Compute speed from pdmg-ion --
-        ; > 67 -> 3, > 34 -> 2, else 1
+        ; 0 -> disabled, > 67 -> 3, > 34 -> 2, else 1
         LDA     FVAR_pdmg_ion+1
+        LBEQ    @exit           ; ion destroyed = no movement (#307)
         CMPA    #68
         BLO     @sp2
         LDA     #3
@@ -3836,40 +3836,21 @@ CODE ship-gravity
 
 : do-undock  ( -- )  0 docked ! ;
 
-\ Gradual energy recharge while docked.
-\ Inverse log curve: fast when empty, slows every 20%.
-VARIABLE dock-tick
-
-\ Add 2 to the 16-bit cell at addr, capping at 100. No-op if already >= 100.
-: repair-sys  ( addr -- )
-  DUP @ 100 < IF DUP @ 2 + 100 < IF DUP @ 2 + ELSE 100 THEN SWAP ! ELSE DROP THEN ;
-
+\ Docked recharge: 3x self-regen rate.
+\ Self-regen = +1 energy / +2 repair to 1 system every 16 frames.
+\ Docked = +3 energy / +6 repair to 1 system every 16 frames, free.
 : tick-dock  ( -- )
   docked @ 0= IF EXIT THEN
-  1 dock-tick +!
-  penergy @ 20 < IF                    \ 0-19%: +4 every frame
-    4 penergy +!
-  ELSE penergy @ 40 < IF               \ 20-39%: +2 every frame
-    2 penergy +!
-  ELSE penergy @ 60 < IF               \ 40-59%: +1 every frame
-    1 penergy +!
-  ELSE penergy @ 80 < IF               \ 60-79%: +1 every 2 frames
-    dock-tick @ 1 AND 0= IF 1 penergy +! THEN
-  ELSE                                  \ 80-99%: +1 every 4 frames
-    dock-tick @ 3 AND 0= IF 1 penergy +! THEN
-  THEN THEN THEN THEN
-  penergy @ 100 > IF 100 penergy ! THEN
-  \ Repair systems: +2 per frame each (0→100 in ~50 frames = 0.8s)
-  pdmg-ion  repair-sys
-  pdmg-warp repair-sys
-  pdmg-scan repair-sys
-  pdmg-defl repair-sys
-  pdmg-masr repair-sys ;
+  frame-tick @ 15 AND 0= IF
+    penergy @ 3 + 100 MIN penergy !
+    repair-any DROP  repair-any DROP  repair-any DROP
+  THEN ;
 
 : check-dock  ( -- )
   qbase @ 0= IF EXIT THEN
   SHIP-POS C@ BASE-POS C@ - abs 8 <
-  SHIP-POS 1 + C@ BASE-POS 1 + C@ - abs 8 < AND IF
+  SHIP-POS 1 + C@ BASE-POS 1 + C@ - abs 8 < AND
+  pshields @ 0= AND IF                  \ shields must be DOWN (#345)
     docked @ 0= IF do-dock THEN
   ELSE
     docked @ IF do-undock THEN
@@ -3890,15 +3871,15 @@ VARIABLE cmd-val                  \ accumulated parameter value
 VARIABLE cmd-digits               \ number of digits entered
 
 : clear-cmd-area  ( -- )
-  17 18 at-xy  15 0 DO  $20 rg-emit  LOOP ;
+  1 18 at-xy  31 0 DO  $20 rg-emit  LOOP ;
 
 \ Show rejection feedback in command area (#238)
 : cmd-reject  ( addr len -- )
-  clear-cmd-area  17 18 at-xy  rg-type  2 cmd-state ! ;
+  clear-cmd-area  1 18 at-xy  rg-type  2 cmd-state ! ;
 
 : draw-cmd-prompt  ( -- )
   clear-cmd-area
-  17 18 at-xy
+  1 18 at-xy
   s-command ;
 
 \ ══════════════════════════════════════════════════════════════════════════
@@ -4383,14 +4364,14 @@ VARIABLE sd-cancel                    \ cancel sequence progress (0-3)
 
 \ Show current countdown digit in command area
 : sd-show  ( -- )
-  clear-cmd-area  17 18 at-xy
-  sd-active @ CHAR 0 + rg-emit ;
+  clear-cmd-area  1 18 at-xy
+  S" DESTRUCT " rg-type  sd-active @ CHAR 0 + rg-emit ;
 
 \ Abort: clear countdown, show ABORT
 : sd-abort  ( -- )
   0 sd-active !
-  clear-cmd-area  17 18 at-xy
-  S" ABORT" rg-type ;
+  clear-cmd-area  1 18 at-xy
+  S" DESTRUCT ABORT" rg-type ;
 
 \ Detonate: explode ship with proximity damage
 : sd-detonate  ( -- )
@@ -4563,6 +4544,8 @@ VARIABLE sg-row                   \ scan grid: outer loop row
   cmd-num @ 1 = IF exec-command EXIT THEN
   cmd-num @ 3 = IF exec-command EXIT THEN
   cmd-num @ 4 = IF exec-command EXIT THEN
+  \ Command 9 while destruct active: immediate abort
+  cmd-num @ 7 = sd-active @ 0 <> AND IF sd-abort EXIT THEN
   \ Commands 5, 6, 7: return to tactical first (need viewport)
   overlay @ IF
     cmd-num @ 5 < 0= IF dismiss-overlay THEN
@@ -4571,19 +4554,24 @@ VARIABLE sg-row                   \ scan grid: outer loop row
   1 cmd-state !
   0 cmd-val !  0 cmd-digits !
   clear-cmd-area
-  17 18 at-xy
-  cmd-num @ 2 = IF S" WARP?" rg-type EXIT THEN
-  cmd-num @ 4 = IF S" SHLD?" rg-type EXIT THEN
-  cmd-num @ 5 = IF S" MASR?" rg-type EXIT THEN
-  cmd-num @ 6 = IF S" MISS?" rg-type EXIT THEN
-  S" DEST?" rg-type ;
+  1 18 at-xy
+  cmd-num @ 2 = IF S" WARP QUADRANT?" rg-type EXIT THEN
+  cmd-num @ 5 = IF S" MASERS HEADING?" rg-type EXIT THEN
+  cmd-num @ 6 = IF S" MISSILE HEADING?" rg-type EXIT THEN
+  S" DESTRUCT CODE?" rg-type ;
 
 : cmd-add-digit  ( digit -- )
   cmd-digits @ 3 < IF
     DUP cmd-val @ 10 * + cmd-val !
     1 cmd-digits +!
-    \ Position cursor after command name prompt
-    cmd-digits @ 21 + 18 at-xy
+    \ Position cursor 1 space after prompt "?"
+    \ base = x(1) + prompt_len + space(1) - 1
+    \ WARP QUADRANT?(14)→15, MASERS HEADING?(15)→16,
+    \ MISSILE HEADING?(16)→17, DESTRUCT CODE?(14)→15
+    cmd-num @ 5 = IF 16 ELSE
+    cmd-num @ 6 = IF 17 ELSE 15
+    THEN THEN
+    cmd-digits @ + 18 at-xy
     CHAR 0 + rg-emit
     \ Auto-execute: warp after 2 digits (#235), destruct after 3 (#236)
     cmd-num @ 2 = cmd-digits @ 2 = AND IF exec-command THEN
@@ -4825,12 +4813,12 @@ VARIABLE jnb-result
     \ ── Background tasks: run even during overlays (#232) ──
     frame-tick @ 1 AND IF
       frame-tick @ 7 AND DUP 7 = IF
-        jov-check-regen  check-dock  tick-dock  tick-base-attack
+        jov-check-regen  check-dock  tick-base-attack
       THEN 5 = IF
         tick-stardate  tick-migrate  check-spawn  update-cond
       THEN
     THEN
-    tick-energy
+    tick-energy  tick-dock
     tick-destruct
 
     VSYNC
@@ -4911,7 +4899,7 @@ VARIABLE jnb-result
         DUP 7 < IF DROP S" CAPTAIN" ELSE
         DROP S" ENSIGN"
         THEN THEN THEN rg-type
-        0 18 at-xy s-again
+        1 18 at-xy s-again
         KEY DROP
         main EXIT
       THEN
@@ -4922,7 +4910,7 @@ VARIABLE jnb-result
         2 5 at-xy  s-destroyed
         2 8 at-xy  s-upsys
         2 10 at-xy S" WILL FALL" rg-type
-        0 18 at-xy s-again
+        1 18 at-xy s-again
         KEY DROP
         main EXIT
       THEN
@@ -4959,7 +4947,7 @@ VARIABLE jnb-result
         draw-base draw-jovians-live
       THEN THEN
       \ AGAIN? prompt — any key restarts
-      0 18 at-xy
+      1 18 at-xy
       s-again
       KEY DROP
       main EXIT

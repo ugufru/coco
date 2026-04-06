@@ -177,11 +177,13 @@ Trek-style shield system — shields absorb damage, degrade under fire, cost ene
 - Jovian beam scrub order: check ship hit on full trace, then truncate at obstacles, then scrub sprites.
 
 **Energy & Repair:**
-- Passive regen: +1 energy every 32 frames (~1.9/sec) when not docked.
-- If energy > 0 and a system is damaged: repair +5% to first damaged system, costs 1 energy.
+- Passive regen: +1 energy every 16 frames (~3.75/sec) when not docked.
+- If energy > 0 and a system is damaged: repair +2% to ONE system per tick (priority order), costs 1 energy. Only highest-priority damaged system heals each tick — creates repair queue pressure.
+- Repair priority: deflectors first when UP, last when DOWN (#340).
 - If energy > 0 and all systems healthy: energy accumulates.
 - If energy = 0: slow regen to 1, then spent on next repair tick.
-- Docking: fast energy recharge + system repair (+2/frame each).
+- Docking: fast energy recharge + all systems repair simultaneously (+2/frame each).
+- Ion engines at 0%: ship frozen, cannot move (#307).
 
 **Death condition:**
 - All 5 systems at 0% = ship destroyed (not energy depletion).

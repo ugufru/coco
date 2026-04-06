@@ -61,9 +61,8 @@ $86CC CONSTANT SINTAB
 VARIABLE sa-tmp
 
 : sin  ( angle -- value )
-  \ Normalize to 0-359
-  DUP 360 < 0= IF  360 -  THEN
-  DUP 0 < IF  360 +  THEN
+  \ Normalize to 0-359 (handles any positive angle)
+  360 /MOD DROP
   sa-tmp !
 
   sa-tmp @ 180 < IF

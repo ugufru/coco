@@ -196,7 +196,7 @@ Five systems, each with health (100% = fully operational, 0% = destroyed). All 5
 
 | System | Key | Effect when damaged | At 0% |
 |--------|-----|-------------------|-------|
-| Ion engines | Arrow keys | (Not yet implemented) | (#307: should disable movement) |
+| Ion engines | Arrow keys | Speed scales: >67%→3px, >34%→2px, >0%→1px | Ship frozen — cannot move (#307) |
 | Hyperdrive | 2 | < 50%: 50% chance of misjump | Cannot warp |
 | Scanners | 3 | (Not yet implemented) | (#310: should garble/blank scanner) |
 | Deflectors | 4 | Caps max shield level | Cannot raise shields |
@@ -205,7 +205,7 @@ Five systems, each with health (100% = fully operational, 0% = destroyed). All 5
 ### Energy Model
 
 - **Ship energy** (0-100) — depleted by raising shields, firing masers, warp, and system repairs. Recharged passively (+1 every 32 frames) and by docking.
-- **Passive regen** — +1 energy per 32 frames (~1.9/sec). Diverted to system repair first (1 energy = 5% repair to worst system). Only accumulates when all systems are at 100%.
+- **Passive regen** — +1 energy per 16 frames (~3.75/sec). Diverted to system repair first (1 energy = +2% to ONE system per tick, priority order). Only accumulates when all systems are at 100%. Repair queue: only the highest-priority damaged system heals each tick.
 - **Triton missiles** — finite supply (10 at start), replenished at bases from finite base stockpiles (#318). Currently one-hit kill; planned nerf to 60-80 damage (#313) making them finishers, not primary weapons.
 
 ### Shield Model
@@ -489,7 +489,6 @@ If all bases are destroyed, the game is lost.
 - Crew count, casualties, and score (#322)
 - Non-linear repair: field repair caps at 50-60% (#309)
 - Friendly fire on starbases (#323)
-- Ion engines at 0% disables movement (#307)
 - Scanner degradation at low health (#310)
 - Smart Jovian missile evasion (#183)
 - Directional Endever sprites (#324)
@@ -530,7 +529,7 @@ Self-destruct is state-driven and runs inside the game loop (non-blocking).
 
 Move the Endever directly above or below a starbase to dock. Docking:
 - Rapidly recharges energy (tiered: +4/frame at low, +1/4 frames at high)
-- Repairs all five ship systems (+2%/frame each, ~0.8 sec to full)
+- Repairs all five ship systems simultaneously (+2%/frame each, ~0.8 sec to full)
 - Replenishes triton missiles to 10
 - Shields are NOT auto-raised — player must re-raise manually after docking
 - Takes time (stardates pass during docking)
