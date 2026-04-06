@@ -155,18 +155,24 @@ Design informed by reverse engineering of the original Z80 Space Warp (1979)
 and tactical analysis of Star Trek TOS combat doctrine. Full comparison in
 `src/spacewarp/COMBAT_ANALYSIS.md`.
 
-**v1.0 release targets:**
-1. Fix BEAM-PATH buffer corruption (#290) — game-breaking bug
-2. Reclaim ~120 bytes through code factoring
-3. Combat rebalance (the core gameplay improvement):
-   - Maser range-dependent damage — primary weapon, devastating close (#312)
-   - Missile damage nerf to 60-80 — finisher, not primary (#313)
-   - Jovian aim scatter by pilot skill — genome matters in combat (#314)
-   - Damage spread across 2-3 systems per hit — ship rusts under fire (#315)
-   - Shield bleedthrough below 40% — TOS dramatic arc (#306)
-4. Bug fix: starbase gravity spawn (#233)
+**Done:**
+- Combat rebalance — maser range damage (#312), missile nerf (#313), aim scatter (#314), damage spread (#315), shield bleedthrough (#306)
+- Deflector toggle — UP/DOWN with key 4, divert warp power at 0% (#338-341)
+- Ion engines at 0% disables movement (#307)
+- One-system-at-a-time repair queue with priority ordering (#340)
+- Shields block docking (#345)
+- Panel polish — padding, full-width terminal prompts (#344)
+- 13 CODE words promoted to kernel — 1,348→937 bytes headroom (#332-336)
+- KCODE directive for kernel-space CODE words (#337)
+- Angle normalization fix (#346)
+
+**Remaining v1.0:**
+1. Bug fix: starbase gravity spawn (#233)
+2. Safe spawn refactor — unified pos-safe? for all entities (#342)
+3. Investigate extended-play crash (#347)
 
 **Post-v1.0 combat features** (prioritized):
+- Endever acceleration/deceleration — smooth movement ramp (#343)
 - SOS timer system with escalating messages (#317, #319)
 - Finite base missile supply — campaign resource anxiety (#318)
 - Direct hit bonus — center-distance damage scaling (#316)

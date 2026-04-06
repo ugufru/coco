@@ -137,10 +137,10 @@ Do not access, search, or modify files outside these paths. If a task appears to
 CoCo Renovation — on-device Forth development environment for the TRS-80 Color Computer.
 Primary doc: `COCO_RENOVATION.md`. Tech reference: `coco_technical_reference.pdf`.
 
-## Current State (2026-04-04)
+## Current State (2026-04-05)
 Tutorial series, calculator, Getting Started ch1–13: all COMPLETE.
-Space Warp: core gameplay complete, combat rebalance in progress, targeting v1.0 release April 15.
-App size: 23,228 bytes, headroom 1,348 bytes. Kernel: 3,504 bytes. Data at $8000+, font at $9000.
+Space Warp: combat rebalance complete, deflector toggle done, panel polished. Targeting v1.0 April 15.
+App size: 23,606 bytes, headroom 970 bytes. Kernel: 3,504 bytes (74 primitives). Data at $8000+, font at $9000.
 Budget: 14,930cy/frame. Slot-based think scheduling (3 Jovians, skip 1-6).
 HSYNC beam-chasing (#262): after VSYNC, wait for beam to pass sprites before VRAM writes.
 Beam system (#259): paint-black erase + draw-stars redraw + beam-scrub-sprites.
@@ -157,18 +157,18 @@ Key findings from TOS analysis ("The Kirk Test"):
 - Damage spread across 2-3 systems creates "slow rust" attrition
 - Jovian aim scatter by pilot skill makes genome matter in combat
 - Current missiles are OP (one-hit kill + infinite restock = no reason to use masers)
-v1.0 combat sprint: #312 (maser range), #313 (missile nerf), #314 (aim scatter),
-#315 (damage spread), #306 (shield bleedthrough). Needs ~125 bytes; must reclaim ~120 first.
+Combat rebalance COMPLETE: #312, #313, #314, #315, #306 all done.
+Remaining v1.0: #233 (starbase gravity spawn), #342 (safe spawn refactor), #347 (extended-play crash).
 
-## Shield / Damage / Energy Model (2026-04-03)
-Trek-style shield system — shields absorb damage, degrade under fire, cost energy to raise.
+## Shield / Damage / Energy Model (2026-04-05)
+Trek-style deflector toggle — shields UP/DOWN, no energy cost.
 
-**Shields:**
-- Raised via command 4 (25-100%). Cost: 20 + level/5 energy (25%=25, 100%=40).
-- Lowering shields (including to 0%) is free.
-- Shields take 25 damage per hit (~4 hits to deplete from 100%).
-- Deflector system health (pdmg-defl) caps max shield level.
-- Shields at 0% must be re-raised manually (costs energy again).
+**Deflectors:**
+- Key 4 toggles UP/DOWN. No energy cost. No number entry.
+- Shield strength = pdmg-defl (deflector system health, 0-100%).
+- Hits reduce pdmg-defl by 15. Below 40%: bleedthrough to other systems.
+- At 0%: shields forced DOWN. Key 4 diverts 25% from warp to deflectors.
+- Shields block docking — must lower to receive starbase assistance (#345).
 
 **Damage (Jovian beam):**
 - JBEAM-DMG = 75 per hit. Shields up: shields absorb (no system damage). Shields down: damage hits a random system with overflow to a second system if the first is depleted.
@@ -250,7 +250,7 @@ Images live in `getting-started/images/`. To replace a placeholder `div.illustra
 - All-RAM mode via `STA $FFDF` (NOT $FFDE — $FFDF sets TY, $FFDE clears)
 - `$8774–$89CB` — BEAM-PATH (player maser, 600 bytes)
 - `$89CC–$8C23` — JBEAM-PATH (Jovian beam, 600 bytes)
-- **Headroom**: App ends ~$7AAC, data starts $8000 — ~1,348 bytes free
+- **Headroom**: App ~23,606 bytes, data starts $8000 — ~970 bytes free
 - Data relocated from $75xx–$7Exx to $8000+ all-RAM region (commit 68e10b9)
 
 ## Architecture
