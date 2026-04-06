@@ -296,6 +296,31 @@ VARIABLE gq-tmp                \ temp for building quadrant byte
 \ Expand packed quadrant byte into position arrays for rendering.
 \ Assigns random positions to all objects.
 
+VARIABLE ss-safe
+
+\ Check if position at addr is >= 35 pixels from all stars and black hole.
+\ Returns flag (1=safe, 0=too close). (#233, #342)
+: pos-safe?  ( addr -- flag )
+  1 ss-safe !
+  qstars @ ?DUP IF 0 DO
+    DUP STAR-POS I 2 * + mdist
+    35 < IF 0 ss-safe ! THEN
+  LOOP THEN
+  qbhole @ IF
+    DUP BHOLE-POS mdist
+    35 < IF 0 ss-safe ! THEN
+  THEN
+  DROP ss-safe @ ;
+
+\ Retry random placement up to n times until pos-safe?.
+\ Addr already has initial coords set by caller.
+: safe-place  ( addr n -- )
+  0 DO
+    DUP pos-safe? 0= IF
+      rnd-x OVER C!  rnd-y OVER 1 + C!
+    THEN
+  LOOP DROP ;
+
 : expand-quadrant  ( col row -- )
   2DUP gal@                    \ ( col row qbyte )
 
@@ -309,68 +334,40 @@ VARIABLE gq-tmp                \ temp for building quadrant byte
   \ Save player quadrant
   SWAP pcol ! prow !
 
-  \ Generate star positions
+  \ Generate star positions (hazards — no safety check needed)
   qstars @ ?DUP IF 0 DO
     rnd-x STAR-POS I 2 * + C!
     rnd-y STAR-POS I 2 * + 1 + C!
   LOOP THEN
 
-  \ Clear all Jovian health (prevent stale data in unused slots)
-  0 JOV-DMG C!  0 JOV-DMG 1 + C!  0 JOV-DMG 2 + C!
-  \ Generate jovian positions
-  qjovians @ ?DUP IF 0 DO
-    rnd-x JOV-POS I 2 * + C!
-    rnd-y JOV-POS I 2 * + 1 + C!
-    100 JOV-DMG I + C!         \ full health
-  LOOP THEN
-
-  \ Generate base position (away from gravity sources)
-  qbase @ IF
-    0 ss-safe !
-    6 0 DO
-      ss-safe @ 0= IF
-        rnd-x BASE-POS C!
-        rnd-y BASE-POS 1 + C!
-        1 ss-safe !
-        qstars @ ?DUP IF 0 DO
-          BASE-POS STAR-POS I 2 * + mdist
-          35 < IF 0 ss-safe ! THEN
-        LOOP THEN
-        qbhole @ IF
-          BASE-POS BHOLE-POS mdist
-          35 < IF 0 ss-safe ! THEN
-        THEN
-      THEN
-    LOOP
-  THEN
-
-  \ Generate black hole position
+  \ Generate black hole position (hazard — placed before base/jovians)
   qbhole @ IF
     rnd-x BHOLE-POS C!
     rnd-y BHOLE-POS 1 + C!
   THEN
 
+  \ Generate base position (away from gravity sources, 6 retries)
+  qbase @ IF
+    rnd-x BASE-POS C!  rnd-y BASE-POS 1 + C!
+    BASE-POS 6 safe-place
+  THEN
+
+  \ Clear all Jovian health (prevent stale data in unused slots)
+  0 JOV-DMG C!  0 JOV-DMG 1 + C!  0 JOV-DMG 2 + C!
+  \ Generate jovian positions (away from gravity sources, 4 retries)
+  qjovians @ ?DUP IF 0 DO
+    rnd-x JOV-POS I 2 * + C!
+    rnd-y JOV-POS I 2 * + 1 + C!
+    JOV-POS I 2 * + 4 safe-place
+    100 JOV-DMG I + C!         \ full health
+  LOOP THEN
+
   \ Place ship at center
   64 SHIP-POS C!  72 SHIP-POS 1 + C! ;
 
-VARIABLE ss-safe
-
-\ Relocate ship if too close to stars or black hole
+\ Relocate ship if too close to stars or black hole (16 retries)
 : safe-spawn  ( -- )
-  16 0 DO
-    1 ss-safe !
-    qstars @ ?DUP IF 0 DO
-      SHIP-POS STAR-POS I 2 * + mdist
-      35 < IF 0 ss-safe ! THEN
-    LOOP THEN
-    qbhole @ IF
-      SHIP-POS BHOLE-POS mdist
-      35 < IF 0 ss-safe ! THEN
-    THEN
-    ss-safe @ 0= IF
-      rnd-x SHIP-POS C!  rnd-y SHIP-POS 1 + C!
-    THEN
-  LOOP ;
+  SHIP-POS 16 safe-place ;
 
 \ ── init-player ( -- ) ───────────────────────────────────────────────────
 
@@ -481,6 +478,7 @@ VARIABLE tcy
 : update-energy   penergy @ 16 panel-val ;
 
 : update-deflectors  ( -- )
+  17 17 at-xy  S" DEFLCTRS      " rg-type
   17 17 at-xy
   pshields @ IF
     pdmg-defl @ 100 = IF
@@ -1501,10 +1499,11 @@ VARIABLE spawn-pending                \ deferred spawn dir+1, or 0
     SWAP DUP set-edge-pos             \ first attempt
     sp-x @ SHIP-POS C@ - abs
     sp-y @ SHIP-POS 1 + C@ - abs + 10 < IF
-      DUP set-edge-pos               \ retry once if too close
+      DUP set-edge-pos               \ retry once if too close to ship
     THEN DROP                         \ ( slot )
     DUP sp-x @ SWAP 2 * JOV-POS + C!    \ store x
     DUP sp-y @ SWAP 2 * JOV-POS + 1 + C!  \ store y
+    DUP 2 * JOV-POS + 3 safe-place   \ move away from stars/bhole
     DUP 100 SWAP JOV-DMG + C!        \ full health
     DUP gen-genome                    \ generate genome
     DUP 12 SWAP jov-emotion-stim      \ high emotion (rage)
@@ -3363,16 +3362,22 @@ VARIABLE prev-docked              \ last displayed dock state
   DUP @ 100 < IF DUP @ 2 + 100 MIN SWAP ! 1 ELSE DROP 0 THEN ;
 
 \ Repair ONE damaged system per tick. Priority depends on deflector state (#340).
+\ Uses stack flag: 0 = not yet repaired, try next. 1 = done, skip rest.
 : repair-any  ( -- flag )
+  0
   pshields @ IF
-    pdmg-defl rep1 IF 1 EXIT THEN
-    pdmg-ion  rep1 IF 1 EXIT THEN  pdmg-warp rep1 IF 1 EXIT THEN
-    pdmg-scan rep1 IF 1 EXIT THEN  pdmg-masr rep1 IF 1 EXIT THEN
+    DUP 0= IF DROP pdmg-defl rep1 THEN
+    DUP 0= IF DROP pdmg-ion  rep1 THEN
+    DUP 0= IF DROP pdmg-warp rep1 THEN
+    DUP 0= IF DROP pdmg-scan rep1 THEN
+    DUP 0= IF DROP pdmg-masr rep1 THEN
   ELSE
-    pdmg-ion  rep1 IF 1 EXIT THEN  pdmg-warp rep1 IF 1 EXIT THEN
-    pdmg-scan rep1 IF 1 EXIT THEN  pdmg-masr rep1 IF 1 EXIT THEN
-    pdmg-defl rep1 IF 1 EXIT THEN
-  THEN 0 ;
+    DUP 0= IF DROP pdmg-ion  rep1 THEN
+    DUP 0= IF DROP pdmg-warp rep1 THEN
+    DUP 0= IF DROP pdmg-scan rep1 THEN
+    DUP 0= IF DROP pdmg-masr rep1 THEN
+    DUP 0= IF DROP pdmg-defl rep1 THEN
+  THEN ;
 
 : tick-energy  ( -- )
   docked @ IF EXIT THEN
@@ -4899,7 +4904,7 @@ VARIABLE jnb-result
         DUP 7 < IF DROP S" CAPTAIN" ELSE
         DROP S" ENSIGN"
         THEN THEN THEN rg-type
-        1 18 at-xy s-again
+        clear-cmd-area  1 18 at-xy s-again
         KEY DROP
         main EXIT
       THEN
@@ -4910,7 +4915,7 @@ VARIABLE jnb-result
         2 5 at-xy  s-destroyed
         2 8 at-xy  s-upsys
         2 10 at-xy S" WILL FALL" rg-type
-        1 18 at-xy s-again
+        clear-cmd-area  1 18 at-xy s-again
         KEY DROP
         main EXIT
       THEN
@@ -4922,7 +4927,7 @@ VARIABLE jnb-result
     0= OR IF
       cancel-beams
       ship-xy
-      0 17 at-xy  14 0 DO $20 rg-emit LOOP
+      0 17 at-xy  16 0 DO $20 rg-emit LOOP
       death-cause @ 1 = IF
         \ Black hole — ship vanishes, no explosion
         restore-ship-bg
@@ -4930,16 +4935,16 @@ VARIABLE jnb-result
         draw-backdrop
         draw-base draw-jovians-live
         2DROP
-        0 17 at-xy
+        1 17 at-xy
         S" BLACK HOLE" rg-type
       ELSE death-cause @ 2 = IF
         \ Self-destruct — explosion already happened
         2DROP
-        0 17 at-xy
+        1 17 at-xy
         s-destroyed
       ELSE
         \ Star collision or all systems failed — ship explodes
-        0 17 at-xy  s-destroyed
+        1 17 at-xy  s-destroyed
         restore-ship-bg
         explode-ship
         clear-tactical
@@ -4947,6 +4952,7 @@ VARIABLE jnb-result
         draw-base draw-jovians-live
       THEN THEN
       \ AGAIN? prompt — any key restarts
+      clear-cmd-area
       1 18 at-xy
       s-again
       KEY DROP
