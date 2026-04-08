@@ -2413,6 +2413,34 @@ CODE tick-jovians-inner
         ;NEXT
 ;CODE
 
+\ Migrate fleeing Jovian to adjacent quadrant (#185)
+: jov-flee-to  ( i dc dr -- )
+  2DUP gal@ q-jovians 3 = IF 2DROP DROP EXIT THEN  \ dest full
+  2DUP gal@ 1 + ROT ROT gal!                  \ increment dest
+  here@ gal@ 1 - here@ gal!                   \ decrement src
+  0 jbg-i @ JOV-DMG + C!
+  -1 gjovians +!
+  refresh-after-kill ;
+
+\ Fleeing Jovian at screen edge → migrate to adjacent quadrant (#185)
+: jov-edge-flee  ( i -- )
+  DUP JOV-DMG + C@ 0= IF DROP EXIT THEN
+  DUP jbg-i !
+  DUP 2 * JOV-POS + DUP C@ SWAP 1 + C@    \ ( i x y )
+  OVER 5 < IF pcol @ 0 > IF
+    2DROP pcol @ 1 - prow @ jov-flee-to EXIT
+  THEN THEN
+  OVER 122 > IF pcol @ 7 < IF
+    2DROP pcol @ 1 + prow @ jov-flee-to EXIT
+  THEN THEN
+  DUP 5 < IF prow @ 0 > IF
+    2DROP pcol @ prow @ 1 - jov-flee-to EXIT
+  THEN THEN
+  138 > IF prow @ 7 < IF
+    DROP pcol @ prow @ 1 + jov-flee-to EXIT
+  THEN THEN
+  DROP ;
+
 \ Dispatch think/flee for Jovians whose threshold fired.
 \ Timers for detection and emotion decay.
 : tick-jovians  ( -- )
@@ -2422,6 +2450,7 @@ CODE tick-jovians-inner
       I jbg-i !
       JOV-STATE I + C@ 2 = IF
         I jov-flee  I apply-intent
+        I jov-edge-flee
       ELSE
         I qbase @ jov-think
         I apply-intent
@@ -3983,14 +4012,14 @@ CODE ship-gravity
 
 : do-undock  ( -- )  0 docked ! ;
 
-\ Docked recharge: 3x self-regen rate.
-\ Self-regen = +1 energy / +2 repair to 1 system every 16 frames.
-\ Docked = +3 energy / +6 repair to 1 system every 16 frames, free.
+: drep  ( addr -- )  DUP @ 2 + 100 MIN SWAP ! ;
+\ Docked recharge: +3 energy, all systems repair to 100%.
 : tick-dock  ( -- )
   docked @ 0= IF EXIT THEN
   frame-tick @ 15 AND 0= IF
     penergy @ 3 + 100 MIN penergy !
-    repair-any DROP  repair-any DROP  repair-any DROP
+    pdmg-ion drep  pdmg-warp drep  pdmg-scan drep
+    pdmg-defl drep  pdmg-masr drep
   THEN ;
 
 : check-dock  ( -- )
