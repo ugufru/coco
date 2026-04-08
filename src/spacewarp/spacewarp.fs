@@ -4313,8 +4313,20 @@ CODE clamp-beam   \ ( -- )  Clamp beam x1/y1/x2/y2 to screen bounds
 
 \ ── Apply maser hit (deferred until bolt reaches target) ──────────────
 
+\ Friendly fire: check if beam endpoint hit the base (#323)
+: beam-hit-base?  ( -- flag )
+  qbase @ 0= IF 0 EXIT THEN
+  beam-total @ 0= IF 0 EXIT THEN
+  BEAM-PATH beam-total @ 1 - 2 * + DUP C@ BASE-POS C@ - abs 5 <
+  SWAP 1 + C@ BASE-POS 1 + C@ - abs 5 < AND ;
+
 : apply-beam-hit  ( -- )
-  beam-hit-idx @ 0 < IF EXIT THEN
+  beam-hit-idx @ 0 < IF
+    \ No Jovian hit — check friendly fire on base (#323)
+    beam-head @ beam-total @ < IF EXIT THEN  \ bolt not there yet
+    beam-hit-base? IF destroy-base THEN
+    EXIT
+  THEN
   \ Only apply when head has reached the end (target)
   beam-head @ beam-total @ < IF EXIT THEN
   \ Apply damage
@@ -4426,6 +4438,14 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
   msl-hit? IF
     msl-kill  0 msl-dirty !
     EXIT
+  THEN
+  \ Friendly fire: missile hits base (#323)
+  qbase @ IF
+    msl-scrx BASE-POS C@ - abs 4 <
+    msl-scry BASE-POS 1 + C@ - abs 4 < AND IF
+      msl-kill  destroy-base  0 msl-dirty !
+      EXIT
+    THEN
   THEN
   1 msl-dirty ! ;
 
