@@ -181,6 +181,7 @@ $80B4 CONSTANT QCOUNTS         \ 4 bytes: nstars, njovians, hasbase, hasbhole
 VARIABLE sos-active
 VARIABLE sos-col
 VARIABLE sos-row
+VARIABLE sos-timer                \ stardate ticks until base destroyed (#317)
 
 \ Docking state
 VARIABLE docked                    \ 1 = currently docked at base
@@ -1426,14 +1427,23 @@ VARIABLE prev-cond
       ELSE
         sos-row !  sos-col !          \ record threatened base
         1 sos-active !
-        8 rnd 0= IF
-          GALAXY I + C@ $FB AND GALAXY I + C!
-          -1 gbases +!
-        THEN
       THEN
     THEN THEN
     DROP                              \ always drop qbyte
   LOOP
+  \ SOS timer: increment while threatened, destroy at 3 (#317)
+  sos-active @ IF
+    sos-timer @ 1 + DUP 3 < IF
+      sos-timer !
+    ELSE DROP
+      \ Destroy the remote base
+      sos-col @ 8 * sos-row @ + DUP
+      GALAXY + C@ $FB AND SWAP GALAXY + C!
+      -1 gbases +!
+      0 sos-timer !
+    THEN
+  ELSE 0 sos-timer !                  \ no threat: reset timer
+  THEN
   update-cond ;
 
 \ ── Galaxy migration system (#160, #186, #187) ────────────────────────────
@@ -2729,7 +2739,7 @@ VARIABLE check-win                \ flag: a kill happened, check win/lose
     \ Clear SOS if we just saved this base
     sos-active @ IF
       pcol @ sos-col @ = prow @ sos-row @ = AND IF
-        0 sos-active !  update-cond
+        0 sos-active !  0 sos-timer !  update-cond
       THEN
     THEN
   THEN ;
@@ -3841,14 +3851,14 @@ CODE ship-gravity
         ADDA    ,S+             ; A = mdist
         CMPA    #6
         BLO     @bclose
-        ; 6-30: gated 1px
+        ; 6-30: gated pull
         CMPA    #31
         BHS     @stars          ; outside well
         LDA     FVAR_grav_tick+1
         ANDA    #3
         BNE     @stars
-        LDB     #1
-        PSHS    B               ; push step=1
+        LDB     #2
+        PSHS    B               ; push step=2 (survives velocity halving)
         LDA     $8052
         LDB     $8053
         BSR     @pull
@@ -3891,8 +3901,8 @@ CODE ship-gravity
         ANDA    #1
         BNE     @snx
 @spull  PSHS    X               ; save star ptr
-        LDB     #1
-        PSHS    B               ; push step=1
+        LDB     #2
+        PSHS    B               ; push step=2 (survives velocity halving)
         LDA     ,X              ; star_x = tx
         LDB     1,X             ; star_y = ty
         BSR     @pull
@@ -3916,11 +3926,12 @@ CODE ship-gravity
         LDA     ,Y              ; cur_x
         CMPA    ,S              ; vs tx
         BEQ     @py
+        BHI     @pxd            ; branch before LDB clobbers Z flag
         LDB     FVAR_ship_vx+1  ; current vx
-        BHI     @pxd
         ADDB    4,S             ; vx + step (pull right)
         BRA     @pxs
-@pxd    NEGB
+@pxd    LDB     FVAR_ship_vx+1  ; current vx
+        NEGB
         ADDB    4,S             ; |vx| + step
         NEGB                    ; vx - step (pull left)
 @pxs    CLRA
@@ -3932,11 +3943,12 @@ CODE ship-gravity
         LDA     1,Y             ; cur_y
         CMPA    1,S             ; vs ty
         BEQ     @pd
+        BHI     @pyd            ; branch before LDB clobbers Z flag
         LDB     FVAR_ship_vy+1  ; current vy
-        BHI     @pyd
         ADDB    4,S             ; vy + step (pull down)
         BRA     @pys
-@pyd    NEGB
+@pyd    LDB     FVAR_ship_vy+1  ; current vy
+        NEGB
         ADDB    4,S
         NEGB                    ; vy - step (pull up)
 @pys    CLRA
@@ -4469,7 +4481,7 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
   \ Clear SOS if we just arrived at the threatened base
   sos-active @ IF
     pcol @ sos-col @ = prow @ sos-row @ = AND IF
-      0 sos-active !
+      0 sos-active !  0 sos-timer !
     THEN
   THEN
   draw-panel
@@ -4900,7 +4912,7 @@ VARIABLE jnb-result
   0 jbeam-total !  0 jbeam-hit-ship !  0 jbeam-pending !  jbeam-cooldown jbeam-cool !
   0 msl-active !  0 msl-dirty !
   0 docked !  0 prev-docked !  0 death-cause !
-  0 sd-active !  0 base-attack !
+  0 sd-active !  0 base-attack !  0 sos-timer !
   0 jov-moved !  0 spawn-pending !  0 migrate-timer !  -1 prev-cond !  0 overlay !  0 think-slot !
   0 frame-tick !
   0 check-win !
@@ -4984,8 +4996,9 @@ VARIABLE jnb-result
       THEN
       0 jov-moved !
     ELSE moved @ msl-dirty @ OR IF
-      \ Ship/missile only: skip Jovian bg ops + stars
+      \ Ship/missile only: skip Jovian bg ops
       restore-ship-bg
+      draw-stars
       draw-base
       save-ship-bg draw-ship
       msl-dirty @ IF
