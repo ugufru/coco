@@ -118,14 +118,14 @@ function buildFrame(f) {
   //   check-win: one-shot per kill, not every frame (#250)
   const isRepairTick = (f % 16 === 0);  // every 16th frame: energy regen + repair
   return {
-    ms:   993,                              // move-ship CODE(669 base + 108cy × 3 Jovians)
+    ms:   922,                              // move-ship CODE(598 base + 108cy × 3 Jovians) (#343 velocity)
     pk:   785,                              // process-key (idle path, traced)
     ssp:  374,                              // save-ship-pos — fc.py: 374cy exact
     tks:  764,                              // tick-missile(212†) + tick-jbeam(340†) + tick-destruct(212†) idle
     lovr: 429,                              // frame-tick +!(103†) + 2× overlay check(326†)
     te:   isRepairTick ? 800 : 175,         // tick-energy: idle 175cy, repair tick ~800cy (#340)
     td:   212,                              // tick-dock: idle path (not docked) ~212cy
-    sgrv: (even && isGrav) ? 476 : 0,       // ship-gravity CODE — fc.py: 473-476cy
+    sgrv: (even && isGrav) ? 466 : 0,       // ship-gravity CODE — fc.py: 466-469cy (#343 velocity @pull)
     coll: !even ? 1833 : 0,                  // check-collisions — moved to odd frames
     tjov: even ? (anyThink ? 140 : 110) : 0,   // tick-jovians-inner CODE (slot-based: ~140 fire, ~110 skip)
     j0:   hasJ0 ? 1449 : 0,                 // jov-think(689-693) + apply-intent(752-757) — fc.py
@@ -309,7 +309,7 @@ statsEl.innerHTML = `
   <br><br>
   <span style="color:#00ff88">Kernel promotion (#332-#337):</span>
   13 CODE words promoted to kernel primitives. 74 total primitives, 3,504 bytes.
-  App: 23,613 bytes, headroom ~963 bytes.
+  App: 23,773 bytes, headroom ~778 bytes.
   <br><br>
   Note: DO/LOOP and nested-loop costs are fc.py base values (single iteration);
   real multi-iteration costs are higher. Relative comparisons remain valid.

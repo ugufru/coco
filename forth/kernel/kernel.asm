@@ -267,15 +267,15 @@ CFA_PLUS_LOOP   FDB     CODE_PLUS_LOOP
 ;;;   sprite-data <dest> 60 CMOVE
 
 CFA_SPRITE_DATA FDB     DOVAR
-        ;;; Endever — blue (1) chevron, 7×5
+        ;;; Endever — blue chevron, twin red engines, 7×5
         FCB     7,5
-        FCB     $01,$00,$04,$40,$14,$50,$55,$54,$55,$54
+        FCB     $01,$00,$04,$40,$15,$50,$55,$54,$42,$84
         ;;; Jovian — red (2) diamond, 7×5
         FCB     7,5
         FCB     $02,$00,$08,$80,$22,$20,$08,$80,$02,$00
-        ;;; Base — blue (1) cross/ring, 7×5
-        FCB     7,5
-        FCB     $05,$40,$10,$10,$41,$04,$10,$10,$05,$40
+        ;;; Base — blue ring, spokes, hollow center, 7×7
+        FCB     7,7
+        FCB     $05,$40,$11,$10,$41,$04,$54,$54,$41,$04,$11,$10,$05,$40
         ;;; Missile frame 1 — red (2) plus +, 3×3
         FCB     3,3
         FCB     $20,$A8,$20

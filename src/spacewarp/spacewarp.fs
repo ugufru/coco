@@ -170,7 +170,7 @@ VARIABLE qbase                 \ base present? (0 or 1)
 VARIABLE qbhole                \ black hole present? (0 or 1)
 
 \ Shadow bytes at fixed addresses for CODE word access
-$80B0 CONSTANT QCOUNTS         \ 4 bytes: nstars, njovians, hasbase, hasbhole
+$80B4 CONSTANT QCOUNTS         \ 4 bytes: nstars, njovians, hasbase, hasbhole
 : sync-qcounts  ( -- )
   qstars @ QCOUNTS C!
   qjovians @ QCOUNTS 1 + C!
@@ -194,9 +194,9 @@ VARIABLE death-cause               \ 0=energy/star, 1=black hole
 
 $8082 CONSTANT SPR-SHIP           \ Endever: blue chevron (12 bytes)
 $808E CONSTANT SPR-JOV            \ Jovian: red diamond (12 bytes)
-$809A CONSTANT SPR-BASE           \ UP base: blue cross (12 bytes)
-$80A6 CONSTANT SPR-MSL1           \ Missile frame 1: + shape (5 bytes)
-$80AB CONSTANT SPR-MSL2           \ Missile frame 2: x shape (5 bytes)
+$809A CONSTANT SPR-BASE           \ UP base: blue ring+spokes (16 bytes)
+$80AA CONSTANT SPR-MSL1           \ Missile frame 1: + shape (5 bytes)
+$80AF CONSTANT SPR-MSL2           \ Missile frame 2: x shape (5 bytes)
 
 \ ── Jovian AI data structures ────────────────────────────────────────────
 \ Per-Jovian sprite + bg buffers (packed before GALAXY at $8000)
@@ -229,7 +229,7 @@ $8EB4 CONSTANT MOOD-GRID        \ 64 bytes: mood per sector
 : jov-draw-dx  ( i -- dx )  jov-spr C@ 1 RSHIFT ;
 : jov-draw-dy  ( i -- dy )  jov-spr 1 + C@ 1 RSHIFT ;
 
-: init-sprites  ( -- )  sprite-data SPR-SHIP 46 CMOVE ;
+: init-sprites  ( -- )  sprite-data SPR-SHIP 50 CMOVE ;
 
 \ ── Random position within tactical view ─────────────────────────────────
 \ Returns x in 4-123, y in 4-139 (away from borders).
@@ -501,7 +501,7 @@ VARIABLE tcy
 \ draw-stars CODE word (#249) — inlines rg-pset loop with fast twinkle.
 CODE draw-stars
         PSHS    X               ; save IP
-        LDB     $80B0           ; nstars
+        LDB     $80B4           ; nstars
         LBEQ    @done
         LDX     #$8040          ; STAR-POS
 @lp     PSHS    B               ; save counter
@@ -557,7 +557,7 @@ CODE draw-stars
 : draw-base  ( -- )
   qbase @ IF
     SPR-BASE
-    BASE-POS C@ 3 - BASE-POS 1 + C@ 2 -
+    BASE-POS C@ 3 - BASE-POS 1 + C@ 3 -
     spr-draw
   THEN ;
 
@@ -758,7 +758,7 @@ CODE save-jov-oldpos-n   \ ( n -- )  copy JOV-POS to JOV-OLDX/Y for n Jovians
 
 CODE save-jov-bgs   \ ( -- )
         PSHS    X
-        LDA     $80B1           ; njovians
+        LDA     $80B5           ; njovians
         TSTA
         LBEQ    @sdone
         CLRB                    ; B = j (Jovian index)
@@ -831,7 +831,7 @@ CODE save-jov-bgs   \ ( -- )
 
 CODE restore-jov-bgs   \ ( -- )
         PSHS    X
-        LDA     $80B1           ; njovians
+        LDA     $80B5           ; njovians
         TSTA
         LBEQ    @rdone
         CLRB                    ; B = j
@@ -917,7 +917,7 @@ CODE max-draw-y
         BHS     @s1
         TFR     B,A
 @s1     ; Check living Jovians: current Y and old Y
-        LDB     $80B1           ; njovians
+        LDB     $80B5           ; njovians
         TSTB
         BEQ     @sdone
         PSHS    A               ; S+0=max, save across loop
@@ -942,7 +942,7 @@ CODE max-draw-y
         STA     1,S             ; update max
 @j3     PULS    B               ; restore j
 @jnxt   INCB
-        CMPB    $80B1           ; j vs njovians
+        CMPB    $80B5           ; j vs njovians
         BNE     @jlp
         PULS    A               ; A = max
 @sdone  ; A = max Y; add sprite height margin (+7)
@@ -1914,7 +1914,7 @@ CODE apply-intent
         PSHS    A               ; S+0=avoid, S+1=cx, S+2=cy
 
         ; -- Stars --
-        LDB     $80B0           ; nstars
+        LDB     $80B4           ; nstars
         LBEQ    @cbh
         LDX     #$8040
 @cslp   PSHS    B               ; save counter
@@ -1941,7 +1941,7 @@ CODE apply-intent
         LBRA    @cblk
 
         ; -- Black hole --
-@cbh    LDA     $80B3
+@cbh    LDA     $80B7
         BEQ     @cbs
         LDX     #$8052
         LBSR    @cmd
@@ -1949,7 +1949,7 @@ CODE apply-intent
         LBLO    @cblk
 
         ; -- Base --
-@cbs    LDA     $80B2
+@cbs    LDA     $80B6
         BEQ     @csh
         LDX     #$8050
         LBSR    @cmd
@@ -1963,7 +1963,7 @@ CODE apply-intent
         LBLO    @cblk
 
         ; -- Other Jovians --
-        LDA     $80B1
+        LDA     $80B5
         BEQ     @cclr
         LDB     #0              ; j
 @cjlp   CMPB    9,S             ; j == i? (S+9=i; LBSR ret is 2 bytes not 3)
@@ -1994,7 +1994,7 @@ CODE apply-intent
         BRA     @cjnx
 @cjdd   PULS    B
 @cjnx   INCB
-        CMPB    $80B1
+        CMPB    $80B5
         BLO     @cjlp
 
 @cclr   LEAS    3,S             ; pop avoid, cx, cy
@@ -2330,7 +2330,7 @@ VARIABLE detect-timer              \ frame counter for detection rolls
 CODE tick-jovians-inner
         PSHS    X               ; save IP
         ; -- Any Jovians? --
-        LDA     $80B1           ; njovians
+        LDA     $80B5           ; njovians
         BEQ     @zero
         ; -- Advance slot: (slot + 1) % njovians --
         LDB     FVAR_think_slot+1   ; current slot (low byte)
@@ -2444,7 +2444,7 @@ CODE tick-jovians-inner
 \ Returns -1 if no contact.  Caller handles the kill in Forth.
 CODE jov-contact
         PSHS    X               ; save IP
-        LDA     $80B1           ; njovians (QCOUNTS shadow)
+        LDA     $80B5           ; njovians (QCOUNTS shadow)
         BEQ     @none
         CLRB                    ; B = i (Jovian index)
 @lp     PSHS    B               ; save i
@@ -2460,7 +2460,7 @@ CODE jov-contact
         ABX                     ; X = &JOV-POS[i]
 
         ; -- Check black hole --
-        LDA     $80B3           ; hasbhole
+        LDA     $80B7           ; hasbhole
         BEQ     @stars
         ; mdist(JOV-POS[i], BHOLE-POS)
         LDA     ,X              ; jov_x
@@ -2478,7 +2478,7 @@ CODE jov-contact
         BLO     @hit            ; contact!
 
         ; -- Check stars --
-@stars  LDB     $80B0           ; nstars
+@stars  LDB     $80B4           ; nstars
         BEQ     @nx
         LDY     #$8040          ; STAR-POS
 @slp    PSHS    B               ; save star counter
@@ -2511,7 +2511,7 @@ CODE jov-contact
 
 @nx     PULS    B               ; restore i
         INCB
-        CMPB    $80B1
+        CMPB    $80B5
         BLO     @lp
 @none   LDD     #$FFFF          ; -1 = no contact
         LEAU    -2,U
@@ -2537,7 +2537,7 @@ CODE jov-gravity-pull
         ANDA    #3
         LBNE    @done
 
-        LDA     $80B1           ; njovians
+        LDA     $80B5           ; njovians
         LBEQ    @done
         CLRB                    ; B = i
 @lp     PSHS    B               ; save i
@@ -2564,7 +2564,7 @@ CODE jov-gravity-pull
         PSHS    A               ; S+0=avoid, S+1=i
 
         ; -- Black hole pull --
-        LDA     $80B3           ; hasbhole
+        LDA     $80B7           ; hasbhole
         BEQ     @sp
         ; mdist to bhole
         LDA     ,Y              ; jov_x
@@ -2586,7 +2586,7 @@ CODE jov-gravity-pull
         LBSR    @pull
 
         ; -- Star pull --
-@sp     LDB     $80B0           ; nstars
+@sp     LDB     $80B4           ; nstars
         LBEQ    @nx2
         LDX     #$8040          ; STAR-POS
 @splp   PSHS    B               ; save star counter
@@ -2629,7 +2629,7 @@ CODE jov-gravity-pull
 @nx2    LEAS    1,S             ; pop avoid_dist
 @nx     PULS    B               ; pop i
         INCB
-        CMPB    $80B1
+        CMPB    $80B5
         LBLO    @lp
 @done   PULS    X
         ;NEXT
@@ -2702,6 +2702,7 @@ CODE jov-gravity-pull
 \ Execute deferred Jovian spawn (requires refresh-after-kill)
 : check-spawn  ( -- )
   spawn-pending @ ?DUP IF
+    overlay @ IF 0 overlay ! THEN
     1 - do-spawn
     0 spawn-pending !
     refresh-after-kill
@@ -3036,7 +3037,7 @@ CODE jbeam-ship-hit?   \ ( -- flag )
 VARIABLE pj-result
 CODE pick-jovian   \ ( -- i|-1 )
         PSHS    X
-        LDA     $80B1           ; njovians
+        LDA     $80B5           ; njovians
         BEQ     @none
         ; Random start: (seed low byte) mod njovians
         LDB     FVAR_seed+1     ; low byte of seed
@@ -3108,7 +3109,7 @@ CODE pick-jovian   \ ( -- i|-1 )
         BRA     @push
 @nx     PULS    B               ; pop i; S+0=count
         INCB
-        CMPB    $80B1           ; >= njovians?
+        CMPB    $80B5           ; >= njovians?
         BLO     @nw
         CLRB
 @nw     DEC     ,S              ; count--
@@ -3433,7 +3434,7 @@ VARIABLE was-near-base
 \ Inlines: ship-dx, ship-dy, ship-on-base?, ship-jov-blocked?, try-move.
 \ Scans 4 arrow key columns via PIA0 ($FF00/$FF02) directly.
 \ Uses Y register for axis address (preserved across subroutines).
-\ Reads QCOUNTS shadow bytes at $80B0 for base/Jovian presence.
+\ Reads QCOUNTS shadow bytes at $80B4 for base/Jovian presence.
 CODE move-ship
         PSHS    X               ; save IP
 
@@ -3674,7 +3675,7 @@ CODE move-ship
         ; ── ship-on-base? subroutine ─────────────────────────
         ; Returns A = 1 if within 5px on both axes, else 0.
         ; Does not modify Y.
-@onbase LDA     $80B2           ; QCOUNTS hasbase
+@onbase LDA     $80B6           ; QCOUNTS hasbase
         BEQ     @ob0
         LDA     $8054           ; ship_x
         SUBA    $8050           ; - base_x
@@ -3696,7 +3697,7 @@ CODE move-ship
         ; ── ship-jov-blocked? subroutine ─────────────────────
         ; Returns A = 1 if ship within 8px manhattan of any live
         ; Jovian, else 0.  Does not modify Y.
-@sjblk  LDA     $80B1           ; QCOUNTS njovians
+@sjblk  LDA     $80B5           ; QCOUNTS njovians
         BEQ     @sj0
         LDB     #0              ; j = 0
 @sjlp   PSHS    B               ; save j
@@ -3726,7 +3727,7 @@ CODE move-ship
         BRA     @sjnx
 @sjdd   PULS    B               ; dead: pop j
 @sjnx   INCB
-        CMPB    $80B1           ; j < njovians?
+        CMPB    $80B5           ; j < njovians?
         BLO     @sjlp
 @sj0    CLRA                    ; not blocked
         RTS
@@ -3824,7 +3825,7 @@ CODE ship-gravity
         LDY     #$8054          ; Y = SHIP-POS (preserved across pulls)
 
         ; ── Black hole gravity ──
-        LDA     $80B3           ; hasbhole
+        LDA     $80B7           ; hasbhole
         LBEQ    @stars
         ; mdist(SHIP-POS, BHOLE-POS)
         LDA     ,Y              ; ship_x
@@ -3865,7 +3866,7 @@ CODE ship-gravity
 @stars  LDA     FVAR_grav_tick+1
         ANDA    #3
         LBNE    @done           ; skip entirely on 3/4 frames
-        LDB     $80B0           ; nstars
+        LDB     $80B4           ; nstars
         LBEQ    @done
         LDX     #$8040          ; STAR-POS
 @slp    PSHS    B               ; save counter
@@ -3906,46 +3907,43 @@ CODE ship-gravity
         ;NEXT
 
         ; ── @pull subroutine ────────────────────────────────────
-        ; Pull ship (at Y) toward target by step px per axis.
+        ; Nudge ship velocity toward target by step per axis (#343).
         ; Entry: A=tx, B=ty.  Step at 4,S (pushed by caller before BSR).
-        ; Stack: S+0..1=ret addr, S+2=step (caller pushed before BSR)
-        ; ... but after PSHS D: S+0=tx, S+1=ty, S+2..3=ret, S+4=step
-        ; Sets FVAR_moved = 1 if any axis moved.  Preserves Y.
+        ; Stack after PSHS D: S+0=tx, S+1=ty, S+2..3=ret, S+4=step
+        ; Modifies ship-vx/ship-vy.  Preserves Y.
 @pull   PSHS    D               ; S+0=tx, S+1=ty
-        ; -- X axis --
+        ; -- X axis: nudge vx toward target --
         LDA     ,Y              ; cur_x
         CMPA    ,S              ; vs tx
         BEQ     @py
+        LDB     FVAR_ship_vx+1  ; current vx
         BHI     @pxd
-        ADDA    4,S             ; cur_x + step
+        ADDB    4,S             ; vx + step (pull right)
         BRA     @pxs
-@pxd    SUBA    4,S             ; cur_x - step
-@pxs    CMPA    #2
-        BHS     @pxnl
-        LDA     #2
-@pxnl   CMPA    #125
-        BLS     @pxnh
-        LDA     #125
-@pxnh   STA     ,Y
-        LDD     #1
-        STD     FVAR_moved
-@py     ; -- Y axis --
+@pxd    NEGB
+        ADDB    4,S             ; |vx| + step
+        NEGB                    ; vx - step (pull left)
+@pxs    CLRA
+        TSTB
+        BPL     @pxp
+        LDA     #$FF
+@pxp    STD     FVAR_ship_vx
+@py     ; -- Y axis: nudge vy toward target --
         LDA     1,Y             ; cur_y
         CMPA    1,S             ; vs ty
         BEQ     @pd
+        LDB     FVAR_ship_vy+1  ; current vy
         BHI     @pyd
-        ADDA    4,S             ; cur_y + step
+        ADDB    4,S             ; vy + step (pull down)
         BRA     @pys
-@pyd    SUBA    4,S             ; cur_y - step
-@pys    CMPA    #2
-        BHS     @pynl
-        LDA     #2
-@pynl   CMPA    #139
-        BLS     @pynh
-        LDA     #139
-@pynh   STA     1,Y
-        LDD     #1
-        STD     FVAR_moved
+@pyd    NEGB
+        ADDB    4,S
+        NEGB                    ; vy - step (pull up)
+@pys    CLRA
+        TSTB
+        BPL     @pyp
+        LDA     #$FF
+@pyp    STD     FVAR_ship_vy
 @pd     LEAS    2,S             ; pop tx, ty
         RTS
 ;CODE
@@ -4074,11 +4072,11 @@ CODE beam-check-path-hits   \ ( buf count -- hit-idx|-1 )
         LEAU    4,U             ; pop 2 args
         CMPD    #0
         BEQ     @nohit
-        LDA     $80B1           ; njovians
+        LDA     $80B5           ; njovians
         BEQ     @nohit
         ; Stack: njovians, pixel_count(16)
         PSHS    D               ; S+0..1 = pixel count
-        LDA     $80B1
+        LDA     $80B5
         PSHS    A               ; S+0=njovians, S+1..2=count
         CLR     FVAR_bchk_hitpx
         CLR     FVAR_bchk_hitpx+1   ; pixel_idx = 0
@@ -4334,7 +4332,7 @@ VARIABLE msl-active              \ nonzero = missile in flight
 5 CONSTANT MSL-COST              \ energy per missile
 
 : msl-spr  ( -- addr )
-  msl-frame @ 1 RSHIFT 1 AND IF SPR-MSL2 ELSE SPR-MSL1 THEN ;
+  msl-frame @ 3 RSHIFT 1 AND IF SPR-MSL2 ELSE SPR-MSL1 THEN ;
 
 : msl-scrx  ( -- x )  msl-x @ 7 RSHIFT ;
 : msl-scry  ( -- y )  msl-y @ 7 RSHIFT ;
@@ -4825,7 +4823,7 @@ VARIABLE key-latch                \ latched keypress (survives between polls)
     0 msl-active !
   THEN
   \ Erase base sprite
-  SPR-BASE BASE-POS C@ 3 - BASE-POS 1 + C@ 2 - spr-erase-box
+  SPR-BASE BASE-POS C@ 3 - BASE-POS 1 + C@ 3 - spr-erase-box
   \ Clear quadrant state
   0 qbase !  0 QCOUNTS 2 + C!
   \ Clear base bit in galaxy byte
@@ -4968,9 +4966,6 @@ VARIABLE jnb-result
     \ ── LAYER 1: Sprite rendering (split cycle) ──
     jov-moved @ IF
       \ Full cycle: ship + Jovians + stars
-      msl-active @ IF
-        erase-msl
-      THEN
       restore-ship-bg
       restore-jov-bgs
       draw-stars
@@ -4979,6 +4974,7 @@ VARIABLE jnb-result
       draw-jovians-live
       draw-ship
       msl-dirty @ IF
+        msl-active @ IF erase-msl THEN
         msl-scrx msl-px !  msl-scry msl-py !
         0 msl-dirty !
       THEN
@@ -4988,12 +4984,10 @@ VARIABLE jnb-result
       0 jov-moved !
     ELSE moved @ msl-dirty @ OR IF
       \ Ship/missile only: skip Jovian bg ops + stars
-      msl-active @ IF
-        erase-msl
-      THEN
       restore-ship-bg
       save-ship-bg draw-ship
       msl-dirty @ IF
+        msl-active @ IF erase-msl THEN
         msl-scrx msl-px !  msl-scry msl-py !
         0 msl-dirty !
       THEN

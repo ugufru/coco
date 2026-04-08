@@ -241,7 +241,7 @@ Images live in `getting-started/images/`. To replace a placeholder `div.illustra
 - `$8050` — BASE-POS (2 bytes: x, y) — NOT $8056!
 - `$8054` — SHIP-POS (2 bytes: x, y)
 - `$8056` — JOV-DMG (3 bytes, one per Jovian) — NOT $8050!
-- `$80B0–$80B3` — QCOUNTS shadow bytes (nstars, njovians, hasbase, hasbhole) for CODE word access
+- `$80B4–$80B7` — QCOUNTS shadow bytes (nstars, njovians, hasbase, hasbhole) for CODE word access
 - `$9000–$91D8` — Font glyphs (59 glyphs × 8 bytes, all-RAM region)
 - `$DE00` — Data stack base (U, grows down)
 - `$E000` — Return stack init (S, grows down from $DFFF)
