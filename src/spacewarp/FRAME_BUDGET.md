@@ -151,7 +151,7 @@ Also fixed: #251 `apply-intent` CMPB 10,S→9,S (Jovians were frozen since #241)
 | #282 | Factor `pcol @ prow @` → `here@` (12 sites) | 54 bytes |
 | #283 | Factor clamp patterns → `0max` / `1max` (11 sites) | 132 bytes |
 
-App size: 23,877 bytes at $2000. Headroom to $8000: **~674 bytes**.
+App size: 24,533 bytes at $2000. Headroom to $8000: **~18 bytes**.
 
 ## Combat Rebalance Frame Impact (#306, #312-315, #338-348)
 
@@ -162,8 +162,8 @@ were added — all changes are Forth-level logic.
 | New work | When it runs | Idle-path cost | Active-path cost |
 |----------|-------------|----------------|-----------------|
 | `tick-energy` | Every frame | ~175cy (not docked, not 16th frame) | ~800cy (16th frame, all healthy) |
-| `tick-dock` | Every frame | ~212cy (not docked) | ~2,700cy (docked, 16th frame: 3× repair-any) |
-| `repair-any` | Every 16 frames from tick-energy | ~600-800cy (all healthy) | ~1,300cy (one system damaged) |
+| `tick-dock` | Every frame | ~212cy (not docked) | ~2,528cy (docked, 16th frame: drep × 5 systems) |
+| `repair-any` | Every 16 frames from tick-energy | ~600-800cy (all healthy) | ~1,300cy (one system damaged, field cap 75%) |
 | `take-damage` | On hit only (event-driven) | 0 | ~1,500-2,000cy |
 | `check-dock` | Every 8 frames (BG slot 1) | ~300cy (no base) | ~2,926cy (near base, shield check) |
 
@@ -171,8 +171,22 @@ The every-frame base cost increased by ~387cy (tick-energy idle + tick-dock idle
 This brings the every-frame base from 3,645cy to ~4,032cy.  Still well within budget.
 
 On the 16th-frame repair tick (not docked): +600-800cy additional.  Once every 16
-frames = negligible average impact.  When docked, tick-dock's 3× repair-any replaces
-tick-energy's single repair — higher burst but infrequent and only while stationary.
+frames = negligible average impact.  When docked, tick-dock uses drep × 5 systems
+(~2,528cy) — higher burst but infrequent and only while stationary.
+
+## V0.92 Gameplay Features — Frame Impact
+
+New gameplay features added with zero per-frame idle-path cost (all event-driven):
+
+| Feature | When it runs | Cost |
+|---------|-------------|------|
+| `jov-edge-flee` (#185) | On fleeing Jovian think tick at screen edge | ~48,661cy (includes refresh-after-kill) |
+| `beam-hit-base?` (#323) | On maser beam completion (no Jovian hit) | ~1,565cy |
+| `jov-flee-to` (#185) | On Jovian reaching screen edge | ~11,336cy (includes galaxy migration) |
+| `destroy-base` (#323) | On friendly fire hit | ~54,838cy (one-shot) |
+| `check-sos` (#317) | Once per stardate (~60s) | ~14,614cy |
+
+None of these affect the per-frame budget.  They fire only on specific game events.
 
 ## Remaining Targets
 
