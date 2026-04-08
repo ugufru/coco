@@ -223,6 +223,7 @@ $80DA CONSTANT JOV-INTENT       \ 9 bytes: 3 Jovians x 3 bytes
 $80E4 CONSTANT JOV-SPRWORK      \ 12 bytes: scratch for sprite gen
 \ Quadrant mood grid (8x8 sectors, emotion persistence)
 $8EB4 CONSTANT MOOD-GRID        \ 64 bytes: mood per sector
+$8EF4 CONSTANT BASE-AMMO        \ 64 bytes: missiles per base (#318)
 
 : jov-spr  ( i -- addr )  23 * JOV-SPR0 + ;
 
@@ -263,6 +264,7 @@ VARIABLE gq-tmp                \ temp for building quadrant byte
     8 rnd 0= IF
       4 gq-tmp @ OR gq-tmp !
       1 gbases +!
+      25 BASE-AMMO I + C!            \ 25 missiles per base (#318)
     THEN
 
     \ Jovians: probability scales with level
@@ -3968,9 +3970,15 @@ CODE ship-gravity
 \ Dock when ship overlaps a base (within 4px on each axis).
 \ Restores energy, missiles, and all ship systems.
 
+: base-ammo-addr  ( -- addr )  prow @ 8 * pcol @ + BASE-AMMO + ;
+
 : do-dock  ( -- )
   1 docked !
-  10 pmissiles !
+  \ Resupply from base pool: give as many as possible up to 10 (#318)
+  10 pmissiles @ - 0max           \ need = 10 - current, min 0
+  base-ammo-addr C@ MIN           \ avail = min(need, base supply)
+  DUP pmissiles +!                 \ give to player
+  NEGATE base-ammo-addr C@ + base-ammo-addr C!  \ deduct from base
   1 jov-emotion-all ;              \ boldness: player docking
 
 : do-undock  ( -- )  0 docked ! ;
