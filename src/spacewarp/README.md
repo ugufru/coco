@@ -137,36 +137,40 @@ make run                       # launch in XRoar emulator
 
 ## Roadmap — v1.0 April 15, 2026
 
-All blockers resolved. ~584 bytes headroom. In playtesting and polish.
+All features complete. 18 bytes headroom. In playtesting — one week to release.
 
 **Done (V0.92):**
 - Combat rebalance — maser range damage, missile nerf, aim scatter, damage spread, shield bleedthrough (#306, #312-315)
 - Deflector toggle — UP/DOWN with key 4, divert energy to rebuild at 0% (#338-341)
-- Ion engines at 0% disables movement (#307)
-- Repair queue — one system at a time, priority based on deflector state (#340)
-- Non-linear repair — field cap at 75%, no repair below 25%; starbase heals to 100% (#309)
+- Non-linear repair — field cap at 75%, no repair below 25%; starbase heals to 100% (#309, #364)
 - SOS timer system — bases survive 3 stardates of threat; no random destruction (#317)
 - Finite base missile supply — 25 per base, docking draws from pool (#318)
+- Friendly fire — masers and missiles can destroy your own starbases (#323)
+- Jovian quadrant flee — wounded Jovians escape to adjacent quadrants (#185)
 - Smooth acceleration/deceleration — velocity-based movement with inertial damping (#343)
 - Velocity-based gravity — stars and black holes nudge velocity for smooth drift (#357)
 - Sprite redesign — Endever chevron with twin red engines, 7×7 starbase with spokes (#353, #354)
+- Ion engines at 0% disables movement (#307)
 - Shields block docking (#345)
-- Panel polish — padding, alignment, full-width terminal prompts (#344)
-- 13 CODE words promoted to kernel — 74 primitives (#332-337)
 - Beam idle guards + save-ship-bg CODE — 1,444cy/frame saved (#349, #350)
-- Starbase gravity spawn fix (#233), safe spawn refactor (#342)
-- Extended-play crash fix (#347), death screen cleanup (#348)
 - Backdrop preservation — stars and base redrawn every frame (#359, #362)
+- 13 CODE words promoted to kernel — 74 primitives (#332-337)
+- Gravity direction fix (#360), gravity step fix (#361)
+- QCOUNTS overlap fix (#355), missile flicker fix (#358)
+- Overlay dismiss on reinforcement spawn (#356)
 
-**Remaining (polish):**
-- Spacebar quick-fire masers in arrow key direction (#320)
-- Reduce Jovian movement flicker (#363)
+**Remaining (playtesting + release prep):**
+- Bug fixes as discovered during testing
+- Final version bump to v1.0, git tag, itch.io upload
 
-**Post-release** (v1.1+):
+**Post-release** (v1.1+ — needs bytes freed via code factoring):
+- Scanner degradation at low health (#149, #230, #310)
+- Spacebar quick-fire masers (#320)
 - Direct hit bonus (#316), SOS escalation messages (#319)
 - Status line micro-reports (#321), crew count and score (#322)
-- Friendly fire on starbases (#323), directional sprites (#324)
+- Directional Endever sprites (#324)
 - Smart Jovian missile evasion (#183), permanent damage (#325)
+- Reduce Jovian movement flicker (#363)
 - Sound system (#188, blocked by all-RAM mode)
 
 ## Documents

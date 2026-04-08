@@ -137,11 +137,11 @@ Do not access, search, or modify files outside these paths. If a task appears to
 CoCo Renovation — on-device Forth development environment for the TRS-80 Color Computer.
 Primary doc: `COCO_RENOVATION.md`. Tech reference: `coco_technical_reference.pdf`.
 
-## Current State (2026-04-07)
+## Current State (2026-04-08)
 Tutorial series, calculator, Getting Started ch1–13: all COMPLETE.
-Space Warp V0.92: all v1.0 blockers resolved (#233, #342, #347). Tagged v0.91. Targeting v1.0 April 15.
-Pre-announced on itch.io. Now optimizing (CODE word conversions) and gameplay testing.
-App size: 23,606 bytes, headroom 970 bytes. Kernel: 3,504 bytes (74 primitives). Data at $8000+, font at $9000.
+Space Warp V0.92: all features complete. Tagged v0.91. Targeting v1.0 April 15.
+Pre-announced on itch.io. In playtesting — one week to release.
+App size: 24,533 bytes, headroom 18 bytes. Kernel: 3,504 bytes (74 primitives). Data at $8000+, font at $9000.
 Budget: 14,930cy/frame. Slot-based think scheduling (3 Jovians, skip 1-6).
 HSYNC beam-chasing (#262): after VSYNC, wait for beam to pass sprites before VRAM writes.
 Beam system (#259): paint-black erase + draw-stars redraw + beam-scrub-sprites.
