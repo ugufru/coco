@@ -4969,6 +4969,7 @@ VARIABLE jnb-result
       restore-ship-bg
       restore-jov-bgs
       draw-stars
+      draw-base
       save-jov-oldpos save-jov-bgs
       save-ship-bg
       draw-jovians-live
@@ -4985,6 +4986,7 @@ VARIABLE jnb-result
     ELSE moved @ msl-dirty @ OR IF
       \ Ship/missile only: skip Jovian bg ops + stars
       restore-ship-bg
+      draw-base
       save-ship-bg draw-ship
       msl-dirty @ IF
         msl-active @ IF erase-msl THEN
