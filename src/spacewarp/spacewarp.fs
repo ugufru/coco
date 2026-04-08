@@ -2419,7 +2419,6 @@ CODE tick-jovians-inner
   here@ gal@ 1 - here@ gal!                   \ decrement src
   0 jbg-i @ JOV-DMG + C!
   -1 gjovians +!
-  1 check-win !
   refresh-after-kill ;
 
 \ Fleeing Jovian at screen edge → migrate to adjacent quadrant (#185)
@@ -2728,6 +2727,8 @@ CODE jov-gravity-pull
 : clear-tactical  ( -- )
   rv @ 4608 0 FILL ;              \ clear rows 0-143 (144 * 32 bytes)
 
+VARIABLE check-win                \ flag: a kill happened, check win/lose
+
 : refresh-after-kill  ( -- )
   cancel-beams msl-kill
   clear-tactical
@@ -2738,7 +2739,8 @@ CODE jov-gravity-pull
   save-ship-pos save-ship-bg
   draw-jovians-live
   draw-ship
-  0 moved !  0 jov-moved ! ;
+  0 moved !  0 jov-moved !
+  1 check-win ! ;
 
 \ Execute deferred Jovian spawn (requires refresh-after-kill)
 : check-spawn  ( -- )
@@ -2750,14 +2752,12 @@ CODE jov-gravity-pull
   THEN ;
 
 \ Kill Jovian (index in jbg-i) — erase sprite, zero health, explode
-VARIABLE check-win                \ flag: a kill happened, check win/lose
 
 : jov-kill  ( -- )
   JOV-DMG jbg-i @ + C@ IF
     jbg-i @ jov-spr-xy spr-erase-box
     0 JOV-DMG jbg-i @ + C!
     -1 gjovians +!
-    1 check-win !
     JOV-POS jbg-i @ 2 * + C@
     JOV-POS jbg-i @ 2 * + 1 + C@
     explode-jovian
@@ -4903,7 +4903,6 @@ VARIABLE key-latch                \ latched keypress (survives between polls)
   BASE-POS C@ BASE-POS 1 + C@ explode-base
   refresh-after-kill
   draw-panel
-  1 check-win !
   \ Undock if docked
   docked @ IF 0 docked ! THEN
   0 base-attack ! ;
