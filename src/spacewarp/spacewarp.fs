@@ -1419,32 +1419,31 @@ VARIABLE prev-cond
 \ Check off-screen bases: any quadrant with both Jovians and a base
 \ (not the player's quadrant) threatens that base each stardate.
 : check-sos  ( -- )
-  0 sos-active !
-  64 0 DO
-    GALAXY I + C@
-    DUP q-base? IF DUP q-jovians IF
-      I 8 /MOD                       \ ( qbyte col row )
-      OVER pcol @ = OVER prow @ = AND IF
-        2DROP                         \ skip current quadrant
-      ELSE
-        sos-row !  sos-col !          \ record threatened base
-        1 sos-active !
-      THEN
-    THEN THEN
-    DROP                              \ always drop qbyte
-  LOOP
-  \ SOS timer: increment while threatened, destroy at 3 (#317)
   sos-active @ IF
+    \ Already tracking — tick timer (#317)
     sos-timer @ 1 + DUP 3 < IF
       sos-timer !
     ELSE DROP
-      \ Destroy the remote base
       sos-col @ 8 * sos-row @ + DUP
       GALAXY + C@ $FB AND SWAP GALAXY + C!
       -1 gbases +!
-      0 sos-timer !
+      0 sos-timer !  0 sos-active !
     THEN
-  ELSE 0 sos-timer !                  \ no threat: reset timer
+  ELSE
+    \ Scan for new threatened base
+    64 0 DO
+      GALAXY I + C@
+      DUP q-base? IF DUP q-jovians IF
+        I 8 /MOD
+        OVER pcol @ = OVER prow @ = AND IF
+          2DROP
+        ELSE
+          sos-row !  sos-col !
+          1 sos-active !
+        THEN
+      THEN THEN
+      DROP
+    LOOP
   THEN
   update-cond ;
 
@@ -2420,6 +2419,7 @@ CODE tick-jovians-inner
   here@ gal@ 1 - here@ gal!                   \ decrement src
   0 jbg-i @ JOV-DMG + C!
   -1 gjovians +!
+  1 check-win !
   refresh-after-kill ;
 
 \ Fleeing Jovian at screen edge → migrate to adjacent quadrant (#185)
@@ -4671,7 +4671,7 @@ VARIABLE sg-row                   \ scan grid: outer loop row
   clear-tactical
   4 1 at-xy  S" LONG RANGE SCAN" rg-type
   8 0 DO
-    I 3 * 5 + 3 at-xy  I CHAR 0 + rg-emit
+    I 3 * 4 + 3 at-xy  I CHAR 0 + rg-emit
   LOOP
   8 0 DO
     I sg-row !
@@ -5117,12 +5117,13 @@ VARIABLE jnb-result
       ship-xy
       0 17 at-xy  16 0 DO $20 rg-emit LOOP
       death-cause @ 1 = IF
-        \ Black hole — ship vanishes, no explosion
+        \ Black hole — ship vanishes, reveal the hole
         restore-ship-bg
         clear-tactical
         draw-backdrop
         draw-base draw-jovians-live
         2DROP
+        BHOLE-POS C@ $8053 C@ explode-base
         1 17 at-xy
         S" BLACK HOLE" rg-type
       ELSE death-cause @ 2 = IF
