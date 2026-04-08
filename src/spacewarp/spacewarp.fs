@@ -3406,9 +3406,11 @@ VARIABLE prev-docked              \ last displayed dock state
 \ ── Energy tick: passive regen (#226) + shield drain (#227) ──────────
 \ Called every frame. Regen: +1 every 32 frames (undocked).
 \ Drain: every 16 frames, 1 if shields<50, 2 if shields>=50.
-\ Repair one system by +2, capped at 100. Returns 1 if repaired.
+\ Field repair: +2 per tick, cap 75%, skip below 25% (#309).
+\ Starbase repair (tick-dock) still heals to 100%.
 : rep1  ( addr -- flag )
-  DUP @ 100 < IF DUP @ 2 + 100 MIN SWAP ! 1 ELSE DROP 0 THEN ;
+  DUP @ DUP 25 < IF 2DROP 0 ELSE
+  75 < IF DUP @ 2 + 75 MIN SWAP ! 1 ELSE DROP 0 THEN THEN ;
 
 \ Repair ONE damaged system per tick. Priority depends on deflector state (#340).
 \ Uses stack flag: 0 = not yet repaired, try next. 1 = done, skip rest.

@@ -63,7 +63,8 @@ const COMPONENTS = [
   { name: 'Jov Grav Pull',   key: 'jgrv',  color: '#cc6600' },  // CODE (#243)
   { name: 'Background',      key: 'bg',    color: '#8866aa' },
   // Post-VSYNC render breakdown
-  { name: 'draw-stars',      key: 'rds',   color: '#44aacc' },  // CODE: fixed colors (#249)
+  { name: 'draw-stars',      key: 'rds',   color: '#44aacc' },  // CODE: fixed colors (#249), both paths (#362)
+  { name: 'draw-base',       key: 'rdb',   color: '#3399aa' },  // both paths (#359)
   { name: 'draw-jovians',    key: 'rdj',   color: '#55bbdd' },  // DO/LOOP 3 Jovians
   { name: 'draw-ship',       key: 'rsh',   color: '#66ccee' },  // spr-draw ship
   { name: 'bg-jov',          key: 'bgj',   color: '#338899' },  // save/restore jov bgs + oldpos
@@ -136,12 +137,13 @@ function buildFrame(f) {
     bg:   hasBG(f) ? ((f & 7) === 7 ? 1360 : 1230) : 0,  // BG slot1=1360†(regen+dock+base-atk), slot2=1230†(stardate+migrate+spawn+cond)
     // Post-VSYNC render breakdown (fc.py values):
     // Full render (jov-moved=1):
-    //   draw-stars CODE: 196, draw-jovians-live: 1,151, draw-ship: 819
+    //   draw-stars CODE: 196, draw-base: 535, draw-jovians-live: 1,151, draw-ship: 819
     //   bg-jov Forth: 2,000 (save 900 + restore 909 + oldpos 191; #248 reverted)
     //   bg-ship: 648 (restore 476 + save-ship-bg CODE 172) (#350)
     //   overhead: 475†, post-render: 1,443† (#349 beam idle guards)
-    // Ship-only (moved=1, jov-moved=0): ~3,513cy
-    rds:  jovMoved ? 196 : 0,               // draw-stars CODE — fc.py: 195-196cy
+    // Ship-only (moved=1, jov-moved=0): ~4,244cy (#359 draw-base, #362 draw-stars)
+    rds:  196,                               // draw-stars CODE — both paths now (#362)
+    rdb:  535,                               // draw-base — both paths now (#359)
     rdj:  jovMoved ? 1151 : 0,              // draw-jovians-live — fc.py: 1,151-1,152cy
     rsh:  819,                               // draw-ship — fc.py: 819-820cy
     bgj:  jovMoved ? 2000 : 0,              // save(900) + restore(909) + oldpos(191) — fc.py, Forth
@@ -309,7 +311,7 @@ statsEl.innerHTML = `
   <br><br>
   <span style="color:#00ff88">Kernel promotion (#332-#337):</span>
   13 CODE words promoted to kernel primitives. 74 total primitives, 3,504 bytes.
-  App: 23,773 bytes, headroom ~778 bytes.
+  App: 23,877 bytes, headroom ~674 bytes.
   <br><br>
   Note: DO/LOOP and nested-loop costs are fc.py base values (single iteration);
   real multi-iteration costs are higher. Relative comparisons remain valid.
