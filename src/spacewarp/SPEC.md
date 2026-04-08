@@ -205,8 +205,8 @@ Five systems, each with health (100% = fully operational, 0% = destroyed). All 5
 ### Energy Model
 
 - **Ship energy** (0-100) — depleted by raising shields, firing masers, warp, and system repairs. Recharged passively (+1 every 32 frames) and by docking.
-- **Passive regen** — +1 energy per 16 frames (~3.75/sec). Diverted to system repair first (1 energy = +2% to ONE system per tick, priority order). Only accumulates when all systems are at 100%. Repair queue: only the highest-priority damaged system heals each tick.
-- **Triton missiles** — finite supply (10 at start), replenished at bases from finite base stockpiles (#318). Currently one-hit kill; planned nerf to 60-80 damage (#313) making them finishers, not primary weapons.
+- **Passive regen** — +1 energy per 16 frames (~3.75/sec). Diverted to system repair first (1 energy = +2% to ONE system per tick, priority order). Only accumulates when all systems are at 75%+. Repair queue: only the highest-priority damaged system heals each tick. **Field repair caps at 75% and cannot heal systems below 25%** (#309) — starbase docking required for full recovery.
+- **Triton missiles** — finite supply (10 at start), replenished at bases. Each base carries **25 missiles total** (#318). Docking refills up to 10 from the base's pool. After 2-3 docks, the base runs dry. One-hit kill.
 
 ### Shield Model
 
@@ -478,16 +478,22 @@ If all bases are destroyed, the game is lost.
 - Damage spread across 2-3 systems per hit (#315)
 - Shield bleedthrough below 40% (#306)
 
+### Implemented in V0.92
+
+- SOS timer system — bases survive 3 stardates of threat, no random destruction (#317)
+- Finite base missile supply — 25 per base, docking draws from pool (#318)
+- Non-linear repair — field cap at 75%, no repair below 25% (#309)
+- Smooth acceleration/deceleration — velocity-based movement (#343)
+- Velocity-based gravity — smooth drift instead of position jerks (#357)
+- Sprite redesign — Endever with twin red engines, 7×7 starbase ring (#353, #354)
+
 ### Not Yet Implemented — Post-v1.0
 
-- SOS timer system — replace random base destruction (#317)
-- Finite base missile supply (#318)
 - SOS escalation messages (#319)
 - Direct hit bonus — center-distance damage scaling (#316)
 - Spacebar quick-fire masers (#320)
 - Status line micro-reports (#321)
 - Crew count, casualties, and score (#322)
-- Non-linear repair: field repair caps at 50-60% (#309)
 - Friendly fire on starbases (#323)
 - Scanner degradation at low health (#310)
 - Smart Jovian missile evasion (#183)
@@ -530,7 +536,7 @@ Self-destruct is state-driven and runs inside the game loop (non-blocking).
 Move the Endever directly above or below a starbase to dock. Docking:
 - Rapidly recharges energy (tiered: +4/frame at low, +1/4 frames at high)
 - Repairs all five ship systems simultaneously (+2%/frame each, ~0.8 sec to full)
-- Replenishes triton missiles to 10
+- Replenishes triton missiles from base supply (up to 10; each base starts with 25 total, #318)
 - Shields are NOT auto-raised — player must re-raise manually after docking
 - Takes time (stardates pass during docking)
 

@@ -46,9 +46,10 @@ adjacent pixel pairs create color through chroma interference:
 | `10` | Blue (Endever, bases, masers) |
 | `01` | Red/orange (Jovians, their beams) |
 
-The Endever is a blue chevron. Jovians are red diamonds. Maser beams streak
-blue; Jovian beams burn red. Stars scatter in all four colors. The color
-coding is functional — you can read the tactical display at a glance.
+The Endever is a blue chevron with twin red engines. Jovians are red diamonds.
+Maser beams streak blue; Jovian beams burn red. Stars scatter in all four
+colors. The color coding is functional — you can read the tactical display
+at a glance.
 
 ## What's In the Game
 
@@ -56,10 +57,11 @@ coding is functional — you can read the tactical display at a glance.
 warships, UP bases, black holes, and magnetic storms. Difficulty level (1-9)
 scales the fleet from 8 to 80+ ships.
 
-**Tactical combat.** Arrow keys move the Endever. Jovians chase you — or the
-base, if there's one to attack. Masers fire at any angle, tracing a visible
-beam across the display. Triton missiles track toward the nearest Jovian.
-Everything happens at 60fps with smooth sprite animation.
+**Tactical combat.** Arrow keys move the Endever with smooth acceleration and
+inertial damping — tap for 1px precision, hold for full cruise speed. Jovians
+chase you — or the base, if there's one to attack. Masers fire at any angle,
+tracing a visible beam across the display. Triton missiles track toward the
+nearest Jovian. Everything happens at 60fps.
 
 **Jovian AI.** Each Jovian has a 4-byte genome controlling aggression, pilot skill, speed, and appearance. Emotion (0-15) drives engagement distance — aggressive Jovians close to 20px, fearful ones orbit at 65px. IDLE Jovians fire opportunistically before detection; ATTACK Jovians chase; wounded Jovians FLEE. Pilot skill determines star avoidance distance (6-13px). Everything bumps — ship, Jovians, and each other collide at 8px.
 
@@ -68,9 +70,10 @@ strength, instant death on contact. Stars have their own gentle gravity.
 Both affect Jovians too: a black hole will swallow a Jovian as happily as
 it swallows you.
 
-**Base defense.** Fly onto a base to dock: energy recharges, systems repair,
-missiles resupply. But Jovians target bases. Leave one undefended too long
-and it explodes. Lose all bases and the galaxy falls.
+**Base defense.** Fly onto a base to dock: energy recharges, systems repair
+to 100%, and missiles resupply from the base's limited pool of 25. But
+Jovians target bases — when an SOS alert shows a base under threat, you have
+3 stardates to warp there before it falls. Lose all bases and the galaxy falls.
 
 **Seven commands:**
 
@@ -79,18 +82,18 @@ and it explodes. Lose all bases and the galaxy falls.
 | 1 | Damage report — system health for all five subsystems |
 | 2 | Hyperdrive — warp to any quadrant (energy cost scales with distance) |
 | 3 | Long range scan — 8x8 galaxy map centered on your position |
-| 4 | Deflectors — adjust shield strength (trades maser power for defense) |
+| 4 | Deflectors — toggle shields UP/DOWN; at 0% diverts energy to rebuild |
 | 5 | Maser — fire at an angle (0-360), beam traces across the display |
 | 6 | Triton missile — homing projectile, one-hit kill, limited supply |
 | 7 | Self-destruct — 10-second countdown, massive blast radius |
 
 **Win** by destroying every Jovian with at least one base still standing.
-**Lose** if all bases are destroyed, you run out of energy, you fly into a
-black hole, or you detonate your own ship.
+**Lose** if all five systems reach 0% (ship destroyed), all bases fall,
+you fly into a black hole, or you detonate your own ship.
 
 ## Technical Notes
 
-The game is about 24K of compiled Forth (24261 bytes) plus a 2.2K kernel (59 primitives). Performance-critical
+The game is about 24K of compiled Forth (23,967 bytes) plus a 3.5K kernel (74 primitives). Performance-critical
 routines are hand-written 6809 assembly, called as CODE words from Forth:
 
 | Primitive | What it does | Speedup vs Forth |
@@ -132,13 +135,46 @@ cd src/spacewarp && make       # build game
 make run                       # launch in XRoar emulator
 ```
 
+## Roadmap — v1.0 April 15, 2026
+
+All blockers resolved. ~584 bytes headroom. In playtesting and polish.
+
+**Done (V0.92):**
+- Combat rebalance — maser range damage, missile nerf, aim scatter, damage spread, shield bleedthrough (#306, #312-315)
+- Deflector toggle — UP/DOWN with key 4, divert energy to rebuild at 0% (#338-341)
+- Ion engines at 0% disables movement (#307)
+- Repair queue — one system at a time, priority based on deflector state (#340)
+- Non-linear repair — field cap at 75%, no repair below 25%; starbase heals to 100% (#309)
+- SOS timer system — bases survive 3 stardates of threat; no random destruction (#317)
+- Finite base missile supply — 25 per base, docking draws from pool (#318)
+- Smooth acceleration/deceleration — velocity-based movement with inertial damping (#343)
+- Velocity-based gravity — stars and black holes nudge velocity for smooth drift (#357)
+- Sprite redesign — Endever chevron with twin red engines, 7×7 starbase with spokes (#353, #354)
+- Shields block docking (#345)
+- Panel polish — padding, alignment, full-width terminal prompts (#344)
+- 13 CODE words promoted to kernel — 74 primitives (#332-337)
+- Beam idle guards + save-ship-bg CODE — 1,444cy/frame saved (#349, #350)
+- Starbase gravity spawn fix (#233), safe spawn refactor (#342)
+- Extended-play crash fix (#347), death screen cleanup (#348)
+- Backdrop preservation — stars and base redrawn every frame (#359, #362)
+
+**Remaining (polish):**
+- Spacebar quick-fire masers in arrow key direction (#320)
+- Reduce Jovian movement flicker (#363)
+
+**Post-release** (v1.1+):
+- Direct hit bonus (#316), SOS escalation messages (#319)
+- Status line micro-reports (#321), crew count and score (#322)
+- Friendly fire on starbases (#323), directional sprites (#324)
+- Smart Jovian missile evasion (#183), permanent damage (#325)
+- Sound system (#188, blocked by all-RAM mode)
+
 ## Documents
 
 - [USERGUIDE.md](USERGUIDE.md) — complete gameplay guide
 - [SPEC.md](SPEC.md) — technical specification and architecture
 - [FRAME_BUDGET.md](FRAME_BUDGET.md) — CPU cycle accounting and optimization history
 - [AI_DIVERSITY_STRATEGY.md](AI_DIVERSITY_STRATEGY.md) — Jovian genome system design
-- [MARKETING.md](MARKETING.md) — elevator pitch
 
 ## References
 

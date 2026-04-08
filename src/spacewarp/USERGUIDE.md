@@ -58,18 +58,19 @@ ENERGY  68%  MISSILES  5    CONDITION GREEN
   Reaches 0% and you're dead.
 - **DEFLECTORS** — current shield strength setting.
 - **MISSILES** — triton missiles remaining.
-- **CONDITION** — GREEN (no enemies), RED (Jovians present), or DOCKED.
-- **SOS-BASE x y** — flashes when a base in another quadrant is under attack,
-  showing its coordinates. Get there fast.
+- **CONDITION** — GREEN (no enemies), YELLOW (Jovians in galaxy), RED (Jovians in this quadrant), DOCKED, or SOS (base under threat).
+- **SOS-BASE x,y** — appears when a base in another quadrant is under attack,
+  showing its coordinates. You have 3 stardates to warp there. Arrive and kill
+  the Jovians to save the base and reset the timer.
 - **COMMAND?** — waiting for your next command.
 
 ### What You See in the Tactical View
 
 | Symbol | Color | Meaning | ASCII shape |
 |--------|-------|---------|---------------|
-| Chevron shape | Blue | The Endever (you) | "V" |
+| Chevron shape | Blue/red | The Endever (you) — twin red engines | "V" |
 | Angular bracket shape | Red | Jovian warship | <*> |
-| Cross/ring shape | Blue | United Planet base | +O+ |
+| Spoked ring | Blue | United Planet base | +O+ |
 | Dots | Mixed colors | Stars and Planets (white, blue, red) |  .  |
 | Line from ship | Blue | Maser beam |  |
 | Ball | Blue | Triton missile | * |
@@ -105,11 +106,16 @@ MASERS                               82%
 Each system shows its operational percentage. At 100%, the system works
 perfectly. As damage accumulates, systems degrade:
 
-- **Ion engines** — movement slows, then stops entirely.
+- **Ion engines** — movement slows (below 67%: speed 2, below 34%: speed 1). At 0% the ship is frozen.
 - **Hyperdrive** — below ~20%, warping becomes unreliable or impossible.
 - **Scanners** — long range scan shows incomplete or garbled data.
-- **Deflectors** — maximum shield setting is capped at the damage level.
+- **Deflectors** — shield strength depends on deflector health. Below 40%, damage bleeds through.
 - **Masers** — reduced damage output.
+
+**Field repair** heals one system at a time, in priority order, up to a maximum
+of 75%. Systems below 25% are too damaged for field repair — only a starbase
+can fix them. This means a hard fight can leave you permanently weakened until
+you dock.
 
 Press any key to return to the tactical view.
 
@@ -159,26 +165,22 @@ Press any key to return to the tactical view.
 
 ### 4 — Deflectors
 
-Press **4**, then enter a number from 0 to 100 to set your deflector shield
-energy level.
+Press **4** to toggle shields UP or DOWN. No energy cost to maintain shields.
 
-Shields protect you from damage, but they cost you firepower:
+**Shields UP:** Incoming Jovian beams are absorbed by the deflector system
+instead of damaging ship systems. Each hit reduces deflector health by 15%.
+Below 40% deflector health, some damage bleeds through to other systems.
+At 0% deflectors, shields are forced DOWN.
 
-| Shield setting | Damage absorbed | Maser power loss |
-|----------------|----------------|-----------------|
-| 0% | None | None |
-| 25% | Low | Minor |
-| 50% | Moderate | 1/3 reduction |
-| 75% | High | 1/2 reduction |
-| 100% | Maximum | 2/3 reduction |
+**Shields DOWN:** No protection. All damage hits ship systems directly. But
+you must lower shields to dock at a starbase.
 
-**The tradeoff is everything.** Shields up means you survive longer but your
-masers hit softer. Shields down means maximum firepower but one good hit could
-finish you. There is no correct answer — it depends on how many enemies you're
-facing, how much energy you have, and how good your aim is.
+**At 0% deflectors:** Pressing 4 diverts energy to rebuild the deflector
+system instead of toggling shields.
 
-If your deflector system is damaged, the maximum shield setting is capped at
-the damage percentage (e.g., 60% damage = max 60% shields).
+**The tradeoff:** Shields protect you but degrade with every hit. Once deflectors
+drop below 40%, the protection becomes unreliable. Field repair only restores
+deflectors to 75% — you need a starbase for full recovery.
 
 ### 5 — Masers
 
@@ -209,14 +211,20 @@ Press **6**, then enter a firing angle from 0 to 360 degrees (same compass as
 masers).
 
 Triton missiles are your heavy weapon: **one hit, one kill** at any range. The
-missile is a blue energy ball that moves from the Endever to the target.
+missile is a red energy ball that moves from the Endever to the target,
+alternating between + and x shapes as it flies.
 
-But they're scarce. You start with 10 and can only get more by docking at a
-base. Triton missiles are blocked by stars and other obstacles — if the flight
-path intersects an obstacle, the missile detonates harmlessly.
+But they're scarce. You start with 10 and can only restock by docking at a
+base. **Each base carries only 25 missiles total.** Docking refills your supply
+up to 10 from the base's pool. After 2-3 docks, the base runs dry — no more
+missiles from that base, ever. Across the galaxy, missiles are a finite
+resource.
+
+Triton missiles are blocked by stars and other obstacles — if the flight path
+intersects an obstacle, the missile detonates harmlessly.
 
 Use them when you can't afford to miss, or when a target is too far for
-effective maser fire.
+effective maser fire. Waste them and you'll face the endgame with masers only.
 
 ### 7 — Self-Destruct
 
@@ -249,12 +257,16 @@ Press and hold the arrow keys to move the Endever within the current quadrant:
 - **Up arrow** — move up
 - **Down arrow** — move down
 
-Movement is continuous while the key is held. **You can move while entering
-other commands** — this is critical for dodging enemy fire while lining up a
-shot.
+The Endever accelerates smoothly when you hold an arrow key — a quick tap
+moves exactly 1 pixel, while holding builds to full cruise speed over 3 frames.
+Release the key and inertial dampers bring the ship to a controlled stop in
+2 frames. Diagonal movement works by holding two keys simultaneously.
+
+**You can move while entering other commands** — this is critical for dodging
+enemy fire while lining up a shot.
 
 Movement consumes a small amount of ship energy. If ion engines are damaged,
-movement is slower. If they're destroyed, you're a sitting target.
+maximum speed is reduced. If they're destroyed, you're a sitting target.
 
 ## Docking
 
@@ -262,11 +274,13 @@ To dock at a United Planet base, maneuver the Endever directly above or below
 the base using the arrow keys. When you're close enough, the status panel
 shows **ENDEVER DOCKED** and your condition changes to **DOCKED**.
 
-Docking restores your ship completely:
-- All five systems repaired to 100%
-- Ship energy restored to 100%
-- Triton missiles replenished to 10
-- Deflector setting preserved
+Docking restores your ship:
+- All five systems repair to 100% (the only way to fully heal — field repair
+  caps at 75% and can't fix systems below 25%)
+- Ship energy recharges to 100%
+- Triton missiles resupply from the base's pool (up to 10 capacity; each base
+  starts with 25 total)
+- You must lower deflectors (shields DOWN) before the base will accept docking
 
 Docking takes time — stardates continue to advance while you're docked, and
 Jovians elsewhere in the galaxy continue their assault on bases. Don't linger.
@@ -306,7 +320,7 @@ Everything bumps. The Endever cannot fly through Jovians — you'll stop against
 
 ### Other Behaviors
 
-- **Target bases** — the first Jovian in a quadrant prioritizes attacking the base. If it holds position near a base long enough, the base is destroyed.
+- **Target bases** — Jovians in a quadrant with a base will threaten it. When an SOS alert appears, you have **3 stardates** (~3 minutes) to warp there and clear the Jovians. If the timer runs out, the base is destroyed. In the current quadrant, a Jovian within 30px of the base will fire beams at it — intercept the beam with your ship to reset the local attack timer.
 - **Avoid obstacles** — Jovians navigate around stars, black holes, and bases. Skilled pilots give hazards a wide berth; poor pilots barely notice until it's too late.
 - **Get pulled by gravity** — black holes and stars pull Jovians just like they pull you. Skilled pilots resist the pull; dumb ones get sucked in. A Jovian caught by a black hole is destroyed.
 - **Quadrant memory** — Jovians remember their emotional state between visits. Leave a quadrant where you killed a Jovian, and when you return, the survivors will be on edge.
@@ -356,7 +370,8 @@ THE UNITED PLANET SYSTEM IS SAVED       YOUR SCORE IS 168
 
 **You lose** when:
 - All UP bases are destroyed (Jovians conquer the galaxy)
-- The Endever is destroyed (energy reaches 0%, or fly into a black hole)
+- All five ship systems reach 0% (ship destroyed)
+- The Endever flies into a black hole or collides with a star
 - Self-destruct is triggered
 
 ```
@@ -387,19 +402,20 @@ difficulty 10 may not be achievable.
    immediately. Once a base is gone, it's gone forever — and you need bases
    to dock and resupply.
 
-3. **Keep shields around 50%.** This balances survivability with firepower.
-   Drop shields to 0% only when you're confident you can kill the target
-   before it fires back. Raise shields to 100% when you're outnumbered and
-   just trying to survive until you can warp out.
+3. **Toggle shields tactically.** Shields UP absorbs damage but degrades
+   deflectors with each hit. Below 40% deflector health, damage bleeds
+   through. Drop shields when you're confident, raise them when outnumbered.
+   Remember: shields must be DOWN to dock.
 
-4. **Save triton missiles for emergencies.** Use masers for most combat.
-   Save missiles for: distant targets you can't reach with masers, situations
-   where you need a guaranteed kill, or when you're low on energy and can't
-   afford maser shots.
+4. **Save triton missiles.** Each base only carries 25. After 2-3 docks,
+   a base runs dry. Use masers for most combat. Save missiles for distant
+   targets, guaranteed kills, or when energy is too low for masers. In the
+   late game, missiles may be gone entirely.
 
-5. **Dock whenever you can.** Don't wait until you're critically damaged.
-   If you're in a quadrant with a base and no enemies, dock. Full repair and
-   resupply takes only a moment and could save your life later.
+5. **Dock strategically.** Docking is the only way to fully heal — field
+   repair caps at 75% and can't fix systems below 25%. But each dock draws
+   from the base's limited missile pool. Don't dock just for missiles if
+   your systems are healthy.
 
 6. **Keep moving.** A stationary Endever is a dead Endever. Use the arrow
    keys constantly, especially during combat. The Jovians' aim isn't perfect
@@ -417,17 +433,19 @@ difficulty 10 may not be achievable.
 ```
 COMMANDS                              TACTICAL SYMBOLS
   1  Damage report                      Blue chevron    = Endever
-  2  Hyperdrive (enter col, row)        Red angular     = Jovian
-  3  Long range scan                    Blue cross      = UP Base
-  4  Deflectors (enter 0-100)           Colored dots    = Stars
+  2  Hyperdrive (enter col, row)        Red shape       = Jovian
+  3  Long range scan                    Blue ring       = UP Base
+  4  Deflectors (toggle UP/DOWN)        Colored dots    = Stars
   5  Masers (enter 0-360 degrees)       (invisible)     = Black hole
   6  Triton missiles (enter 0-360)
   7  Self-destruct (confirm: 123)     SCANNER SYMBOLS
-                                        E = Endever    B = Base
-MOVEMENT                               1-3 = Jovians  M = Storm
-  Arrow keys — hold to move
-  (works during any command)          CONDITION
-                                        GREEN  = No enemies
-DOCKING                                 RED    = Jovians present
-  Fly directly above/below a base       DOCKED = At base
+  CLEAR  Cancel current command         E = Endever    B = Base
+                                        1-3 = Jovians  M = Storm
+MOVEMENT
+  Arrow keys — tap or hold            CONDITION
+  Smooth accel, inertial damping        GREEN  = No enemies
+  (works during any command)            YELLOW = Jovians in galaxy
+                                        RED    = Jovians in quadrant
+DOCKING (shields must be DOWN)          DOCKED = At base
+  Fly onto a base                       SOS    = Base under threat
 ```
