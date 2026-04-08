@@ -381,7 +381,7 @@ VARIABLE ss-safe
   100 pdmg-defl !
   100 pdmg-masr !
   0 gtime !  0 stardate-timer !
-  0 move-count ! ;
+  0 move-count !  0 ship-vx !  0 ship-vy ! ;
 
 \ ══════════════════════════════════════════════════════════════════════════
 \  STATUS PANEL
@@ -636,9 +636,45 @@ CODE bg-restore  \ ( buf x y -- )  restore 4×5 VRAM bytes from buf
         ;NEXT
 ;CODE
 
-: save-ship-bg  ( -- )
-  SHIP-BG SHIP-POS C@ 3 - SHIP-POS 1 + C@ 2 - bg-save
-  jbeam-total @ IF SHIP-BG 20 0 FILL THEN ;
+CODE save-ship-bg  \ ( -- )  save 4×5 VRAM under ship; zero if jbeam active
+        PSHS    X               ; save IP
+        LDA     $8055           ; SHIP-POS y
+        SUBA    #2
+        LDB     #32
+        MUL                     ; D = (y-2) * 32
+        ADDD    VAR_RGVRAM      ; D = row base
+        TFR     D,Y             ; Y = VRAM row
+        LDA     $8054           ; SHIP-POS x
+        SUBA    #3
+        LSRA
+        LSRA                    ; A = (x-3) / 4
+        LEAY    A,Y             ; Y = first VRAM byte
+        LDX     #$805A          ; X = SHIP-BG buffer
+        LDB     #5
+@row    LDA     ,Y
+        STA     ,X+
+        LDA     1,Y
+        STA     ,X+
+        LDA     2,Y
+        STA     ,X+
+        LDA     3,Y
+        STA     ,X+
+        LEAY    32,Y
+        DECB
+        BNE     @row
+        ; If jbeam active, zero the buffer so beam-scrub sees black
+        LDD     FVAR_jbeam_total
+        BEQ     @done
+        LDX     #$805A
+        CLRA
+        CLRB
+        LDY     #10
+@zr     STD     ,X++
+        LEAY    -1,Y
+        BNE     @zr
+@done   PULS    X
+        ;NEXT
+;CODE
 
 : restore-ship-bg  ( -- )
   SHIP-BG old-sx @ 3 - old-sy @ 2 - bg-restore ;
@@ -3345,6 +3381,8 @@ VARIABLE sp-r2
 VARIABLE moved                    \ flag: did ship move this frame?
 VARIABLE frame-tick               \ main loop frame counter
 VARIABLE move-count               \ counts moves; energy charged every 4th
+VARIABLE ship-vx                  \ ship X velocity (-3..+3), signed (#343)
+VARIABLE ship-vy                  \ ship Y velocity (-3..+3), signed (#343)
 VARIABLE prev-energy              \ last displayed energy (for dirty check)
 VARIABLE prev-missiles            \ last displayed missile count
 VARIABLE prev-shields             \ last displayed shield level
@@ -3413,10 +3451,10 @@ CODE move-ship
         CLRA                    ; high byte = 0
         STD     FVAR_was_near_base  ; big-endian: 0:result
 
-        ; -- Compute speed from pdmg-ion --
+        ; -- Compute max speed from pdmg-ion --
         ; 0 -> disabled, > 67 -> 3, > 34 -> 2, else 1
         LDA     FVAR_pdmg_ion+1
-        LBEQ    @exit           ; ion destroyed = no movement (#307)
+        LBEQ    @vzero          ; ion destroyed = zero velocity, exit (#307)
         CMPA    #68
         BLO     @sp2
         LDA     #3
@@ -3426,64 +3464,142 @@ CODE move-ship
         LDA     #2
         BRA     @spd
 @sp1    LDA     #1
-@spd    PSHS    A               ; S+0=speed, S+1..2=saved IP
+@spd    PSHS    A               ; S+0=max_speed, S+1..2=saved IP
 
-        ; -- Scan UP: col 3 ($F7), row 3 ($08) --
-        LDA     #$F7
+        ; -- Scan all 4 arrow keys into B register --
+        ; B bits: 3=UP, 2=DN, 1=LT, 0=RT
+        CLRB
+        LDA     #$F7            ; UP column
         STA     $FF02
         LDA     $FF00
         COMA
         ANDA    #$08
-        BEQ     @noup
-        LDY     #$8055          ; SHIP-POS+1 (Y axis)
-        LDA     ,S              ; speed
-        NEGA                    ; up = negative
-        LDB     #139
-        LBSR    @try
-@noup
-        ; -- Scan DN: col 4 ($EF), row 3 --
-        LDA     #$EF
+        BEQ     @ku
+        ORB     #$08            ; set bit 3
+@ku     LDA     #$EF            ; DN column
         STA     $FF02
         LDA     $FF00
         COMA
         ANDA    #$08
-        BEQ     @nodn
-        LDY     #$8055
-        LDA     ,S              ; speed (positive = down)
-        LDB     #139
-        LBSR    @try
-@nodn
-        ; -- Scan LT: col 5 ($DF), row 3 --
-        LDA     #$DF
+        BEQ     @kd
+        ORB     #$04            ; set bit 2
+@kd     LDA     #$DF            ; LT column
         STA     $FF02
         LDA     $FF00
         COMA
         ANDA    #$08
-        BEQ     @nolt
-        LDY     #$8054          ; SHIP-POS (X axis)
-        LDA     ,S
-        NEGA                    ; left = negative
-        LDB     #123
-        LBSR    @try
-@nolt
-        ; -- Scan RT: col 6 ($BF), row 3 --
-        LDA     #$BF
+        BEQ     @kl
+        ORB     #$02            ; set bit 1
+@kl     LDA     #$BF            ; RT column
         STA     $FF02
         LDA     $FF00
         COMA
         ANDA    #$08
-        BEQ     @nort
-        LDY     #$8054
-        LDA     ,S              ; speed (positive = right)
-        LDB     #123
-        LBSR    @try
-@nort
-        ; -- Deselect keyboard columns --
+        BEQ     @kr
+        ORB     #$01            ; set bit 0
+@kr     LDA     #$FF            ; deselect keyboard
+        STA     $FF02
+        PSHS    B               ; S+0=keys, S+1=max_speed
+
+        ; ── Update ship-vx (#343) ────────────────────────────
+        ; LT(bit1) accelerates negative, RT(bit0) accelerates positive
+        ; No key: decelerate (halve toward zero)
+        LDA     FVAR_ship_vx+1  ; current vx (signed byte, low byte of 16-bit var)
+        BITB    #$02            ; LT pressed?
+        BNE     @vxlt
+        BITB    #$01            ; RT pressed?
+        BNE     @vxrt
+        ; No horizontal key: decelerate — halve toward zero
+        TSTA
+        BEQ     @vxdn           ; already zero
+        BPL     @vxdp
+        NEGA                    ; A = |vx|
+        LSRA                    ; halve
+        NEGA                    ; re-negate
+        BRA     @vxdn
+@vxdp   LSRA                    ; halve positive
+        BRA     @vxdn
+@vxlt   DECA                    ; accelerate left (negative)
+        PSHS    A               ; save new vx
+        LDA     1+1,S           ; max_speed (shifted by push)
+        NEGA                    ; A = -max
+        CMPA    ,S              ; -max vs new vx (signed)
+        BGT     @vxcn           ; if -max > vx, clamp
+        PULS    A               ; restore vx
+        BRA     @vxdn
+@vxcn   LEAS    1,S             ; discard saved vx
+        LDA     1,S             ; max_speed
+        NEGA                    ; A = -max (clamped value)
+        BRA     @vxdn
+@vxrt   INCA                    ; accelerate right (positive)
+        CMPA    1,S             ; > max_speed?
+        BLE     @vxdn
+        LDA     1,S             ; clamp to max
+@vxdn   TFR     A,B             ; vx in B
+        CLRA                    ; sign-extend
+        TSTB
+        BPL     @vxp
+        LDA     #$FF            ; negative: high byte = $FF
+@vxp    STD     FVAR_ship_vx
+
+        ; ── Update ship-vy (#343) ────────────────────────────
+        ; UP(bit3) accelerates negative, DN(bit2) accelerates positive
+        LDB     ,S              ; reload keys
+        LDA     FVAR_ship_vy+1  ; current vy
+        BITB    #$08            ; UP pressed?
+        BNE     @vyup
+        BITB    #$04            ; DN pressed?
+        BNE     @vydn
+        ; No vertical key: decelerate
+        TSTA
+        BEQ     @vyok
+        BPL     @vydp
+        NEGA
+        LSRA
+        NEGA
+        BRA     @vyok
+@vydp   LSRA
+        BRA     @vyok
+@vyup   DECA                    ; accelerate up (negative)
+        PSHS    A
+        LDA     1+1,S           ; max_speed
+        NEGA
+        CMPA    ,S
+        BGT     @vycn
+        PULS    A
+        BRA     @vyok
+@vycn   LEAS    1,S
+        LDA     1,S
+        NEGA
+        BRA     @vyok
+@vydn   INCA                    ; accelerate down (positive)
+        CMPA    1,S
+        BLE     @vyok
+        LDA     1,S
+@vyok   TFR     A,B
+        CLRA
+        TSTB
+        BPL     @vyp
         LDA     #$FF
-        STA     $FF02
+@vyp    STD     FVAR_ship_vy
 
-        ; -- Pop speed --
-        LEAS    1,S
+        ; -- Pop keys + max_speed --
+        LEAS    2,S
+
+        ; ── Apply ship-vx via @try ───────────────────────────
+        LDA     FVAR_ship_vx+1
+        BEQ     @novx
+        LDY     #$8054          ; SHIP-POS X axis
+        LDB     #123            ; max X bound
+        LBSR    @try
+@novx
+        ; ── Apply ship-vy via @try ───────────────────────────
+        LDA     FVAR_ship_vy+1
+        BEQ     @novy
+        LDY     #$8055          ; SHIP-POS Y axis
+        LDB     #139            ; max Y bound
+        LBSR    @try
+@novy
 
         ; -- Update move-count / energy drain --
         LDD     FVAR_moved
@@ -3506,6 +3622,12 @@ CODE move-ship
 
 @exit   PULS    X               ; restore IP
         ;NEXT
+
+        ; -- Ion disabled: zero both velocities and exit --
+@vzero  LDD     #0
+        STD     FVAR_ship_vx
+        STD     FVAR_ship_vy
+        BRA     @exit
 
         ; ── try-move subroutine ──────────────────────────────
         ; Y = axis address (SHIP-POS or SHIP-POS+1)
@@ -4662,7 +4784,7 @@ VARIABLE key-latch                \ latched keypress (survives between polls)
   S" LEVEL 1-9" rg-type
   \ Version in lower right
   27 18 at-xy
-  S" V0.91" rg-type
+  S" V0.92" rg-type
   \ Read level key (1-9)
   BEGIN KEY DUP CHAR 1 < OVER CHAR 9 > OR IF DROP 0 ELSE 1 THEN UNTIL
   CHAR 0 - glevel ! ;
@@ -4837,9 +4959,11 @@ VARIABLE jnb-result
     ELSE
 
     \ ── LAYER 2: Erase beam tails (paint black) ──
-    tick-jbeam-erase
-    tick-beam-erase
-    beam-total @ jbeam-total @ OR IF 1 moved ! THEN
+    beam-total @ jbeam-total @ OR IF
+      tick-jbeam-erase
+      tick-beam-erase
+      1 moved !
+    THEN
 
     \ ── LAYER 1: Sprite rendering (split cycle) ──
     jov-moved @ IF
@@ -4878,13 +5002,9 @@ VARIABLE jnb-result
       THEN
     THEN THEN
 
-    \ ── LAYER 2b: Advance beam heads (draw new pixels) ──
-    tick-beam-draw
-    tick-jbeam-draw
-
-    \ ── Apply deferred hit damage ──
-    apply-beam-hit
-    apply-jbeam-hit
+    \ ── LAYER 2b: Advance beam heads + apply deferred hits ──
+    beam-total @ IF tick-beam-draw apply-beam-hit THEN
+    jbeam-total @ IF tick-jbeam-draw apply-jbeam-hit THEN
     \ ── Win/lose checks (after any kill, one-shot) ──
     check-win @ IF
       0 check-win !                  \ clear immediately — don't re-check every frame

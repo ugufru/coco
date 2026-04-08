@@ -81,6 +81,7 @@ Assembly CODE words bypass ITC overhead — their costs are exact:
 | `jov-flee` | 201 | Flee movement calc |
 | `rg-char` | 188 | Character draw (8-line loop) |
 | `collision-scan` | 177 | Star/bhole collision loop |
+| `save-ship-bg` | 172 | Inlined bg-save + jbeam-fill gate (#350) |
 | `bg-save` / `bg-restore` | 140 | Background save/restore |
 | `bg-save-7` / `bg-restore-7` | 140 | 7-row variant |
 | `save-jov-oldpos-n` | 82 | Position copy loop |
@@ -133,6 +134,9 @@ the dominant cost, not the primitive operations.
 | #249 | `draw-stars` CODE with fixed colors | 1,840cy | 400cy | 1,440cy/render |
 | #250 | `check-win` bug fix (count not every frame) | 2,443cy/frame | amortized | ~2,400cy saved |
 
+| #349 | Beam/hit idle guards — gate 6 calls with 3 IF checks | 1,544cy idle | 477cy idle | 1,067cy/frame (idle) |
+| #350 | `save-ship-bg` CODE — inline bg-save + jbeam fill | 549cy Forth | 172cy CODE | 377cy/frame |
+
 Also fixed: #251 `apply-intent` CMPB 10,S→9,S (Jovians were frozen since #241).
 #252 Sprite coordinate underflow clamping (BCS/CLRB).
 #253 Two STA ,-S → PSHS A fixes.
@@ -147,7 +151,28 @@ Also fixed: #251 `apply-intent` CMPB 10,S→9,S (Jovians were frozen since #241)
 | #282 | Factor `pcol @ prow @` → `here@` (12 sites) | 54 bytes |
 | #283 | Factor clamp patterns → `0max` / `1max` (11 sites) | 132 bytes |
 
-App size: 24,292 bytes at $2000. Headroom to $8000: **284 bytes**.
+App size: 23,613 bytes at $2000. Headroom to $8000: **~963 bytes**.
+
+## Combat Rebalance Frame Impact (#306, #312-315, #338-348)
+
+The combat rebalance added deflector toggle, shield bleedthrough, damage spread,
+repair priority queue, ion disable, and docking shield check.  No new CODE words
+were added — all changes are Forth-level logic.
+
+| New work | When it runs | Idle-path cost | Active-path cost |
+|----------|-------------|----------------|-----------------|
+| `tick-energy` | Every frame | ~175cy (not docked, not 16th frame) | ~800cy (16th frame, all healthy) |
+| `tick-dock` | Every frame | ~212cy (not docked) | ~2,700cy (docked, 16th frame: 3× repair-any) |
+| `repair-any` | Every 16 frames from tick-energy | ~600-800cy (all healthy) | ~1,300cy (one system damaged) |
+| `take-damage` | On hit only (event-driven) | 0 | ~1,500-2,000cy |
+| `check-dock` | Every 8 frames (BG slot 1) | ~300cy (no base) | ~2,926cy (near base, shield check) |
+
+The every-frame base cost increased by ~387cy (tick-energy idle + tick-dock idle).
+This brings the every-frame base from 3,645cy to ~4,032cy.  Still well within budget.
+
+On the 16th-frame repair tick (not docked): +600-800cy additional.  Once every 16
+frames = negligible average impact.  When docked, tick-dock's 3× repair-any replaces
+tick-energy's single repair — higher burst but infrequent and only while stationary.
 
 ## Remaining Targets
 
@@ -173,11 +198,11 @@ The appendix below uses manually expanded costs with correct loop iteration coun
 
 ## Appendix: Component Cost Table
 
-Current measured costs after all optimizations (#166, #215, #241-#253).
+Current measured costs after all optimizations (#166, #215, #241-#253, #306-#350).
 
 | Component | Cycles | Derivation |
 |-----------|--------|------------|
-| Every-frame base | 3,645 | move-ship CODE(669) + process-key(785†) + save-ship-pos(374) + tick-systems(764†) + loop overhead(429†) + jov-contact CODE(294) |
+| Every-frame base | 4,032 | move-ship CODE(669) + process-key(785†) + save-ship-pos(374) + tick-systems(764†) + loop overhead(429†) + jov-contact CODE(294) + tick-energy(175†) + tick-dock(212†) + tick-destruct(~130†) |
 | Ship gravity (grav frames) | 476 | ship-gravity CODE(473-476) (#242) |
 | Check collisions (odd frames) | 1,833 | check-collisions(1,833): collision-scan CODE + Forth wrapper. Moved to odd frames to balance even-frame think load. |
 | Per-Jovian think | 1,446 | jov-think CODE(689-693) + apply-intent CODE(752-757 base) |
@@ -187,9 +212,9 @@ Current measured costs after all optimizations (#166, #215, #241-#253).
 | Jov-gravity-pull (non-grav) | 30 | Early exit on grav-tick gate |
 | Background slot 1 (`AND 7 = 7`) | 1,360† | jov-check-regen(~500†) + check-dock(~300†) + tick-dock(~30† not docked) + tick-base-attack(~500†). Moved from `= 3` to `= 7` to avoid gravity collision (#284). |
 | Background slot 2 (`AND 7 = 5`) | 1,230† | tick-stardate(~200† not firing) + tick-migrate(~200† not firing) + check-spawn(~30†) + update-cond(~800†). |
-| Full render | 8,458 | draw-stars CODE(196) + draw-jovians-live(1,151) + draw-ship(819) + bg-jov Forth(save 900 + restore 909 + oldpos 191 = 2,000) + bg-ship(restore 476 + save 549 = 1,025) + overhead(475†) + post-render(2,510†) |
-| Ship-only render | 4,957 | draw-ship(819) + bg-ship(1,025) + overhead(603†) + post-render(2,510†) |
-| Post-render | 2,510† | beam-erase 2×(~424†) + beam-draw 2×(~424†) + apply-beam/jbeam(~471†) + panel 3×(~714†) + check-win(~126†) + overlay(~126†) |
+| Full render | 6,732 | draw-stars CODE(196) + draw-jovians-live(1,151) + draw-ship(819) + bg-jov Forth(save 900 + restore 909 + oldpos 191 = 2,000) + bg-ship(restore 476 + save CODE 172 = 648) (#350) + overhead(475†) + post-render(1,443†) (#349) |
+| Ship-only render | 3,513 | draw-ship(819) + bg-ship(648) (#350) + overhead(603†) + post-render(1,443†) (#349) |
+| Post-render | 1,443† | beam guards 3×(~477† idle) (#349) + panel 3×(~714†) + check-win(~126†) + overlay(~126†) |
 
 †Upper bound or estimated idle-path cost; fc.py reports worst-case branch sums.
 Actual idle-path costs traced manually from primitive timing.
@@ -250,7 +275,7 @@ Background tasks on odd frames: slot 1 at `N AND 7 = 7` (#284), slot 2 at `N AND
 BG slot 1 moved from `= 3` to `= 7` to avoid collision with gravity frames (#284).
 jov-contact (294cy) included in EF.  tick-jovians-inner (~165cy†) runs on even frames.
 
-Component abbreviations: EF=every-frame base(3,645), SGrv=ship-gravity(476),
+Component abbreviations: EF=every-frame base(4,032), SGrv=ship-gravity(476),
 Coll=check-collisions(1,833, odd frames only),
 TJov=tick-jovians-inner(~140 fire/~110 skip), J=per-think(1,449),
 JGrv=jov-gravity-pull(494/30), BG=background(slot1: 1,360†, slot2: 1,230†),
@@ -258,59 +283,61 @@ Rnd-F=full render(8,458), Rnd-S=ship-only(4,957).
 
 | Fr | E/O | EF | SGrv | TJov | Think | Coll | JGrv | BG | Rnd | **Total** | |
 |----|-----|----|------|------|-------|------|------|----|-----|-----------|---|
-| 0 | E/G | 3645 | 476 | 140 | J1 1449 |  |  |  | 8458 | **14,168** | |
-| 1 | O/G | 3645 |  |  |  | 1833 | 494 |  | 8458 | **14,430** | |
-| 2 | E | 3645 |  | 140 | J2 1449 |  |  |  | 8458 | **13,692** | |
-| 3 | O | 3645 |  |  |  | 1833 | 30 |  | 4957 | **10,465** | |
-| 4 | E | 3645 |  | 140 | J0 1449 |  |  |  | 8458 | **13,692** | |
-| 5 | O | 3645 |  |  |  | 1833 | 30 | 1230 | 4957 | **11,695** | |
-| 6 | E | 3645 |  | 140 | J1 1449 |  |  |  | 8458 | **13,692** | |
-| 7 | O | 3645 |  |  |  | 1833 | 30 | 1360 | 4957 | **11,825** | |
-| 8 | E/G | 3645 | 476 | 140 | J2 1449 |  |  |  | 8458 | **14,168** | |
-| 9 | O/G | 3645 |  |  |  | 1833 | 494 |  | 8458 | **14,430** | |
-| 10-15 | | (repeats: E=13,692 / O=10,465 or 11,695 or 11,825) | | | | | | | | |
-| 16 | E/G | 3645 | 476 | 140 | J0 1449 |  |  |  | 8458 | **14,168** | |
-| 17 | O/G | 3645 |  |  |  | 1833 | 494 |  | 8458 | **14,430** | |
+| 0 | E/G | 4032 | 476 | 140 | J1 1449 |  |  |  | 6732 | **12,829** | |
+| 1 | O/G | 4032 |  |  |  | 1833 | 494 |  | 6732 | **13,091** | |
+| 2 | E | 4032 |  | 140 | J2 1449 |  |  |  | 6732 | **12,353** | |
+| 3 | O | 4032 |  |  |  | 1833 | 30 |  | 3513 | **9,408** | |
+| 4 | E | 4032 |  | 140 | J0 1449 |  |  |  | 6732 | **12,353** | |
+| 5 | O | 4032 |  |  |  | 1833 | 30 | 1230 | 3513 | **10,638** | |
+| 6 | E | 4032 |  | 140 | J1 1449 |  |  |  | 6732 | **12,353** | |
+| 7 | O | 4032 |  |  |  | 1833 | 30 | 1360 | 3513 | **10,768** | |
+| 8 | E/G | 4032 | 476 | 140 | J2 1449 |  |  |  | 6732 | **12,829** | |
+| 9 | O/G | 4032 |  |  |  | 1833 | 494 |  | 6732 | **13,091** | |
+| 10-15 | | (repeats: E=12,353 / O=9,408 or 10,638 or 10,768) | | | | | | | | |
+| 16 | E/G | 4032 | 476 | 140 | J0 1449 |  |  |  | 6732 | **12,829** | |
+| 17 | O/G | 4032 |  |  |  | 1833 | 494 |  | 6732 | **13,091** | |
 | 18-23 | | (repeats) | | | | | | | | |
-| 24 | E/G | 3645 | 476 | 140 | J1 1449 |  |  |  | 8458 | **14,168** | |
-| 25 | O/G | 3645 |  |  |  | 1833 | 494 |  | 8458 | **14,430** | |
+| 24 | E/G | 4032 | 476 | 140 | J1 1449 |  |  |  | 6732 | **12,829** | |
+| 25 | O/G | 4032 |  |  |  | 1833 | 494 |  | 6732 | **13,091** | |
 | 26-55 | | (repeats 8-frame pattern) | | | | | | | | |
-| 56 | E/G | 3645 | 476 | 140 | J2 1449 |  |  |  | 8458 | **14,168** | |
-| 57 | O/G | 3645 |  |  |  | 1833 | 494 |  | 8458 | **14,430** | |
-| 58 | E | 3645 |  | 140 | J0 1449 |  |  |  | 8458 | **13,692** | |
-| 59 | O | 3645 |  |  |  | 1833 | 30 |  | 4957 | **10,465** | |
+| 56 | E/G | 4032 | 476 | 140 | J2 1449 |  |  |  | 6732 | **12,829** | |
+| 57 | O/G | 4032 |  |  |  | 1833 | 494 |  | 6732 | **13,091** | |
+| 58 | E | 4032 |  | 140 | J0 1449 |  |  |  | 6732 | **12,353** | |
+| 59 | O | 4032 |  |  |  | 1833 | 30 |  | 3513 | **9,408** | |
 
-Key observation: **all frames under budget**.  Moving BG slot 1 from `AND 7 = 3`
-to `AND 7 = 7` (#284) separates it from gravity frames.  Gravity odd frames
-(1, 9, 17, ...) drop from 15,790cy to 14,430cy.  BG1 moves to non-gravity odd
-frames (7, 15, 23, ...) at 11,825cy.  **Zero over-budget frames.**
+Key observation: **all frames under budget** (14,930cy).  #349 beam idle guards
+saved 1,067cy/frame, #350 save-ship-bg CODE saved 377cy/frame.  Peak frame is
+the gravity odd frame at 13,091cy (87.7%) — comfortable headroom for new features.
+**Zero over-budget frames.**
 
 Also see `frame_budget_chart.html` for the interactive visual chart.
 
-### Summary (slot-based scheduling, after #166, #215, #241-#253, #284)
+### Summary (after #349-350 optimizations, combat rebalance #306-348, slot-based scheduling)
 
-| Metric | Current | Old slot-based | Before optimization |
-|--------|---------|---------------|---------------------|
-| **Budget per frame** | 14,930 cy | 14,930 cy | 14,930 cy |
-| **Even, 1 think, no gravity** | 13,692 cy (92%) | 13,692 cy (92%) | 20,840 cy (140%) |
-| **Even, 1 think + gravity** | 14,168 cy (95%) | 14,168 cy (95%) | 27,155 cy (182%) |
-| **Gravity odd + Coll** | 14,430 cy (97%) | 15,790 cy (106%) | 22,214 cy (149%) |
-| **BG1 odd + Coll** | 11,825 cy (79%) | — | — |
-| **Light odd + Coll** | 10,465 cy (70%) | 10,465 cy (70%) | — |
-| **Frames over budget (L10)** | **0 of 60 (0%)** | 8 of 60 (13%) | 29 of 60 (48%) |
-| **Peak frame cost** | **14,430 cy (97%)** | 15,790 cy (106%) | 27,155 cy (182%) |
-| **Jitter (peak - trough, even)** | 476 cy (gravity only) | 476 cy | 17,029 cy |
+| Metric | Current | Pre-#349/350 | Pre-rebalance | Before optimization |
+|--------|---------|--------------|---------------|---------------------|
+| **Budget per frame** | 14,930 cy | 14,930 cy | 14,930 cy | 14,930 cy |
+| **Even, 1 think, no gravity** | 12,353 cy (83%) | 14,079 cy (94%) | 13,692 cy (92%) | 20,840 cy (140%) |
+| **Even, 1 think + gravity** | 12,829 cy (86%) | 14,555 cy (98%) | 14,168 cy (95%) | 27,155 cy (182%) |
+| **Gravity odd + Coll** | 13,091 cy (88%) | 14,817 cy (99%) | 14,430 cy (97%) | 22,214 cy (149%) |
+| **BG1 odd + Coll** | 10,768 cy (72%) | 12,212 cy (82%) | 11,825 cy (79%) | — |
+| **Light odd + Coll** | 9,408 cy (63%) | 10,852 cy (73%) | 10,465 cy (70%) | — |
+| **Frames over budget (L10)** | **0 of 60 (0%)** | 0 of 60 (0%) | 0 of 60 (0%) | 29 of 60 (48%) |
+| **Peak frame cost** | **13,091 cy (88%)** | 14,817 cy (99%) | 14,430 cy (97%) | 27,155 cy (182%) |
+| **Jitter (peak - trough, even)** | 476 cy (gravity only) | 476 cy | 476 cy | 17,029 cy |
 
 tick-jovians-inner measured at 254cy by `fc.py --cycles` (path sum / upper bound).
 Actual execution: ~140cy (fire path) / ~110cy (skip path), no loop.
 
-**Key improvement**: Moving BG slot 1 from `AND 7 = 3` to `AND 7 = 7` (#284)
-eliminates all over-budget frames.  The gravity odd frames no longer collide
-with background tasks.  Peak frame drops from 15,790cy (106%) to 14,430cy (97%).
+**Key improvement**: #349 beam idle guards eliminated 1,067cy/frame by gating 6
+beam/hit word calls with 3 IF checks (idle frames skip all beam dispatch).  #350
+converted save-ship-bg from Forth wrapper (549cy) to CODE (172cy), saving 377cy/frame.
+Combined savings: ~1,444cy/frame, dropping peak from 14,817cy (99%) to 13,091cy (88%).
+This opens ~1,839cy of headroom on the peak frame for new gameplay features.
 
 At moderate difficulty (mixed skip factors), some even frames skip their Jovian's
-turn, producing a mix of 15,550cy and 10,545cy frames — but never exceeding
-15,550cy.  The ceiling is hard-capped at 1 think per even frame.
+turn, producing a mix of 13,805cy and 9,101cy frames — but never exceeding
+13,805cy.  The ceiling is hard-capped at 1 think per even frame.
 
 ### Think Frequency by Difficulty Level
 
@@ -327,13 +354,13 @@ Dumb Jovians are genuinely sluggish; smart ones are still snappy.
 
 ### Remaining Bottlenecks
 
-1. **Full render (8,458cy)**: The dominant cost on think frames.  bg-jov Forth
+1. **Full render (6,732cy)**: Still the dominant cost on think frames.  bg-jov Forth
    (save 900 + restore 909 + oldpos 191 = 2,000cy) is the largest sub-component.
    Converting to CODE (#248, needs @bgcalc debug) would save ~1,200cy.
 
-2. **Gravity odd + BG + Coll (15,790cy, 106%)**: jov-gravity-pull(494) +
-   BG tasks(1,360†) + check-collisions(1,833) + full render(8,458) + EF(3,645).
-   The only frames over budget.  8 of 60 frames (13%).
+2. **Gravity odd frames (13,091cy, 88%)**: jov-gravity-pull(494) +
+   check-collisions(1,833) + full render(6,732) + EF(4,032).  1,839cy headroom —
+   comfortable for new per-frame features.
 
-3. **Even think frames now under budget**: 13,692cy (92%) without gravity,
-   14,168cy (95%) with.  Moving check-collisions to odd frames freed 1,833cy.
+3. **Even think + gravity (12,829cy, 86%)**: ship-gravity(476) + think(1,449) +
+   tick-jovians-inner(140) + full render(6,732) + EF(4,032).  2,101cy headroom.

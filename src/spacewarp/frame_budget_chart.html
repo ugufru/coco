@@ -20,7 +20,7 @@
 <body>
 
 <h1>Space Warp — 60-Frame Cycle Map (1 Second @ 60fps)</h1>
-<h2>Level 10: 3 Jovians (slot-based, skip=1), 5 stars, black hole, base</h2>
+<h2>Level 10: 3 Jovians (slot-based, skip=1), 5 stars, black hole, base — after #349/#350</h2>
 
 <div class="chart-container">
   <canvas id="chart" width="1200" height="500"></canvas>
@@ -48,6 +48,8 @@ const COMPONENTS = [
   { name: 'save-ship-pos',   key: 'ssp',   color: '#2266aa' },  // copy ship x,y
   { name: 'tick systems',    key: 'tks',   color: '#4488cc' },  // missile + jbeam + destruct
   { name: 'loop overhead',   key: 'lovr',  color: '#336699' },  // frame-tick, overlay checks
+  { name: 'tick-energy',     key: 'te',    color: '#227755' },  // energy regen + repair queue
+  { name: 'tick-dock',       key: 'td',    color: '#2a9966' },  // docked recharge
   // Even-frame systems
   { name: 'Ship Gravity',    key: 'sgrv',  color: '#cc8844' },  // CODE: merged gravity-well+star-gravity (#242)
   { name: 'Collisions',      key: 'coll',  color: '#66aa44' },
@@ -109,15 +111,20 @@ function buildFrame(f) {
   //   tick systems: 764cy (missile + jbeam + destruct idle)
   //   loop overhead: 429cy (frame-tick +! + overlay checks)
   //   jov-contact CODE: 300cy every frame (#243)
+  //   tick-energy: ~175cy idle (not docked, not 16th frame), ~800cy on repair tick
+  //   tick-dock: ~212cy idle (not docked), ~2700cy on docked repair tick
   //   ship-gravity CODE: 476cy on grav frames (#242, was 5,776cy)
   //   tick-jovians-inner CODE: ~140cy fire / ~110cy skip (slot-based)
   //   check-win: one-shot per kill, not every frame (#250)
+  const isRepairTick = (f % 16 === 0);  // every 16th frame: energy regen + repair
   return {
     ms:   993,                              // move-ship CODE(669 base + 108cy × 3 Jovians)
     pk:   785,                              // process-key (idle path, traced)
     ssp:  374,                              // save-ship-pos — fc.py: 374cy exact
     tks:  764,                              // tick-missile(212†) + tick-jbeam(340†) + tick-destruct(212†) idle
     lovr: 429,                              // frame-tick +!(103†) + 2× overlay check(326†)
+    te:   isRepairTick ? 800 : 175,         // tick-energy: idle 175cy, repair tick ~800cy (#340)
+    td:   212,                              // tick-dock: idle path (not docked) ~212cy
     sgrv: (even && isGrav) ? 476 : 0,       // ship-gravity CODE — fc.py: 473-476cy
     coll: !even ? 1833 : 0,                  // check-collisions — moved to odd frames
     tjov: even ? (anyThink ? 140 : 110) : 0,   // tick-jovians-inner CODE (slot-based: ~140 fire, ~110 skip)
@@ -126,21 +133,21 @@ function buildFrame(f) {
     j2:   hasJ2 ? 1449 : 0,
     jcon: 294,                               // jov-contact CODE — fc.py: 294cy
     jgrv: !even ? (isGrav ? 494 : 30) : 0,  // jov-gravity-pull CODE — fc.py: 489-494cy
-    bg:   hasBG(f) ? 3000 : 0,              // BG tasks (traced idle paths)
+    bg:   hasBG(f) ? ((f & 7) === 7 ? 1360 : 1230) : 0,  // BG slot1=1360†(regen+dock+base-atk), slot2=1230†(stardate+migrate+spawn+cond)
     // Post-VSYNC render breakdown (fc.py values):
     // Full render (jov-moved=1):
     //   draw-stars CODE: 196, draw-jovians-live: 1,151, draw-ship: 819
     //   bg-jov Forth: 2,000 (save 900 + restore 909 + oldpos 191; #248 reverted)
-    //   bg-ship: 1,025 (restore 476 + save 549)
-    //   overhead: 475†, post-render: 2,510†
-    // Ship-only (moved=1, jov-moved=0): ~4,957cy
+    //   bg-ship: 648 (restore 476 + save-ship-bg CODE 172) (#350)
+    //   overhead: 475†, post-render: 1,443† (#349 beam idle guards)
+    // Ship-only (moved=1, jov-moved=0): ~3,513cy
     rds:  jovMoved ? 196 : 0,               // draw-stars CODE — fc.py: 195-196cy
     rdj:  jovMoved ? 1151 : 0,              // draw-jovians-live — fc.py: 1,151-1,152cy
     rsh:  819,                               // draw-ship — fc.py: 819-820cy
     bgj:  jovMoved ? 2000 : 0,              // save(900) + restore(909) + oldpos(191) — fc.py, Forth
-    bgs:  1025,                              // restore(476) + save(549) — fc.py
+    bgs:  648,                               // restore(476) + save-ship-bg CODE(172) (#350)
     rovr: jovMoved ? 475 : 603,              // conditional checks (traced)
-    post: 2510,                              // post-render (traced idle paths)
+    post: 1443,                              // post-render: beam guards(477†) + panel(714†) + wins/overlay(252†) (#349)
   };
 }
 
@@ -279,29 +286,34 @@ statsEl.innerHTML = `
   (${Math.round(avgCycles / BUDGET * 100)}% of budget)<br>
   Effective FPS: ~${effectiveFPS} fps (over-budget frames drop to 30fps)<br>
   <br>
-  <span style="color:#00ff88">After #166 + #215 + #241-#253:</span>
-  <code>tick-jovians-inner</code> CODE: tick loop + inlined threshold (200cy; was ~4,140cy Forth).
-  <code>apply-intent</code> CODE with inlined <code>jov-blocked?</code> (Think: 2,058cy; was 17,000cy).
-  <code>move-ship</code> CODE (993cy; was 1,633cy).
-  <code>save/restore-jov-bgs</code> reverted to Forth (949+948cy; #248 CODE had rendering bug).
-  <code>jov-contact</code> CODE (300cy every frame) + <code>jov-gravity-pull</code> CODE (400cy; was 5,000cy).
+  <span style="color:#00ff88">CODE word optimizations (#166, #215, #241-#253):</span>
+  <code>tick-jovians-inner</code> CODE: slot-based scheduling (254cy path sum; ~140cy fire, ~110cy skip).
+  <code>apply-intent</code> CODE with inlined <code>jov-blocked?</code> (1,369cy; was 17,000cy Forth).
+  <code>move-ship</code> CODE (993cy; was 1,633cy). Includes ion disable gate (#307).
+  <code>jov-contact</code> CODE (294cy) + <code>jov-gravity-pull</code> CODE (494cy; was 5,000cy).
   <code>ship-gravity</code> CODE (476cy; was 5,776cy).
-  <code>draw-stars</code> CODE with fixed colors (400cy; was 1,840cy).
-  <code>check-win</code> bug fixed: galaxy scan no longer runs every frame (#250).
-  All constants inlined as LIT.
+  <code>draw-stars</code> CODE with fixed colors (196cy; was 1,840cy).
+  All constants inlined as LIT (#245/#246).
   <br><br>
-  <span style="color:#00ff88">BG slot rebalance (#284):</span>
-  Moved BG slot 1 from <code>AND 7 = 3</code> to <code>AND 7 = 7</code>, separating it from
-  gravity frames. Peak odd frame drops from 15,790cy (106%) to 14,430cy (97%).
-  <strong>Zero over-budget frames.</strong>
+  <span style="color:#00ff88">Combat rebalance (#306-#348):</span>
+  Deflector toggle UP/DOWN, shield bleedthrough below 40%, damage spread across 2-3 systems,
+  repair queue with priority ordering, ion disable at 0%, docking requires shields DOWN.
+  Added ~387cy/frame from <code>tick-energy</code> (175cy idle) + <code>tick-dock</code> (212cy idle).
+  Every 16th frame: repair tick adds ~600-800cy. No new CODE words.
+  Peak frame: 14,817cy (99%) on gravity odd frames. <strong>Zero over-budget frames.</strong>
   <br><br>
-  <span style="color:#00ff88">Size optimizations (#268, #280-#283):</span>
-  String dedup (~161b), <code>cancel-beams</code> (6b), <code>draw-backdrop</code> (18b),
-  <code>here@</code> (54b), <code>0max</code>/<code>1max</code> (132b).
-  App: 24,292 bytes, headroom 284 bytes.
+  <span style="color:#00ff88">Idle-path optimizations (#349-#350):</span>
+  <code>save-ship-bg</code> CODE (172cy; was 549cy Forth wrapper) — inlines bg-save + jbeam fill gate (#350).
+  Beam idle guards: 3 IF checks gate 6 beam/hit word calls, saving 1,067cy/frame when no beams active (#349).
+  Combined savings: ~1,444cy/frame. Peak dropped from 14,817cy (99%) to 13,091cy (88%).
+  <br><br>
+  <span style="color:#00ff88">Kernel promotion (#332-#337):</span>
+  13 CODE words promoted to kernel primitives. 74 total primitives, 3,504 bytes.
+  App: 23,613 bytes, headroom ~963 bytes.
   <br><br>
   Note: DO/LOOP and nested-loop costs are fc.py base values (single iteration);
   real multi-iteration costs are higher. Relative comparisons remain valid.
+  Repair tick (frame 0, 16, 32, 48) adds ~625cy burst; averaged over 16 frames = ~39cy/frame.
 `;
 </script>
 
