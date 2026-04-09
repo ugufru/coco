@@ -198,7 +198,9 @@ None of these affect the per-frame budget.  They fire only on specific game even
 
 None affect per-frame budget. #286 is pure size savings. #213 adds ~20cy only on
 the already-expensive blocked path (tier 1 fail). #310 runs only in the LRS overlay.
-App: 24,543 bytes, headroom ~8 bytes.
+Additional V0.93 changes: warp gate below 25% (#378), field repair to 25% floor (#378),
+energy drain to zero for weapons (#379), ghost sprite fix (#375), title screen credit.
+App: 24,546 bytes, headroom ~5 bytes.
 
 ## Remaining Targets
 

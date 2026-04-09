@@ -137,12 +137,23 @@ make run                       # launch in XRoar emulator
 
 ## Roadmap — v1.0 April 15, 2026
 
-All features complete. 18 bytes headroom. In playtesting — one week to release.
+All features complete. 5 bytes headroom. In playtesting — one week to release.
+
+**Done (V0.93):**
+- Handedness-based obstacle avoidance — genome drives Jovian slide direction (#213)
+- Scanner degradation — LRS garbles with @ below 40% scanner health (#310, #149, #230)
+- Warp non-operative below 25% drive health (#378)
+- Field repair recovers systems below 25% up to 25% floor (#378)
+- Energy drain to zero permitted for weapons (#379)
+- Ghost ship sprite after warp fixed (#375)
+- jov-pos-addr factoring — 86 bytes saved (#286)
+- 6 new kernel primitives: U<, 0MAX, 2*, 2/, 0MIN, WITHIN — 80 total (#371-374, #376-377)
+- Title screen publisher credit: BARE NAKED GAMES
 
 **Done (V0.92):**
 - Combat rebalance — maser range damage, missile nerf, aim scatter, damage spread, shield bleedthrough (#306, #312-315)
 - Deflector toggle — UP/DOWN with key 4, divert energy to rebuild at 0% (#338-341)
-- Non-linear repair — field cap at 75%, no repair below 25%; starbase heals to 100% (#309, #364)
+- Non-linear repair — field cap at 75%; starbase heals to 100% (#309, #364)
 - SOS timer system — bases survive 3 stardates of threat; no random destruction (#317)
 - Finite base missile supply — 25 per base, docking draws from pool (#318)
 - Friendly fire — masers and missiles can destroy your own starbases (#323)
@@ -155,7 +166,6 @@ All features complete. 18 bytes headroom. In playtesting — one week to release
 - Beam idle guards + save-ship-bg CODE — 1,444cy/frame saved (#349, #350)
 - Backdrop preservation — stars and base redrawn every frame (#359, #362)
 - 13 CODE words promoted to kernel — 74 primitives (#332-337)
-- 6 new kernel primitives: U<, 0MAX, 2*, 2/, 0MIN, WITHIN — 80 total (#371-374, #376-377)
 - Gravity direction fix (#360), gravity step fix (#361)
 - QCOUNTS overlap fix (#355), missile flicker fix (#358)
 - Overlay dismiss on reinforcement spawn (#356)
@@ -165,7 +175,6 @@ All features complete. 18 bytes headroom. In playtesting — one week to release
 - Final version bump to v1.0, git tag, itch.io upload
 
 **Post-release** (v1.1+ — needs bytes freed via code factoring):
-- Scanner degradation at low health (#149, #230, #310)
 - Spacebar quick-fire masers (#320)
 - Direct hit bonus (#316), SOS escalation messages (#319)
 - Status line micro-reports (#321), crew count and score (#322)
