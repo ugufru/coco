@@ -552,14 +552,8 @@ Move the Endever directly above or below a starbase to dock. Shields must be DOW
 
 ## Future Enhancements
 
-These features are not in the initial implementation but are tracked as future
-issues:
-
 - **Sound effects** — maser fire, triton launch, explosions, docking, SOS alarm,
-  self-destruct countdown (requires sound/DAC library, issue #36)
-- **Star twinkling** — randomly toggle star pixel patterns each frame for a
-  living starfield effect
-- **Title screen** — animated starfield or ship graphic before game start
+  self-destruct countdown (requires sound/DAC library, issue #36/#188)
 - **High score table** — persist across game restarts (like Tetris)
 
 ## Dependencies
