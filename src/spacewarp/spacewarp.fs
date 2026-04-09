@@ -583,7 +583,7 @@ VARIABLE old-sy                   \ previous ship y
 \ Restore to erase without a black flash.
 $805A CONSTANT SHIP-BG              \ 20-byte save buffer
 
-CODE bg-save   \ ( buf x y -- )  save 4×5 VRAM bytes to buf
+KCODE bg-save   \ ( buf x y -- )  save 4×5 VRAM bytes to buf
         PSHS    X
         LDA     1,U             ; A = y
         LDB     #32
@@ -610,9 +610,9 @@ CODE bg-save   \ ( buf x y -- )  save 4×5 VRAM bytes to buf
         BNE     @row
         PULS    X
         ;NEXT
-;CODE
+;KCODE
 
-CODE bg-restore  \ ( buf x y -- )  restore 4×5 VRAM bytes from buf
+KCODE bg-restore  \ ( buf x y -- )  restore 4×5 VRAM bytes from buf
         PSHS    X
         LDA     1,U             ; A = y
         LDB     #32
@@ -639,7 +639,7 @@ CODE bg-restore  \ ( buf x y -- )  restore 4×5 VRAM bytes from buf
         BNE     @row
         PULS    X
         ;NEXT
-;CODE
+;KCODE
 
 CODE save-ship-bg  \ ( -- )  save 4×5 VRAM under ship; zero if jbeam active
         PSHS    X               ; save IP
@@ -700,7 +700,7 @@ VARIABLE jbg-i
 \ CODE helpers: compute sprite/bg addr + centered (x,y) for Jovian i.
 \ Inlines jov-spr/jov-bg/jov-draw-dx/jov-draw-dy into register ops.
 
-CODE jov-spr-xy   \ ( i -- spr x y )
+KCODE jov-spr-xy   \ ( i -- spr x y )
         PSHS    X               ; save IP
         LDA     1,U             ; A = i
         LEAU    -4,U            ; grow stack by 2 cells
@@ -736,9 +736,9 @@ CODE jov-spr-xy   \ ( i -- spr x y )
         STD     ,U              ; y
         PULS    X
         ;NEXT
-;CODE
+;KCODE
 
-CODE save-jov-oldpos-n   \ ( n -- )  copy JOV-POS to JOV-OLDX/Y for n Jovians
+KCODE save-jov-oldpos-n   \ ( n -- )  copy JOV-POS to JOV-OLDX/Y for n Jovians
         PSHS    X               ; save IP
         LDB     1,U             ; B = count
         LEAU    2,U             ; pop
@@ -755,7 +755,7 @@ CODE save-jov-oldpos-n   \ ( n -- )  copy JOV-POS to JOV-OLDX/Y for n Jovians
         BNE     @loop
 @done   PULS    X
         ;NEXT
-;CODE
+;KCODE
 
 \ save-jov-bgs / restore-jov-bgs — CODE with inline bg calc + clamp
 \ Iterates living Jovians, computes centered screen coords from JOV-POS,
@@ -1038,7 +1038,7 @@ CODE max-draw-y
 \ Decays toward genome baseline every 120 frames (~2s).
 \ Stimuli shift emotion immediately; clamped to 0-15.
 
-CODE jov-emo@   \ ( i -- e )
+KCODE jov-emo@   \ ( i -- e )
         LDA     1,U             ; A = i
         LDB     #4
         MUL
@@ -1053,9 +1053,9 @@ CODE jov-emo@   \ ( i -- e )
         CLRA
         STD     ,U
         ;NEXT
-;CODE
+;KCODE
 
-CODE jov-emotion!   \ ( e i -- )
+KCODE jov-emotion!   \ ( e i -- )
         LDA     1,U             ; A = i
         LDB     #4
         MUL
@@ -1079,9 +1079,9 @@ CODE jov-emotion!   \ ( e i -- )
         ORB     ,S+             ; combine
         STB     ,Y              ; write back
         ;NEXT
-;CODE
+;KCODE
 
-CODE jov-emotion-base   \ ( i -- e )  aggression-derived baseline
+KCODE jov-emotion-base   \ ( i -- e )  aggression-derived baseline
         LDA     1,U             ; A = i
         LDB     #4
         MUL
@@ -1102,7 +1102,7 @@ CODE jov-emotion-base   \ ( i -- e )  aggression-derived baseline
         CLRA
         STD     ,U
         ;NEXT
-;CODE
+;KCODE
 
 \ Drift 1 step toward baseline
 : jov-emotion-decay  ( i -- )
@@ -3816,7 +3816,7 @@ CODE move-ship
 
 \ Check if any (x,y) pair in array is within 3px of (sx,sy) on both axes.
 \ Returns nonzero flag if collision found.
-CODE collision-scan  ( sx sy array count -- flag )
+KCODE collision-scan  ( sx sy array count -- flag )
         PSHS    X
         LDA     1,U             ; A = count (low byte)
         BEQ     @none
@@ -3855,7 +3855,7 @@ CODE collision-scan  ( sx sy array count -- flag )
         STD     ,--U            ; push flag=0
         PULS    X
         ;NEXT
-;CODE
+;KCODE
 
 : ship-xy  ( -- x y )  SHIP-POS C@ SHIP-POS 1 + C@ ;
 
@@ -4844,10 +4844,8 @@ VARIABLE sg-row                   \ scan grid: outer loop row
 
 \ Poll keyboard and dispatch (debounce: only fire on key change)
 VARIABLE prev-key                 \ last key seen by KEY?
-VARIABLE key-latch                \ latched keypress (survives between polls)
+VARIABLE key-latch                \ kept for init zeroing
 
-\ Sample keyboard — if a key is down, latch it for later processing.
-\ Called at multiple points in the game loop to catch brief taps.
 : latch-key  ( -- )
   KEY? ?DUP IF key-latch ! THEN ;
 
@@ -4895,7 +4893,7 @@ VARIABLE key-latch                \ latched keypress (survives between polls)
   S" LEVEL 1-9" rg-type
   \ Publisher + version on bottom row
   1 18 at-xy
-  S" BARE NAKED GAMES         V0.93" rg-type
+  S" BARE NAKED GAMES         V0.94" rg-type
   \ Read level key (1-9)
   BEGIN KEY DUP CHAR 1 < OVER CHAR 9 > OR IF DROP 0 ELSE 1 THEN UNTIL
   CHAR 0 - glevel ! ;

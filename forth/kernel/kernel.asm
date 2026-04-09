@@ -792,11 +792,23 @@ KEY_TABLE
 ;;; Modifier-only presses return 0.
 
 CODE_KEY_NB
+        BSR     KEY_SCAN        ; A = ASCII key or 0
+        TFR     A,B             ; B = char (or 0)
+        CLRA                    ; A = 0 (high byte)
+        STD     ,--U            ; push result
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── KEY_SCAN — subroutine: scan keyboard, return ASCII in A ───────────────
+;;; Returns A = ASCII character, or 0 if no key pressed.
+;;; Callable from CODE words via BSR/LBSR. Preserves X, U.
+
+KEY_SCAN
         CLR     $FF02           ; strobe all columns
         LDA     $FF00           ; read all row bits (active-low)
         COMA                    ; invert: pressed=1
-        ANDA    #$7F            ; mask joystick bit — avoid spurious scan overhead
-        BEQ     KEY_NB_DONE     ; nothing in rows 0–6 → fall through with A=0
+        ANDA    #$7F            ; mask joystick bit
+        BEQ     @done           ; nothing → A=0
         ; pre-check SHIFT (PB7/PA6)
         LDA     #$7F
         STA     $FF02
@@ -808,17 +820,11 @@ CODE_KEY_NB
         STA     $FF02
         ; identify key
         LBSR    MATRIX2ASCII    ; A = ASCII of first pressed key (0 = modifier)
-        BEQ     KEY_NB_DONE     ; modifier only → return 0
+        BEQ     @done           ; modifier only → return 0
         TST     VAR_KEY_SHIFT
-        BEQ     KEY_NB_DONE2
+        BEQ     @done
         BSR     SHIFT_APPLY
-KEY_NB_DONE2
-KEY_NB_DONE
-        TFR     A,B             ; B = char (or 0)
-        CLRA                    ; A = 0 (high byte)
-        STD     ,--U            ; push result
-        LDY     ,X++            ; NEXT
-        JMP     [,Y]
+@done   RTS
 
 ;;; ─── SHIFT_APPLY — transform character in A to its shifted variant ──────────
 ;;; Called when SHIFT was detected (pre-checked before MATRIX2ASCII).

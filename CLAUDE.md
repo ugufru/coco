@@ -139,7 +139,7 @@ Primary doc: `COCO_RENOVATION.md`. Tech reference: `coco_technical_reference.pdf
 
 ## Current State (2026-04-08)
 Tutorial series, calculator, Getting Started ch1–13: all COMPLETE.
-Space Warp V0.93: all features complete. Tagged v0.92. Targeting v1.0 April 15.
+Space Warp V0.94: all features complete. Tagged v0.93. Targeting v1.0 April 15.
 Pre-announced on itch.io. In playtesting — one week to release.
 App size: 24,546 bytes, headroom 5 bytes. Kernel: 80 primitives. Data at $8000+, font at $9000.
 Budget: 14,930cy/frame. Slot-based think scheduling (3 Jovians, skip 1-6).
