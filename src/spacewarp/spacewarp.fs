@@ -144,7 +144,7 @@ VARIABLE pdmg-defl             \ deflector damage
 VARIABLE pdmg-masr             \ maser damage
 
 : here@  pcol @ prow @ ;
-: 0max  DUP 0 < IF DROP 0 THEN ;
+\ 0max is now a kernel primitive (#372)
 : 1max  DUP 1 < IF DROP 1 THEN ;
 
 \ ── Expanded quadrant state ──────────────────────────────────────────────
@@ -162,6 +162,8 @@ $8054 CONSTANT SHIP-POS        \ player ship x 2 bytes = 2 bytes
 
 \ Jovian damage (3 bytes, one per jovian: 100=full health, 0=dead)
 $8056 CONSTANT JOV-DMG         \ 3 bytes
+
+: jov-pos-addr  ( i -- addr )  2* JOV-POS + ;
 
 \ Quadrant object counts (from the packed byte, cached for speed)
 VARIABLE qstars                \ star count in current quadrant
@@ -228,8 +230,8 @@ $8EF4 CONSTANT BASE-AMMO        \ 64 bytes: missiles per base (#318)
 : jov-spr  ( i -- addr )  23 * JOV-SPR0 + ;
 
 \ Dynamic centering offsets from sprite header
-: jov-draw-dx  ( i -- dx )  jov-spr C@ 1 RSHIFT ;
-: jov-draw-dy  ( i -- dy )  jov-spr 1 + C@ 1 RSHIFT ;
+: jov-draw-dx  ( i -- dx )  jov-spr C@ 2/ ;
+: jov-draw-dy  ( i -- dy )  jov-spr 1 + C@ 2/ ;
 
 : init-sprites  ( -- )  sprite-data SPR-SHIP 50 CMOVE ;
 
@@ -359,9 +361,9 @@ VARIABLE ss-safe
   0 JOV-DMG C!  0 JOV-DMG 1 + C!  0 JOV-DMG 2 + C!
   \ Generate jovian positions (away from gravity sources, 4 retries)
   qjovians @ ?DUP IF 0 DO
-    rnd-x JOV-POS I 2 * + C!
-    rnd-y JOV-POS I 2 * + 1 + C!
-    JOV-POS I 2 * + 4 safe-place
+    rnd-x I jov-pos-addr C!
+    rnd-y I jov-pos-addr 1 + C!
+    I jov-pos-addr 4 safe-place
     100 JOV-DMG I + C!         \ full health
   LOOP THEN
 
@@ -997,11 +999,11 @@ CODE max-draw-y
   4 *  JOV-GENOME +            \ addr = base + i*4
 
   \ -- Byte 0: aggression(3) | initiative(2) | pilot_skill_hi(3) --
-  8 rnd  glevel @ 1 - 1 RSHIFT  +  clamp7   \ aggression (biased)
+  8 rnd  glevel @ 1 - 2/  +  clamp7   \ aggression (biased)
   DUP >R                       \ R: aggression (for emotion seed)
   3 LSHIFT                     \ shift to bits 7-5
   4 rnd  2 LSHIFT  OR          \ initiative (bits 4-3)
-  8 rnd  glevel @ 1 - 1 RSHIFT  +  clamp7  \ pilot_skill (biased)
+  8 rnd  glevel @ 1 - 2/  +  clamp7  \ pilot_skill (biased)
   OR                           \ combine into byte 0
   OVER C!                      \ store byte 0
 
@@ -1855,19 +1857,49 @@ CODE apply-intent
         TSTA
         BEQ     @apply          ; clear → apply nx, ny
 
-        ; ── Tier 2: try (nx, cur_y) ──
+        ; ── Handedness check (#213) ──
+        ; Genome byte 1, bits 3-2: 0=neutral,1=left,2=right,3=strong
+        ; If bit 1 set (handedness >= 2), try Y-axis first
+        LDA     4,S             ; i
+        LDX     #$80CF          ; JOV-GENOME+1 (byte 1)
+        ASLA                    ; i*2
+        ASLA                    ; i*4
+        LDA     A,X             ; genome byte 1 for Jovian i
+        ANDA    #$08            ; test bit 3 of byte (high bit of handedness)
+        BNE     @tryY           ; handedness >= 2: try Y-axis first
+
+        ; ── Tier 2: try (nx, cur_y) — X-axis slide ──
         LDA     2,S             ; nx
         LDB     1,S             ; cur_y
         LBSR    @chk
         TSTA
         BEQ     @t2ok
 
-        ; ── Tier 3: try (cur_x, ny) ──
+        ; ── Tier 3: try (cur_x, ny) — Y-axis slide ──
         LDA     ,S              ; cur_x
         LDB     3,S             ; ny
         LBSR    @chk
         TSTA
         BEQ     @t3ok
+
+        ; All blocked → stay put
+        LEAS    5,S             ; pop cur_x, cur_y, nx, ny, i
+        PULS    X
+        ;NEXT
+
+@tryY   ; ── Tier 2h: try (cur_x, ny) — Y-axis slide first ──
+        LDA     ,S              ; cur_x
+        LDB     3,S             ; ny
+        LBSR    @chk
+        TSTA
+        BEQ     @t3ok
+
+        ; ── Tier 3h: try (nx, cur_y) — X-axis slide ──
+        LDA     2,S             ; nx
+        LDB     1,S             ; cur_y
+        LBSR    @chk
+        TSTA
+        BEQ     @t2ok
 
         ; All blocked → stay put
         LEAS    5,S             ; pop cur_x, cur_y, nx, ny, i
@@ -2455,7 +2487,7 @@ CODE tick-jovians-inner
         I apply-intent
       THEN
     THEN
-    1 RSHIFT
+    2/
   LOOP DROP
   detect-timer @ 1 + DUP 15 < IF
     detect-timer !
@@ -2962,11 +2994,11 @@ CODE prox-dmg  ( cx cy radius damage count -- killmask )
       1 I LSHIFT pd-kills @ AND IF
         -1 gjovians +!
         I jov-spr
-        JOV-POS I 2 * + C@ I jov-draw-dx -
-        JOV-POS I 2 * + 1 + C@ I jov-draw-dy -
+        I jov-pos-addr C@ I jov-draw-dx -
+        I jov-pos-addr 1 + C@ I jov-draw-dy -
         spr-erase-box
-        JOV-POS I 2 * + C@
-        JOV-POS I 2 * + 1 + C@
+        I jov-pos-addr C@
+        I jov-pos-addr 1 + C@
         explode-jovian
       THEN
     LOOP THEN
@@ -3181,8 +3213,8 @@ CODE pick-jovian   \ ( -- i|-1 )
   \ Aim scatter: offset endpoint by (7-pilot_skill) random px (#314)
   pj-result @ 4 * JOV-GENOME + C@ 7 AND  \ pilot_skill (0-7)
   7 SWAP - ?DUP IF
-    DUP 8 rnd SWAP 1 RSHIFT - jbeam-x2 +!
-        8 rnd SWAP 1 RSHIFT - jbeam-y2 +!
+    DUP 8 rnd SWAP 2/ - jbeam-x2 +!
+        8 rnd SWAP 2/ - jbeam-y2 +!
   THEN
   SWAP DUP 0= IF DROP ELSE 0 < IF -5 ELSE 5 THEN jbeam-x1 @ + jbeam-x1 ! THEN
   DUP 0= IF DROP ELSE 0 < IF -5 ELSE 5 THEN jbeam-y1 @ + jbeam-y1 ! THEN
@@ -3268,7 +3300,7 @@ CODE pick-jovian   \ ( -- i|-1 )
 
 \ Split damage across 2 random systems (#315).
 : damage-system  ( dmg -- )
-  DUP 1 RSHIFT SWAP OVER -        \ ( half remainder )
+  DUP 2/ SWAP OVER -        \ ( half remainder )
   apply-sys-dmg apply-sys-dmg ;
 
 \ Apply damage: deflectors absorb when UP, bleedthrough <40% (#306, #338).
@@ -3362,7 +3394,7 @@ VARIABLE sp-r2
 : gen-spiral-arm  ( start-angle -- )
   20 sp-r2 !                     \ radius*2 = 20 → 10px start
   8 0 DO
-    sp-r2 @ 1 RSHIFT sp-r !
+    sp-r2 @ 2/ sp-r !
     DUP sp-r @ angle-dx BHOLE-POS C@ +
     OVER sp-r @ angle-dy BHOLE-POS 1 + C@ +
     \ Bounds check — skip out-of-range dots ( angle x y )
@@ -3437,11 +3469,13 @@ VARIABLE prev-docked              \ last displayed dock state
 \ ── Energy tick: passive regen (#226) + shield drain (#227) ──────────
 \ Called every frame. Regen: +1 every 32 frames (undocked).
 \ Drain: every 16 frames, 1 if shields<50, 2 if shields>=50.
-\ Field repair: +2 per tick, cap 75%, skip below 25% (#309).
+\ Field repair: +2 per tick. Below 25%: cap at 25%. 25-74%: cap at 75%.
 \ Starbase repair (tick-dock) still heals to 100%.
 : rep1  ( addr -- flag )
-  DUP @ DUP 25 < IF 2DROP 0 ELSE
-  75 < IF DUP @ 2 + 75 MIN SWAP ! 1 ELSE DROP 0 THEN THEN ;
+  DUP @ 75 < IF
+    DUP @ 25 < IF 25 ELSE 75 THEN
+    OVER @ 2 + MIN SWAP ! 1
+  ELSE DROP 0 THEN ;
 
 \ Repair ONE damaged system per tick. Priority depends on deflector state (#340).
 \ Uses stack flag: 0 = not yet repaired, try next. 1 = done, skip rest.
@@ -4052,6 +4086,7 @@ VARIABLE cmd-digits               \ number of digits entered
 \ Show rejection feedback in command area (#238)
 : cmd-reject  ( addr len -- )
   clear-cmd-area  1 18 at-xy  rg-type  2 cmd-state ! ;
+: no-energy  S" NO ENERGY" cmd-reject ;
 
 : draw-cmd-prompt  ( -- )
   clear-cmd-area
@@ -4250,7 +4285,7 @@ CODE clamp-beam   \ ( -- )  Clamp beam x1/y1/x2/y2 to screen bounds
   2DUP ship-xy beam-scrub-pos
   qjovians @ ?DUP IF 0 DO
     JOV-DMG I + C@ IF
-      2DUP JOV-POS I 2 * + C@ JOV-POS I 2 * + 1 + C@ beam-scrub-pos
+      2DUP I jov-pos-addr C@ I jov-pos-addr 1 + C@ beam-scrub-pos
     THEN
   LOOP THEN
   2DROP ;
@@ -4259,7 +4294,7 @@ CODE clamp-beam   \ ( -- )  Clamp beam x1/y1/x2/y2 to screen bounds
 \ Trace path, detect hits, start bolt animation.
 
 : fire-maser  ( angle -- )
-  penergy @ MASER-COST 1 + < IF DROP EXIT THEN
+  penergy @ MASER-COST < IF DROP EXIT THEN
   MASER-COST use-energy
   \ Cancel any active beam first
   cancel-beam
@@ -4480,7 +4515,7 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
 
 : fire-missile  ( angle -- )
   pmissiles @ 0= IF DROP EXIT THEN
-  penergy @ MSL-COST 1 + < IF DROP EXIT THEN
+  penergy @ MSL-COST < IF DROP EXIT THEN
   msl-active @ IF DROP EXIT THEN
   MSL-COST use-energy
   -1 pmissiles +!
@@ -4511,6 +4546,8 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
   OVER 8 < OVER 8 < AND 0= IF 2DROP EXIT THEN
   \ Check if already there
   2DUP pcol @ = SWAP prow @ = AND IF 2DROP EXIT THEN
+  \ Check warp drive health (#378)
+  pdmg-warp @ 25 < IF 2DROP EXIT THEN
   \ Calculate and pay energy cost
   2DUP warp-cost
   DUP penergy @ > IF 2DROP DROP EXIT THEN   \ not enough energy
@@ -4545,6 +4582,7 @@ VARIABLE msl-dirty               \ 1 = needs erase+draw this frame
   THEN
   draw-panel
   0 docked !  0 prev-docked !
+  save-ship-pos 0 moved !
   0 jov-moved !  0 base-attack !  0 think-slot !
   jbeam-cooldown jbeam-cool !
   0 msl-dirty ! ;
@@ -4681,12 +4719,15 @@ VARIABLE sg-row                   \ scan grid: outer loop row
       I pcol @ =  sg-row @ prow @ =  AND IF
         CHAR E rg-emit
       ELSE
-        I sg-row @ gal@ DUP q-storm? IF
-          DROP CHAR M rg-emit
-        ELSE
-          DUP q-base? IF CHAR B rg-emit THEN
-          q-jovians DUP IF CHAR 0 + rg-emit ELSE DROP THEN
-        THEN
+        pdmg-scan @ 40 < IF 64 rnd pdmg-scan @ 2/ < ELSE 1 THEN
+        IF
+          I sg-row @ gal@ DUP q-storm? IF
+            DROP CHAR M rg-emit
+          ELSE
+            DUP q-base? IF CHAR B rg-emit THEN
+            q-jovians DUP IF CHAR 0 + rg-emit ELSE DROP THEN
+          THEN
+        ELSE CHAR @ rg-emit THEN
       THEN
     LOOP
   LOOP ;
@@ -4722,12 +4763,13 @@ VARIABLE sg-row                   \ scan grid: outer loop row
     THEN
   THEN
   cmd-num @ 5 = IF
-    penergy @ 2 > IF cmd-val @ fire-maser
-    ELSE S" NO ENERGY" cmd-reject THEN
+    penergy @ MASER-COST < IF no-energy
+    ELSE cmd-val @ fire-maser THEN
   THEN
   cmd-num @ 6 = IF
-    pmissiles @ IF cmd-val @ fire-missile
-    ELSE S" NO MISSILES" cmd-reject THEN
+    pmissiles @ 0= IF S" NO MISSILES" cmd-reject ELSE
+    penergy @ MSL-COST < IF no-energy ELSE
+    cmd-val @ fire-missile THEN THEN
   THEN
   cmd-num @ 7 = IF do-destruct THEN
   cmd-state @ 2 = IF 0 cmd-state ! EXIT THEN  \ feedback shown, keep it
@@ -4851,9 +4893,9 @@ VARIABLE key-latch                \ latched keypress (survives between polls)
   \ LEVEL 1-9 on row 9
   11 9 at-xy
   S" LEVEL 1-9" rg-type
-  \ Version in lower right
-  27 18 at-xy
-  S" V0.92" rg-type
+  \ Publisher + version on bottom row
+  1 18 at-xy
+  S" BARE NAKED GAMES         V0.93" rg-type
   \ Read level key (1-9)
   BEGIN KEY DUP CHAR 1 < OVER CHAR 9 > OR IF DROP 0 ELSE 1 THEN UNTIL
   CHAR 0 - glevel ! ;
@@ -4913,7 +4955,7 @@ VARIABLE jnb-result
   -1 jnb-result !
   qjovians @ ?DUP IF 0 DO
     JOV-DMG I + C@ IF
-      JOV-POS I 2 * + BASE-POS mdist 30 < IF
+      I jov-pos-addr BASE-POS mdist 30 < IF
         I jnb-result !
       THEN
     THEN

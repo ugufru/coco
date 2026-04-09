@@ -139,9 +139,9 @@ Primary doc: `COCO_RENOVATION.md`. Tech reference: `coco_technical_reference.pdf
 
 ## Current State (2026-04-08)
 Tutorial series, calculator, Getting Started ch1–13: all COMPLETE.
-Space Warp V0.92: all features complete. Tagged v0.91. Targeting v1.0 April 15.
+Space Warp V0.93: all features complete. Tagged v0.92. Targeting v1.0 April 15.
 Pre-announced on itch.io. In playtesting — one week to release.
-App size: 24,533 bytes, headroom 18 bytes. Kernel: 3,504 bytes (74 primitives). Data at $8000+, font at $9000.
+App size: 24,487 bytes, headroom 64 bytes. Kernel: 80 primitives. Data at $8000+, font at $9000.
 Budget: 14,930cy/frame. Slot-based think scheduling (3 Jovians, skip 1-6).
 HSYNC beam-chasing (#262): after VSYNC, wait for beam to pass sprites before VRAM writes.
 Beam system (#259): paint-black erase + draw-stars redraw + beam-scrub-sprites.
@@ -245,8 +245,8 @@ Images live in `getting-started/images/`. To replace a placeholder `div.illustra
 - `$9000–$91D8` — Font glyphs (59 glyphs × 8 bytes, all-RAM region)
 - `$DE00` — Data stack base (U, grows down)
 - `$E000` — Return stack init (S, grows down from $DFFF)
-- `$E000–$EDB0` — Kernel code (final location, all-RAM mode, 74 primitives incl. graphics/beam/sprite + DOVAR data)
-- `$EDB0–$FEFF` — Free for kernel growth (~4.4K)
+- `$E000–$EE30` — Kernel code (final location, all-RAM mode, 80 primitives incl. graphics/beam/sprite + DOVAR data)
+- `$EE30–$FEFF` — Free at final location (~4.3K), but staging limit is 4K ($1000–$1FFF); ~452 bytes remain
 - fc.py remaps kernel DECB records from $E000+ to $1000 (staging)
 - All-RAM mode via `STA $FFDF` (NOT $FFDE — $FFDF sets TY, $FFDE clears)
 - `$8774–$89CB` — BEAM-PATH (player maser, 600 bytes)

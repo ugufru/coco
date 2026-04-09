@@ -595,7 +595,7 @@ $8000–$8EF4   Game data (all-RAM region — galaxy, sprites, AI, mood, etc.)
 $8774–$8C23   Beam path buffers (BEAM-PATH 600b + JBEAM-PATH 600b)
 $9000–$91D8   Font glyphs (59 × 8 bytes, all-RAM region)
 $DE00         Data stack base (U register, grows downward)
-$E000–$EDB0   Kernel code (74 primitives incl. graphics/beam/sprite, all-RAM mode)
+$E000–$EE30   Kernel code (80 primitives incl. graphics/beam/sprite, all-RAM mode)
 $EDB0–$FEFF   Kernel growth headroom (~4.4K)
 $FF00–$FFFF   I/O (PIA, SAM, VDG registers)
 ```

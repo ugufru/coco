@@ -88,6 +88,10 @@ processors where Forth fits naturally without compromise.
 | `ABS` | `( n -- |n| )` | Absolute value |
 | `MIN` | `( n1 n2 -- n )` | Smaller of two signed values |
 | `MAX` | `( n1 n2 -- n )` | Larger of two signed values |
+| `0MAX` | `( n -- n' )` | Clamp to non-negative: max(n, 0) |
+| `0MIN` | `( n -- n' )` | Clamp to non-positive: min(n, 0) |
+| `2*` | `( n -- n*2 )` | Arithmetic shift left by 1 |
+| `2/` | `( n -- n/2 )` | Arithmetic shift right by 1 (sign-preserving) |
 
 > **Tip:** `/MOD` gives both remainder and quotient. For just division use `/MOD SWAP DROP`.
 > For just modulus use `/MOD DROP`. No separate `/` or `MOD` primitives are needed.
@@ -112,6 +116,8 @@ processors where Forth fits naturally without compromise.
 | `<` | `( n1 n2 -- flag )` | True if n1 < n2 (signed) |
 | `>` | `( n1 n2 -- flag )` | True if n1 > n2 (signed) |
 | `0=` | `( n -- flag )` | True if zero |
+| `U<` | `( u1 u2 -- flag )` | True if u1 < u2 (unsigned) |
+| `WITHIN` | `( n lo hi -- flag )` | True if lo ≤ n < hi |
 
 ### Memory
 
@@ -241,6 +247,12 @@ step-by-step walkthrough.
 All DECB records must target the lower 32K (`$0000–$7FFF`) because CLOADM
 runs with ROM still mapped at `$8000–$FEFF`.
 
+**Staging limit:** The kernel is staged at `$1000–$1FFF` (4,096 bytes) before
+the bootstrap copies it to `$E000`. The app starts at `$2000`, so the kernel
+binary must fit within 4K. At ~3.6K currently, **~452 bytes remain** for
+kernel growth. The final location at `$E000` has ~4.3K free, but the staging
+window is the binding constraint.
+
 ### SAM all-RAM mode
 
 The MC6883 SAM uses address-decoded write-only register pairs
@@ -289,12 +301,12 @@ $2000–$7FFF   application code (contiguous, ~24K loadable via CLOADM)
 $8000–$DDFF   runtime RAM (24K — variables, tables, buffers; NOT CLOADM-loadable)
 $DE00         data stack base (U, grows downward)
 $E000–$E012   DOCOL, DOVAR entry points (final location)
-$E013–$E0xx   CFA table (74 entries × 2 bytes, includes DOVAR data blocks)
+$E013–$E0xx   CFA table (80 entries × 2 bytes, includes DOVAR data blocks)
 $E0xx–$E829   primitive machine code + font/sprite FCB data + key table
 $E82A–$E869   START: hardware init + app entry
-$E86A–$EDB0   promoted library primitives (graphics, sprites, beams)
-$EDB0         KERN_END (end of bootstrap copy range)
-$EDB0–$FEFF   free RAM for kernel growth (~4.4K)
+$E86A–$EE30   promoted library primitives (graphics, sprites, beams)
+$EE30         KERN_END (end of bootstrap copy range)
+$EE30–$FEFF   free RAM for kernel growth (~4.3K)
 $FF00–$FFFF   I/O registers + hardware vectors (always mapped, never RAM)
 ```
 
@@ -314,8 +326,8 @@ runtime (after the bootstrap enables all-RAM) but cannot hold loaded code.
 | Runtime RAM | 24K | variables, tables, buffers (`$8000–$DDFF`; not CLOADM-loadable) |
 | Data stack | 512B | grows down from `$DE00` |
 | Return stack | 512B | grows down from `$E000` (below kernel) |
-| Kernel code | ~3.5K | primitives + graphics/beam/sprite + font/sprite data + startup (`$E000–$EDB0`) |
-| Post-kernel | ~4.4K | free for kernel growth (`$EDB0–$FEFF`) |
+| Kernel code | ~3.6K | 80 primitives + graphics/beam/sprite + font/sprite data + startup (`$E000–$EE30`) |
+| Post-kernel | ~4.3K | free at final location (`$EE30–$FEFF`), but **staging limit is 4K** (see below) |
 
 ---
 

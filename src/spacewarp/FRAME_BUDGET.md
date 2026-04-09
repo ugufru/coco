@@ -188,6 +188,18 @@ New gameplay features added with zero per-frame idle-path cost (all event-driven
 
 None of these affect the per-frame budget.  They fire only on specific game events.
 
+## V0.93 Features — Frame Impact
+
+| Feature | When it runs | Cost |
+|---------|-------------|------|
+| `jov-pos-addr` (#286) | N/A — code factoring only | Zero (same logic, 86 bytes saved) |
+| Handedness avoidance (#213) | On blocked-path in `apply-intent` CODE | ~20cy (one genome byte read + branch) |
+| Scanner degradation (#310) | Only when viewing LRS overlay | ~30cy per cell (64 rnd + compare) |
+
+None affect per-frame budget. #286 is pure size savings. #213 adds ~20cy only on
+the already-expensive blocked path (tier 1 fail). #310 runs only in the LRS overlay.
+App: 24,543 bytes, headroom ~8 bytes.
+
 ## Remaining Targets
 
 | Area | Notes |

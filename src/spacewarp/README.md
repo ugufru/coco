@@ -93,7 +93,7 @@ you fly into a black hole, or you detonate your own ship.
 
 ## Technical Notes
 
-The game is about 24K of compiled Forth (23,967 bytes) plus a 3.5K kernel (74 primitives). Performance-critical
+The game is about 24K of compiled Forth plus a 3.6K kernel (80 primitives). Performance-critical
 routines are hand-written 6809 assembly, called as CODE words from Forth:
 
 | Primitive | What it does | Speedup vs Forth |
@@ -155,6 +155,7 @@ All features complete. 18 bytes headroom. In playtesting — one week to release
 - Beam idle guards + save-ship-bg CODE — 1,444cy/frame saved (#349, #350)
 - Backdrop preservation — stars and base redrawn every frame (#359, #362)
 - 13 CODE words promoted to kernel — 74 primitives (#332-337)
+- 6 new kernel primitives: U<, 0MAX, 2*, 2/, 0MIN, WITHIN — 80 total (#371-374, #376-377)
 - Gravity direction fix (#360), gravity step fix (#361)
 - QCOUNTS overlap fix (#355), missile flicker fix (#358)
 - Overlay dismiss on reinforcement spawn (#356)

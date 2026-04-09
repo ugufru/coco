@@ -310,13 +310,18 @@ statsEl.innerHTML = `
   Combined savings: ~1,444cy/frame. Peak dropped from 14,817cy (99%) to 13,091cy (88%).
   <br><br>
   <span style="color:#00ff88">Kernel promotion (#332-#337):</span>
-  13 CODE words promoted to kernel primitives. 74 total primitives, 3,504 bytes.
+  13 CODE words promoted to kernel primitives, plus 6 new standard primitives (U<, 0MAX, 2*, 2/, 0MIN, WITHIN). 80 total primitives.
   <br><br>
   <span style="color:#00ff88">V0.92 gameplay features (#185, #309, #317, #318, #323, #343, #357-364):</span>
   SOS timer (3 stardates), finite base missiles (25/base), non-linear field repair (75% cap, 25% floor),
   friendly fire on starbases, Jovian quadrant flee, smooth acceleration, velocity-based gravity,
   sprite redesign, backdrop preservation. All event-driven — zero per-frame idle cost.
-  App: 24,533 bytes, headroom ~18 bytes. <strong>ROM is full.</strong>
+  <br><br>
+  <span style="color:#00ff88">V0.93 features (#213, #286, #310):</span>
+  <code>jov-pos-addr</code> factoring saved 86 bytes (#286). Handedness-based obstacle avoidance —
+  genome drives Y-first vs X-first slide around obstacles, ~20cy on blocked path only (#213).
+  Scanner degradation — LRS garbles cells with @ below 40% scanner health (#310).
+  App: 24,543 bytes, headroom ~8 bytes.
   <br><br>
   Note: DO/LOOP and nested-loop costs are fc.py base values (single iteration);
   real multi-iteration costs are higher. Relative comparisons remain valid.

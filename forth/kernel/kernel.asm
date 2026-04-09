@@ -256,6 +256,12 @@ CFA_INVERT      FDB     CODE_INVERT
 CFA_XOR         FDB     CODE_XOR
 CFA_J           FDB     CODE_J
 CFA_PLUS_LOOP   FDB     CODE_PLUS_LOOP
+CFA_ULT         FDB     CODE_ULT
+CFA_ZEROMAX     FDB     CODE_ZEROMAX
+CFA_TWOSTAR     FDB     CODE_TWOSTAR
+CFA_TWOSLASH    FDB     CODE_TWOSLASH
+CFA_ZEROMIN     FDB     CODE_ZEROMIN
+CFA_WITHIN      FDB     CODE_WITHIN
 
 ;;; ─── Sprite data table ─────────────────────────────────────────────────────
 ;;; DOVAR entry: calling sprite-data pushes the address of the first byte.
@@ -1130,6 +1136,91 @@ CODE_ABS
         ADDD    #1              ; negate
         STD     ,U
 ABS_OK  LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── U< ( u1 u2 -- flag ) ──────────────────────────────────────────────────
+;;; Unsigned less-than comparison.
+
+CODE_ULT
+        LDD     2,U             ; D = u1 (NOS)
+        CMPD    ,U              ; u1 vs u2
+        BLO     ULT_T           ; unsigned: u1 < u2
+        LDD     #0
+        BRA     ULT_D
+ULT_T   LDD     #1
+ULT_D   LEAU    2,U             ; pop one cell
+        STD     ,U              ; store flag
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── 0MAX ( n -- max(n,0) ) ────────────────────────────────────────────────
+;;; Clamp to non-negative. If negative, replace with 0.
+
+CODE_ZEROMAX
+        LDD     ,U              ; D = TOS
+        BPL     ZMAX_OK         ; already >= 0
+        CLRA
+        CLRB
+        STD     ,U
+ZMAX_OK LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── 2* ( n -- n*2 ) ───────────────────────────────────────────────────────
+;;; Arithmetic shift left by 1.
+
+CODE_TWOSTAR
+        LDD     ,U              ; D = TOS
+        ASLB
+        ROLA                    ; D = D * 2
+        STD     ,U
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── 2/ ( n -- n/2 ) ───────────────────────────────────────────────────────
+;;; Arithmetic shift right by 1 (sign-preserving).
+
+CODE_TWOSLASH
+        LDD     ,U              ; D = TOS
+        ASRA
+        RORB                    ; D = D / 2 (signed)
+        STD     ,U
+        LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── 0MIN ( n -- min(n,0) ) ────────────────────────────────────────────────
+;;; Clamp to non-positive. If positive, replace with 0.
+
+CODE_ZEROMIN
+        LDD     ,U              ; D = TOS
+        BMI     ZMIN_OK         ; already < 0
+        BEQ     ZMIN_OK         ; zero is fine
+        CLRA
+        CLRB
+        STD     ,U
+ZMIN_OK LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── WITHIN ( n lo hi -- flag ) ────────────────────────────────────────────
+;;; True if lo <= n < hi (standard Forth WITHIN using unsigned trick).
+;;; Implementation: n-lo u< hi-lo
+
+CODE_WITHIN
+        LDD     2,U             ; D = lo
+        PSHS    D               ; save lo
+        LDD     ,U              ; D = hi
+        SUBD    ,S              ; D = hi - lo
+        PSHS    D               ; save (hi - lo)
+        LDD     4+2,U           ; D = n
+        SUBD    2,S             ; D = n - lo
+        CMPD    ,S              ; (n - lo) vs (hi - lo)
+        LEAS    4,S             ; clean temp
+        BLO     WITH_T          ; unsigned: n-lo < hi-lo
+        LDD     #0
+        BRA     WITH_D
+WITH_T  LDD     #1
+WITH_D  LEAU    4,U             ; pop 3 cells, push 1
+        STD     ,U
+        LDY     ,X++            ; NEXT
         JMP     [,Y]
 
 ;;; ─── MDIST ( addr1 addr2 -- d ) ────────────────────────────────────────────
