@@ -141,7 +141,7 @@ Primary doc: `COCO_RENOVATION.md`. Tech reference: `coco_technical_reference.pdf
 Tutorial series, calculator, Getting Started ch1–13: all COMPLETE.
 Space Warp V0.94: all features complete. Tagged v0.93. Targeting v1.0 April 15.
 Pre-announced on itch.io. In playtesting — one week to release.
-App size: 24,546 bytes, headroom 5 bytes. Kernel: 80 primitives. Data at $8000+, font at $9000.
+App size: 24,240 bytes, headroom 311 bytes. Kernel: 80 primitives + 9 KCODE words (427 bytes). Data at $8000+, font at $9000.
 Budget: 14,930cy/frame. Slot-based think scheduling (3 Jovians, skip 1-6).
 HSYNC beam-chasing (#262): after VSYNC, wait for beam to pass sprites before VRAM writes.
 Beam system (#259): paint-black erase + draw-stars redraw + beam-scrub-sprites.

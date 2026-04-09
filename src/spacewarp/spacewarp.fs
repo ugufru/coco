@@ -1377,7 +1377,7 @@ CODE gen-jov-sprite   \ ( i -- )
     DUP I jov-emotion-stim
   LOOP THEN DROP ;
 
-450 CONSTANT STARDATE-FRAMES      \ ~60 seconds per stardate (tier-3: /8)
+112 CONSTANT STARDATE-FRAMES      \ ~15 seconds per stardate (called every 8 frames)
 VARIABLE stardate-timer            \ frame counter
 
 \ Decay all mood bytes 1 step toward neutral (8)
@@ -1401,13 +1401,18 @@ VARIABLE prev-cond
   jov-engaged? IF 2 ELSE 1
   THEN THEN THEN THEN ;
 
+: sos-label  ( -- )
+  sos-timer @ 2 = IF S" SOS-FINAL" rg-type THEN
+  sos-timer @ 1 = IF S" SOS-URGENT" rg-type THEN
+  sos-timer @ 0= IF S" SOS-BASE" rg-type THEN ;
+
 \ Redraw condition area (left half of row 17) — only on change
 : update-cond  ( -- )
   cond-state DUP prev-cond @ = IF DROP ELSE
     DUP prev-cond !
     1 17 at-xy  14 0 DO $20 rg-emit LOOP
     1 17 at-xy
-    DUP 4 = IF S" SOS-BASE" rg-type
+    DUP 4 = IF sos-label
       12 17 at-xy sos-col @ rg-u. CHAR , rg-emit sos-row @ rg-u.
     ELSE S" COND" rg-type
       DUP 3 = IF 9 17 at-xy S" DOCKED" rg-type ELSE
@@ -1424,12 +1429,16 @@ VARIABLE prev-cond
   sos-active @ IF
     \ Already tracking — tick timer (#317)
     sos-timer @ 1 + DUP 3 < IF
-      sos-timer !
+      sos-timer !  -1 prev-cond !
     ELSE DROP
-      sos-col @ 8 * sos-row @ + DUP
-      GALAXY + C@ $FB AND SWAP GALAXY + C!
+      1 17 at-xy  14 0 DO $20 rg-emit LOOP
+      1 17 at-xy S" DESTROYED  " rg-type
+      sos-col @ rg-u.  CHAR , rg-emit  sos-row @ rg-u.
+      sos-col @ sos-row @ gal@
+      $FB AND sos-col @ sos-row @ gal!
       -1 gbases +!
       0 sos-timer !  0 sos-active !
+      cond-state prev-cond !
     THEN
   ELSE
     \ Scan for new threatened base
@@ -1716,7 +1725,8 @@ VARIABLE calm-found                   \ flag
   ELSE
     DROP 0 stardate-timer !
     1 gtime +!
-    9 15 at-xy  gtime @ 14 rg-u.r    \ update stardate display
+    12 15 at-xy $20 rg-emit $20 rg-emit $20 rg-emit
+    gtime @ 15 rg-u.r    \ update stardate display
     mood-decay-all
     check-sos
   THEN ;

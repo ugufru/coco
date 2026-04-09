@@ -137,7 +137,15 @@ make run                       # launch in XRoar emulator
 
 ## Roadmap — v1.0 April 15, 2026
 
-All features complete. 5 bytes headroom. In playtesting — one week to release.
+All features complete. 311 bytes headroom. In playtesting — targeting release.
+
+**Done (V0.94):**
+- KCODE promotion — 8 CODE words moved to kernel space, 397 bytes freed (#326)
+- KEY_SCAN kernel subroutine for CODE word keyboard access (#380)
+- Base destroyed notification — "DESTROYED C,R" on COND line (#381)
+- Stardate display clearing fix — digits no longer linger on growth (#382)
+- SOS base destruction fix — was clearing wrong galaxy quadrant (#383)
+- Stardate pace — 15 seconds per stardate, SOS falls in 45s (#384)
 
 **Done (V0.93):**
 - Handedness-based obstacle avoidance — genome drives Jovian slide direction (#213)
@@ -174,14 +182,17 @@ All features complete. 5 bytes headroom. In playtesting — one week to release.
 - Bug fixes as discovered during testing
 - Final version bump to v1.0, git tag, itch.io upload
 
-**Post-release** (v1.1+ — needs bytes freed via code factoring):
+**Post-release** (v1.1+ — 311 bytes headroom available):
 - Spacebar quick-fire masers (#320)
 - Direct hit bonus (#316), SOS escalation messages (#319)
 - Status line micro-reports (#321), crew count and score (#322)
 - Directional Endever sprites (#324)
 - Smart Jovian missile evasion (#183), permanent damage (#325)
 - Reduce Jovian movement flicker (#363)
+- Regional character from genome (#179), gravity slingshot (#182)
 - Sound system (#188, blocked by all-RAM mode)
+- More KCODE promotions available if space needed
+- Cycle optimizations: bg-jov orchestration (#351), process-key CODE (#352)
 
 ## Documents
 
