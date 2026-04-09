@@ -192,37 +192,40 @@ objects:
 
 ### Ship Systems
 
-Five systems, each with health (100% = fully operational, 0% = destroyed). All 5 at 0% = ship destroyed.
+Five systems, each with health (100% = fully operational, 0% = destroyed). All 5 at 0% = ship destroyed. Energy can reach 0 without death — ship is just powerless.
 
 | System | Key | Effect when damaged | At 0% |
 |--------|-----|-------------------|-------|
-| Ion engines | Arrow keys | Speed scales: >67%→3px, >34%→2px, >0%→1px | Ship frozen — cannot move (#307) |
-| Hyperdrive | 2 | < 50%: 50% chance of misjump | Cannot warp |
-| Scanners | 3 | (Not yet implemented) | (#310: should garble/blank scanner) |
-| Deflectors | 4 | Caps max shield level | Cannot raise shields |
-| Masers | 5 | Damage scales linearly (30 at 100%, 0 at 0%). Planned: range-dependent damage (#312) | Cannot damage enemies |
+| Ion engines | Arrow keys | Speed scales: >67%→3px, 35-67%→2px, 1-34%→1px | Ship frozen — zero velocity, cannot move (#307) |
+| Hyperdrive | 2 | <50%: 50% chance of mis-jump to adjacent quadrant | <25%: warp disabled entirely |
+| Scanners | 3 | <40%: long-range scan shows noise (@), worse health = more static (#310) | Scanners useless — all noise |
+| Deflectors | 4 | Absorbs 15/hit when UP. <40%: bleedthrough leaks damage to systems (#306) | Forced DOWN, cannot raise. Key 4 diverts 25% from warp to rebuild (#339) |
+| Masers | 5 | Damage = maser-base × health / 100. Range-dependent base: 50 close (<15px), 30 mid (15-60px), 10 long (>60px) (#312) | Zero damage output |
 
 ### Energy Model
 
-- **Ship energy** (0-100) — depleted by raising shields, firing masers, warp, and system repairs. Recharged passively (+1 every 32 frames) and by docking.
-- **Passive regen** — +1 energy per 16 frames (~3.75/sec). Diverted to system repair first (1 energy = +2% to ONE system per tick, priority order). Only accumulates when all systems are at 75%+. Repair queue: only the highest-priority damaged system heals each tick. **Field repair caps at 75% and cannot heal systems below 25%** (#309) — starbase docking required for full recovery.
+- **Ship energy** (0-100) — depleted by firing masers (10 energy), warp (Manhattan distance × 2, max 10), and system repairs. Recharged passively and by docking.
+- **Passive regen** — every 16 frames (~3.75/sec), if energy > 0: attempt repair of ONE system (+2% to highest-priority damaged system, costs 1 energy). If no system needs repair, energy accumulates (+1). If energy = 0: slow regen to 1, then spent on next repair tick.
+- **Field repair** — +2% per tick to ONE system. Below 25%: repairs up to 25% cap. 25-74%: repairs up to 75% cap. 75%+: no field repair (#309). Starbase docking required for full recovery to 100%.
+- **Repair priority** — shields UP: deflectors → ion → warp → scan → masers. Shields DOWN: ion → warp → scan → masers → deflectors (#340). Only the highest-priority damaged system heals each tick — creates repair queue pressure.
 - **Triton missiles** — finite supply (10 at start), replenished at bases. Each base carries **25 missiles total** (#318). Docking refills up to 10 from the base's pool. After 2-3 docks, the base runs dry. One-hit kill.
 
 ### Shield Model
 
-Shields are a strength pool (0-100%) that degrades under fire, not a static setting.
+Trek-style deflector toggle — shields UP/DOWN, no energy cost, no number entry.
 
-- **Raising shields**: Command 4, costs 20 + level/5 energy (25% = 25 energy, 100% = 40 energy). Minimum level 25%. Deflector health caps max level.
-- **Lowering shields**: Free (command 4, enter 0 or any lower value).
-- **Damage absorption**: Shields take 25 damage per hit (~4 hits from 100% to failure). Above 40%, full absorption. Below 40%, bleedthrough fraction bypasses to systems (#306).
-- **Shield failure**: At 0%, shields must be re-raised manually (costs energy again). All incoming damage goes directly to systems.
-- **No passive drain**: Shields stay at their level until hit or lowered. The cost is upfront activation, not maintenance.
+- **Toggle**: Key 4 toggles UP/DOWN. No energy cost. Shield strength = pdmg-defl (deflector system health, 0-100%).
+- **Damage absorption**: Each hit reduces pdmg-defl by 15. Above 40%: full absorption, no system damage. Below 40%: bleedthrough fraction `(damage × (40 - health) / 80)` bypasses to random systems (#306).
+- **Shield failure**: At 0%, shields forced DOWN automatically. Cannot raise until repaired.
+- **Emergency power**: When deflectors at 0%, Key 4 diverts 25% from warp drive to rebuild deflectors to 25% (#339). Requires warp ≥ 25%.
+- **Docking**: Shields must be DOWN to dock (#345).
+- **Damage spread**: Unshielded hits split across 2 random systems. If first system depleted, remainder overflows to second (#315).
 
 ### Time
 
-- 1 stardate = approximately 1 real-time minute (60 VSYNC frames/sec x 60 = 3600 frames)
+- 1 stardate = ~15 seconds real-time (112 frames at 60fps, called every 8 frames = 896 actual frames)
 - Game clock advances continuously
-- Jovians attack bases on a timer — SOS alerts warn the player
+- SOS escalation: SOS-BASE (stardate 1) → SOS-URGENT (stardate 2) → SOS-FINAL (stardate 3) → base destroyed with DESTROYED C,R notification (#319)
 
 ### Scoring
 
@@ -236,7 +239,7 @@ stardates elapsed. Scale 1-250.
 | 1 | Damage Report | — | Show system damage %, Jovians/bases remaining |
 | 2 | Hyperdrive | 2 digits (col, row) | Warp to quadrant (0-7, 0-7) |
 | 3 | Long Range Scan | — | Show 8x8 galaxy map |
-| 4 | Deflectors | 3 digits (0-100) | Set shield energy percentage |
+| 4 | Deflectors | — (toggle) | Toggle shields UP/DOWN. At 0%: diverts 25% warp power |
 | 5 | Masers | 3 digits (0-360) | Fire at angle, variable damage by distance |
 | 6 | Triton Missiles | 3 digits (0-360) | Fire at angle, one-hit kill, limited supply |
 | 7 | Self-Destruct | "123" + ENTER | Countdown 5→1, destroy ship + nearby Jovians |
@@ -470,13 +473,15 @@ If all bases are destroyed, the game is lost.
 - CLEAR key cancels command input
 - Beam trace buffer capped at 200 pixels
 
-### Not Yet Implemented — v1.0 Combat Rebalance
+### Implemented in V0.93 — Combat Rebalance
 
-- Maser range-dependent damage — devastating close, weak at distance (#312)
+- Maser range-dependent damage — 50 close, 30 mid, 10 long (#312)
 - Missile damage nerf — 60-80, no longer one-hit kill (#313)
 - Jovian aim scatter by pilot skill — dolts miss, aces terrify (#314)
-- Damage spread across 2-3 systems per hit (#315)
+- Damage spread across 2 random systems per hit (#315)
 - Shield bleedthrough below 40% (#306)
+- Handedness-based obstacle routing (#213)
+- Scanner degradation at low health (#310)
 
 ### Implemented in V0.92
 
@@ -487,19 +492,23 @@ If all bases are destroyed, the game is lost.
 - Velocity-based gravity — smooth drift instead of position jerks (#357)
 - Sprite redesign — Endever with twin red engines, 7×7 starbase ring (#353, #354)
 
+### Implemented in V0.94
+
+- SOS escalation messages — SOS-BASE → SOS-URGENT → SOS-FINAL (#319)
+- Base destruction notification with coordinates (#381)
+- Stardate pace — 15 seconds per stardate (#384)
+- Warp non-operative below 25%, field repair recovers to 25% (#378)
+- Friendly fire on starbases (#323)
+
 ### Not Yet Implemented — Post-v1.0
 
-- SOS escalation messages (#319)
 - Direct hit bonus — center-distance damage scaling (#316)
 - Spacebar quick-fire masers (#320)
 - Status line micro-reports (#321)
 - Crew count, casualties, and score (#322)
-- Friendly fire on starbases (#323)
-- Scanner degradation at low health (#310)
 - Smart Jovian missile evasion (#183)
 - Directional Endever sprites (#324)
 - Permanent damage accumulation (#325)
-- Handedness-based obstacle routing (#213)
 - Sound effects (#188)
 - Inter-quadrant Jovian movement (#160)
 - Regional character from origin hash (#179)
@@ -533,9 +542,10 @@ Self-destruct is state-driven and runs inside the game loop (non-blocking).
 
 ## Docking
 
-Move the Endever directly above or below a starbase to dock. Docking:
-- Rapidly recharges energy (tiered: +4/frame at low, +1/4 frames at high)
-- Repairs all five ship systems simultaneously (+2%/frame each, ~0.8 sec to full)
+Move the Endever directly above or below a starbase to dock. Shields must be DOWN to dock (#345).
+
+- Rapidly recharges energy (+3/tick, capped at 100)
+- Repairs all five ship systems simultaneously (+2%/tick each, no cap — heals to 100%)
 - Replenishes triton missiles from base supply (up to 10; each base starts with 25 total, #318)
 - Shields are NOT auto-raised — player must re-raise manually after docking
 - Takes time (stardates pass during docking)
