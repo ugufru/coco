@@ -4045,21 +4045,34 @@ CODE ship-gravity
 
 : base-ammo-addr  ( -- addr )  prow @ 8 * pcol @ + BASE-AMMO + ;
 
+VARIABLE msl-reload               \ missile reload frame counter
+
 : do-dock  ( -- )
   1 docked !
-  \ Resupply from base pool: give as many as possible up to 10 (#318)
-  10 pmissiles @ - 0max           \ need = 10 - current, min 0
-  base-ammo-addr C@ MIN           \ avail = min(need, base supply)
-  DUP pmissiles +!                 \ give to player
-  NEGATE base-ammo-addr C@ + base-ammo-addr C!  \ deduct from base
+  0 msl-reload !                   \ reset reload timer
   1 jov-emotion-all ;              \ boldness: player docking
 
 : do-undock  ( -- )  0 docked ! ;
 
 : drep  ( addr -- )  DUP @ 2 + 100 MIN SWAP ! ;
+
+\ Transfer 1 missile from base to player if available (#385)
+: reload1  ( -- )
+  pmissiles @ 10 < IF
+    base-ammo-addr C@ IF
+      1 pmissiles +!
+      base-ammo-addr C@ 1 - base-ammo-addr C!
+    THEN
+  THEN ;
+
 \ Docked recharge: +3 energy, all systems repair to 100%.
+\ Missiles: 1 every 30 frames (~500ms) from base supply (#385).
 : tick-dock  ( -- )
   docked @ 0= IF EXIT THEN
+  msl-reload @ 1 + DUP 30 < IF
+    msl-reload !
+  ELSE DROP 0 msl-reload !  reload1
+  THEN
   frame-tick @ 15 AND 0= IF
     penergy @ 3 + 100 MIN penergy !
     pdmg-ion drep  pdmg-warp drep  pdmg-scan drep
