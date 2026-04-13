@@ -1,4 +1,4 @@
-# CoCo Forth Executor Kernel
+# CoCo Forth Executor Kernel — Version 1.0
 
 A minimal ITC Forth executor kernel for the TRS-80 Color Computer 2, written
 in 6809 assembly. Assembled with `lwasm`, tested under XRoar.
@@ -225,10 +225,11 @@ processors where Forth fits naturally without compromise.
 The kernel is assembled at `$E000` but BASIC's `CLOADM` can't write there
 (ROM is mapped at `$8000–$FEFF`).  A bootstrap solves this:
 
-1. `fc.py` remaps the kernel DECB record from `$E000` to `$1000` (staging).
-2. `CLOADM` loads four records into low RAM (`$0000–$7FFF`).
+1. `fc.py` remaps the kernel DECB record from `$E000` to the staging area
+   (immediately after the bootstrap, typically `$0E19`).
+2. `CLOADM`/`LOADM` loads three records into low RAM (`$0000–$7FFF`).
 3. The bootstrap at `$0E00` enables all-RAM mode (`STA $FFDF`) and copies
-   `$1000` → `$E000`.
+   the staged kernel to `$E000`.
 4. `JMP START` enters the kernel at its final location.
 
 **[Open the interactive boot animation](boot-animation.html)** for a visual
@@ -238,20 +239,18 @@ step-by-step walkthrough.
 
 | Record | Addr | Size | Content |
 |---|---|---|---|
-| 1 | `$0050` | 44 B | Kernel variables |
-| 2 | `$0E00` | ~25 B | Bootstrap |
-| 3 | `$1000` | ~3.5K | Staged kernel (remapped from `$E000`) |
-| 4 | `$2000` | ~23K | Application (contiguous, varies by app) |
+| 1 | `$0E00` | ~25 B | Bootstrap |
+| 2 | `$0E19` | ~3.9K | Staged kernel + variables (remapped from `$E000`) |
+| 3 | `$2000` | varies | Application code |
 | Exec | `$0E00` | — | Bootstrap entry point |
 
-All DECB records must target the lower 32K (`$0000–$7FFF`) because CLOADM
-runs with ROM still mapped at `$8000–$FEFF`.
+All DECB records target the lower 32K (`$0000–$7FFF`). Kernel variables live
+inside the kernel (at `$EF03+`), not in low RAM, so binaries are LOADM-safe
+under Disk BASIC.
 
-**Staging limit:** The kernel is staged at `$1000–$1FFF` (4,096 bytes) before
-the bootstrap copies it to `$E000`. The app starts at `$2000`, so the kernel
-binary must fit within 4K. At ~3.6K currently, **~452 bytes remain** for
-kernel growth. The final location at `$E000` has ~4.3K free, but the staging
-window is the binding constraint.
+**Staging area:** The kernel is staged at `$0E19` (right after the bootstrap)
+and extends to just below `APP_BASE`. `fc.py` dynamically computes the staging
+address and patches the bootstrap accordingly.
 
 ### SAM all-RAM mode
 
@@ -270,43 +269,41 @@ Requires 64K×1 DRAM (4164 chips).  XRoar: use `-ram 64`.
 
 ## Memory map
 
-### Kernel variables ($0050–$0082)
+### Kernel variables ($EF03+)
 
-Scratch variables in low RAM, accessed via extended addressing. Zero ROM cost.
+Scratch variables in kernel space, accessed via extended addressing. Copied to
+all-RAM with the kernel by the bootstrap. Forth source accesses them via
+`KVAR-*` constants injected by `fc.py` from the kernel map.
 
 ```
-$0050  VAR_CUR          cursor offset into video RAM (0–511)
-$0052  VAR_KEY_PREV     last accepted key ASCII (debounce)
-$0053  VAR_KEY_SHIFT    SHIFT flag
-$0054  VAR_KEY_RELCNT   release debounce counter
-$0055  VAR_KEY_REPDLY   auto-repeat countdown (16-bit)
-$0057  VAR_RGVRAM       RG6 VRAM base address (set by rg-init)
-
-$0059  VAR_LINE_*       Bresenham line scratch (13 bytes, used by rg-line CODE word)
-$0066  VAR_SPR_*        sprite drawing scratch (15 bytes, used by spr-draw/spr-erase-box CODE words)
-$0075  VAR_RG*          text rendering config (7 bytes, used by rg-char CODE word)
-$007C  VAR_BEAM_*       beam rendering scratch (5 bytes)
+$EF03  VAR_CUR          cursor offset into video RAM (0–511)
+$EF05  VAR_KEY_PREV     last accepted key ASCII (debounce)
+       ...              (keyboard, line, sprite, text, beam scratch — 50 bytes total)
+$EF34  VAR_BEAM_CNT     last variable
+$EF35  KERN_END         end of kernel (bootstrap copy range)
 ```
+
+Addresses are resolved from `kernel.map` — do not hardcode them in Forth
+source. Use `KVAR-CUR`, `KVAR-RGVRAM`, `KVAR-RGFONT`, etc.
 
 ### Full address space
 
 ```
-$0000–$004F   direct page (reserved)
-$0050–$0082   kernel scratch variables (see above)
 $0400–$05FF   VDG text VRAM (32×16, boot only)
 $0600–$1FFF   RG6 VRAM (6144 bytes, set by rg-init after boot)
               ├ $0E00  bootstrap (dead after boot, overwritten by VRAM)
-              └ $1000  staged kernel (dead after boot, overwritten by VRAM)
-$2000–$7FFF   application code (contiguous, ~24K loadable via CLOADM)
-$8000–$DDFF   runtime RAM (24K — variables, tables, buffers; NOT CLOADM-loadable)
+              └ $0E19  staged kernel (dead after boot, overwritten by VRAM)
+$1F00–$7FFF   application code (APP_BASE configurable via --base)
+$8000–$DDFF   runtime RAM (24K — variables, tables, buffers)
 $DE00         data stack base (U, grows downward)
 $E000–$E012   DOCOL, DOVAR entry points (final location)
 $E013–$E0xx   CFA table (80 entries × 2 bytes, includes DOVAR data blocks)
 $E0xx–$E829   primitive machine code + font/sprite FCB data + key table
 $E82A–$E869   START: hardware init + app entry
-$E86A–$EE30   promoted library primitives (graphics, sprites, beams)
-$EE30         KERN_END (end of bootstrap copy range)
-$EE30–$FEFF   free RAM for kernel growth (~4.3K)
+$E86A–$EF02   promoted library primitives (graphics, sprites, beams)
+$EF03–$EF34   kernel variables (50 bytes, see above)
+$EF35         KERN_END (end of bootstrap copy range)
+$EF35–$FEFF   free RAM for kernel growth (~4.3K)
 $FF00–$FFFF   I/O registers + hardware vectors (always mapped, never RAM)
 ```
 
