@@ -91,7 +91,7 @@ VARIABLE bl-offset     \ blanking offset (tunable)
   set-sam-v set-sam-f set-pia
   rg-init
   init-font
-  $6000 $75 !  0 $77 C!  7 $78 C!  7 $79 C!  32 $7A C!  8 $7B C!
+  $6000 KVAR-RGFONT !  0 KVAR-RGCHARMIN C!  7 KVAR-RGGLYPHSZ C!  7 KVAR-RGNROWS C!  32 KVAR-RGBPR C!  8 KVAR-RGROWH C!
   init-ball-spr
   $0600 6144 0 FILL
   60  90  2  1  0 init-one

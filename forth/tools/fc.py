@@ -1583,6 +1583,15 @@ def main():
     source               = src_path.read_text()
     tokens               = tokenize(source, base_dir=src_path.parent)
     defs, variables, main, code_defs, kcode_defs = parse(tokens)
+
+    # Inject kernel VAR_* addresses as Forth CONSTANTs so source files
+    # can write  `$9000 KVAR-RGFONT !`  instead of hardcoding hex addrs.
+    for sym, addr in symbols.items():
+        if sym.startswith('VAR_'):
+            forth_name = 'kvar-' + sym[4:].lower().replace('_', '-')
+            if forth_name not in defs:
+                defs[forth_name] = [('lit', addr)]
+
     inline_constants(defs, main)
 
     # ── Assemble KCODE words into kernel address space ──
@@ -1621,9 +1630,16 @@ def main():
         # BASIC loads both blocks in a single CLOADM, then executes bootstrap.
         kernel_records, exec_addr = read_decb(args.kernel_bin)
 
-        # Remap kernel records at $E000+ to staging address ($1000).
+        # Remap kernel records at $E000+ to staging address.
         # The bootstrap code copies them to their final location at runtime.
-        KERNEL_STAGE_ADDR = 0x1000
+        # Stage immediately after the bootstrap record to maximise headroom
+        # before APP_BASE.  The bootstrap at $0E00 is small (~25 bytes);
+        # packing the kernel right after it reclaims ~$0E19–$0FFF.
+        boot_end = 0x0E00
+        for addr, payload in kernel_records:
+            if addr < 0xE000:
+                boot_end = max(boot_end, addr + len(payload))
+        KERNEL_STAGE_ADDR = boot_end
         staged_records = []
         stage_cursor = KERNEL_STAGE_ADDR
         for addr, payload in kernel_records:
@@ -1633,6 +1649,25 @@ def main():
             else:
                 staged_records.append((addr, payload))
         kernel_records = staged_records
+
+        # Patch bootstrap's LDX #$1000 to point at new staging address.
+        # The bootstrap has: LDX #<stage_addr> (opcode 8E xx xx)
+        OLD_STAGE = 0x1000
+        if KERNEL_STAGE_ADDR != OLD_STAGE:
+            old_hi = (OLD_STAGE >> 8) & 0xFF
+            old_lo = OLD_STAGE & 0xFF
+            new_hi = (KERNEL_STAGE_ADDR >> 8) & 0xFF
+            new_lo = KERNEL_STAGE_ADDR & 0xFF
+            for idx, (addr, payload) in enumerate(kernel_records):
+                if addr < 0xE000:       # bootstrap record
+                    payload = bytearray(payload)
+                    for j in range(len(payload) - 2):
+                        if (payload[j] == 0x8E and
+                            payload[j+1] == old_hi and payload[j+2] == old_lo):
+                            payload[j+1] = new_hi
+                            payload[j+2] = new_lo
+                            kernel_records[idx] = (addr, bytes(payload))
+                            break
 
         # Append KCODE bytes to the staged kernel region
         if kcode_bytes:
@@ -1656,6 +1691,24 @@ def main():
                         payload[j+2] == old_end_hi and payload[j+3] == old_end_lo):
                         payload[j+2] = new_end_hi
                         payload[j+3] = new_end_lo
+                        kernel_records[idx] = (addr, bytes(payload))
+                        break
+
+        # Patch kernel's LDX #APP_BASE if --base differs from default.
+        # START has: LDX #$2000 (opcode 8E 20 00).
+        KERN_APP_BASE = symbols.get('APP_BASE', 0x2000)
+        if app_base != KERN_APP_BASE:
+            old_hi = (KERN_APP_BASE >> 8) & 0xFF
+            old_lo = KERN_APP_BASE & 0xFF
+            new_hi = (app_base >> 8) & 0xFF
+            new_lo = app_base & 0xFF
+            for idx, (addr, payload) in enumerate(kernel_records):
+                payload = bytearray(payload)
+                for j in range(len(payload) - 2):
+                    if (payload[j] == 0x8E and
+                        payload[j+1] == old_hi and payload[j+2] == old_lo):
+                        payload[j+1] = new_hi
+                        payload[j+2] = new_lo
                         kernel_records[idx] = (addr, bytes(payload))
                         break
 

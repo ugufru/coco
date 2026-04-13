@@ -16,7 +16,7 @@
 
 \ ── Variables ────────────────────────────────────────────────────────────────
 
-\ VAR_CUR is the kernel's cursor variable at $0050 (2 bytes).
+\ VAR_CUR is the kernel's cursor variable at KVAR-CUR (2 bytes).
 \ We also need to track the character "under" the cursor so we can
 \ restore it when the cursor moves.
 
@@ -25,10 +25,10 @@ VARIABLE saved-char
 \ ── Cursor helpers ───────────────────────────────────────────────────────────
 
 \ Read the VDG byte at the current cursor position
-: cur@  ( -- vdg-byte )  $0050 @ $0400 + C@ ;
+: cur@  ( -- vdg-byte )  KVAR-CUR @ $0400 + C@ ;
 
 \ Write a VDG byte at the current cursor position
-: cur!  ( vdg-byte -- )  $0050 @ $0400 + C! ;
+: cur!  ( vdg-byte -- )  KVAR-CUR @ $0400 + C! ;
 
 \ Show cursor: save char under cursor, write cursor block ($EF = inverse block)
 : cursor-on   cur@ saved-char !  $EF cur! ;
@@ -48,9 +48,9 @@ VARIABLE saved-char
 
 \ Backspace: move cursor left, erase character there
 : backspace
-  $0050 @                    \ get cursor offset
+  KVAR-CUR @                    \ get cursor offset
   DUP 0 > IF                \ if > 0
-    1 -  DUP $0050 !         \ decrement and store
+    1 -  DUP KVAR-CUR !         \ decrement and store
     $0400 +  $60 SWAP C!     \ erase char at new position (VDG space)
   ELSE
     DROP
@@ -58,27 +58,27 @@ VARIABLE saved-char
 
 \ Move cursor right by 1 (with ceiling at 511)
 : cur-right
-  $0050 @
+  KVAR-CUR @
   DUP 511 < IF
-    1 +  $0050 !
+    1 +  KVAR-CUR !
   ELSE
     DROP
   THEN ;
 
 \ Move cursor up one row (subtract 32, floor at 0)
 : cur-up
-  $0050 @
+  KVAR-CUR @
   DUP 31 > IF
-    32 -  $0050 !
+    32 -  KVAR-CUR !
   ELSE
     DROP
   THEN ;
 
 \ Move cursor down one row (add 32, ceiling at 511)
 : cur-down
-  $0050 @
+  KVAR-CUR @
   DUP 480 < IF
-    32 +  $0050 !
+    32 +  KVAR-CUR !
   ELSE
     DROP
   THEN ;

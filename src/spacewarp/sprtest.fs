@@ -50,13 +50,13 @@ VARIABLE tcy
 : init-text  ( -- )
   init-font
   rv @ cv !  32 cb !
-  rv @ $57 !
-  $9000 $75 !
-  $20 $77 C!
-  8 $78 C!
-  8 $79 C!
-  32 $7A C!
-  10 $7B C!
+  rv @ KVAR-RGVRAM !
+  $9000 KVAR-RGFONT !
+  $20 KVAR-RGCHARMIN C!
+  8 KVAR-RGGLYPHSZ C!
+  8 KVAR-RGNROWS C!
+  32 KVAR-RGBPR C!
+  10 KVAR-RGROWH C!
   $F8 set-pia ;
 
 \ ── Sprite generation (extracted from spacewarp.fs gen-jov-sprite) ─────

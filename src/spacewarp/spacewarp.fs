@@ -397,13 +397,13 @@ VARIABLE ss-safe
 : init-text  ( -- )
   init-font
   rv @ cv !  32 cb !
-  rv @ $57 !                    \ kernel VRAM base
-  $9000 $75 !                   \ font base (all-RAM region)
-  $20 $77 C!                    \ min char (space)
-  8 $78 C!                      \ bytes per glyph
-  8 $79 C!                      \ rows to copy
-  32 $7A C!                     \ bytes per VRAM row
-  10 $7B C!                     \ row height for cy
+  rv @ KVAR-RGVRAM !            \ kernel VRAM base
+  $9000 KVAR-RGFONT !           \ font base (all-RAM region)
+  $20 KVAR-RGCHARMIN C!         \ min char (space)
+  8 KVAR-RGGLYPHSZ C!           \ bytes per glyph
+  8 KVAR-RGNROWS C!             \ rows to copy
+  32 KVAR-RGBPR C!              \ bytes per VRAM row
+  10 KVAR-RGROWH C!             \ row height for cy
   $F8 set-pia ;                 \ CSS=1: buff/white for NTSC artifacts
 
 VARIABLE tcx
@@ -4916,7 +4916,7 @@ VARIABLE key-latch                \ kept for init zeroing
   S" LEVEL 1-9" rg-type
   \ Publisher + version on bottom row
   1 18 at-xy
-  S" BARE NAKED GAMES         V0.94" rg-type
+  S" BARE NAKED GAMES         V0.95" rg-type
   \ Read level key (1-9)
   BEGIN KEY DUP CHAR 1 < OVER CHAR 9 > OR IF DROP 0 ELSE 1 THEN UNTIL
   CHAR 0 - glevel ! ;

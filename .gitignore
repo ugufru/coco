@@ -6,6 +6,7 @@ coco_technical_reference.txt
 coco_technical_reference.pdf
 
 *.bin
+*.dsk
 
 # macOS
 .DS_Store

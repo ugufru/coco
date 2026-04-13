@@ -11,6 +11,7 @@ spacewarp.bin: spacewarp.fs $(KERNEL_MAP) $(KERNEL_BIN)
 	$(FC) spacewarp.fs \
 	    --kernel    $(KERNEL_MAP) \
 	    --kernel-bin $(KERNEL_BIN) \
+	    --base      0x1F00 \
 	    --output    spacewarp.bin
 
 run: spacewarp.bin

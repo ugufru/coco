@@ -89,55 +89,6 @@
 SCREEN  EQU     $0400           ; video RAM base (32×16 alphanumeric text)
 NSCR    EQU     512             ; 32 cols × 16 rows
 
-;;; ─── Variables ───────────────────────────────────────────────────────────────
-;;; Placed in low RAM, accessed via extended addressing.
-;;; (Can be moved to direct page later for a 1-cycle saving per access.)
-
-        ORG     $0050
-
-VAR_CUR         FDB     0       ; cursor offset into video RAM (0–511)
-VAR_KEY_PREV    FCB     0       ; last accepted key ASCII (KEY debounce)
-VAR_KEY_SHIFT   FCB     0       ; SHIFT flag (nonzero = shift held)
-VAR_KEY_RELCNT  FCB     0       ; release debounce counter
-VAR_KEY_REPDLY  FDB     0       ; auto-repeat countdown (16-bit)
-VAR_RGVRAM      FDB     $0600   ; RG6 VRAM base address (written by rg-init)
-;;; Bresenham line drawing scratch (used by rg-line CODE word in rg-pixel.fs)
-VAR_LINE_CX     FCB     0       ; current x
-VAR_LINE_CY     FCB     0       ; current y
-VAR_LINE_X2     FCB     0       ; target x
-VAR_LINE_Y2     FCB     0       ; target y
-VAR_LINE_SX     FCB     0       ; step x (+1 or -1)
-VAR_LINE_SY     FCB     0       ; step y (+1 or -1)
-VAR_LINE_DX     FCB     0       ; |x2-x1|
-VAR_LINE_DY     FCB     0       ; |y2-y1|
-VAR_LINE_ERR    FDB     0       ; error accumulator (signed 16-bit)
-VAR_LINE_E2     FDB     0       ; 2*error temp
-VAR_LINE_COL    FCB     0       ; line color
-;;; Sprite drawing scratch (used by spr-draw/spr-erase-box CODE words in sprite.fs)
-VAR_SPR_SA      FDB     0       ; sprite data base (byte 2+)
-VAR_SPR_SX      FCB     0       ; screen X origin
-VAR_SPR_SY      FCB     0       ; screen Y origin
-VAR_SPR_W       FCB     0       ; sprite width (pixels)
-VAR_SPR_H       FCB     0       ; sprite height (rows)
-VAR_SPR_BPR     FCB     0       ; bytes per row = ceil(width/4)
-VAR_SPR_ROW     FCB     0       ; current row counter
-VAR_SPR_COL     FCB     0       ; current pixel column
-VAR_SPR_VROW    FDB     0       ; VRAM row base (precomputed)
-VAR_SPR_SRC     FDB     0       ; current sprite data pointer
-VAR_SPR_DBYTE   FCB     0       ; current data byte
-VAR_SPR_SHIFT   FCB     0       ; pixel shift within byte
-;;; RG-CHAR text rendering config (used by rg-char CODE word in rg-text.fs)
-VAR_RGFONT      FDB     $7400   ; font table base address
-VAR_RGCHARMIN   FCB     $20     ; minimum ASCII code (chars below → this)
-VAR_RGGLYPHSZ   FCB     8       ; bytes per glyph
-VAR_RGNROWS     FCB     8       ; rows to copy per glyph
-VAR_RGBPR       FCB     32      ; bytes per VRAM row
-VAR_RGROWH      FCB     10      ; row height for cy positioning (pixels)
-;;; Beam system scratch (used by beam-trace/draw-slice/restore-slice in beam.fs)
-VAR_BEAM_BUF    FDB     0       ; path buffer pointer (during trace/draw/restore)
-VAR_BEAM_VRAM   FDB     0       ; VRAM byte address scratch
-VAR_BEAM_CNT    FDB     0       ; pixel count / loop counter scratch
-
 ;;; ─── Bootstrap ──────────────────────────────────────────────────────────────
 ;;; DECB exec address points here.  Runs once at load time, then never again.
 ;;;
@@ -2363,6 +2314,54 @@ CODE_BEAM_SCRUB_POS
 @done   PULS    X
         LDY     ,X++
         JMP     [,Y]
+
+;;; ─── Kernel Variables ────────────────────────────────────────────────────────
+;;; Placed in kernel space so they are copied to all-RAM with the kernel.
+;;; Accessed via extended addressing (relocatable, no direct-page dependency).
+;;; Living here keeps them out of BASIC's workspace, making LOADM safe.
+
+VAR_CUR         FDB     0       ; cursor offset into video RAM (0–511)
+VAR_KEY_PREV    FCB     0       ; last accepted key ASCII (KEY debounce)
+VAR_KEY_SHIFT   FCB     0       ; SHIFT flag (nonzero = shift held)
+VAR_KEY_RELCNT  FCB     0       ; release debounce counter
+VAR_KEY_REPDLY  FDB     0       ; auto-repeat countdown (16-bit)
+VAR_RGVRAM      FDB     $0600   ; RG6 VRAM base address (written by rg-init)
+;;; Bresenham line drawing scratch (used by rg-line CODE word in rg-pixel.fs)
+VAR_LINE_CX     FCB     0       ; current x
+VAR_LINE_CY     FCB     0       ; current y
+VAR_LINE_X2     FCB     0       ; target x
+VAR_LINE_Y2     FCB     0       ; target y
+VAR_LINE_SX     FCB     0       ; step x (+1 or -1)
+VAR_LINE_SY     FCB     0       ; step y (+1 or -1)
+VAR_LINE_DX     FCB     0       ; |x2-x1|
+VAR_LINE_DY     FCB     0       ; |y2-y1|
+VAR_LINE_ERR    FDB     0       ; error accumulator (signed 16-bit)
+VAR_LINE_E2     FDB     0       ; 2*error temp
+VAR_LINE_COL    FCB     0       ; line color
+;;; Sprite drawing scratch (used by spr-draw/spr-erase-box CODE words in sprite.fs)
+VAR_SPR_SA      FDB     0       ; sprite data base (byte 2+)
+VAR_SPR_SX      FCB     0       ; screen X origin
+VAR_SPR_SY      FCB     0       ; screen Y origin
+VAR_SPR_W       FCB     0       ; sprite width (pixels)
+VAR_SPR_H       FCB     0       ; sprite height (rows)
+VAR_SPR_BPR     FCB     0       ; bytes per row = ceil(width/4)
+VAR_SPR_ROW     FCB     0       ; current row counter
+VAR_SPR_COL     FCB     0       ; current pixel column
+VAR_SPR_VROW    FDB     0       ; VRAM row base (precomputed)
+VAR_SPR_SRC     FDB     0       ; current sprite data pointer
+VAR_SPR_DBYTE   FCB     0       ; current data byte
+VAR_SPR_SHIFT   FCB     0       ; pixel shift within byte
+;;; RG-CHAR text rendering config (used by rg-char CODE word in rg-text.fs)
+VAR_RGFONT      FDB     $7400   ; font table base address
+VAR_RGCHARMIN   FCB     $20     ; minimum ASCII code (chars below → this)
+VAR_RGGLYPHSZ   FCB     8       ; bytes per glyph
+VAR_RGNROWS     FCB     8       ; rows to copy per glyph
+VAR_RGBPR       FCB     32      ; bytes per VRAM row
+VAR_RGROWH      FCB     10      ; row height for cy positioning (pixels)
+;;; Beam system scratch (used by beam-trace/draw-slice/restore-slice in beam.fs)
+VAR_BEAM_BUF    FDB     0       ; path buffer pointer (during trace/draw/restore)
+VAR_BEAM_VRAM   FDB     0       ; VRAM byte address scratch
+VAR_BEAM_CNT    FDB     0       ; pixel count / loop counter scratch
 
 KERN_END                        ; end marker — bootstrap copies $E000..KERN_END-1
 

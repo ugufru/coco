@@ -17,8 +17,8 @@ INCLUDE ../../forth/lib/screen.fs
 
 : vemit  ( char -- )
   $3F AND
-  $0050 @ $0400 + C!
-  $0050 @ 1 + $0050 ! ;
+  KVAR-CUR @ $0400 + C!
+  KVAR-CUR @ 1 + KVAR-CUR ! ;
 
 \ ── Constants ─────────────────────────────────────────────────────
 

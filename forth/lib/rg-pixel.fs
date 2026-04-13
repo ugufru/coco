@@ -21,7 +21,7 @@ $8730 CONSTANT MSKTAB
 
 : rg-init  ( -- )
   init-tables
-  $0600 DUP rv !  $57 !
+  $0600 DUP rv !  KVAR-RGVRAM !
   6 set-sam-v
   rv @ 9 RSHIFT set-sam-f
   $F8 set-pia
