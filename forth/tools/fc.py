@@ -1584,13 +1584,18 @@ def main():
     tokens               = tokenize(source, base_dir=src_path.parent)
     defs, variables, main, code_defs, kcode_defs = parse(tokens)
 
-    # Inject kernel VAR_* addresses as Forth CONSTANTs so source files
-    # can write  `$9000 KVAR-RGFONT !`  instead of hardcoding hex addrs.
+    # Inject kernel symbols as Forth CONSTANTs:
+    #   VAR_*        → KVAR-*        (variable addresses)
+    #   KERN_VERSION → KERN-VERSION  (version constant)
     for sym, addr in symbols.items():
         if sym.startswith('VAR_'):
             forth_name = 'kvar-' + sym[4:].lower().replace('_', '-')
-            if forth_name not in defs:
-                defs[forth_name] = [('lit', addr)]
+        elif sym == 'KERN_VERSION':
+            forth_name = 'kern-version'
+        else:
+            continue
+        if forth_name not in defs:
+            defs[forth_name] = [('lit', addr)]
 
     inline_constants(defs, main)
 
