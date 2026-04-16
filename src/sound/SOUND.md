@@ -4,7 +4,7 @@
 
 ## Goal
 
-Add short sound effects to Space Warp: beeps for commands, zaps for masers, booms for explosions. A few milliseconds each, synchronous (blocking the game loop briefly).
+Add short sound effects to demos: beeps, zaps, booms. A few milliseconds each, synchronous (blocking the caller briefly).
 
 ## The CoCo Audio Hardware
 

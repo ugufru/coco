@@ -1,4 +1,4 @@
-# Bare Naked Forth — Modern Bytecode for the Color Computer
+# Bare Naked Forth 1.0 — Modern Bytecode for the Color Computer
 
 A cross-compiled Forth toolchain for the TRS-80 Color Computer. Write Forth
 on a modern machine. Run it natively on the CoCo's 6809.
@@ -38,7 +38,6 @@ A kernel, a compiler, a tutorial, and a growing library of programs that prove i
 | `src/tetris/` | Bare Naked Tetris — SG4 semigraphics game |
 | `src/kaleidoscope/` | Kaleidoscope — SG4 symmetric pattern generator |
 | `src/calculator/` | RPN calculator |
-| `src/spacewarp/` | Space Warp — real-time space combat game with genome-driven AI |
 | `docs/` | Tutorial book: *Getting Started with Bare Naked Forth* |
 | `docs/reference.html` | [Language Reference](docs/reference.html) — all words, stack effects, and memory map |
 | `COCO_RENOVATION.md` | Original vision document |
@@ -71,11 +70,13 @@ To run any Forth program:
 
 ## Status
 
+**Version 1.0** — Released April 2026.
+
 The foundation is solid. The kernel boots, the compiler works, and real programs run on real (emulated) hardware.
 
 Working: kernel boots, clears screen, executes cross-compiled Forth bytecode.
 All 13 tutorial chapters complete with working example programs.
-Space Warp (src/spacewarp/) — a full real-time space combat game with procedural AI, artifact-color graphics, and 51 kernel primitives.
+Six demo applications: Tetris, Kaleidoscope, Rain, Bounce, Typewriter, and RPN Calculator.
 
 ### Kernel primitives
 
@@ -144,50 +145,6 @@ Open `docs/index.html` in a browser to read it locally.
 ---
 
 ## Roadmap
-
-### Space Warp v1.0 — April 15, 2026
-
-The flagship application. A real-time space combat game with procedural AI,
-artifact-color graphics, and Trek-inspired tactical depth. Core gameplay is
-complete. The v1.0 sprint focuses on combat balance and dramatic feel.
-
-Design informed by reverse engineering of the original Z80 Space Warp (1979)
-and tactical analysis of Star Trek TOS combat doctrine. Full comparison in
-`src/spacewarp/COMBAT_ANALYSIS.md`.
-
-**Done:**
-- Combat rebalance — maser range damage (#312), missile nerf (#313), aim scatter (#314), damage spread (#315), shield bleedthrough (#306)
-- Deflector toggle — UP/DOWN with key 4, divert warp power at 0% (#338-341)
-- Ion engines at 0% disables movement (#307)
-- One-system-at-a-time repair queue with priority ordering (#340)
-- Shields block docking (#345)
-- Panel polish — padding, full-width terminal prompts (#344)
-- 13 CODE words promoted to kernel — 1,348→937 bytes headroom (#332-336)
-- KCODE directive for kernel-space CODE words (#337)
-- Angle normalization fix (#346)
-
-**Remaining v1.0:**
-1. Bug fix: starbase gravity spawn (#233)
-2. Safe spawn refactor — unified pos-safe? for all entities (#342)
-3. Investigate extended-play crash (#347)
-
-**Post-v1.0 combat features** (prioritized):
-- Endever acceleration/deceleration — smooth movement ramp (#343)
-- SOS timer system with escalating messages (#317, #319)
-- Finite base missile supply — campaign resource anxiety (#318)
-- Direct hit bonus — center-distance damage scaling (#316)
-- Spacebar quick-fire masers for dogfighting (#320)
-- Status line micro-reports — TOS bridge crew flavor (#321)
-- Crew count, casualties, and score (#322)
-- Non-linear repair — field cap at 50-60%, dock required below 25% (#309)
-- Friendly fire on starbases (#323)
-- Smart Jovian missile evasion (#183)
-- Directional Endever sprites (#324)
-- Permanent damage accumulation (#325)
-
-**Sprite evaluation tools** (complete):
-- Visual tuning harness, SVG catalog, and mobile rater app for evaluating
-  all 256 procedural Jovian sprite patterns. See `src/spacewarp/SPRITE_RATER.md`.
 
 ### Platform
 

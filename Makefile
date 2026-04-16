@@ -5,7 +5,7 @@
 #   make dsk      build everything, then package into build/demos.dsk
 #   make clean    remove all build artifacts
 
-DEMOS    = bounce kaleidoscope rain tetris rg-test typewriter spacewarp
+DEMOS    = bounce calculator kaleidoscope rain tetris rg-test typewriter
 KERNEL   = forth/kernel
 DSK      = build/demos.dsk
 
@@ -35,12 +35,12 @@ dsk: demos
 	@mkdir -p build
 	decb dskini $(DSK)
 	decb copy src/bounce/bounce.bin               $(DSK),BOUNCE.BIN -2
+	decb copy src/calculator/calc.bin             $(DSK),CALC.BIN -2
 	decb copy src/kaleidoscope/kaleidoscope.bin    $(DSK),KALEIDSC.BIN -2
 	decb copy src/rain/rain.bin                    $(DSK),RAIN.BIN -2
 	decb copy src/tetris/tetris.bin                $(DSK),TETRIS.BIN -2
 	decb copy src/rg-test/rg-test.bin              $(DSK),RG-TEST.BIN -2
 	decb copy src/typewriter/typewriter.bin        $(DSK),TYPEWRTR.BIN -2
-	decb copy src/spacewarp/spacewarp.bin          $(DSK),SPACEWRP.BIN -2
 	@echo ""
 	@echo "  $(DSK) created with 7 programs."
 	@echo "  Copy to SD card for FujiNet, or load in XRoar."
