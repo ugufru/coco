@@ -152,8 +152,24 @@ Where this goes next — from software-only to cartridge hardware.
 
 - Serial loader — bit-banged via PIA ($FF20/$FF22) for loading bytecode over RS-232
 - ROM cartridge image — kernel + loader burned to flash, bootable from the pak slot
-- SD card integration — store and load `.bin` files via CoCoSDC
 - RP2350 co-processor — one core on the 6809 bus, the other managing storage and services
+
+### Documentation & demos
+
+Turning the docs into a live, interactive showroom for the toolchain.
+
+- Tutorial flow audit — re-read all 13 chapters against the current kernel and smooth the seams where new material has made the old flow rough
+- Demo appendix — a featured page per demo, built into the tutorial, showing what each one exercises and why
+- Runnable docs — embed XRoar (WASM) so every demo runs inline in the browser, no install required
+- Static site — host `docs/` as a public website once the embedded player is wired up
+- Bespoke illustrations — replace tutorial placeholders with original artwork
+- DSK workflow — document the `make dsk` path from Forth source to a CoCoSDC-loadable disk image
+
+### Workflow
+
+Writing about how we built this, so others can do the same.
+
+- Working with Claude — a guide to the modern Bare Naked Forth development loop with Claude Code as a collaborator
 
 ---
 
