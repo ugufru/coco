@@ -133,6 +133,11 @@
           <td class="stack-effect">( n1 n2 n3 -- n2 n3 n1 )</td>
           <td>Rotate the third item to the top of the stack.</td>
         </tr>
+        <tr>
+          <td class="word-name">PICK</td>
+          <td class="stack-effect">( ...xn ... x0 n -- ...xn ... x0 xn )</td>
+          <td>Copy the <em>n</em>th stack item to the top. <code>0 PICK</code> is DUP, <code>1 PICK</code> is OVER.</td>
+        </tr>
       </table>
 
       <!-- Arithmetic -->
@@ -168,6 +173,46 @@
           <td class="stack-effect">( n -- -n )</td>
           <td>Two's complement negate. Flips the sign of the top of stack.</td>
         </tr>
+        <tr>
+          <td class="word-name">ABS</td>
+          <td class="stack-effect">( n -- |n| )</td>
+          <td>Absolute value.</td>
+        </tr>
+        <tr>
+          <td class="word-name">MIN</td>
+          <td class="stack-effect">( n1 n2 -- min )</td>
+          <td>Signed minimum of the top two stack items.</td>
+        </tr>
+        <tr>
+          <td class="word-name">MAX</td>
+          <td class="stack-effect">( n1 n2 -- max )</td>
+          <td>Signed maximum of the top two stack items.</td>
+        </tr>
+        <tr>
+          <td class="word-name">0MIN</td>
+          <td class="stack-effect">( n -- min(n,0) )</td>
+          <td>Clamp to maximum 0. Returns n if negative, else 0.</td>
+        </tr>
+        <tr>
+          <td class="word-name">0MAX</td>
+          <td class="stack-effect">( n -- max(n,0) )</td>
+          <td>Clamp to minimum 0. Returns n if positive, else 0.</td>
+        </tr>
+        <tr>
+          <td class="word-name">2*</td>
+          <td class="stack-effect">( n -- n*2 )</td>
+          <td>Arithmetic left shift by 1 (multiply by 2).</td>
+        </tr>
+        <tr>
+          <td class="word-name">2/</td>
+          <td class="stack-effect">( n -- n/2 )</td>
+          <td>Arithmetic right shift by 1 (divide by 2, sign-preserving).</td>
+        </tr>
+        <tr>
+          <td class="word-name">MDIST</td>
+          <td class="stack-effect">( addr1 addr2 -- d )</td>
+          <td>Manhattan distance between two (x,y) byte pairs at <em>addr1</em> and <em>addr2</em>. Returns <code>|x1&minus;x2| + |y1&minus;y2|</code>.</td>
+        </tr>
       </table>
 
       <!-- Comparison -->
@@ -202,6 +247,16 @@
           <td class="word-name">0=</td>
           <td class="stack-effect">( n -- flag )</td>
           <td>True if n is zero.</td>
+        </tr>
+        <tr>
+          <td class="word-name">U&lt;</td>
+          <td class="stack-effect">( u1 u2 -- flag )</td>
+          <td>True if u1 is less than u2 (unsigned comparison). Use this for address / size comparisons where signed <code>&lt;</code> would give wrong results near <code>$8000</code>.</td>
+        </tr>
+        <tr>
+          <td class="word-name">WITHIN</td>
+          <td class="stack-effect">( n lo hi -- flag )</td>
+          <td>True if <em>lo</em> &le; n &lt; <em>hi</em> (unsigned, half-open range).</td>
         </tr>
       </table>
 
@@ -278,6 +333,16 @@
           <td class="stack-effect">( n count -- n' )</td>
           <td>Logical right shift n by <em>count</em> bits.</td>
         </tr>
+        <tr>
+          <td class="word-name">XOR</td>
+          <td class="stack-effect">( n1 n2 -- n3 )</td>
+          <td>Bitwise exclusive-or of the top two stack items.</td>
+        </tr>
+        <tr>
+          <td class="word-name">INVERT</td>
+          <td class="stack-effect">( n -- ~n )</td>
+          <td>Bitwise complement. Equivalent to <code>-1 XOR</code>.</td>
+        </tr>
       </table>
 
       <!-- I/O -->
@@ -318,6 +383,16 @@
           <td class="stack-effect">( row col -- )</td>
           <td>Set the cursor to the given row (0&ndash;15) and column (0&ndash;31).</td>
         </tr>
+        <tr>
+          <td class="word-name">TYPE</td>
+          <td class="stack-effect">( addr len -- )</td>
+          <td>Print <em>len</em> bytes starting at <em>addr</em> via <code>EMIT</code>. Used by <code>S" ... "</code> and <code>."</code>.</td>
+        </tr>
+        <tr>
+          <td class="word-name">COUNT</td>
+          <td class="stack-effect">( c-addr -- addr+1 len )</td>
+          <td>Extract a counted string: <em>c-addr</em> points at a length byte; returns the address of the first character plus the length ready for <code>TYPE</code>.</td>
+        </tr>
       </table>
 
       <!-- Control Flow -->
@@ -353,6 +428,21 @@
           <td class="stack-effect">( -- n )</td>
           <td>Push the current loop index onto the data stack.</td>
         </tr>
+        <tr>
+          <td class="word-name">+LOOP</td>
+          <td class="stack-effect">( n -- )</td>
+          <td>Increment the loop index by <em>n</em> (which may be negative). If the index has not crossed the limit, branch back to the word after <code>DO</code>.</td>
+        </tr>
+        <tr>
+          <td class="word-name">J</td>
+          <td class="stack-effect">( -- n )</td>
+          <td>Push the index of the <em>outer</em> enclosing <code>DO</code> loop (for nested loops). <code>I</code> is the inner index.</td>
+        </tr>
+        <tr>
+          <td class="word-name">UNLOOP</td>
+          <td class="stack-effect">( -- ) R:( limit index -- )</td>
+          <td>Discard the current loop's index/limit from the return stack. Required before <code>EXIT</code> inside a <code>DO ... LOOP</code> to keep the return stack balanced.</td>
+        </tr>
       </table>
 
       <!-- Return Stack -->
@@ -377,6 +467,108 @@
           <td class="word-name">R@</td>
           <td class="stack-effect">( -- n ) R:( n -- n )</td>
           <td>Copy the top of the return stack to the data stack without removing it.</td>
+        </tr>
+      </table>
+
+      <!-- Screen Timing -->
+      <div class="group-label">Screen Timing</div>
+      <table class="ref-table">
+        <tr>
+          <th style="width:180px">Word</th>
+          <th style="width:180px">Stack</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td class="word-name">VSYNC</td>
+          <td class="stack-effect">( -- )</td>
+          <td>Block until the next vertical sync (start of vertical blanking). Polls PIA0 HSYNC/VSYNC bits. Use to pace animation at 60 Hz.</td>
+        </tr>
+        <tr>
+          <td class="word-name">WAIT-PAST-ROW</td>
+          <td class="stack-effect">( row -- )</td>
+          <td>Block until the scanning beam has passed the given pixel <em>row</em> (0&ndash;191). Used for beam-chasing: split-frame updates that run above or below the beam without tearing.</td>
+        </tr>
+        <tr>
+          <td class="word-name">COUNT-BLANKING</td>
+          <td class="stack-effect">( -- cycles )</td>
+          <td>Return the number of inner-loop cycles counted during the most recent vertical blanking interval. Used to tune beam-chasing offsets empirically.</td>
+        </tr>
+      </table>
+
+      <!-- Graphics -->
+      <div class="group-label">Graphics</div>
+      <p>RG6 (256&times;192 NTSC artifact-color) pixel and sprite primitives. The
+      library <code>forth/lib/rg-pixel.fs</code> sets up tables and VRAM; these
+      words then run at native 6809 speed in the kernel.</p>
+      <table class="ref-table">
+        <tr>
+          <th style="width:180px">Word</th>
+          <th style="width:180px">Stack</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td class="word-name">RG-PSET</td>
+          <td class="stack-effect">( x y color -- )</td>
+          <td>Plot an artifact-color pixel. <em>x</em> is 0&ndash;127 (pixel pairs), <em>y</em> is 0&ndash;191. <em>color</em>: 0=black, 1=blue, 2=red, 3=white.</td>
+        </tr>
+        <tr>
+          <td class="word-name">RG-LINE</td>
+          <td class="stack-effect">( x1 y1 x2 y2 color -- )</td>
+          <td>Draw a line using Bresenham's algorithm. Clips at screen edges.</td>
+        </tr>
+        <tr>
+          <td class="word-name">RG-CHAR</td>
+          <td class="stack-effect">( char cx cy -- )</td>
+          <td>Render one glyph from the kernel font at character cell (<em>cx</em>,<em>cy</em>). Uses the font base, glyph size, and row metrics configured in kernel variables at $0075&ndash;$007B.</td>
+        </tr>
+        <tr>
+          <td class="word-name">SPR-DRAW</td>
+          <td class="stack-effect">( addr x y -- )</td>
+          <td>Draw a sprite at pixel (<em>x</em>,<em>y</em>). Sprite format: width byte, height byte, then 2-bits-per-pixel packed rows. Color 0 is transparent.</td>
+        </tr>
+        <tr>
+          <td class="word-name">SPR-ERASE-BOX</td>
+          <td class="stack-effect">( addr x y -- )</td>
+          <td>Erase the bounding box of a sprite at (<em>x</em>,<em>y</em>) to black. Sister to <code>SPR-DRAW</code>.</td>
+        </tr>
+      </table>
+
+      <!-- Beam -->
+      <div class="group-label">Beam</div>
+      <p>Beam primitives save a line's original pixels into a buffer, draw a
+      colored slice over them, then restore them later. Used for maser beams,
+      laser lines, and any transient straight-line drawing that must not
+      damage the background. Obstacle-finding supports collision detection.</p>
+      <table class="ref-table">
+        <tr>
+          <th style="width:200px">Word</th>
+          <th style="width:200px">Stack</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td class="word-name">BEAM-TRACE</td>
+          <td class="stack-effect">( x1 y1 x2 y2 buf -- count )</td>
+          <td>Trace the pixels along the line from (x1,y1) to (x2,y2). Save each pixel's original color into <em>buf</em>. Return the pixel count.</td>
+        </tr>
+        <tr>
+          <td class="word-name">BEAM-DRAW-SLICE</td>
+          <td class="stack-effect">( buf start count color -- )</td>
+          <td>Draw <em>count</em> pixels of a previously-traced beam in the given <em>color</em>, starting at offset <em>start</em> in <em>buf</em>.</td>
+        </tr>
+        <tr>
+          <td class="word-name">BEAM-RESTORE-SLICE</td>
+          <td class="stack-effect">( buf start count -- )</td>
+          <td>Restore <em>count</em> pixels of a traced beam to their original colors, starting at offset <em>start</em>.</td>
+        </tr>
+        <tr>
+          <td class="word-name">BEAM-FIND-OBSTACLE</td>
+          <td class="stack-effect">( buf count -- index|-1 )</td>
+          <td>Scan a beam's save buffer for the first non-black original pixel. Returns the index of the obstacle, or &minus;1 if none. Used for collision detection.</td>
+        </tr>
+        <tr>
+          <td class="word-name">BEAM-SCRUB-POS</td>
+          <td class="stack-effect">( buf index -- )</td>
+          <td>Overwrite one saved pixel at <em>index</em> with black ($00). Used to &ldquo;forget&rdquo; a pixel so a later restore will leave it as background, e.g. after an object on the beam path moves.</td>
         </tr>
       </table>
 
@@ -412,6 +604,21 @@
           <td class="word-name">font-data</td>
           <td class="stack-effect">( -- addr )</td>
           <td>Address of kernel font data (59 glyphs &times; 8 bytes). Copy to <code>$9000</code> with <code>CMOVE</code>.</td>
+        </tr>
+      </table>
+
+      <!-- Constants -->
+      <div class="group-label">Constants</div>
+      <table class="ref-table">
+        <tr>
+          <th style="width:180px">Name</th>
+          <th style="width:120px">Value</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td class="word-name">KERN-VERSION</td>
+          <td><code>$0100</code> (1.0)</td>
+          <td>Kernel version in packed BCD: high byte is the major version, low byte is the minor (so <code>$0100</code> means 1.0). Exported from <code>KERN_VERSION</code> in <code>kernel.asm</code> via the kernel map. Use it to gate features or print the version, e.g. <code>hello.fs</code> prints it on boot.</td>
         </tr>
       </table>
 
@@ -523,6 +730,26 @@
           <td><code>( comment text )</code></td>
           <td>Block comment. Text between <code>(</code> and <code>)</code> is ignored. May span multiple lines.</td>
         </tr>
+        <tr>
+          <td class="word-name">CODE</td>
+          <td><code>CODE name<br>&nbsp;&nbsp;... 6809 asm ...<br>;CODE</code></td>
+          <td>Define a word implemented in inline 6809 assembly. The body is assembled by <code>lwasm</code> and placed in <em>app space</em>. End the assembly with <code>;NEXT</code> (the macro for <code>JMP [,X++]</code>) to return to the threaded interpreter. Use this for performance-critical inner loops.</td>
+        </tr>
+        <tr>
+          <td class="word-name">;CODE</td>
+          <td></td>
+          <td>End a <code>CODE</code> block.</td>
+        </tr>
+        <tr>
+          <td class="word-name">KCODE</td>
+          <td><code>KCODE name<br>&nbsp;&nbsp;... 6809 asm ...<br>;KCODE</code></td>
+          <td>Like <code>CODE</code>, but the assembled bytes are packed into <em>kernel space</em> (appended to the kernel region, not the app). Use this when app space is tight but kernel headroom is available, or when several apps share a primitive. Same rules as <code>CODE</code>: end with <code>;NEXT</code>. fc.py assembles KCODE twice &mdash; once to get sizes, then again with final variable addresses patched in.</td>
+        </tr>
+        <tr>
+          <td class="word-name">;KCODE</td>
+          <td></td>
+          <td>End a <code>KCODE</code> block.</td>
+        </tr>
       </table>
 
       <div class="tip">
@@ -530,6 +757,42 @@
         with a <code>$</code> prefix (<code>$FF02</code>). Negative numbers
         work too: <code>-1</code> compiles as <code>$FFFF</code>.</p>
       </div>
+
+      <h3>Accessing variables from inline assembly</h3>
+
+      <p>Inside <code>CODE</code> and <code>KCODE</code> blocks, fc.py exposes
+      variable addresses as <code>EQU</code> labels so you can load and store
+      directly without going through the data stack:</p>
+
+      <table class="ref-table">
+        <tr>
+          <th style="width:180px">Label form</th>
+          <th>What it resolves to</th>
+        </tr>
+        <tr>
+          <td class="word-name">FVAR_<em>name</em></td>
+          <td>Address of a Forth <code>VARIABLE</code> you defined in your own source. fc.py walks every <code>VARIABLE</code> in the program, assigns addresses in app space, and injects <code>FVAR_name EQU $xxxx</code> before each assembly pass. Use <code>LDD FVAR_score</code> / <code>STD FVAR_score</code> etc. to read and write app variables from assembly.</td>
+        </tr>
+        <tr>
+          <td class="word-name">KVAR-<em>name</em></td>
+          <td>Address of a <em>kernel</em> variable (the <code>VAR_*</code> symbols in <code>kernel.asm</code>, e.g. cursor, sprite scratch, beam scratch). fc.py reads these out of <code>kernel.map</code> and exposes them as Forth <code>CONSTANT</code>s with a <code>KVAR-</code> prefix. For example, <code>KVAR-CUR</code> resolves to the address of <code>VAR_CUR</code>. Use them to read or adjust kernel state from application Forth or from inline assembly.</td>
+        </tr>
+      </table>
+
+      <p>The two systems work together: an app defines its own variables with
+      <code>VARIABLE</code> and reaches them from assembly as
+      <code>FVAR_</code>&hellip;; and it reaches shared kernel state as
+      <code>KVAR-</code>&hellip;. Example pattern from
+      <code>forth/lib/rg-pixel.fs</code>, where the app caches the kernel
+      VRAM pointer:</p>
+
+      <pre><code>$0600 DUP rv !  KVAR-RGVRAM !   \ set local and kernel copies
+
+CODE fast-plot   ( x y -- )
+    LDD  FVAR_rv       \ app variable: VRAM base
+    ADDD #0            \ ... computation ...
+    ;NEXT
+;CODE</code></pre>
 
       <!-- ================================================================== -->
       <h2>Library Words</h2>
@@ -539,6 +802,17 @@
       Load them with <code>INCLUDE</code> at the top of your source file.
       Some libraries depend on others &mdash; the required include order is
       shown below.</p>
+
+      <div class="tip">
+        <p>A few words grouped here by topic &mdash; <code>VSYNC</code>,
+        <code>WAIT-PAST-ROW</code>, <code>COUNT-BLANKING</code>,
+        <code>RG-PSET</code>, <code>RG-LINE</code>, <code>RG-CHAR</code>,
+        <code>SPR-DRAW</code>, <code>SPR-ERASE-BOX</code>, and the
+        <code>BEAM-*</code> family &mdash; are actually <em>kernel primitives</em>,
+        listed above in the Kernel Primitives section. They live in the
+        kernel for speed, but the initialization patterns and usage context
+        belong with their functional library, so we describe them here too.</p>
+      </div>
 
       <!-- print.fs -->
       <div class="ref-section">

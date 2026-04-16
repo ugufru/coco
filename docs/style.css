@@ -17,7 +17,7 @@
 
 body {
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 16px;
+  font-size: 17px;
   line-height: 1.7;
   color: var(--text);
   background: #e8e4de;
@@ -193,8 +193,9 @@ pre.shell .comment { color: #888; }
 /* ── Stack diagram ─────────────────────────────────────────────────────── */
 
 .stack-effect {
-  font-family: "Courier New", Courier, monospace;
+  font-family: Menlo, Monaco, "SF Mono", Consolas, "Courier New", monospace;
   font-size: 0.9em;
+  font-weight: 700;
   background: var(--green-light);
   border: 1px solid var(--green);
   display: inline-block;
