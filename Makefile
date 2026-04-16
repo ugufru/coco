@@ -1,15 +1,18 @@
-# Makefile — build all CoCo demos and create a .DSK disk image
+# Makefile — build all CoCo demos and create .DSK disk images
 #
 # Targets:
-#   make          build kernel + all demo binaries
-#   make dsk      build everything, then package into build/demos.dsk
-#   make clean    remove all build artifacts
+#   make              build kernel + all demo binaries
+#   make dsk          build demos DSK (build/demos.dsk)
+#   make tutorial-dsk build tutorial examples DSK (build/tutorial.dsk)
+#   make dsks         build both DSKs
+#   make clean        remove all build artifacts
 
-DEMOS    = bounce calculator kaleidoscope rain tetris rg-test typewriter
-KERNEL   = forth/kernel
-DSK      = build/demos.dsk
+DEMOS        = bounce calculator kaleidoscope rain tetris rg-test typewriter
+KERNEL       = forth/kernel
+DSK          = build/demos.dsk
+TUTORIAL_DSK = build/tutorial.dsk
 
-.PHONY: all kernel demos dsk clean
+.PHONY: all kernel demos dsk tutorial-dsk dsks clean
 
 all: demos
 
@@ -46,7 +49,42 @@ dsk: demos
 	@echo "  Copy to SD card for FujiNet, or load in XRoar."
 	@echo "  In DECB:  LOADM\"BOUNCE\":EXEC"
 
+# Create a DECB disk image with the 12 tutorial example programs.
+# Uses the pre-built .bin files committed under docs/examples/.
+# Requires Toolshed's 'decb' command.
+tutorial-dsk:
+	@command -v decb >/dev/null 2>&1 || { \
+	    echo ""; \
+	    echo "  Error: 'decb' not found on PATH."; \
+	    echo ""; \
+	    echo "  Install Toolshed: https://github.com/boisy/toolshed"; \
+	    echo "    macOS:  brew install toolshed"; \
+	    echo "    source: clone repo, make, add bin/ to PATH"; \
+	    echo ""; \
+	    exit 1; \
+	}
+	@mkdir -p build
+	decb dskini $(TUTORIAL_DSK)
+	decb copy docs/examples/01/hello.bin    $(TUTORIAL_DSK),HELLO.BIN -2
+	decb copy docs/examples/02/title.bin    $(TUTORIAL_DSK),TITLE.BIN -2
+	decb copy docs/examples/03/letter.bin   $(TUTORIAL_DSK),LETTER.BIN -2
+	decb copy docs/examples/04/mirror.bin   $(TUTORIAL_DSK),MIRROR.BIN -2
+	decb copy docs/examples/05/hi.bin       $(TUTORIAL_DSK),HI.BIN -2
+	decb copy docs/examples/06/alpha.bin    $(TUTORIAL_DSK),ALPHA.BIN -2
+	decb copy docs/examples/07/grade.bin    $(TUTORIAL_DSK),GRADE.BIN -2
+	decb copy docs/examples/08/yorn.bin     $(TUTORIAL_DSK),YORN.BIN -2
+	decb copy docs/examples/09/arith.bin    $(TUTORIAL_DSK),ARITH.BIN -2
+	decb copy docs/examples/10/calc.bin     $(TUTORIAL_DSK),CALC.BIN -2
+	decb copy docs/examples/11/screen.bin   $(TUTORIAL_DSK),SCREEN.BIN -2
+	decb copy docs/examples/12/guess.bin    $(TUTORIAL_DSK),GUESS.BIN -2
+	@echo ""
+	@echo "  $(TUTORIAL_DSK) created with 12 programs (tutorial chapters 1-12)."
+	@echo "  Copy to SD card for FujiNet, or load in XRoar."
+	@echo "  In DECB:  LOADM\"HELLO\":EXEC"
+
+dsks: dsk tutorial-dsk
+
 clean:
 	@for d in $(DEMOS); do rm -f src/$$d/$$d.bin; done
-	rm -f $(DSK)
+	rm -f $(DSK) $(TUTORIAL_DSK)
 	$(MAKE) -C $(KERNEL) clean
