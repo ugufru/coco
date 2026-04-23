@@ -34,10 +34,11 @@ Assembly CODE words bypass ITC overhead — their costs are exact:
 
 | CODE Word | Cycles | Notes |
 |-----------|--------|-------|
-| `flip-state` | 197 | 7 × (LDD/LDX/STX/STD) swapping fr-/bk- pointer pairs |
+| `flip-state` | 245 | 9 × (LDD/LDX/STX/STD) swapping fr-/bk- pointer pairs + sec-lt lasts |
 | `set-sam-f-fast` | 169 | Unrolled 7-bit SAM-F write for the page flip |
 | `dw-read` | 114 | HDB-DOS DWRead vector wrapper |
 | `dw-write` | 95 | HDB-DOS DWWrite vector wrapper |
+| `sec-tx-tab` / `sec-ty-tab` | 29 each | Push address of precomputed 360-byte endpoint table |
 | `time-buf` | 29 | Push address of 6-byte time buffer |
 
 All within the vblank window (~680 cycles), so the page flip is
@@ -48,7 +49,8 @@ atomic from the raster's perspective.
 | Word | Cycles | Runs when |
 |------|--------|-----------|
 | `tick-hands` | 24,558 | mn change (2 frames per minute) |
-| `redraw-sc-back` | 8,396 | Every frame (smooth sweep) |
+| `redraw-sc-back` (draw path) | 1,968 | When tx/ty moved — pixel-dedup saves most frames (was 8,396 via ep2/angle-dx/dy; see #452) |
+| `redraw-sc-back` (skip path) | ~180 | When endpoint unchanged — tables lookup + compare, no beam work |
 | `render-datetime` | 7,174 | 2 frames after each sec change |
 | `trace-line` | 6,720 | Inside each hand redraw |
 | `ep1` / `ep2` | 5,923 | Inside trace-line |

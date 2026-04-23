@@ -20,8 +20,8 @@
 </head>
 <body>
 
-<h1>Clock — 60-Frame Cycle Map (1 Local Second, Mid-Minute)</h1>
-<h2>Smooth-sweep second hand updates every vsync.  sec rolls at frame 0; dig-pending=2 covers the next two back buffers.  No mn change, no :59 sync in this sample.</h2>
+<h1>Clock — 60-Frame Cycle Map (1 Local Second, Mid-Minute, post-#452)</h1>
+<h2>Smooth-sweep second hand uses precomputed endpoint tables + pixel-endpoint dedup.  Only ~3 of 60 frames do pixel work; the rest skip the beam pipeline.  sec rolls at frame 0; dig-pending=2 covers the next two back buffers.  No mn change, no :59 sync in this sample.</h2>
 
 <div class="chart-container">
   <canvas id="chart" width="1200" height="500"></canvas>
@@ -59,7 +59,8 @@ const COMPONENTS = [
   { name: 'tick-second',        key: 'ts',    color: '#ff8844' },
 
   // Hand rendering
-  { name: 'redraw-sc-back',     key: 'rsc',   color: '#ff4444' },   // smooth sweep, every frame
+  { name: 'redraw-sc-back (draw)', key: 'rsc',  color: '#ff4444' },   // smooth sweep, draw path
+  { name: 'redraw-sc-back (skip)', key: 'rscs', color: '#884444' },   // dedup path, no pixel work
   { name: 'tick-hands (mn)',    key: 'th',    color: '#cc2222' },   // only on mn change
 
   // Digital + badge (dig-pending driven)
@@ -71,7 +72,7 @@ const COMPONENTS = [
 const COSTS = {
   vs:   152,        // vsync+ (CODE-ish wrapper)
   flip: 169,        // set-sam-f-fast CODE
-  fs:   197,        // flip-state CODE
+  fs:   245,        // flip-state CODE (9 pair swaps including sec-lt lasts)
   tf:   304,        // tick-frame no-rollover path
   kvs:   60,        // bk-vram @ KVAR-RGVRAM !
   sc:   100,        // clk-sc @ last-sc @ <> IF (false)
@@ -79,16 +80,38 @@ const COSTS = {
   mp:   100,        // mn-pending @ 0 > IF (false)
   lo:   100,        // AGAIN branch overhead
   ts:  2376,        // tick-second cascade (only on rollover)
-  rsc: 8396,        // redraw-sc-back — dominant cost
+  rsc: 1968,        // redraw-sc-back draw path (table lookup + beam trace/draw/restore)
+  rscs: 180,        // redraw-sc-back skip path (endpoint unchanged — just tables + compare)
   th: 24558,        // tick-hands — only on mn change
   rd:  7174,        // render-datetime
   rsf: 1780,        // render-sync-flash
 };
 
+// Precompute which frames are "draw frames" for the sec hand — i.e. the
+// ones where the integer endpoint changed vs. the previous frame.  With
+// the precomputed 360-entry table, most consecutive frames share the
+// same (tx, ty) pixel so redraw-sc-back skips the beam pipeline.  For a
+// mid-minute sample (sec=30) only ~3 frames out of 60 do pixel work.
+const DRAW_FRAMES = new Set();
+(function() {
+  const secBase = 30;  // mid-minute sample
+  const R = 46, CX = 64, CY = 72;
+  let prevTx = null, prevTy = null;
+  for (let i = 0; i < 60; i++) {
+    const a = (secBase * 6 + Math.floor((i * 16 * 6) / 960)) % 360;
+    const rad = a * Math.PI / 180;
+    const tx = CX + Math.round(Math.sin(rad) * R / 2);
+    const ty = CY - Math.round(Math.cos(rad) * R);
+    if (tx !== prevTx || ty !== prevTy) DRAW_FRAMES.add(i);
+    prevTx = tx; prevTy = ty;
+  }
+})();
+
 function buildFrame(f) {
   // sec rolls at frame 0; dig-pending=2 fires on frames 0 and 1
   const secChange   = (f === 0);
   const digPending  = (f === 0 || f === 1);
+  const isDraw      = DRAW_FRAMES.has(f);
 
   return {
     vs:   COSTS.vs,
@@ -101,7 +124,8 @@ function buildFrame(f) {
     mp:   COSTS.mp,
     lo:   COSTS.lo,
     ts:   0,  // already folded into tf above
-    rsc:  COSTS.rsc,
+    rsc:  isDraw ? COSTS.rsc  : 0,
+    rscs: isDraw ? 0          : COSTS.rscs,
     th:   0,  // not firing this second
     rd:   digPending ? COSTS.rd  : 0,
     rsf:  digPending ? COSTS.rsf : 0,
@@ -236,17 +260,19 @@ statsEl.innerHTML = `
   Effective frame rate: ~${effectiveFPS} fps (over-budget frames cost 2 vsyncs each)<br>
   Local-second drift: ~${Math.round((totalVsyncs - 60) * 1000 / 60)}ms per real second<br>
   <br>
-  <span style="color:#ff4488">Dominant cost:</span>
-  <code>redraw-sc-back</code> (8,396cy) runs every frame for the smooth-sweep second hand.
-  <code>angle-dx</code>/<code>angle-dy</code> (each ~2,800cy) account for most of it — sin/cos
-  table lookup plus a signed 16×16 multiply, all in Forth.  Converting these to CODE
-  would drop the typical frame from 9,608cy (64%) to ~4,500cy (30%).
+  <span style="color:#ff4488">Endpoint-dedup optimization (issue #452):</span>
+  <code>redraw-sc-back</code> no longer calls <code>ep2</code>/<code>angle-dx</code>/<code>angle-dy</code>
+  every frame.  Two 360-byte lookup tables (<code>sec-tx-tab</code>, <code>sec-ty-tab</code>)
+  hold precomputed endpoints for every clock-degree.  At 60 fps the angle only advances
+  0.1°/frame, so consecutive frames share the same integer (tx, ty) pixel.  Frames that
+  detect an unchanged endpoint skip erase+trace+paint entirely — ~180cy instead of 1,968cy.
+  In a mid-minute sample only ~3 frames out of 60 do real pixel work, and the typical
+  frame drops from 9,608cy (64% budget) to ~1,440cy (10%).
   <br><br>
   <span style="color:#ff4488">Sec-change frames (0 and 1):</span>
   <code>render-datetime</code> (7,174cy) + <code>render-sync-flash</code> (1,780cy) =
-  +8,954cy on top of the typical 9,608cy = 18,562cy total (124% of budget).
-  <code>dig-pending=2</code> keeps both back buffers fresh without requiring every-frame
-  digital re-render.  These two frames take ~2 real frames each.
+  ~11,000cy total (74% of budget) — now fits in one vblank on a draw frame, versus
+  the previous 124% overrun.
   <br><br>
   <span style="color:#ff4488">Minute-change frames (not shown):</span>
   <code>tick-hands</code> (24,558cy) fires for 2 consecutive frames every 60 seconds,

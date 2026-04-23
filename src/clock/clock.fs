@@ -165,6 +165,16 @@ CODE flip-state
         STX     FVAR_bk_sc_len
         STD     FVAR_fr_sc_len
 
+        LDD     FVAR_bk_sc_ltx
+        LDX     FVAR_fr_sc_ltx
+        STX     FVAR_bk_sc_ltx
+        STD     FVAR_fr_sc_ltx
+
+        LDD     FVAR_bk_sc_lty
+        LDX     FVAR_fr_sc_lty
+        STX     FVAR_bk_sc_lty
+        STD     FVAR_fr_sc_lty
+
         PULS    X
         ;NEXT
 ;CODE
@@ -361,13 +371,95 @@ VARIABLE _hb
   vs-cnt @ 6 *  vps @ /  + ;
 
 
+\ Precomputed sec-hand endpoint tables.  Indexed by clock-angle 0..359.
+\ Each entry holds the absolute endpoint pixel coord for the sec hand at
+\ that angle, given fixed radius R-SC=46 and center (CX=64, CY=72).
+\ Eliminates ep2/angle-dx/angle-dy calls from the per-frame path
+\ (saves ~5,700cy/frame, which is what lets the loop fit in one vblank).
+
+CODE sec-tx-tab
+        LEAY    @tab,PCR
+        STY     ,--U
+        ;NEXT
+@tab    FCB     64,64,65,65,66,66,66,67,67,68,68,68,69,69,70,70
+        FCB     70,71,71,71,72,72,73,73,73,74,74,74,75,75,76,76
+        FCB     76,77,77,77,78,78,78,78,79,79,79,80,80,80,81,81
+        FCB     81,81,82,82,82,82,83,83,83,83,84,84,84,84,84,84
+        FCB     85,85,85,85,85,85,86,86,86,86,86,86,86,86,86,87
+        FCB     87,87,87,87,87,87,87,87,87,87,87,87,87,87,87,87
+        FCB     87,87,87,87,87,87,86,86,86,86,86,86,86,86,86,85
+        FCB     85,85,85,85,85,84,84,84,84,84,84,83,83,83,83,82
+        FCB     82,82,82,81,81,81,81,80,80,80,79,79,79,78,78,78
+        FCB     78,77,77,77,76,76,76,75,75,74,74,74,73,73,73,72
+        FCB     72,71,71,71,70,70,70,69,69,68,68,68,67,67,66,66
+        FCB     66,65,65,64,64,64,63,63,62,62,62,61,61,60,60,60
+        FCB     59,59,58,58,58,57,57,57,56,56,55,55,55,54,54,54
+        FCB     53,53,52,52,52,51,51,51,50,50,50,50,49,49,49,48
+        FCB     48,48,47,47,47,47,46,46,46,46,45,45,45,45,44,44
+        FCB     44,44,44,44,43,43,43,43,43,43,42,42,42,42,42,42
+        FCB     42,42,42,41,41,41,41,41,41,41,41,41,41,41,41,41
+        FCB     41,41,41,41,41,41,41,41,41,41,42,42,42,42,42,42
+        FCB     42,42,42,43,43,43,43,43,43,44,44,44,44,44,44,45
+        FCB     45,45,45,46,46,46,46,47,47,47,47,48,48,48,49,49
+        FCB     49,50,50,50,50,51,51,51,52,52,52,53,53,54,54,54
+        FCB     55,55,55,56,56,57,57,57,58,58,58,59,59,60,60,60
+        FCB     61,61,62,62,62,63,63,64
+;CODE
+
+CODE sec-ty-tab
+        LEAY    @tab,PCR
+        STY     ,--U
+        ;NEXT
+@tab    FCB     26,26,26,26,26,26,26,26,26,27,27,27,27,27,27,28
+        FCB     28,28,28,29,29,29,29,30,30,30,31,31,31,32,32,33
+        FCB     33,33,34,34,35,35,36,36,37,37,38,38,39,39,40,41
+        FCB     41,42,42,43,44,44,45,46,46,47,48,48,49,50,50,51
+        FCB     52,53,53,54,55,56,56,57,58,59,59,60,61,62,62,63
+        FCB     64,65,66,66,67,68,69,70,70,71,72,73,74,74,75,76
+        FCB     77,78,78,79,80,81,82,82,83,84,85,85,86,87,88,88
+        FCB     89,90,91,91,92,93,94,94,95,96,96,97,98,98,99,100
+        FCB     100,101,102,102,103,103,104,105,105,106,106,107,107,108,108,109
+        FCB     109,110,110,111,111,111,112,112,113,113,113,114,114,114,115,115
+        FCB     115,115,116,116,116,116,117,117,117,117,117,117,118,118,118,118
+        FCB     118,118,118,118,118,118,118,118,118,118,118,118,118,117,117,117
+        FCB     117,117,117,116,116,116,116,115,115,115,115,114,114,114,113,113
+        FCB     113,112,112,111,111,111,110,110,109,109,108,108,107,107,106,106
+        FCB     105,105,104,103,103,102,102,101,100,100,99,98,98,97,96,96
+        FCB     95,94,94,93,92,91,91,90,89,88,88,87,86,85,85,84
+        FCB     83,82,82,81,80,79,78,78,77,76,75,74,74,73,72,71
+        FCB     70,70,69,68,67,66,66,65,64,63,62,62,61,60,59,59
+        FCB     58,57,56,56,55,54,53,53,52,51,50,50,49,48,48,47
+        FCB     46,46,45,44,44,43,42,42,41,41,40,39,39,38,38,37
+        FCB     37,36,36,35,35,34,34,33,33,33,32,32,31,31,31,30
+        FCB     30,30,29,29,29,29,28,28,28,28,27,27,27,27,27,27
+        FCB     26,26,26,26,26,26,26,26
+;CODE
+
+
+\ Last rendered endpoint per back buffer — lets us skip the beam
+\ trace/draw/restore pipeline on frames where the sec hand's integer
+\ endpoint hasn't moved (at 60 Hz the angle only advances 0.1°/frame, so
+\ most frames land on the same pixel).  That's what actually keeps the
+\ loop under one vblank.  Two sets of lasts, one per back buffer.
+VARIABLE bk-sc-ltx   VARIABLE bk-sc-lty
+VARIABLE fr-sc-ltx   VARIABLE fr-sc-lty
+
 \ Single-hand redraw on the BACK buffer.  Used every frame for the
 \ smooth-sweep second hand — far cheaper than a full tick-hands pass.
 \ Min/hr are assumed unchanged since the last back render.
+\ Uses the precomputed endpoint tables so per-frame path has no trig;
+\ dedups on integer endpoint so most frames do zero pixel work.
 : redraw-sc-back  ( -- )
-  bk-sc-buf @ bk-sc-len @ erase-line
-  sc-angle R-SC bk-sc-buf @ trace-line bk-sc-len !
-  bk-sc-buf @ bk-sc-len @ C-RED paint-line ;
+  sc-angle
+  DUP sec-tx-tab + C@ tx2 !
+  sec-ty-tab + C@ ty2 !
+  tx2 @ bk-sc-ltx @ =
+  ty2 @ bk-sc-lty @ = AND 0= IF
+    tx2 @ bk-sc-ltx !   ty2 @ bk-sc-lty !
+    bk-sc-buf @ bk-sc-len @ erase-line
+    CX CY tx2 @ ty2 @ bk-sc-buf @ beam-trace bk-sc-len !
+    bk-sc-buf @ bk-sc-len @ C-RED paint-line
+  THEN ;
 
 
 \ Erase ALL hands top-down then redraw them all bottom-up — applied
