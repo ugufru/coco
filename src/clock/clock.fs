@@ -511,15 +511,22 @@ VARIABLE _dc  VARIABLE _dr
   CHAR .  18 18 rg-char
   clk-dy @ 19 18 2dig ;                \ DD cols 19..20
 
-: render-time  ( -- )
+\ Split into the three natural update cadences so the loop only repaints
+\ what actually changed (see issue #448).  render-date touches ~8 chars,
+\ render-hm ~5, render-ss ~2 — total cost scales accordingly.
+
+: render-hm  ( -- )
   clk-hr @ 12 21 2dig                  \ HH cols 12..13
   CHAR :  14 21 rg-char
   clk-mn @ 15 21 2dig                  \ MM cols 15..16
-  CHAR :  17 21 rg-char
+  CHAR :  17 21 rg-char ;
+
+: render-ss  ( -- )
   clk-sc @ 18 21 2dig ;                \ SS cols 18..19
 
+\ Full repaint, used at boot via paint-back-full.
 : render-datetime  ( -- )
-  render-date render-time ;
+  render-date render-hm render-ss ;
 
 
 \ ── "RTC SYNC" flash in the upper-right corner ──────────────────────
@@ -694,14 +701,22 @@ VARIABLE _dc  VARIABLE _dr
 
 VARIABLE last-sc
 VARIABLE last-mn
+VARIABLE last-dy
 VARIABLE mn-pending         \ frames left to do full tick-hands after mn change
-VARIABLE dig-pending        \ frames left to re-render digital + flash
+VARIABLE ss-pending         \ frames left to re-render :SS + flash
+VARIABLE hm-pending         \ frames left to re-render HH:MM
+VARIABLE date-pending       \ frames left to re-render YYYY.MM.DD
 
 : clock-loop  ( -- )
   clk-sc @ last-sc !
   clk-mn @ last-mn !
+  clk-dy @ last-dy !
   0 mn-pending !
-  2 dig-pending !                 \ render digital on first 2 frames
+  \ Paint all three digital groups on the first 2 backs so both VRAMs
+  \ match before we start relying on split renders.
+  2 ss-pending !
+  2 hm-pending !
+  2 date-pending !
   BEGIN
     \ One vsync wait per iteration → 1 frame per loop = true 60 Hz.
     \ Flip happens IMMEDIATELY after vsync (still in vblank window), so
@@ -713,24 +728,37 @@ VARIABLE dig-pending        \ frames left to re-render digital + flash
 
     bk-vram @ KVAR-RGVRAM !       \ target the new back for all draws
 
-    \ Per-second housekeeping (sync, mn/dig pending triggers).
+    \ Per-second housekeeping (sync triggers, pending counters).
     clk-sc @ last-sc @ <> IF
       clk-sc @ last-sc !
       clk-sc @ 59 = fn-enabled @ AND IF sync-from-fn THEN
       sync-flash @ 0 > IF -1 sync-flash +! THEN
-      2 dig-pending !             \ refresh digital on next 2 backs
+      2 ss-pending !              \ :SS always changes every second
       clk-mn @ last-mn @ <> IF
         clk-mn @ last-mn !
+        2 hm-pending !
         2 mn-pending !
+        clk-dy @ last-dy @ <> IF
+          clk-dy @ last-dy !
+          2 date-pending !
+        THEN
       THEN
     THEN
 
-    \ Digital + flash only when pending — saves ~3500 cycles/frame on
-    \ the 58/60 frames where sec hasn't changed.
-    dig-pending @ 0 > IF
-      render-datetime
+    \ Split digital render — each group only repaints when its source
+    \ changed.  Cuts the sec-change frame from ~7,174 → ~1,350cy.
+    date-pending @ 0 > IF
+      render-date
+      -1 date-pending +!
+    THEN
+    hm-pending @ 0 > IF
+      render-hm
+      -1 hm-pending +!
+    THEN
+    ss-pending @ 0 > IF
+      render-ss
       render-sync-flash
-      -1 dig-pending +!
+      -1 ss-pending +!
     THEN
 
     \ Hands: full tick-hands while mn-pending covers both backs after

@@ -20,8 +20,8 @@
 </head>
 <body>
 
-<h1>Clock — 60-Frame Cycle Map (1 Local Second, Mid-Minute, post-#452)</h1>
-<h2>Smooth-sweep second hand uses precomputed endpoint tables + pixel-endpoint dedup.  Only ~3 of 60 frames do pixel work; the rest skip the beam pipeline.  sec rolls at frame 0; dig-pending=2 covers the next two back buffers.  No mn change, no :59 sync in this sample.</h2>
+<h1>Clock — 60-Frame Cycle Map (1 Local Second, Mid-Minute, post-#452 + #448)</h1>
+<h2>Smooth-sweep second hand uses precomputed endpoint tables + pixel-endpoint dedup.  Only ~3 of 60 frames do pixel work; the rest skip the beam pipeline.  Digital readout split into date/hm/ss groups, each on its own pending counter so only the 2 :SS digits get repainted on typical sec changes.  No mn change, no :59 sync in this sample.</h2>
 
 <div class="chart-container">
   <canvas id="chart" width="1200" height="500"></canvas>
@@ -63,9 +63,11 @@ const COMPONENTS = [
   { name: 'redraw-sc-back (skip)', key: 'rscs', color: '#884444' },   // dedup path, no pixel work
   { name: 'tick-hands (mn)',    key: 'th',    color: '#cc2222' },   // only on mn change
 
-  // Digital + badge (dig-pending driven)
-  { name: 'render-datetime',    key: 'rd',    color: '#ffaa66' },
-  { name: 'render-sync-flash',  key: 'rsf',   color: '#ffcc88' },
+  // Digital + badge (split into three independent cadences after #448)
+  { name: 'render-date (boot/day)', key: 'rdate', color: '#ffaa66' },  // 8 chars
+  { name: 'render-hm (min)',      key: 'rhm',    color: '#ffbb77' },  // 5 chars
+  { name: 'render-ss (sec)',      key: 'rss',    color: '#ffcc88' },  // 2 chars
+  { name: 'render-sync-flash',  key: 'rsf',   color: '#ffdda0' },
 ];
 
 // Cycle costs — measured via fc.py --cycles, typical paths (no worst-case branches)
@@ -83,8 +85,10 @@ const COSTS = {
   rsc: 1968,        // redraw-sc-back draw path (table lookup + beam trace/draw/restore)
   rscs: 180,        // redraw-sc-back skip path (endpoint unchanged — just tables + compare)
   th: 24558,        // tick-hands — only on mn change
-  rd:  7174,        // render-datetime
-  rsf: 1780,        // render-sync-flash
+  rdate: 4301,      // render-date (YYYY.MM.DD)
+  rhm:   1961,      // render-hm (HH:MM)
+  rss:    912,      // render-ss (SS)
+  rsf:   1780,      // render-sync-flash
 };
 
 // Precompute which frames are "draw frames" for the sec hand — i.e. the
@@ -108,9 +112,11 @@ const DRAW_FRAMES = new Set();
 })();
 
 function buildFrame(f) {
-  // sec rolls at frame 0; dig-pending=2 fires on frames 0 and 1
+  // sec rolls at frame 0 → ss-pending=2 fires on frames 0 and 1.
+  // Mid-minute sample: no min change, no day change, so hm-pending and
+  // date-pending stay 0 all second.
   const secChange   = (f === 0);
-  const digPending  = (f === 0 || f === 1);
+  const ssPending   = (f === 0 || f === 1);
   const isDraw      = DRAW_FRAMES.has(f);
 
   return {
@@ -127,8 +133,10 @@ function buildFrame(f) {
     rsc:  isDraw ? COSTS.rsc  : 0,
     rscs: isDraw ? 0          : COSTS.rscs,
     th:   0,  // not firing this second
-    rd:   digPending ? COSTS.rd  : 0,
-    rsf:  digPending ? COSTS.rsf : 0,
+    rdate: 0,            // no date change this second
+    rhm:   0,            // no min change this second
+    rss:   ssPending ? COSTS.rss : 0,
+    rsf:   ssPending ? COSTS.rsf : 0,
   };
 }
 
@@ -270,9 +278,11 @@ statsEl.innerHTML = `
   frame drops from 9,608cy (64% budget) to ~1,440cy (10%).
   <br><br>
   <span style="color:#ff4488">Sec-change frames (0 and 1):</span>
-  <code>render-datetime</code> (7,174cy) + <code>render-sync-flash</code> (1,780cy) =
-  ~11,000cy total (74% of budget) — now fits in one vblank on a draw frame, versus
-  the previous 124% overrun.
+  After issue #448 the digital render splits into three groups.  Only
+  <code>render-ss</code> (912cy) + <code>render-sync-flash</code> (1,780cy) fires
+  on typical sec changes.  <code>render-hm</code> (1,961cy) waits for a minute change;
+  <code>render-date</code> (4,301cy) waits for a day change.  Sec-change add-on drops
+  from 8,954cy to ~2,692cy — the whole frame now well under budget even with a draw frame.
   <br><br>
   <span style="color:#ff4488">Minute-change frames (not shown):</span>
   <code>tick-hands</code> (24,558cy) fires for 2 consecutive frames every 60 seconds,
