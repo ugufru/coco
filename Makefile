@@ -11,8 +11,10 @@ DEMOS        = bounce calculator kaleidoscope rain tetris rg-test typewriter
 KERNEL       = forth/kernel
 DSK          = build/demos.dsk
 TUTORIAL_DSK = build/tutorial.dsk
+FNTIME_DSK   = build/fntime.dsk
+CLOCK_DSK    = build/clock.dsk
 
-.PHONY: all kernel demos dsk tutorial-dsk dsks clean
+.PHONY: all kernel demos dsk tutorial-dsk dsks fntime-dsk clock-dsk clean
 
 all: demos
 
@@ -83,6 +85,41 @@ tutorial-dsk:
 	@echo "  In DECB:  LOADM\"HELLO\":EXEC"
 
 dsks: dsk tutorial-dsk
+
+# Single-program DSK with the FujiNet RTC demo, for the FujiNet SD card.
+# Builds the .bin via the demo's own Makefile, then wraps it in a DECB image.
+fntime-dsk: kernel
+	@command -v decb >/dev/null 2>&1 || { \
+	    echo ""; \
+	    echo "  Error: 'decb' not found on PATH."; \
+	    echo "  Install Toolshed: https://github.com/boisy/toolshed"; \
+	    exit 1; \
+	}
+	$(MAKE) -C src/fujinet-time
+	@mkdir -p build
+	decb dskini $(FNTIME_DSK)
+	decb copy src/fujinet-time/fujinet-time.bin $(FNTIME_DSK),FNTIME.BIN -2
+	@echo ""
+	@echo "  $(FNTIME_DSK) created."
+	@echo "  Copy to your FujiNet SD card."
+	@echo "  In DECB:  LOADM\"FNTIME\":EXEC"
+
+# Single-program DSK with the analog+digital clock demo.
+clock-dsk: kernel
+	@command -v decb >/dev/null 2>&1 || { \
+	    echo ""; \
+	    echo "  Error: 'decb' not found on PATH."; \
+	    echo "  Install Toolshed: https://github.com/boisy/toolshed"; \
+	    exit 1; \
+	}
+	$(MAKE) -C src/clock
+	@mkdir -p build
+	decb dskini $(CLOCK_DSK)
+	decb copy src/clock/clock.bin $(CLOCK_DSK),CLOCK.BIN -2
+	@echo ""
+	@echo "  $(CLOCK_DSK) created."
+	@echo "  Copy to your FujiNet SD card."
+	@echo "  In DECB:  LOADM\"CLOCK\":EXEC"
 
 clean:
 	@for d in $(DEMOS); do rm -f src/$$d/$$d.bin; done

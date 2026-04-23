@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Clock — 60-Frame Cycle Budget</title>
+<style>
+  body { background: #1a1a2e; color: #e0e0e0; font-family: 'Menlo', 'Consolas', monospace; margin: 0; padding: 20px; }
+  h1 { color: #ff4488; font-size: 18px; margin-bottom: 4px; }
+  h2 { color: #888; font-size: 13px; font-weight: normal; margin-top: 0; }
+  .chart-container { position: relative; margin: 20px 0; }
+  canvas { display: block; }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; font-size: 12px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-swatch { width: 14px; height: 14px; border-radius: 2px; }
+  .stats { margin-top: 20px; font-size: 13px; line-height: 1.8; }
+  .stats .over { color: #ff4444; }
+  .stats .ok { color: #00ff88; }
+  code { color: #66ccee; background: #0a0a1a; padding: 1px 4px; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<h1>Clock — 60-Frame Cycle Map (1 Local Second, Mid-Minute)</h1>
+<h2>Smooth-sweep second hand updates every vsync.  sec rolls at frame 0; dig-pending=2 covers the next two back buffers.  No mn change, no :59 sync in this sample.</h2>
+
+<div class="chart-container">
+  <canvas id="chart" width="1200" height="500"></canvas>
+</div>
+
+<div class="legend" id="legend"></div>
+
+<div class="stats" id="stats"></div>
+
+<script>
+const BUDGET = 14917;  // 894886 Hz / 59.94 Hz NTSC
+const FRAMES = 60;
+const BAR_W = 16;
+const GAP = 4;
+const LEFT = 60;
+const TOP = 30;
+const BOTTOM = 60;
+const MAX_CY = 28000;
+
+// Component colors — warm reds for sec work, blue/teal for back-buffer
+// management, greens for static per-frame overhead.
+const COMPONENTS = [
+  // Per-frame housekeeping (every frame)
+  { name: 'vsync wait',         key: 'vs',    color: '#446699' },   // vsync+
+  { name: 'set-sam-f-fast',     key: 'flip',  color: '#5588bb' },   // page flip
+  { name: 'flip-state',         key: 'fs',    color: '#66aaee' },   // pointer swap
+  { name: 'tick-frame',         key: 'tf',    color: '#337755' },   // vs-cnt++ + rollover check
+  { name: 'KVAR-RGVRAM set',    key: 'kvs',   color: '#448866' },   // target back
+  { name: 'per-sec IF check',   key: 'sc',    color: '#559977' },
+  { name: 'dig-pending check',  key: 'dp',    color: '#5fa882' },
+  { name: 'mn-pending check',   key: 'mp',    color: '#6ab890' },
+  { name: 'loop overhead',      key: 'lo',    color: '#80c0a0' },
+
+  // Seconds-change work (fires on rollover only)
+  { name: 'tick-second',        key: 'ts',    color: '#ff8844' },
+
+  // Hand rendering
+  { name: 'redraw-sc-back',     key: 'rsc',   color: '#ff4444' },   // smooth sweep, every frame
+  { name: 'tick-hands (mn)',    key: 'th',    color: '#cc2222' },   // only on mn change
+
+  // Digital + badge (dig-pending driven)
+  { name: 'render-datetime',    key: 'rd',    color: '#ffaa66' },
+  { name: 'render-sync-flash',  key: 'rsf',   color: '#ffcc88' },
+];
+
+// Cycle costs — measured via fc.py --cycles, typical paths (no worst-case branches)
+const COSTS = {
+  vs:   152,        // vsync+ (CODE-ish wrapper)
+  flip: 169,        // set-sam-f-fast CODE
+  fs:   197,        // flip-state CODE
+  tf:   304,        // tick-frame no-rollover path
+  kvs:   60,        // bk-vram @ KVAR-RGVRAM !
+  sc:   100,        // clk-sc @ last-sc @ <> IF (false)
+  dp:    30,        // dig-pending @ 0 > IF (false)
+  mp:   100,        // mn-pending @ 0 > IF (false)
+  lo:   100,        // AGAIN branch overhead
+  ts:  2376,        // tick-second cascade (only on rollover)
+  rsc: 8396,        // redraw-sc-back — dominant cost
+  th: 24558,        // tick-hands — only on mn change
+  rd:  7174,        // render-datetime
+  rsf: 1780,        // render-sync-flash
+};
+
+function buildFrame(f) {
+  // sec rolls at frame 0; dig-pending=2 fires on frames 0 and 1
+  const secChange   = (f === 0);
+  const digPending  = (f === 0 || f === 1);
+
+  return {
+    vs:   COSTS.vs,
+    flip: COSTS.flip,
+    fs:   COSTS.fs,
+    tf:   COSTS.tf + (secChange ? COSTS.ts : 0),   // folds tick-second in on rollover
+    kvs:  COSTS.kvs,
+    sc:   COSTS.sc,
+    dp:   COSTS.dp,
+    mp:   COSTS.mp,
+    lo:   COSTS.lo,
+    ts:   0,  // already folded into tf above
+    rsc:  COSTS.rsc,
+    th:   0,  // not firing this second
+    rd:   digPending ? COSTS.rd  : 0,
+    rsf:  digPending ? COSTS.rsf : 0,
+  };
+}
+
+// Build all frames
+const frames = [];
+for (let f = 0; f < FRAMES; f++) frames.push(buildFrame(f));
+
+// Draw
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
+const chartW = canvas.width - LEFT - 20;
+const chartH = canvas.height - TOP - BOTTOM;
+
+function yPos(cy) {
+  return TOP + chartH - (cy / MAX_CY) * chartH;
+}
+
+// Background
+ctx.fillStyle = '#1a1a2e';
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+// Y-axis gridlines
+ctx.strokeStyle = '#333';
+ctx.lineWidth = 1;
+ctx.font = '11px Menlo, Consolas, monospace';
+ctx.fillStyle = '#666';
+ctx.textAlign = 'right';
+for (let cy = 0; cy <= MAX_CY; cy += 5000) {
+  const y = yPos(cy);
+  ctx.beginPath();
+  ctx.moveTo(LEFT, y);
+  ctx.lineTo(canvas.width - 20, y);
+  ctx.stroke();
+  ctx.fillText((cy / 1000).toFixed(0) + 'K', LEFT - 8, y + 4);
+}
+
+// Budget line
+ctx.strokeStyle = '#ff4444';
+ctx.lineWidth = 2;
+ctx.setLineDash([6, 4]);
+ctx.beginPath();
+ctx.moveTo(LEFT, yPos(BUDGET));
+ctx.lineTo(canvas.width - 20, yPos(BUDGET));
+ctx.stroke();
+ctx.setLineDash([]);
+ctx.fillStyle = '#ff4444';
+ctx.textAlign = 'left';
+ctx.fillText('BUDGET 14,917cy', canvas.width - 150, yPos(BUDGET) - 6);
+
+// Draw stacked bars
+let overCount = 0;
+let totalCycles = 0;
+
+for (let f = 0; f < FRAMES; f++) {
+  const x = LEFT + f * (BAR_W + GAP);
+  const data = frames[f];
+  let y = yPos(0);
+
+  let frameTotal = 0;
+  for (const comp of COMPONENTS) {
+    const val = data[comp.key];
+    if (!val) continue;
+    const h = (val / MAX_CY) * chartH;
+    ctx.fillStyle = comp.color;
+    ctx.fillRect(x, y - h, BAR_W, h);
+    y -= h;
+    frameTotal += val;
+  }
+
+  totalCycles += frameTotal;
+  if (frameTotal > BUDGET) overCount++;
+
+  // Frame number
+  ctx.fillStyle = '#aaa';
+  ctx.textAlign = 'center';
+  ctx.font = '9px Menlo, Consolas, monospace';
+  ctx.fillText(f, x + BAR_W / 2, canvas.height - BOTTOM + 14);
+
+  // Over-budget marker
+  if (frameTotal > BUDGET) {
+    ctx.fillStyle = '#ff4444';
+    ctx.font = 'bold 10px Menlo, Consolas, monospace';
+    const totalY = yPos(frameTotal);
+    ctx.fillText((frameTotal / 1000).toFixed(1) + 'K', x + BAR_W / 2, totalY - 4);
+  }
+}
+
+// X-axis label
+ctx.fillStyle = '#888';
+ctx.textAlign = 'center';
+ctx.font = '12px Menlo, Consolas, monospace';
+ctx.fillText('Frame Number (1 local second = 60 frames @ 60fps VSYNC)', LEFT + chartW / 2, canvas.height - 8);
+
+// Y-axis label
+ctx.save();
+ctx.translate(14, TOP + chartH / 2);
+ctx.rotate(-Math.PI / 2);
+ctx.fillText('CPU Cycles', 0, 0);
+ctx.restore();
+
+// Legend
+const legendEl = document.getElementById('legend');
+for (const comp of COMPONENTS) {
+  const item = document.createElement('div');
+  item.className = 'legend-item';
+  item.innerHTML = `<div class="legend-swatch" style="background:${comp.color}"></div>${comp.name}`;
+  legendEl.appendChild(item);
+}
+const budgetItem = document.createElement('div');
+budgetItem.className = 'legend-item';
+budgetItem.innerHTML = `<div class="legend-swatch" style="background:#ff4444; height:3px; margin:5px 0;"></div>Budget (14,917cy)`;
+legendEl.appendChild(budgetItem);
+
+// Stats
+const avgCycles = totalCycles / FRAMES;
+let totalVsyncs = 0;
+for (let f = 0; f < FRAMES; f++) {
+  let fc = 0;
+  for (const comp of COMPONENTS) fc += frames[f][comp.key] || 0;
+  totalVsyncs += Math.ceil(fc / BUDGET);
+}
+const effectiveFPS = Math.round(FRAMES / totalVsyncs * 60 * 10) / 10;
+const statsEl = document.getElementById('stats');
+statsEl.innerHTML = `
+  <span class="${overCount ? 'over' : 'ok'}">Frames over budget: ${overCount} of ${FRAMES} (${Math.round(overCount/FRAMES*100)}%)</span><br>
+  <span class="ok">Frames under budget: ${FRAMES - overCount} of ${FRAMES} (${Math.round((FRAMES-overCount)/FRAMES*100)}%)</span><br>
+  Average cycles/frame: ${Math.round(avgCycles).toLocaleString()}cy
+  (${Math.round(avgCycles / BUDGET * 100)}% of budget)<br>
+  Effective frame rate: ~${effectiveFPS} fps (over-budget frames cost 2 vsyncs each)<br>
+  Local-second drift: ~${Math.round((totalVsyncs - 60) * 1000 / 60)}ms per real second<br>
+  <br>
+  <span style="color:#ff4488">Dominant cost:</span>
+  <code>redraw-sc-back</code> (8,396cy) runs every frame for the smooth-sweep second hand.
+  <code>angle-dx</code>/<code>angle-dy</code> (each ~2,800cy) account for most of it — sin/cos
+  table lookup plus a signed 16×16 multiply, all in Forth.  Converting these to CODE
+  would drop the typical frame from 9,608cy (64%) to ~4,500cy (30%).
+  <br><br>
+  <span style="color:#ff4488">Sec-change frames (0 and 1):</span>
+  <code>render-datetime</code> (7,174cy) + <code>render-sync-flash</code> (1,780cy) =
+  +8,954cy on top of the typical 9,608cy = 18,562cy total (124% of budget).
+  <code>dig-pending=2</code> keeps both back buffers fresh without requiring every-frame
+  digital re-render.  These two frames take ~2 real frames each.
+  <br><br>
+  <span style="color:#ff4488">Minute-change frames (not shown):</span>
+  <code>tick-hands</code> (24,558cy) fires for 2 consecutive frames every 60 seconds,
+  replacing <code>redraw-sc-back</code>.  Each such frame totals ~34,724cy (233% of budget)
+  and takes ~3 real frames to render.  Costs 4 extra real frames per minute.
+  <br><br>
+  <span style="color:#ff4488">:59 sync frame (not shown, production only):</span>
+  <code>sync-from-fn</code> (5,387cy) runs once per minute at sec=59 in production,
+  pushing that frame to ~23,949cy (160% of budget).  1 extra real frame per minute.
+  <br><br>
+  <span style="color:#00ff88">Self-correcting:</span>
+  Adaptive <code>vps</code> calibration measures actual <code>vsync+</code> calls per
+  real-second (reported by FN sync) and adjusts the tick-frame rollover threshold
+  (scaled by 16 for sub-vsync precision).  On hardware this absorbs the ~2ms/sec
+  drift caused by sec-change and minute-change frame overruns.  See <code>calibrate-vps</code>
+  in <code>clock.fs</code>.
+`;
+</script>
+
+</body>
+</html>

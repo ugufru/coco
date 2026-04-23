@@ -2062,7 +2062,8 @@ CODE_BEAM_TRACE
         ADDA    #6
         LDB     ,Y
         PSHS    A
-        BEQ     @nr
+        TSTA                    ; bug fix (#446): BEQ must test A (shift),
+        BEQ     @nr             ; not B (VRAM byte from LDB)
 @rsh    LSRB
         DECA
         BNE     @rsh

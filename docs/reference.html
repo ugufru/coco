@@ -1299,6 +1299,61 @@ CODE fast-plot   ( x y -- )
         </table>
       </div>
 
+      <!-- fujinet.fs -->
+      <div class="ref-section">
+        <h3>FujiNet Device</h3>
+        <p class="lib-path">INCLUDE lib/fujinet.fs</p>
+        <p>Talks to a FujiNet cartridge over the HDB-DOS DriveWire
+        bit-banger. Each primitive briefly switches SAM TY back to ROM
+        mode so the cart vectors at <code>$D93F</code> (read) and
+        <code>$D941</code> (write) are visible, then restores all-RAM
+        on return. The kernel return stack <code>S</code> lives inside
+        the ROM overlay window, so a small temp stack inside each CODE
+        word body is used during the call.</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">dw-write</td>
+            <td class="stack-effect">( buf len -- )</td>
+            <td>Send <code>len</code> bytes from <code>buf</code> via
+            HDB-DOS DWWrite. <em>CODE word.</em></td>
+          </tr>
+          <tr>
+            <td class="word-name">dw-read</td>
+            <td class="stack-effect">( buf len -- ok )</td>
+            <td>Read <code>len</code> bytes into <code>buf</code> via
+            HDB-DOS DWRead. <code>ok</code> = 1 on success, 0 on
+            timeout. <em>CODE word.</em></td>
+          </tr>
+          <tr>
+            <td class="word-name">fn-ping</td>
+            <td class="stack-effect">( -- ok )</td>
+            <td>Single FujiNet handshake attempt
+            (<code>$E2&nbsp;$00</code>, then read 1 ack byte).
+            <code>ok</code> = 1 if the device answered.</td>
+          </tr>
+          <tr>
+            <td class="word-name">fn-ready</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Loop <code>fn-ping</code> until the device acks. Spins
+            forever if no FujiNet is attached &mdash; callers wanting
+            visible progress should build their own loop around
+            <code>fn-ping</code>.</td>
+          </tr>
+          <tr>
+            <td class="word-name">fn-time</td>
+            <td class="stack-effect">( buf -- )</td>
+            <td>Hand-shakes, sends <code>$23</code>, reads 6 bytes into
+            <code>buf</code>: year&minus;1900, month, day, hour,
+            minute, second (UTC).</td>
+          </tr>
+        </table>
+      </div>
+
       <!-- sound.fs -->
       <div class="ref-section">
         <h3>Sound Effects</h3>
