@@ -175,6 +175,26 @@ CODE flip-state
         STX     FVAR_bk_sc_lty
         STD     FVAR_fr_sc_lty
 
+        LDD     FVAR_bk_mn_ltx
+        LDX     FVAR_fr_mn_ltx
+        STX     FVAR_bk_mn_ltx
+        STD     FVAR_fr_mn_ltx
+
+        LDD     FVAR_bk_mn_lty
+        LDX     FVAR_fr_mn_lty
+        STX     FVAR_bk_mn_lty
+        STD     FVAR_fr_mn_lty
+
+        LDD     FVAR_bk_hr_ltx
+        LDX     FVAR_fr_hr_ltx
+        STX     FVAR_bk_hr_ltx
+        STD     FVAR_fr_hr_ltx
+
+        LDD     FVAR_bk_hr_lty
+        LDX     FVAR_fr_hr_lty
+        STX     FVAR_bk_hr_lty
+        STD     FVAR_fr_hr_lty
+
         PULS    X
         ;NEXT
 ;CODE
@@ -351,16 +371,6 @@ VARIABLE _hb
   THEN ;
 
 
-\ Hand-angle calculations (return clock-degrees 0..359)
-: hr-angle  ( -- deg )
-  clk-hr @ 12 /MOD DROP 30 *
-  clk-mn @ 2 / + ;
-
-\ Hands tick discretely (once per minute / once per second), so the
-\ angle calcs don't need sub-second smoothness.
-
-: mn-angle  ( -- deg )  clk-mn @ 6 * ;
-
 \ Smooth-sweep second-hand angle includes sub-second progress so the
 \ hand updates 60 Hz instead of jumping each tick.  vs-cnt and vps are
 \ both scaled by 16, so their ratio (vs-cnt/vps) is unitless seconds.
@@ -369,6 +379,15 @@ VARIABLE _hb
 : sc-angle  ( -- deg )
   clk-sc @ 6 *
   vs-cnt @ 6 *  vps @ /  + ;
+
+\ Smooth-sweep minute/hour angles (return clock-degrees 0..359).
+\ mn advances 1° every ~10 real-sec; hr every ~2 real-min.  All three
+\ hands share the same time base so motion stays proportional.
+: mn-angle  ( -- deg )  clk-mn @ 6 *  sc-angle 60 / + ;
+
+: hr-angle  ( -- deg )
+  clk-hr @ 12 /MOD DROP 30 *
+  mn-angle 12 / + ;
 
 
 \ Precomputed sec-hand endpoint tables.  Indexed by clock-angle 0..359.
@@ -436,49 +455,207 @@ CODE sec-ty-tab
 ;CODE
 
 
-\ Last rendered endpoint per back buffer — lets us skip the beam
-\ trace/draw/restore pipeline on frames where the sec hand's integer
-\ endpoint hasn't moved (at 60 Hz the angle only advances 0.1°/frame, so
-\ most frames land on the same pixel).  That's what actually keeps the
-\ loop under one vblank.  Two sets of lasts, one per back buffer.
+\ Precomputed hr-hand endpoint tables.  R-HR=24.
+CODE hr-tx-tab
+        LEAY    @tab,PCR
+        STY     ,--U
+        ;NEXT
+@tab    FCB     64,64,64,65,65,65,65,65,66,66,66,66,66,67,67,67
+        FCB     67,68,68,68,68,68,68,69,69,69,69,69,70,70,70,70
+        FCB     70,71,71,71,71,71,71,72,72,72,72,72,72,72,73,73
+        FCB     73,73,73,73,73,74,74,74,74,74,74,74,74,74,75,75
+        FCB     75,75,75,75,75,75,75,75,75,75,76,76,76,76,76,76
+        FCB     76,76,76,76,76,76,76,76,76,76,76,76,76,76,76,76
+        FCB     76,76,76,76,76,76,76,76,76,76,76,75,75,75,75,75
+        FCB     75,75,75,75,75,75,75,74,74,74,74,74,74,74,74,74
+        FCB     73,73,73,73,73,73,73,72,72,72,72,72,72,72,71,71
+        FCB     71,71,71,71,70,70,70,70,70,69,69,69,69,69,68,68
+        FCB     68,68,68,68,67,67,67,67,66,66,66,66,66,65,65,65
+        FCB     65,65,64,64,64,64,64,63,63,63,63,63,62,62,62,62
+        FCB     62,61,61,61,61,60,60,60,60,60,60,59,59,59,59,59
+        FCB     58,58,58,58,58,57,57,57,57,57,57,56,56,56,56,56
+        FCB     56,56,55,55,55,55,55,55,55,54,54,54,54,54,54,54
+        FCB     54,54,53,53,53,53,53,53,53,53,53,53,53,53,52,52
+        FCB     52,52,52,52,52,52,52,52,52,52,52,52,52,52,52,52
+        FCB     52,52,52,52,52,52,52,52,52,52,52,52,52,52,52,53
+        FCB     53,53,53,53,53,53,53,53,53,53,53,54,54,54,54,54
+        FCB     54,54,54,54,55,55,55,55,55,55,55,56,56,56,56,56
+        FCB     56,56,57,57,57,57,57,57,58,58,58,58,58,59,59,59
+        FCB     59,59,60,60,60,60,60,60,61,61,61,61,62,62,62,62
+        FCB     62,63,63,63,63,63,64,64
+;CODE
+
+CODE hr-ty-tab
+        LEAY    @tab,PCR
+        STY     ,--U
+        ;NEXT
+@tab    FCB     48,48,48,48,48,48,48,48,48,48,48,48,49,49,49,49
+        FCB     49,49,49,49,49,50,50,50,50,50,50,51,51,51,51,51
+        FCB     52,52,52,52,53,53,53,53,54,54,54,54,55,55,55,56
+        FCB     56,56,57,57,57,58,58,58,59,59,59,60,60,60,61,61
+        FCB     61,62,62,63,63,63,64,64,65,65,65,66,66,67,67,67
+        FCB     68,68,69,69,69,70,70,71,71,72,72,72,73,73,74,74
+        FCB     75,75,75,76,76,77,77,77,78,78,79,79,79,80,80,81
+        FCB     81,81,82,82,83,83,83,84,84,84,85,85,85,86,86,86
+        FCB     87,87,87,88,88,88,89,89,89,90,90,90,90,91,91,91
+        FCB     91,92,92,92,92,93,93,93,93,93,94,94,94,94,94,94
+        FCB     95,95,95,95,95,95,95,95,95,96,96,96,96,96,96,96
+        FCB     96,96,96,96,96,96,96,96,96,96,96,96,96,96,96,96
+        FCB     95,95,95,95,95,95,95,95,95,94,94,94,94,94,94,93
+        FCB     93,93,93,93,92,92,92,92,91,91,91,91,90,90,90,90
+        FCB     89,89,89,88,88,88,87,87,87,86,86,86,85,85,85,84
+        FCB     84,84,83,83,83,82,82,81,81,81,80,80,79,79,79,78
+        FCB     78,77,77,77,76,76,75,75,75,74,74,73,73,72,72,72
+        FCB     71,71,70,70,69,69,69,68,68,67,67,67,66,66,65,65
+        FCB     65,64,64,63,63,63,62,62,61,61,61,60,60,60,59,59
+        FCB     59,58,58,58,57,57,57,56,56,56,55,55,55,54,54,54
+        FCB     54,53,53,53,53,52,52,52,52,51,51,51,51,51,50,50
+        FCB     50,50,50,50,49,49,49,49,49,49,49,49,49,48,48,48
+        FCB     48,48,48,48,48,48,48,48
+;CODE
+
+\ Precomputed mn-hand endpoint tables.  R-MN=40.
+CODE mn-tx-tab
+        LEAY    @tab,PCR
+        STY     ,--U
+        ;NEXT
+@tab    FCB     64,64,65,65,65,66,66,66,67,67,67,68,68,68,69,69
+        FCB     70,70,70,71,71,71,71,72,72,72,73,73,73,74,74,74
+        FCB     75,75,75,75,76,76,76,77,77,77,77,78,78,78,78,79
+        FCB     79,79,79,80,80,80,80,80,81,81,81,81,81,81,82,82
+        FCB     82,82,82,82,83,83,83,83,83,83,83,83,83,83,84,84
+        FCB     84,84,84,84,84,84,84,84,84,84,84,84,84,84,84,84
+        FCB     84,84,84,84,84,84,84,83,83,83,83,83,83,83,83,83
+        FCB     83,82,82,82,82,82,82,81,81,81,81,81,81,80,80,80
+        FCB     80,80,79,79,79,79,78,78,78,78,77,77,77,77,76,76
+        FCB     76,75,75,75,75,74,74,74,73,73,73,72,72,72,71,71
+        FCB     71,71,70,70,70,69,69,68,68,68,67,67,67,66,66,66
+        FCB     65,65,65,64,64,64,63,63,63,62,62,62,61,61,61,60
+        FCB     60,60,59,59,58,58,58,57,57,57,57,56,56,56,55,55
+        FCB     55,54,54,54,53,53,53,53,52,52,52,51,51,51,51,50
+        FCB     50,50,50,49,49,49,49,48,48,48,48,48,47,47,47,47
+        FCB     47,47,46,46,46,46,46,46,45,45,45,45,45,45,45,45
+        FCB     45,45,44,44,44,44,44,44,44,44,44,44,44,44,44,44
+        FCB     44,44,44,44,44,44,44,44,44,44,44,45,45,45,45,45
+        FCB     45,45,45,45,45,46,46,46,46,46,46,47,47,47,47,47
+        FCB     47,48,48,48,48,48,49,49,49,49,50,50,50,50,51,51
+        FCB     51,51,52,52,52,53,53,53,53,54,54,54,55,55,55,56
+        FCB     56,56,57,57,57,57,58,58,58,59,59,60,60,60,61,61
+        FCB     61,62,62,62,63,63,63,64
+;CODE
+
+CODE mn-ty-tab
+        LEAY    @tab,PCR
+        STY     ,--U
+        ;NEXT
+@tab    FCB     32,32,32,32,32,32,32,32,32,32,33,33,33,33,33,33
+        FCB     34,34,34,34,34,35,35,35,35,36,36,36,37,37,37,38
+        FCB     38,38,39,39,40,40,40,41,41,42,42,43,43,44,44,45
+        FCB     45,46,46,47,47,48,48,49,50,50,51,51,52,53,53,54
+        FCB     54,55,56,56,57,58,58,59,60,60,61,62,62,63,64,64
+        FCB     65,66,66,67,68,69,69,70,71,71,72,73,73,74,75,75
+        FCB     76,77,78,78,79,80,80,81,82,82,83,84,84,85,86,86
+        FCB     87,88,88,89,90,90,91,91,92,93,93,94,94,95,96,96
+        FCB     97,97,98,98,99,99,100,100,101,101,102,102,103,103,104,104
+        FCB     104,105,105,106,106,106,107,107,107,108,108,108,109,109,109,109
+        FCB     110,110,110,110,110,111,111,111,111,111,111,112,112,112,112,112
+        FCB     112,112,112,112,112,112,112,112,112,112,112,112,112,112,111,111
+        FCB     111,111,111,111,110,110,110,110,110,109,109,109,109,108,108,108
+        FCB     107,107,107,106,106,106,105,105,104,104,104,103,103,102,102,101
+        FCB     101,100,100,99,99,98,98,97,97,96,96,95,94,94,93,93
+        FCB     92,91,91,90,90,89,88,88,87,86,86,85,84,84,83,82
+        FCB     82,81,80,80,79,78,78,77,76,75,75,74,73,73,72,71
+        FCB     71,70,69,69,68,67,66,66,65,64,64,63,62,62,61,60
+        FCB     60,59,58,58,57,56,56,55,54,54,53,53,52,51,51,50
+        FCB     50,49,48,48,47,47,46,46,45,45,44,44,43,43,42,42
+        FCB     41,41,40,40,40,39,39,38,38,38,37,37,37,36,36,36
+        FCB     35,35,35,35,34,34,34,34,34,33,33,33,33,33,33,32
+        FCB     32,32,32,32,32,32,32,32
+;CODE
+
+
+\ Last rendered endpoint per back buffer for each hand.  Lets us skip
+\ the beam trace/draw/restore pipeline on frames where the integer pixel
+\ endpoint hasn't moved.  Cascade redraw in z-order when any hand moves.
 VARIABLE bk-sc-ltx   VARIABLE bk-sc-lty
 VARIABLE fr-sc-ltx   VARIABLE fr-sc-lty
+VARIABLE bk-mn-ltx   VARIABLE bk-mn-lty
+VARIABLE fr-mn-ltx   VARIABLE fr-mn-lty
+VARIABLE bk-hr-ltx   VARIABLE bk-hr-lty
+VARIABLE fr-hr-ltx   VARIABLE fr-hr-lty
 
-\ Single-hand redraw on the BACK buffer.  Used every frame for the
-\ smooth-sweep second hand — far cheaper than a full tick-hands pass.
-\ Min/hr are assumed unchanged since the last back render.
-\ Uses the precomputed endpoint tables so per-frame path has no trig;
-\ dedups on integer endpoint so most frames do zero pixel work.
-: redraw-sc-back  ( -- )
-  sc-angle
-  DUP sec-tx-tab + C@ tx2 !
-  sec-ty-tab + C@ ty2 !
-  tx2 @ bk-sc-ltx @ =
-  ty2 @ bk-sc-lty @ = AND 0= IF
-    tx2 @ bk-sc-ltx !   ty2 @ bk-sc-lty !
+\ Scratch for this frame's computed endpoints.
+VARIABLE new-sc-tx   VARIABLE new-sc-ty
+VARIABLE new-mn-tx   VARIABLE new-mn-ty
+VARIABLE new-hr-tx   VARIABLE new-hr-ty
+VARIABLE movelvl             \ 0=none 1=sc 2=mn 3=hr (lowest moved hand)
+
+\ Unified smooth-sweep redraw for all three hands.  Every frame:
+\   • compute current endpoints via table lookup (no trig math)
+\   • determine lowest hand whose integer endpoint changed
+\   • erase top-down to that hand, redraw bottom-up from that hand
+\ Nothing-moved frames skip the beam pipeline entirely.  Each back
+\ buffer tracks its own lasts, so after flip the new back catches up.
+: redraw-hands  ( -- )
+  sc-angle DUP sec-tx-tab + C@ new-sc-tx !  sec-ty-tab + C@ new-sc-ty !
+  mn-angle DUP mn-tx-tab  + C@ new-mn-tx !  mn-ty-tab  + C@ new-mn-ty !
+  hr-angle DUP hr-tx-tab  + C@ new-hr-tx !  hr-ty-tab  + C@ new-hr-ty !
+
+  0 movelvl !
+  new-hr-tx @ bk-hr-ltx @ <>  new-hr-ty @ bk-hr-lty @ <>  OR IF
+    3 movelvl !
+  ELSE new-mn-tx @ bk-mn-ltx @ <>  new-mn-ty @ bk-mn-lty @ <>  OR IF
+    2 movelvl !
+  ELSE new-sc-tx @ bk-sc-ltx @ <>  new-sc-ty @ bk-sc-lty @ <>  OR IF
+    1 movelvl !
+  THEN THEN THEN
+
+  movelvl @ 0= 0= IF
+    \ Erase top-down to the lowest moved hand.
     bk-sc-buf @ bk-sc-len @ erase-line
-    CX CY tx2 @ ty2 @ bk-sc-buf @ beam-trace bk-sc-len !
+    movelvl @ 1 > IF bk-mn-buf @ bk-mn-len @ erase-line THEN
+    movelvl @ 2 > IF bk-hr-buf @ bk-hr-len @ erase-line THEN
+
+    \ Redraw bottom-up from the lowest moved hand.
+    movelvl @ 2 > IF
+      CX CY new-hr-tx @ new-hr-ty @ bk-hr-buf @ beam-trace bk-hr-len !
+      bk-hr-buf @ bk-hr-len @ C-WHITE paint-line
+      new-hr-tx @ bk-hr-ltx !  new-hr-ty @ bk-hr-lty !
+    THEN
+    movelvl @ 1 > IF
+      CX CY new-mn-tx @ new-mn-ty @ bk-mn-buf @ beam-trace bk-mn-len !
+      bk-mn-buf @ bk-mn-len @ C-WHITE paint-line
+      new-mn-tx @ bk-mn-ltx !  new-mn-ty @ bk-mn-lty !
+    THEN
+    CX CY new-sc-tx @ new-sc-ty @ bk-sc-buf @ beam-trace bk-sc-len !
     bk-sc-buf @ bk-sc-len @ C-RED paint-line
+    new-sc-tx @ bk-sc-ltx !  new-sc-ty @ bk-sc-lty !
   THEN ;
 
 
-\ Erase ALL hands top-down then redraw them all bottom-up — applied
-\ to whichever buffer is currently the BACK.  Each VRAM has its own
-\ trio of beam buffers so the saved-pixel state stays consistent
-\ with that buffer's actual contents.
+\ Full-force repaint used by paint-back-full during init.  Draws all
+\ three hands unconditionally via the endpoint tables and refreshes the
+\ lasts so redraw-hands enters the loop with a correct baseline.
 : tick-hands  ( -- )
+  sc-angle DUP sec-tx-tab + C@ new-sc-tx !  sec-ty-tab + C@ new-sc-ty !
+  mn-angle DUP mn-tx-tab  + C@ new-mn-tx !  mn-ty-tab  + C@ new-mn-ty !
+  hr-angle DUP hr-tx-tab  + C@ new-hr-tx !  hr-ty-tab  + C@ new-hr-ty !
+
   bk-sc-buf @ bk-sc-len @ erase-line
   bk-mn-buf @ bk-mn-len @ erase-line
   bk-hr-buf @ bk-hr-len @ erase-line
 
-  hr-angle R-HR bk-hr-buf @ trace-line bk-hr-len !
+  CX CY new-hr-tx @ new-hr-ty @ bk-hr-buf @ beam-trace bk-hr-len !
   bk-hr-buf @ bk-hr-len @ C-WHITE paint-line
+  new-hr-tx @ bk-hr-ltx !  new-hr-ty @ bk-hr-lty !
 
-  mn-angle R-MN bk-mn-buf @ trace-line bk-mn-len !
+  CX CY new-mn-tx @ new-mn-ty @ bk-mn-buf @ beam-trace bk-mn-len !
   bk-mn-buf @ bk-mn-len @ C-WHITE paint-line
+  new-mn-tx @ bk-mn-ltx !  new-mn-ty @ bk-mn-lty !
 
-  sc-angle R-SC bk-sc-buf @ trace-line bk-sc-len !
-  bk-sc-buf @ bk-sc-len @ C-RED paint-line ;
+  CX CY new-sc-tx @ new-sc-ty @ bk-sc-buf @ beam-trace bk-sc-len !
+  bk-sc-buf @ bk-sc-len @ C-RED paint-line
+  new-sc-tx @ bk-sc-ltx !  new-sc-ty @ bk-sc-lty ! ;
 
 
 \ ── Digital readout via rg-char ────────────────────────────────────
@@ -702,7 +879,6 @@ VARIABLE _dc  VARIABLE _dr
 VARIABLE last-sc
 VARIABLE last-mn
 VARIABLE last-dy
-VARIABLE mn-pending         \ frames left to do full tick-hands after mn change
 VARIABLE ss-pending         \ frames left to re-render :SS + flash
 VARIABLE hm-pending         \ frames left to re-render HH:MM
 VARIABLE date-pending       \ frames left to re-render YYYY.MM.DD
@@ -711,7 +887,6 @@ VARIABLE date-pending       \ frames left to re-render YYYY.MM.DD
   clk-sc @ last-sc !
   clk-mn @ last-mn !
   clk-dy @ last-dy !
-  0 mn-pending !
   \ Paint all three digital groups on the first 2 backs so both VRAMs
   \ match before we start relying on split renders.
   2 ss-pending !
@@ -728,7 +903,7 @@ VARIABLE date-pending       \ frames left to re-render YYYY.MM.DD
 
     bk-vram @ KVAR-RGVRAM !       \ target the new back for all draws
 
-    \ Per-second housekeeping (sync triggers, pending counters).
+    \ Per-second housekeeping (sync + digital pending counters).
     clk-sc @ last-sc @ <> IF
       clk-sc @ last-sc !
       clk-sc @ 59 = fn-enabled @ AND IF sync-from-fn THEN
@@ -737,7 +912,6 @@ VARIABLE date-pending       \ frames left to re-render YYYY.MM.DD
       clk-mn @ last-mn @ <> IF
         clk-mn @ last-mn !
         2 hm-pending !
-        2 mn-pending !
         clk-dy @ last-dy @ <> IF
           clk-dy @ last-dy !
           2 date-pending !
@@ -761,14 +935,10 @@ VARIABLE date-pending       \ frames left to re-render YYYY.MM.DD
       -1 ss-pending +!
     THEN
 
-    \ Hands: full tick-hands while mn-pending covers both backs after
-    \ a minute change; otherwise just the cheap sec-hand redraw.
-    mn-pending @ 0 > IF
-      tick-hands
-      -1 mn-pending +!
-    ELSE
-      redraw-sc-back
-    THEN
+    \ Smooth-sweep all three hands.  Buffer-private lasts drive the
+    \ dedup + cascade logic, so no pending counter is needed — each back
+    \ catches up on its own next visit.
+    redraw-hands
   AGAIN ;
 
 : main  ( -- )

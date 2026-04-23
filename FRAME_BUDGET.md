@@ -48,22 +48,24 @@ atomic from the raster's perspective.
 
 | Word | Cycles | Runs when |
 |------|--------|-----------|
-| `tick-hands` | 24,558 | mn change (2 frames per minute) |
-| `redraw-sc-back` (draw path) | 1,968 | When tx/ty moved — pixel-dedup saves most frames (was 8,396 via ep2/angle-dx/dy; see #452) |
-| `redraw-sc-back` (skip path) | ~180 | When endpoint unchanged — tables lookup + compare, no beam work |
-| `render-datetime` | 7,223 | Full repaint (used at boot only) |
-| `trace-line` | 6,720 | Inside each hand redraw |
-| `ep1` / `ep2` | 5,923 | Inside trace-line |
+| `redraw-hands` | 11,732 | Worst case (hr+mn+sc all moved); typical mid-frame is base + dedup ~5,560cy |
+| `tick-hands` | 8,891 | Boot only via paint-back-full — full repaint of all 3 hands |
+| `render-datetime` | 7,223 | Full repaint (boot only) |
+| `trace-line` | 6,720 | Used by face-circle / face-ticks (init) |
+| `ep1` / `ep2` | 5,923 | Used by face-circle / face-ticks (init) |
 | `sync-from-fn` | 5,387 | Once per minute (production) or boot (fake-time) |
 | `render-date` | 4,301 | Day/boot only (see #448) |
 | `tick-frame` | 2,897 | Every frame (worst case — rollover) |
-| `angle-dx` | 2,824 | Inside ep1 / ep2 |
-| `angle-dy` | 2,741 | Inside ep1 / ep2 |
+| `angle-dx` | 2,824 | Used by ep1 / ep2 |
+| `angle-dy` | 2,741 | Used by ep1 / ep2 |
 | `tick-second` | 2,376 | Rollover only |
 | `render-year` | 2,278 | Part of render-date |
+| `hr-angle` | 1,924 | Per frame (smooth-sweep, see #453) |
 | `render-hm` | 1,961 | Minute/boot only (see #448) |
 | `render-sync-flash` | 1,780 | With ss-pending |
-| `render-ss` | 912 | Every sec change — was embedded in render-datetime (7,174cy) |
+| `mn-angle` | 1,268 | Per frame (smooth-sweep, see #453) |
+| `render-ss` | 912 | Every sec change |
+| `sc-angle` | 751 | Per frame |
 | `tick-frame` (no rollover) | ~304 | Every frame typical |
 | `sc-angle` | 751 | Every frame |
 | `vsync+` | 152 | Every frame (plus the vblank wait itself) |

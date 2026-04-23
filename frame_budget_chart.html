@@ -20,8 +20,8 @@
 </head>
 <body>
 
-<h1>Clock — 60-Frame Cycle Map (1 Local Second, Mid-Minute, post-#452 + #448)</h1>
-<h2>Smooth-sweep second hand uses precomputed endpoint tables + pixel-endpoint dedup.  Only ~3 of 60 frames do pixel work; the rest skip the beam pipeline.  Digital readout split into date/hm/ss groups, each on its own pending counter so only the 2 :SS digits get repainted on typical sec changes.  No mn change, no :59 sync in this sample.</h2>
+<h1>Clock — 60-Frame Cycle Map (1 Local Second, Mid-Minute, post-#452 + #448 + #453)</h1>
+<h2>All three hands now smooth-sweep via precomputed endpoint tables (hr R=24, mn R=40, sc R=46).  Every frame computes current endpoints, dedups against the buffer's lasts, and cascades erase+redraw in z-order (hr &lt; mn &lt; sc) only when something moved.  Digital readout split into date/hm/ss groups, each on its own pending counter so only the 2 :SS digits get repainted on typical sec changes.  No mn change, no :59 sync in this sample.</h2>
 
 <div class="chart-container">
   <canvas id="chart" width="1200" height="500"></canvas>
@@ -58,10 +58,11 @@ const COMPONENTS = [
   // Seconds-change work (fires on rollover only)
   { name: 'tick-second',        key: 'ts',    color: '#ff8844' },
 
-  // Hand rendering
-  { name: 'redraw-sc-back (draw)', key: 'rsc',  color: '#ff4444' },   // smooth sweep, draw path
-  { name: 'redraw-sc-back (skip)', key: 'rscs', color: '#884444' },   // dedup path, no pixel work
-  { name: 'tick-hands (mn)',    key: 'th',    color: '#cc2222' },   // only on mn change
+  // Hand rendering (all three hands via endpoint tables + cascade redraw)
+  { name: 'redraw-hands (base: lookup+compare)', key: 'rhb', color: '#884444' },
+  { name: 'redraw-hands (sc draw)',  key: 'rhs', color: '#ff4444' },  // ~3 frames/sec
+  { name: 'redraw-hands (mn draw)',  key: 'rhm', color: '#dd3333' },  // ~6/min
+  { name: 'redraw-hands (hr draw)',  key: 'rhh', color: '#aa2222' },  // ~30/hour
 
   // Digital + badge (split into three independent cadences after #448)
   { name: 'render-date (boot/day)', key: 'rdate', color: '#ffaa66' },  // 8 chars
@@ -74,19 +75,21 @@ const COMPONENTS = [
 const COSTS = {
   vs:   152,        // vsync+ (CODE-ish wrapper)
   flip: 169,        // set-sam-f-fast CODE
-  fs:   245,        // flip-state CODE (9 pair swaps including sec-lt lasts)
+  fs:   341,        // flip-state CODE (15 pair swaps incl. mn/hr lasts per #453)
   tf:   304,        // tick-frame no-rollover path
   kvs:   60,        // bk-vram @ KVAR-RGVRAM !
   sc:   100,        // clk-sc @ last-sc @ <> IF (false)
-  dp:    30,        // dig-pending @ 0 > IF (false)
-  mp:   100,        // mn-pending @ 0 > IF (false)
+  dp:    30,        // pending check (false)
+  mp:   100,        // pending check (false)
   lo:   100,        // AGAIN branch overhead
   ts:  2376,        // tick-second cascade (only on rollover)
-  rsc: 1968,        // redraw-sc-back draw path (table lookup + beam trace/draw/restore)
-  rscs: 180,        // redraw-sc-back skip path (endpoint unchanged — just tables + compare)
-  th: 24558,        // tick-hands — only on mn change
-  rdate: 4301,      // render-date (YYYY.MM.DD)
-  rhm:   1961,      // render-hm (HH:MM)
+  // redraw-hands (#453): one entry covers the whole cascade, split by path
+  rhb:  5560,       // base: sc-angle + mn-angle + hr-angle + 3 × endpoint lookup + compare
+  rhs:  2000,       // +erase/trace/paint for sec hand (46 px) — when sc moved
+  rhm:  2000,       // +erase/trace/paint for mn hand (40 px) — when mn moved
+  rhh:  1400,       // +erase/trace/paint for hr hand (24 px) — when hr moved
+  rdate: 4301,      // render-date (YYYY.MM.DD) — day/boot only
+  rhmd:  1961,      // render-hm (HH:MM) — minute/boot only
   rss:    912,      // render-ss (SS)
   rsf:   1780,      // render-sync-flash
 };
@@ -112,29 +115,32 @@ const DRAW_FRAMES = new Set();
 })();
 
 function buildFrame(f) {
-  // sec rolls at frame 0 → ss-pending=2 fires on frames 0 and 1.
-  // Mid-minute sample: no min change, no day change, so hm-pending and
-  // date-pending stay 0 all second.
-  const secChange   = (f === 0);
-  const ssPending   = (f === 0 || f === 1);
-  const isDraw      = DRAW_FRAMES.has(f);
+  // Mid-minute sample: sec rolls at frame 0 → ss-pending=2 on frames 0,1.
+  // No min change, no day change this second → hm-pending, date-pending = 0.
+  // mn-hand doesn't move (integer mn-angle stable across this minute).
+  // hr-hand doesn't move either.  Only the sec hand draws, on the
+  // DRAW_FRAMES identified above.
+  const secChange  = (f === 0);
+  const ssPending  = (f === 0 || f === 1);
+  const scMoved    = DRAW_FRAMES.has(f);
 
   return {
     vs:   COSTS.vs,
     flip: COSTS.flip,
     fs:   COSTS.fs,
-    tf:   COSTS.tf + (secChange ? COSTS.ts : 0),   // folds tick-second in on rollover
+    tf:   COSTS.tf + (secChange ? COSTS.ts : 0),
     kvs:  COSTS.kvs,
     sc:   COSTS.sc,
     dp:   COSTS.dp,
     mp:   COSTS.mp,
     lo:   COSTS.lo,
-    ts:   0,  // already folded into tf above
-    rsc:  isDraw ? COSTS.rsc  : 0,
-    rscs: isDraw ? 0          : COSTS.rscs,
-    th:   0,  // not firing this second
-    rdate: 0,            // no date change this second
-    rhm:   0,            // no min change this second
+    ts:   0,
+    rhb:  COSTS.rhb,                             // always fires
+    rhs:  scMoved ? COSTS.rhs : 0,
+    rhm:  0,                                     // no mn move this sample
+    rhh:  0,                                     // no hr move this sample
+    rdate: 0,
+    rhmd: 0,
     rss:   ssPending ? COSTS.rss : 0,
     rsf:   ssPending ? COSTS.rsf : 0,
   };
@@ -268,21 +274,26 @@ statsEl.innerHTML = `
   Effective frame rate: ~${effectiveFPS} fps (over-budget frames cost 2 vsyncs each)<br>
   Local-second drift: ~${Math.round((totalVsyncs - 60) * 1000 / 60)}ms per real second<br>
   <br>
-  <span style="color:#ff4488">Endpoint-dedup optimization (issue #452):</span>
-  <code>redraw-sc-back</code> no longer calls <code>ep2</code>/<code>angle-dx</code>/<code>angle-dy</code>
-  every frame.  Two 360-byte lookup tables (<code>sec-tx-tab</code>, <code>sec-ty-tab</code>)
-  hold precomputed endpoints for every clock-degree.  At 60 fps the angle only advances
-  0.1°/frame, so consecutive frames share the same integer (tx, ty) pixel.  Frames that
-  detect an unchanged endpoint skip erase+trace+paint entirely — ~180cy instead of 1,968cy.
-  In a mid-minute sample only ~3 frames out of 60 do real pixel work, and the typical
-  frame drops from 9,608cy (64% budget) to ~1,440cy (10%).
+  <span style="color:#ff4488">Smooth-sweep all three hands (issue #453):</span>
+  <code>redraw-hands</code> replaces the old <code>redraw-sc-back</code> /
+  <code>tick-hands</code> split.  Every frame computes hr/mn/sc endpoints via three
+  pairs of 360-byte tables, finds the lowest hand whose integer pixel moved, then
+  erases top-down and redraws bottom-up from there in z-order.  At our angular
+  resolution mn moves once every ~10 sec, hr once every ~2 min — both visually
+  continuous, no more discrete tick events.  Base lookup+compare costs ~5,560cy/frame,
+  plus ~2,000cy per hand that actually moved.
+  <br><br>
+  <span style="color:#ff4488">Endpoint-dedup foundation (issue #452):</span>
+  At 60 fps the sec hand angle only advances 0.1°/frame, so consecutive frames usually
+  share the same integer (tx, ty) pixel.  Only ~3 of 60 frames per second redraw the
+  sec hand.  Combined with the cascade in #453, mid-minute frames cost ~6-8k cycles
+  (40-55% of budget) — leaving comfortable headroom for the digital render.
   <br><br>
   <span style="color:#ff4488">Sec-change frames (0 and 1):</span>
   After issue #448 the digital render splits into three groups.  Only
   <code>render-ss</code> (912cy) + <code>render-sync-flash</code> (1,780cy) fires
   on typical sec changes.  <code>render-hm</code> (1,961cy) waits for a minute change;
-  <code>render-date</code> (4,301cy) waits for a day change.  Sec-change add-on drops
-  from 8,954cy to ~2,692cy — the whole frame now well under budget even with a draw frame.
+  <code>render-date</code> (4,301cy) waits for a day change.
   <br><br>
   <span style="color:#ff4488">Minute-change frames (not shown):</span>
   <code>tick-hands</code> (24,558cy) fires for 2 consecutive frames every 60 seconds,
