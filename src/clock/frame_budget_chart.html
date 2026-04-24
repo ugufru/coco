@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Clock — 60-Frame Cycle Budget</title>
+<style>
+  body { background: #1a1a2e; color: #e0e0e0; font-family: 'Menlo', 'Consolas', monospace; margin: 0; padding: 20px; }
+  h1 { color: #ff4488; font-size: 18px; margin-bottom: 4px; }
+  h2 { color: #888; font-size: 13px; font-weight: normal; margin-top: 0; }
+  .chart-container { position: relative; margin: 20px 0; }
+  canvas { display: block; }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; font-size: 12px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-swatch { width: 14px; height: 14px; border-radius: 2px; }
+  .stats { margin-top: 20px; font-size: 13px; line-height: 1.8; }
+  .stats .over { color: #ff4444; }
+  .stats .ok { color: #00ff88; }
+  code { color: #66ccee; background: #0a0a1a; padding: 1px 4px; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<h1>Clock — 60-Frame Cycle Map (post-#452 + #448 + #453 + #454 + #455)</h1>
+<h2>All three hands smooth-sweep via precomputed endpoint tables (hr R=24, mn R=40, sc R=46).  Every frame computes current endpoints, dedups against the buffer's lasts, and cascades erase+redraw in z-order (hr &lt; mn &lt; sc) only when something moved.  Angle math (sc/mn/hr-angle) runs in a single CODE word (compute-angles, 282cy) instead of three Forth calls (was 3,940cy).  Digital readout split into date/hm/ss groups.  Two scenarios shown: the typical mid-minute second and the minute-boundary second — with #455 both are now fully under budget.</h2>
+
+<h3 style="color:#88ccaa; margin-top: 18px;">Scenario A — Mid-minute second (58 of every 60 sec)</h3>
+<div class="chart-container">
+  <canvas id="chart-mid" width="1200" height="500"></canvas>
+</div>
+<div class="legend" id="legend-mid"></div>
+<div class="stats" id="stats-mid"></div>
+
+<h3 style="color:#ffaa88; margin-top: 32px;">Scenario B — Minute-boundary second (the :59 → :00 transition, 1 of every 60 sec)</h3>
+<div class="chart-container">
+  <canvas id="chart-min" width="1200" height="500"></canvas>
+</div>
+<div class="stats" id="stats-min"></div>
+
+<script>
+const BUDGET = 14917;  // 894886 Hz / 59.94 Hz NTSC
+const FRAMES = 60;
+const BAR_W = 16;
+const GAP = 4;
+const LEFT = 60;
+const TOP = 30;
+const BOTTOM = 60;
+const MAX_CY = 28000;
+
+// Component colors — warm reds for sec work, blue/teal for back-buffer
+// management, greens for static per-frame overhead.
+const COMPONENTS = [
+  // Per-frame housekeeping (every frame)
+  { name: 'vsync wait',         key: 'vs',    color: '#446699' },   // vsync+
+  { name: 'set-sam-f-fast',     key: 'flip',  color: '#5588bb' },   // page flip
+  { name: 'flip-state',         key: 'fs',    color: '#66aaee' },   // pointer swap
+  { name: 'tick-frame',         key: 'tf',    color: '#337755' },   // vs-cnt++ + rollover check
+  { name: 'KVAR-RGVRAM set',    key: 'kvs',   color: '#448866' },   // target back
+  { name: 'per-sec IF check',   key: 'sc',    color: '#559977' },
+  { name: 'dig-pending check',  key: 'dp',    color: '#5fa882' },
+  { name: 'mn-pending check',   key: 'mp',    color: '#6ab890' },
+  { name: 'loop overhead',      key: 'lo',    color: '#80c0a0' },
+
+  // Seconds-change work (fires on rollover only)
+  { name: 'tick-second',        key: 'ts',    color: '#ff8844' },
+
+  // Hand rendering (all three hands via endpoint tables + cascade redraw)
+  { name: 'redraw-hands (base: lookup+compare)', key: 'rhb', color: '#884444' },
+  { name: 'redraw-hands (sc draw)',  key: 'rhs', color: '#ff4444' },  // ~3 frames/sec
+  { name: 'redraw-hands (mn draw)',  key: 'rhm', color: '#dd3333' },  // ~6/min
+  { name: 'redraw-hands (hr draw)',  key: 'rhh', color: '#aa2222' },  // ~30/hour
+
+  // Digital + badge (split into three independent cadences after #448)
+  { name: 'render-date (boot/day)', key: 'rdate', color: '#ffaa66' },  // 8 chars
+  { name: 'render-hm (min)',      key: 'rhm',    color: '#ffbb77' },  // 5 chars
+  { name: 'render-ss (sec)',      key: 'rss',    color: '#ffcc88' },  // 2 chars
+  { name: 'render-sync-flash',  key: 'rsf',   color: '#ffdda0' },
+];
+
+// Cycle costs — measured via fc.py --cycles, typical paths (no worst-case branches)
+const COSTS = {
+  vs:   152,        // vsync+ (CODE-ish wrapper)
+  flip: 169,        // set-sam-f-fast CODE
+  fs:   341,        // flip-state CODE (15 pair swaps incl. mn/hr lasts per #453)
+  tf:   304,        // tick-frame no-rollover path
+  kvs:   60,        // bk-vram @ KVAR-RGVRAM !
+  sc:   100,        // clk-sc @ last-sc @ <> IF (false)
+  dp:    30,        // pending check (false)
+  mp:   100,        // pending check (false)
+  lo:   100,        // AGAIN branch overhead
+  ts:  2376,        // tick-second cascade (only on rollover)
+  // redraw-hands (#453, #455): one entry covers the whole cascade, split by path
+  rhb:  1900,       // base: compute-angles CODE (282) + 3 × endpoint lookup + compare + lasts (post-#455; was 5,560 with Forth angles)
+  rhs:  2000,       // +erase/trace/paint for sec hand (46 px) — when sc moved
+  rhm:  2000,       // +erase/trace/paint for mn hand (40 px) — when mn moved
+  rhh:  1400,       // +erase/trace/paint for hr hand (24 px) — when hr moved
+  rdate: 4301,      // render-date (YYYY.MM.DD) — day/boot only
+  rhmd:  1961,      // render-hm (HH:MM) — minute/boot only
+  rss:    912,      // render-ss (SS)
+  rsf:   1780,      // render-sync-flash
+};
+
+// For a given starting clock-second, compute which of the next 60 frames
+// see the sec-hand integer endpoint change (a "draw frame").  Each second
+// sweeps 6° in 0.1° increments, so consecutive frames usually share the
+// same (tx, ty) pixel.  Returns a Set of frame indices.
+function computeDrawFrames(secBase) {
+  const set = new Set();
+  const R = 46, CX = 64, CY = 72;
+  let prevTx = null, prevTy = null;
+  for (let i = 0; i < 60; i++) {
+    const a = (secBase * 6 + Math.floor((i * 16 * 6) / 960)) % 360;
+    const rad = a * Math.PI / 180;
+    const tx = CX + Math.round(Math.sin(rad) * R * 0.55);
+    const ty = CY - Math.round(Math.cos(rad) * R);
+    if (tx !== prevTx || ty !== prevTy) set.add(i);
+    prevTx = tx; prevTy = ty;
+  }
+  return set;
+}
+
+// Build a 60-frame scenario.  `minBoundary` flips on the hm-pending and
+// the mn-hand redraw on the rollover frames (0, 1).
+function buildScenario(secBase, minBoundary) {
+  const drawFrames = computeDrawFrames(secBase);
+  const frames = [];
+  for (let f = 0; f < 60; f++) {
+    const secChange = (f === 0);
+    const ssPending = (f === 0 || f === 1);
+    const hmPending = minBoundary && (f === 0 || f === 1);
+    const scMoved   = drawFrames.has(f);
+    // mn endpoint shifts once per ~10 sec; on minute boundary it shifts
+    // on the rollover frames (0/1) — same frames as hm-pending.
+    const mnMoved   = minBoundary && (f === 0 || f === 1);
+    frames.push({
+      vs:   COSTS.vs,
+      flip: COSTS.flip,
+      fs:   COSTS.fs,
+      tf:   COSTS.tf + (secChange ? COSTS.ts : 0),
+      kvs:  COSTS.kvs,
+      sc:   COSTS.sc,
+      dp:   COSTS.dp,
+      mp:   COSTS.mp,
+      lo:   COSTS.lo,
+      ts:   0,
+      rhb:  COSTS.rhb,
+      rhs:  (scMoved || mnMoved) ? COSTS.rhs : 0,  // sc redraws when mn does
+      rhm:  mnMoved ? COSTS.rhm : 0,
+      rhh:  0,                                      // hr doesn't move within 1 sec
+      rdate: 0,
+      rhmd:  hmPending ? COSTS.rhmd : 0,
+      rss:   ssPending ? COSTS.rss : 0,
+      rsf:   ssPending ? COSTS.rsf : 0,
+    });
+  }
+  return frames;
+}
+
+const FRAMES_MID = buildScenario(30, false);
+const FRAMES_MIN = buildScenario(59, true);
+
+function renderChart(canvasId, frames) {
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+  const chartW = canvas.width - LEFT - 20;
+  const chartH = canvas.height - TOP - BOTTOM;
+  const yPos = cy => TOP + chartH - (cy / MAX_CY) * chartH;
+
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1;
+  ctx.font = '11px Menlo, Consolas, monospace';
+  ctx.fillStyle = '#666';
+  ctx.textAlign = 'right';
+  for (let cy = 0; cy <= MAX_CY; cy += 5000) {
+    const y = yPos(cy);
+    ctx.beginPath();
+    ctx.moveTo(LEFT, y);
+    ctx.lineTo(canvas.width - 20, y);
+    ctx.stroke();
+    ctx.fillText((cy / 1000).toFixed(0) + 'K', LEFT - 8, y + 4);
+  }
+
+  ctx.strokeStyle = '#ff4444';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  ctx.moveTo(LEFT, yPos(BUDGET));
+  ctx.lineTo(canvas.width - 20, yPos(BUDGET));
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#ff4444';
+  ctx.textAlign = 'left';
+  ctx.fillText('BUDGET 14,917cy', canvas.width - 150, yPos(BUDGET) - 6);
+
+  let overCount = 0;
+  let totalCycles = 0;
+  for (let f = 0; f < frames.length; f++) {
+    const x = LEFT + f * (BAR_W + GAP);
+    const data = frames[f];
+    let y = yPos(0);
+    let frameTotal = 0;
+    for (const comp of COMPONENTS) {
+      const val = data[comp.key];
+      if (!val) continue;
+      const h = (val / MAX_CY) * chartH;
+      ctx.fillStyle = comp.color;
+      ctx.fillRect(x, y - h, BAR_W, h);
+      y -= h;
+      frameTotal += val;
+    }
+    totalCycles += frameTotal;
+    if (frameTotal > BUDGET) overCount++;
+
+    ctx.fillStyle = '#aaa';
+    ctx.textAlign = 'center';
+    ctx.font = '9px Menlo, Consolas, monospace';
+    ctx.fillText(f, x + BAR_W / 2, canvas.height - BOTTOM + 14);
+
+    if (frameTotal > BUDGET) {
+      ctx.fillStyle = '#ff4444';
+      ctx.font = 'bold 10px Menlo, Consolas, monospace';
+      const totalY = yPos(frameTotal);
+      ctx.fillText((frameTotal / 1000).toFixed(1) + 'K', x + BAR_W / 2, totalY - 4);
+    }
+  }
+
+  ctx.fillStyle = '#888';
+  ctx.textAlign = 'center';
+  ctx.font = '12px Menlo, Consolas, monospace';
+  ctx.fillText('Frame Number (1 local second = 60 frames @ 60fps VSYNC)', LEFT + chartW / 2, canvas.height - 8);
+
+  ctx.save();
+  ctx.translate(14, TOP + chartH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('CPU Cycles', 0, 0);
+  ctx.restore();
+
+  return { overCount, totalCycles };
+}
+
+function renderStats(elId, frames, overCount, totalCycles) {
+  const avgCycles = totalCycles / frames.length;
+  let totalVsyncs = 0;
+  for (const fr of frames) {
+    let fc = 0;
+    for (const comp of COMPONENTS) fc += fr[comp.key] || 0;
+    totalVsyncs += Math.ceil(fc / BUDGET);
+  }
+  const effectiveFPS = Math.round(frames.length / totalVsyncs * 60 * 10) / 10;
+  document.getElementById(elId).innerHTML = `
+    <span class="${overCount ? 'over' : 'ok'}">Frames over budget: ${overCount} of ${frames.length} (${Math.round(overCount/frames.length*100)}%)</span><br>
+    <span class="ok">Frames under budget: ${frames.length - overCount} of ${frames.length} (${Math.round((frames.length-overCount)/frames.length*100)}%)</span><br>
+    Average cycles/frame: ${Math.round(avgCycles).toLocaleString()}cy
+    (${Math.round(avgCycles / BUDGET * 100)}% of budget)<br>
+    Effective frame rate for this second: ~${effectiveFPS} fps
+    (over-budget frames each cost an extra vblank)<br>
+    Local-second drift: ~${Math.round((totalVsyncs - 60) * 1000 / 60)}ms vs real-time<br>
+  `;
+}
+
+function renderLegend(elId) {
+  const el = document.getElementById(elId);
+  for (const comp of COMPONENTS) {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `<div class="legend-swatch" style="background:${comp.color}"></div>${comp.name}`;
+    el.appendChild(item);
+  }
+  const b = document.createElement('div');
+  b.className = 'legend-item';
+  b.innerHTML = `<div class="legend-swatch" style="background:#ff4444; height:3px; margin:5px 0;"></div>Budget (14,917cy)`;
+  el.appendChild(b);
+}
+
+const midResult = renderChart('chart-mid', FRAMES_MID);
+renderStats('stats-mid', FRAMES_MID, midResult.overCount, midResult.totalCycles);
+renderLegend('legend-mid');
+
+const minResult = renderChart('chart-min', FRAMES_MIN);
+renderStats('stats-min', FRAMES_MIN, minResult.overCount, minResult.totalCycles);
+
+// Per-minute summary appended below the second chart.
+document.getElementById('stats-min').innerHTML += `
+  <br>
+  <span style="color:#ff4488">Smooth-sweep all three hands (issue #453):</span>
+  <code>redraw-hands</code> computes hr/mn/sc endpoints via three pairs of 360-byte
+  tables, finds the lowest hand whose integer pixel moved, then erases top-down and
+  redraws bottom-up from there in z-order.
+  <br><br>
+  <span style="color:#ff4488">Angle math as CODE (issue #455):</span>
+  <code>compute-angles</code> computes sc/mn/hr angles (each derived from clk-sc,
+  vs-cnt, vps, clk-mn, clk-hr via *6, /vps, /60, /12) in a single 282-cycle CODE
+  word, vs 3,943cy across the three Forth colon definitions.  Base redraw-hands cost
+  drops from 5,560cy to 1,900cy, and the Scenario B minute-boundary frames now fit
+  in one vblank with headroom.
+  <br><br>
+  <span style="color:#ff4488">Day-boundary frames (not shown):</span>
+  At midnight, frame 0 also fires render-date (4,301cy).  With #455 that still fits:
+  total ~18,600cy is barely over 1 vblank (125%).  Two frames lost once per day — trivial.
+  <br><br>
+  <span style="color:#ff4488">:59 sync frame (production only):</span>
+  When FN sync is enabled, <code>sync-from-fn</code> (5,387cy) runs once per minute
+  at sec=59, pushing that frame's total to ~12,300cy (still under budget) — except
+  in fake-time dev mode where the sync is skipped.
+  <br><br>
+  <span style="color:#00ff88">Self-correcting on hardware:</span>
+  Adaptive <code>vps</code> calibration measures actual <code>vsync+</code> calls per
+  real-second (reported by FN sync) and adjusts the tick-frame rollover threshold
+  (scaled by 16 for sub-vsync precision).  Absorbs the per-minute drift on its
+  own — see <code>calibrate-vps</code> in <code>clock.fs</code>.
+`;
+</script>
+
+</body>
+</html>

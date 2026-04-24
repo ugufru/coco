@@ -403,6 +403,87 @@ VARIABLE _hb
   clk-hr @ 12 /MOD DROP 30 *
   mn-angle 12 / + ;
 
+\ Cached angles populated by compute-angles below.  Per-frame redraw
+\ uses these instead of calling sc/mn/hr-angle three times.
+VARIABLE sa  VARIABLE ma  VARIABLE ha
+
+\ CODE version of all three angle calcs in one shot (#455).  Saves
+\ ~3,000cy/frame vs the Forth versions: replaces three colon defs (each
+\ paying DOCOL/EXIT and per-op ITC overhead) plus the 16-bit / divides.
+\ Stores results into FVAR_sa, FVAR_ma, FVAR_ha so redraw-hands can
+\ just @ them.  Forth sc-angle / mn-angle / hr-angle remain for the
+\ boot path (face init, tick-hands).
+CODE compute-angles
+        PSHS    X
+        ; ── sc = clk-sc * 6 + (vs-cnt * 6) / vps ────────────────────
+        LDA     #6
+        LDB     FVAR_clk_sc+1
+        MUL                             ; D = clk-sc * 6  (max 354)
+        STD     @scbase,PCR
+
+        LDD     FVAR_vs_cnt
+        STD     @tmp,PCR
+        ASLB
+        ROLA                            ; D *= 2
+        ADDD    @tmp,PCR                ; D *= 3
+        ASLB
+        ROLA                            ; D *= 2 → vs-cnt * 6
+
+        LDY     #0
+@scd    CMPD    FVAR_vps
+        BLO     @scdd
+        SUBD    FVAR_vps
+        LEAY    1,Y
+        BRA     @scd
+@scdd   TFR     Y,D
+        ADDD    @scbase,PCR
+        STD     FVAR_sa
+
+        ; ── mn = clk-mn * 6 + sa / 60 ────────────────────────────────
+        LDA     #6
+        LDB     FVAR_clk_mn+1
+        MUL                             ; D = clk-mn * 6  (max 354)
+        STD     @mnbase,PCR
+
+        LDD     FVAR_sa
+        LDY     #0
+@mnd    CMPD    #60
+        BLO     @mndd
+        SUBD    #60
+        LEAY    1,Y
+        BRA     @mnd
+@mndd   TFR     Y,D
+        ADDD    @mnbase,PCR
+        STD     FVAR_ma
+
+        ; ── hr = (clk-hr % 12) * 30 + ma / 12 ────────────────────────
+        LDB     FVAR_clk_hr+1
+        CMPB    #12
+        BLO     @hr12
+        SUBB    #12
+@hr12   LDA     #30
+        MUL                             ; D = (clk-hr%12) * 30  (max 330)
+        STD     @hrbase,PCR
+
+        LDD     FVAR_ma
+        LDY     #0
+@hrd    CMPD    #12
+        BLO     @hrdd
+        SUBD    #12
+        LEAY    1,Y
+        BRA     @hrd
+@hrdd   TFR     Y,D
+        ADDD    @hrbase,PCR
+        STD     FVAR_ha
+
+        PULS    X
+        ;NEXT
+@scbase FDB     0
+@mnbase FDB     0
+@hrbase FDB     0
+@tmp    FDB     0
+;CODE
+
 
 \ Precomputed sec-hand endpoint tables.  Indexed by clock-angle 0..359.
 \ Each entry holds the absolute endpoint pixel coord for the sec hand at
@@ -611,9 +692,10 @@ VARIABLE movelvl             \ 0=none 1=sc 2=mn 3=hr (lowest moved hand)
 \ Nothing-moved frames skip the beam pipeline entirely.  Each back
 \ buffer tracks its own lasts, so after flip the new back catches up.
 : redraw-hands  ( -- )
-  sc-angle DUP sec-tx-tab + C@ new-sc-tx !  sec-ty-tab + C@ new-sc-ty !
-  mn-angle DUP mn-tx-tab  + C@ new-mn-tx !  mn-ty-tab  + C@ new-mn-ty !
-  hr-angle DUP hr-tx-tab  + C@ new-hr-tx !  hr-ty-tab  + C@ new-hr-ty !
+  compute-angles
+  sa @ DUP sec-tx-tab + C@ new-sc-tx !  sec-ty-tab + C@ new-sc-ty !
+  ma @ DUP mn-tx-tab  + C@ new-mn-tx !  mn-ty-tab  + C@ new-mn-ty !
+  ha @ DUP hr-tx-tab  + C@ new-hr-tx !  hr-ty-tab  + C@ new-hr-ty !
 
   0 movelvl !
   new-hr-tx @ bk-hr-ltx @ <>  new-hr-ty @ bk-hr-lty @ <>  OR IF
@@ -651,9 +733,10 @@ VARIABLE movelvl             \ 0=none 1=sc 2=mn 3=hr (lowest moved hand)
 \ three hands unconditionally via the endpoint tables and refreshes the
 \ lasts so redraw-hands enters the loop with a correct baseline.
 : tick-hands  ( -- )
-  sc-angle DUP sec-tx-tab + C@ new-sc-tx !  sec-ty-tab + C@ new-sc-ty !
-  mn-angle DUP mn-tx-tab  + C@ new-mn-tx !  mn-ty-tab  + C@ new-mn-ty !
-  hr-angle DUP hr-tx-tab  + C@ new-hr-tx !  hr-ty-tab  + C@ new-hr-ty !
+  compute-angles
+  sa @ DUP sec-tx-tab + C@ new-sc-tx !  sec-ty-tab + C@ new-sc-ty !
+  ma @ DUP mn-tx-tab  + C@ new-mn-tx !  mn-ty-tab  + C@ new-mn-ty !
+  ha @ DUP hr-tx-tab  + C@ new-hr-tx !  hr-ty-tab  + C@ new-hr-ty !
 
   bk-sc-buf @ bk-sc-len @ erase-line
   bk-mn-buf @ bk-mn-len @ erase-line
