@@ -964,7 +964,7 @@ VARIABLE _dc  VARIABLE _dr
   0 fr-hr-len !  0 fr-mn-len !  0 fr-sc-len !
   0 bk-hr-len !  0 bk-mn-len !  0 bk-sc-len !
 
-  fake-time                  \ DEV: replace with sync-from-fn for hardware
+  sync-from-fn               \ pull real time from FujiNet RTC at boot
 
   \ Render full clock into VRAM-B (current back), clearing it first.
   VRAM-B 6144 0 FILL
