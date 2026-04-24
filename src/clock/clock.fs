@@ -893,31 +893,47 @@ VARIABLE _dc  VARIABLE _dr
   THEN ;
 
 
-\ ── FN sync ────────────────────────────────────────────────────────
+\ ── FN sync (with fake-time fallback) ─────────────────────────────
+
+\ DEV-ONLY / fallback: hardcode a known time when FujiNet is absent.
+\ Sets fn-enabled=0 so the per-minute resync loop skips sync-from-fn.
+: fake-time  ( -- )
+  126 clk-yr !  4 clk-mo !  22 clk-dy !
+  10  clk-hr !  10 clk-mn !  0  clk-sc !
+  0   vs-cnt !
+  0   fn-enabled !
+  SYNC-FLASH-COUNT sync-flash ! ;
+
+30 CONSTANT FN-PROBE-TRIES   \ ~1-2 seconds of bit-banger pings
 
 : sync-from-fn  ( -- )
-  -1 fn-enabled !            \ if we got here, FN is reachable
-  time-buf fn-time
-  time-buf       C@ clk-yr !
-  time-buf 1 + C@ clk-mo !
-  time-buf 2 + C@ clk-dy !
-  time-buf 3 + C@ clk-hr !
-  time-buf 4 + C@ clk-mn !
-  time-buf 5 + C@ clk-sc !
+  time-buf FN-PROBE-TRIES fn-time/N IF
+    -1 fn-enabled !            \ FN responded
+    time-buf       C@ clk-yr !
+    time-buf 1 + C@ clk-mo !
+    time-buf 2 + C@ clk-dy !
+    time-buf 3 + C@ clk-hr !
+    time-buf 4 + C@ clk-mn !
+    time-buf 5 + C@ clk-sc !
 
-  \ Calibrate (only after the first sync gave us a baseline).
-  synced-once @ IF
-    calibrate-vps
+    \ Calibrate (only after the first sync gave us a baseline).
+    synced-once @ IF
+      calibrate-vps
+    ELSE
+      -1 synced-once !
+    THEN
+
+    \ Remember this sync's FN time and reset counters for next interval.
+    clk-mn @ last-fn-min !
+    clk-sc @ last-fn-sec !
+    0 vps-cnt !
+    0 vs-cnt !
+    SYNC-FLASH-COUNT sync-flash !
   ELSE
-    -1 synced-once !
-  THEN
-
-  \ Remember this sync's FN time and reset counters for next interval.
-  clk-mn @ last-fn-min !
-  clk-sc @ last-fn-sec !
-  0 vps-cnt !
-  0 vs-cnt !
-  SYNC-FLASH-COUNT sync-flash ! ;
+    \ No FN — fall back to the development clock so the demo still runs.
+    \ fake-time also sets fn-enabled=0 so we won't retry every minute.
+    fake-time
+  THEN ;
 
 
 \ ── Init RG6 mode + font ───────────────────────────────────────────
@@ -933,16 +949,6 @@ VARIABLE _dc  VARIABLE _dr
 
 
 \ ── Main loop ──────────────────────────────────────────────────────
-
-\ DEV-ONLY: hardcode a known time so we can iterate on visuals under
-\ XRoar without a live FujiNet.  Swap back to sync-from-fn before
-\ shipping to real hardware.
-: fake-time  ( -- )
-  126 clk-yr !  4 clk-mo !  22 clk-dy !
-  10  clk-hr !  10 clk-mn !  0  clk-sc !
-  0   vs-cnt !
-  0   fn-enabled !           \ skip the :59 sync (no FN in dev)
-  SYNC-FLASH-COUNT sync-flash ! ;
 
 \ Render the full clock (face + ticks + pin + digital + flash + hands)
 \ into whichever buffer is currently the BACK.  Used twice during init

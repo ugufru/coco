@@ -128,6 +128,20 @@ VARIABLE fn-cmd
 : fn-ready  ( -- )
   BEGIN fn-ping UNTIL ;
 
+\ ── fn-ready/N: bounded retry, returns -1 on ack, 0 on giveup ───
+\ Stack-only solution would need WHILE/REPEAT (which fc.py lacks),
+\ so use a small flag variable.  Typical caller passes ~30 retries
+\ for a ~1-2 second boot probe.
+VARIABLE fn-rdy-ok
+: fn-ready/N  ( n -- ok )
+  0 fn-rdy-ok !
+  BEGIN
+    fn-ping IF -1 fn-rdy-ok ! THEN
+    1 -
+    DUP 0=  fn-rdy-ok @  OR
+  UNTIL
+  DROP fn-rdy-ok @ ;
+
 
 \ ── fn-time: read 6 bytes of wall-clock time into buf ────────────
 : fn-time  ( buf -- )
@@ -135,3 +149,15 @@ VARIABLE fn-cmd
   FN-CMD-TIME fn-cmd C!
   fn-cmd 1 dw-write
   6 dw-read DROP ;
+
+\ ── fn-time/N: bounded version of fn-time ───────────────────────
+\ Returns -1 on success (buf populated), 0 on giveup (buf untouched).
+: fn-time/N  ( buf n -- ok )
+  fn-ready/N IF
+    FN-CMD-TIME fn-cmd C!
+    fn-cmd 1 dw-write
+    6 dw-read DROP
+    -1
+  ELSE
+    DROP 0
+  THEN ;
