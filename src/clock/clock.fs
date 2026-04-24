@@ -53,12 +53,16 @@ $A000 CONSTANT VRAM-B
 \ ── Beam path buffers — one set per VRAM ────────────────────────────
 \ Each hand stroke is ~50 px × 3 bytes = 150 bytes; reserve 256.
 
-$4000 CONSTANT BUF-A-HR
-$4100 CONSTANT BUF-A-MN
-$4200 CONSTANT BUF-A-SC
-$4300 CONSTANT BUF-B-HR
-$4400 CONSTANT BUF-B-MN
-$4500 CONSTANT BUF-B-SC
+\ Beam buffers live at $8000 (above the all-RAM-mode font region is at
+\ $9000+; the gap $8000-$9000 is free).  They used to live at $4000 but
+\ the app outgrew that — issue #455's CODE words pushed the binary past
+\ $4000, and the buffers were silently overwriting our own code.
+$8000 CONSTANT BUF-A-HR
+$8100 CONSTANT BUF-A-MN
+$8200 CONSTANT BUF-A-SC
+$8300 CONSTANT BUF-B-HR
+$8400 CONSTANT BUF-B-MN
+$8500 CONSTANT BUF-B-SC
 
 
 \ ── Fast SAM-F write (~110 cycles, fits inside the ~680-cycle vblank) ─
@@ -415,7 +419,7 @@ VARIABLE sa  VARIABLE ma  VARIABLE ha
 \ boot path (face init, tick-hands).
 CODE compute-angles
         PSHS    X
-        ; ── sc = clk-sc * 6 + (vs-cnt * 6) / vps ────────────────────
+        ; -- sc = clk-sc * 6 + (vs-cnt * 6) / vps --
         LDA     #6
         LDB     FVAR_clk_sc+1
         MUL                             ; D = clk-sc * 6  (max 354)
@@ -427,7 +431,7 @@ CODE compute-angles
         ROLA                            ; D *= 2
         ADDD    @tmp,PCR                ; D *= 3
         ASLB
-        ROLA                            ; D *= 2 → vs-cnt * 6
+        ROLA                            ; D *= 2 = vs-cnt * 6
 
         LDY     #0
 @scd    CMPD    FVAR_vps
@@ -439,7 +443,7 @@ CODE compute-angles
         ADDD    @scbase,PCR
         STD     FVAR_sa
 
-        ; ── mn = clk-mn * 6 + sa / 60 ────────────────────────────────
+        ; -- mn = clk-mn * 6 + sa / 60 --
         LDA     #6
         LDB     FVAR_clk_mn+1
         MUL                             ; D = clk-mn * 6  (max 354)
@@ -456,7 +460,7 @@ CODE compute-angles
         ADDD    @mnbase,PCR
         STD     FVAR_ma
 
-        ; ── hr = (clk-hr % 12) * 30 + ma / 12 ────────────────────────
+        ; -- hr = (clk-hr % 12) * 30 + ma / 12 --
         LDB     FVAR_clk_hr+1
         CMPB    #12
         BLO     @hr12
