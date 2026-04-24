@@ -863,7 +863,15 @@ VARIABLE _dc  VARIABLE _dr
   THEN ;
 
 \ Counting wrapper around vsync — accumulates vps-cnt for calibration.
-: vsync+  ( -- )  vsync 1 vps-cnt +! ;
+\ Wait for a *fresh* vblank rising edge.  The kernel's vsync returns
+\ immediately if the flag is already set (e.g., we missed a vblank
+\ because rendering overran the previous frame).  Pre-clearing $FF02
+\ discards any stale latch so we always exit at the start of a real
+\ vblank window — required for tear-free page flipping when the loop
+\ occasionally runs long (minute boundary, FN sync frame).
+: vsync+  ( -- )
+  $FF02 C@ DROP              \ clear stale vsync flag
+  vsync 1 vps-cnt +! ;
 
 \ Real seconds elapsed since the previous sync, derived from FN's
 \ minute/second values (assumes < 1 hour between syncs).
