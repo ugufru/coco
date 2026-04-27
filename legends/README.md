@@ -21,7 +21,7 @@ The CoCo world was never one community — it was several overlapping ones, each
 
 The biggest public face of the platform. Radio Shack sold CoCos to families, and families bought games. The commercial game era ran from about 1980 through the late 1980s, with a remarkable modern revival continuing today.
 
-Key names: **Steve Bjork**, **Ken Kalish**, **Steve Ostrom** (Spectral Associates); **Rick Adams** and **Phil DeLong** (*Dungeons of Daggorath*); **Nick Marentes** (modern era, Australia); **Jim Gerrie** (BASIC ports); **Robert Arnstein** (Tandy in-house); **Greg Zumwalt**, **Chuck Ekblad**.
+Key names: **Scott Adams** (Adventure International — father of the microcomputer adventure game); **Steve Bjork**, **Ken Kalish**, **Steve Ostrom** (Spectral Associates); **Rick Adams** and **Phil DeLong** (*Dungeons of Daggorath*); **Nick Marentes** (modern era, Australia); **Jim Gerrie** (BASIC ports); **Robert Arnstein** (Tandy in-house); **Greg Zumwalt**, **Chuck Ekblad**.
 
 ### Demo Scene
 
@@ -74,6 +74,8 @@ Key names (classic era → modern): **Tony Podraza** (Glenside CCC past Presiden
 Specific moments and artifacts that define the arc of the platform.
 
 - **1977** — Joint Tandy / Motorola Semiconductor venture begins on a videotex terminal for the Kentucky Cooperative Extension Service. This project seeds the hardware that will become the Color Computer.
+- **1978** — **Scott Adams** writes *Adventureland*, the first text adventure for a home microcomputer (TRS-80 Model I, 16K).
+- **1979** — Adams founds **Adventure International** in Longwood, Florida; the *Scott Adams Adventures* series goes on to ship on virtually every micro of the era, including the CoCo.
 - **1980** — CoCo 1 ships with **Bill Gates**-credited Color BASIC 1.0 (Microsoft) in ROM — the only programming environment out of the box.
 - **1982** — *Dungeons of Daggorath* released. Real-time 3D dungeon crawler on a 64K home computer — years ahead of its time.
 - **1981** — **Robert Kilgus**'s *Color SCRIPSIT* (cat. 26-3105) ships as a Tandy cartridge — the first-party CoCo word processor.
@@ -106,6 +108,7 @@ The threads that connect people across the ecosystem.
 
 - **Spectral Associates lineage** — Ken Kalish, Steve Bjork, Steve Ostrom. One of the era's defining game houses; catalog and history preserved through L. Curtis Boyle's Kalish interview.
 - **Dungeons of Daggorath circle** — Rick Adams and Phil DeLong (creators), Glen Dahlgren (preservation/revival).
+- **Adventure-game lineage on the CoCo** — Scott Adams / Adventure International (text adventures, 1978 onward) → *Dungeons of Daggorath* (Rick Adams + Phil DeLong, 1982; real-time 3D dungeon crawl). Two very different branches of the adventure tree, both well represented on the CoCo.
 - **NitrOS-9 continuum** — Microware's OS-9 (Ken Kaplan + Larry Crane + Robert Doggett, 1977–2001) → the three Canadian originators of NitrOS-9 (Bill Noble + Wes Gayle + L. Curtis Boyle) → modern contributor wave (Boisy Pitre, David Ladd, William Astle, Robert Gault, Aaron Wolfe) → NitrOS-9 EOU distribution (L. Curtis Boyle). Boisy Pitre is uniquely positioned as a modern NitrOS-9 contributor who was also a Microware software engineer from 1992 — a direct human bridge between the commercial and community eras.
 - **Modern cross-dev stack** — XRoar (Anscomb) + lwtools (Astle) + CMOC (Sarrazin) is the triad everyone uses today.
 - **Emulator lineage** — Jeff Vavasour's early emulator → Nathan Woods' MAME driver → Tim Lindner's MAME accuracy work → Ciaran Anscomb's XRoar (now dominant).

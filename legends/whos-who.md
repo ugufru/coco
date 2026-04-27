@@ -10,6 +10,8 @@ This is a working research document. Uncertain claims are marked **(verify)** an
 
 **Rick Adams** — Co-creator of *Dungeons of Daggorath* with Phil DeLong. The real-time 3D dungeon crawler is widely considered one of the greatest CoCo games ever made.
 
+**Scott Adams** — Founder of **Adventure International** (1979, Longwood, Florida) and widely credited as the **father of the microcomputer adventure game**. Wrote *Adventureland* in 1978 — the first text adventure to run on a home microcomputer (originally TRS-80 Model I, 16K). The *Scott Adams Adventures* series (*Adventureland*, *Pirate Adventure*, *Mission Impossible*, *Voodoo Castle*, *The Count*, *Strange Odyssey*, *Mystery Fun House*, *Pyramid of Doom*, *Ghost Town*, *Savage Island* I & II, *Golden Voyage*, *Sorcerer of Claymorgue Castle*) was ported to the TRS-80 Color Computer and remained a defining adventure-game catalog on the platform. Later collaborated with Marvel on the **Questprobe** series (*The Hulk*, *Spider-Man*). **(Not to be confused with Scott Adams the *Dilbert* cartoonist — different person, same name.)** **(verify exact CoCo release years for each title)**
+
 **Bob Albrecht** — *Rainbow Magazine* Contributing Editor (1985 masthead).
 
 **Cray Augsburg** — *Rainbow Magazine* Technical Editor (1987), promoted to Managing Editor by August 1992 — carried the magazine's top editorial role through its final years leading up to the May 1993 close.
@@ -48,7 +50,7 @@ This is a working research document. Uncertain claims are marked **(verify)** an
 
 **Howard Cohen** — Cognitec. Author of *Telewriter* (November 1983), *Telewriter-64*, and *Telewriter-128* — the CoCo's dominant pre-OS-9 word processor and the first widely regarded as a "world-class" product on the platform.
 
-**H. Allen Curtiss** — desktop publishing software and extensive authorship in *The Rainbow Magazine*.
+**H. Allen Curtis** — Long-running *Rainbow Magazine* contributor (Nov 1982 through at least April 1988), specializing in CoCo graphics, color/palette techniques, and reference utilities. Confirmed articles include *Shades of PMODE3* (Nov 1982), *MC-10 Memory Map* (Jan 1984 — the MC-10 follow-up to Bob Russell's CoCo memory map series, pitched as "Reading little brother's mind"), *Little E* editor (April 1984), *A Feline CoCo 3 Fandango* (May 1987 graphics tutorial, p. 52, cross-promoted by the editor from the Letters page), and *PALETTEable Color Mixing* (April 1988, p. 124). No biographical details (hometown, profession, employer) surface in available sources. (**Correction:** earlier drafts of this roster spelled the name "Curtiss" with two s's — every Rainbow byline I've located uses "Curtis." **Earlier drafts also credited him with desktop publishing software — that claim is unverified and likely a misattribution; flagged for removal pending evidence.**)
 
 ## D
 
@@ -185,6 +187,8 @@ This is a working research document. Uncertain claims are marked **(verify)** an
 ## R
 
 **James E. "Jim" Reed** — *Rainbow Magazine* Managing Editor (confirmed 1985–1987), later promoted to Assistant Vice President of Programs & Projects at Falsoft, Inc.
+
+**Bob Russell** — R. R. Enterprises. Author of *Color Computer Memory Map* — a hand-researched reference cataloging CoCo system variables, BASIC internals, ROM entry points, and hardware registers that Radio Shack never officially documented. The work was delivered on two channels in parallel during 1983: as a multi-part series in *The Rainbow Magazine* billed each month as "CoCo's most complete memory map" (**Part I** July 1983, **Part II** August 1983, **Part III** September 1983, **Part IV** December 1983), and as a privately-published consolidated edition (Version 2.0, 10/01/83) distributed through R. R. Enterprises mid-series. By his own account in the introduction, the project consumed 650+ hours of reverse-engineering and cross-referencing against the TRS-80 Color Computer Service Manual, *Color Computer News*, *The Rainbow*, *80 Micro*, and *Hot CoCo* — undertaken because Tandy's published references (Getting Started With Color Basic, Going Ahead With Extended Basic, TRS-80 Microcomputer News) were "frequently incorrect." Planned annual updates and offered a 40% discount to subscribers who reported errors and omissions — an early example of the community-maintained living-document model. Russell's series directly seeded H. Allen Curtis's MC-10 memory map (Rainbow, January 1984). The PDF remains preserved on the Color Computer Archive and os9projects.com, where it continues to serve as a primary reference for modern CoCo development. **(no further biographical details — hometown, other products, or Rainbow masthead role — surface in available sources)**
 
 **Dale Rickert** — Author of *Simply Better*, a CoCo 3 word processor widely admired for its feature depth — compact executable, substantial (~137-page) manual.
 

@@ -6,6 +6,9 @@
 \ trails.
 \
 \ Press any key on title screen to start.  Close XRoar to exit.
+\
+\ Build:   make
+\ Load:    LOADM"RAIN":EXEC
 
 \ ── Shared libraries ──────────────────────────────────────────────
 

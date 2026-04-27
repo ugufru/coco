@@ -12,6 +12,9 @@
 \
 \ Rendering: zero-flicker "draw first, clean stale" approach.
 \ Text uses normal video (green on black) via vemit instead of EMIT.
+\
+\ Build:   make
+\ Load:    LOADM"TETRIS":EXEC
 
 \ ── Shared library ──────────────────────────────────────────────────────────
 

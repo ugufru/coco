@@ -58,6 +58,7 @@ def kernel_words(symbols):
     names = {
         'emit': 'CFA_EMIT',
         'halt': 'CFA_HALT',
+        'bye':  'CFA_BYE',
         'exit': 'CFA_EXIT',
         '+':    'CFA_ADD',
         '-':    'CFA_SUB',
@@ -1326,7 +1327,7 @@ def analyze_kernel_primitives(kernel_asm_path):
     # Build reverse mapping: CFA_xxx → Forth name
     # Use the same names dict from kernel_words()
     cfa_to_forth = {
-        'CODE_EMIT': 'emit', 'CODE_HALT': 'halt', 'CODE_EXIT': 'exit',
+        'CODE_EMIT': 'emit', 'CODE_HALT': 'halt', 'CODE_BYE': 'bye', 'CODE_EXIT': 'exit',
         'CODE_ADD': '+', 'CODE_SUB': '-', 'CODE_CR': 'cr',
         'CODE_DUP': 'dup', 'CODE_DROP': 'drop', 'CODE_SWAP': 'swap',
         'CODE_OVER': 'over', 'CODE_FETCH': '@', 'CODE_STORE': '!',

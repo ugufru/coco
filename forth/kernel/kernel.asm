@@ -154,6 +154,7 @@ CFA_EXIT        FDB     CODE_EXIT
 CFA_LIT         FDB     CODE_LIT
 CFA_EMIT        FDB     CODE_EMIT
 CFA_HALT        FDB     CODE_HALT
+CFA_BYE         FDB     CODE_BYE
 CFA_ADD         FDB     CODE_ADD
 CFA_SUB         FDB     CODE_SUB
 CFA_CR          FDB     CODE_CR
@@ -1499,6 +1500,36 @@ CODE_RAT
 
 CODE_HALT
         BRA     CODE_HALT
+
+;;; ─── BYE ────────────────────────────────────────────────────────────────────
+;;; Exit the application: restore VDG to default text mode, clear the
+;;; screen, then spin.  Honest about what it is — the program has ended,
+;;; press RESET to restart.  Proper BASIC ROM handoff: see issue #474.
+
+CODE_BYE
+        ; SAM V bits = 000 (text/SG4 mode)
+        STA     $FFC0           ; clear V0
+        STA     $FFC2           ; clear V1
+        STA     $FFC4           ; clear V2
+        ; SAM F bits = 2 (display offset $0400 = default text VRAM)
+        STA     $FFC6           ; clear F0
+        STA     $FFC9           ; set   F1
+        STA     $FFCA           ; clear F2
+        STA     $FFCC           ; clear F3
+        STA     $FFCE           ; clear F4
+        STA     $FFD0           ; clear F5
+        STA     $FFD2           ; clear F6
+        ; PIA1 $FF22 bits 7-3 = 0 (A*/G=0 → alpha; preserve bits 2-0)
+        LDA     $FF22
+        ANDA    #$07
+        STA     $FF22
+        ; Clear $0400-$05FF to normal-alpha space (black background)
+        LDA     #$60
+        LDX     #$0400
+@cls    STA     ,X+
+        CMPX    #$0600
+        BNE     @cls
+@hold   BRA     @hold
 
 ;;; ─── START ─────────────────────────────────────────────────────────────────
 ;;; Hardware initialisation and application entry.

@@ -2,7 +2,7 @@
 \
 \ Draws random colored pixels in semigraphics-4 mode with four-way
 \ symmetry around the screen center, creating evolving kaleidoscope
-\ patterns.  Close XRoar to exit.
+\ patterns.  Press BREAK to exit back to BASIC.
 \
 \ Semigraphics-4 maps a 64x32 pixel grid onto the 32x16 VDG text
 \ display.  Each byte in video RAM ($0400-$05FF):
@@ -12,6 +12,9 @@
 \   bit 2     = bottom-left element
 \   bit 1     = top-right element
 \   bit 0     = top-left element
+\
+\ Build:   make
+\ Load:    LOADM"KALEIDSC":EXEC
 
 \ ── Shared libraries ──────────────────────────────────────────────────
 
@@ -111,7 +114,7 @@ VARIABLE dx    VARIABLE dy    VARIABLE dc
   \ Wait for key release before starting
   BEGIN  vsync  KEY? 0=  UNTIL
 
-  \ Run the pattern (infinite — close XRoar to exit)
+  \ Run the pattern (BREAK to exit)
   cls-black
   BEGIN
     $FF $FFD7 C!                  \ SAM double speed (~1.78 MHz)
@@ -121,6 +124,7 @@ VARIABLE dx    VARIABLE dy    VARIABLE dc
     step step step step
     $FF $FFD6 C!                  \ SAM normal speed (display refresh)
     vsync
+    key? IF key $03 = IF bye THEN THEN
   0 UNTIL ;
 
 kaleidoscope

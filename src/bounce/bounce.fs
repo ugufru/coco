@@ -3,10 +3,14 @@
 \ Controls:
 \   Up/Down arrows: adjust blanking offset live
 \   Space:          cycle mode 0/1/2
+\   BREAK:          exit to BASIC
 \
 \ Mode 0: free-running (no sync)
 \ Mode 1: VSYNC only (draw in blanking window)
 \ Mode 2: VSYNC + HSYNC tracking
+\
+\ Build:   make
+\ Load:    LOADM"BOUNCE":EXEC
 
 INCLUDE ../../forth/lib/vdg.fs
 INCLUDE ../../forth/lib/screen.fs
@@ -196,6 +200,9 @@ VARIABLE hx                   \ HUD cursor column
 
 \ ── Main loop ────────────────────────────────────────────────────────
 
+: check-quit  ( -- )
+  key? IF key $03 = IF bye THEN THEN ;
+
 : bounce  ( -- )
   init-bounce
   0 draw-idx !
@@ -207,6 +214,7 @@ VARIABLE hx                   \ HUD cursor column
     draw-idx @ 1 + draw-ball-n
     check-keys
     check-mode
+    check-quit
     draw-hud
     draw-idx @ 2 + DUP NBALLS = IF DROP 0 THEN draw-idx !
   AGAIN ;

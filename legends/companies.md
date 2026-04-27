@@ -37,6 +37,8 @@ See also:
 
 ## Game Publishers
 
+**Adventure International** — Founded by **Scott Adams** in 1979, Longwood, Florida. One of the earliest software publishers in the home-computer era and the dominant text-adventure publisher of the early 1980s. CoCo catalog included the full *Scott Adams Adventures* series (*Adventureland*, *Pirate Adventure*, *Mission Impossible*, *Voodoo Castle*, *The Count*, *Strange Odyssey*, *Mystery Fun House*, *Pyramid of Doom*, *Ghost Town*, *Savage Island* I & II, *Golden Voyage*, *Sorcerer of Claymorgue Castle*) and the Marvel-licensed *Questprobe* adventures (*The Hulk*, *Spider-Man*). Also published action and arcade titles by other authors. Ceased operations in 1985 following financial difficulties. **(verify CoCo-specific catalog breadth and AI's non-Adams CoCo titles.)**
+
 **Spectral Associates** — one of the most prolific CoCo game houses. Co-founded by **Ken Kalish**. Key developers included **Steve Bjork** and **Steve Ostrom**. Titles included *Zaxxon*, *Astro Blast*, and numerous Tandy-licensed products.
 
 **Tom Mix Software** — prolific CoCo game publisher. *Doubleback*, *Katerpillar Attack*, and many others. Instantly recognizable packaging and one of the iconic CoCo game imprints.

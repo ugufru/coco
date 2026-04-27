@@ -8,11 +8,14 @@
 \   Printable keys  -> emit character at cursor, advance
 \   ENTER  ($0D)    -> move to next row (CR)
 \   CLEAR  ($0C)    -> clear screen and home cursor
-\   BREAK  ($03)    -> halt
+\   BREAK  ($03)    -> exit to BASIC
 \   LEFT   ($1E)    -> move cursor left (backspace)
 \   RIGHT  ($1F)    -> move cursor right
 \   UP     ($1C)    -> move cursor up one row
 \   DOWN   ($1D)    -> move cursor down one row
+\
+\ Build:   make
+\ Load:    LOADM"TYPEWRTR":EXEC
 
 \ ── Variables ────────────────────────────────────────────────────────────────
 
@@ -91,7 +94,7 @@ VARIABLE saved-char
   BEGIN
     KEY
     cursor-off
-    DUP $03 = IF  DROP  halt                    THEN
+    DUP $03 = IF  DROP  bye                     THEN
     DUP $0D = IF  DROP  cr                      ELSE
     DUP $0C = IF  DROP  cls                     ELSE
     DUP $1E = IF  DROP  backspace                ELSE

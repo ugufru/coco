@@ -2,12 +2,16 @@
 \
 \ Cycles through all 11 MC6847 display modes.  Each mode shows a visual
 \ pattern (color bars, stripes, checkerboard) plus the mode name rendered
-\ in the appropriate way for that mode.  Press any key to advance.
+\ in the appropriate way for that mode.  Press any key to advance, BREAK
+\ to exit back to BASIC.
 \
 \ Modes: Alpha, SG4, SG6, CG1, RG1, CG2, RG2, CG3, RG3, CG6, RG6
 \
 \ Requires: vdg.fs, font5x7.fs, datawrite.fs, rg-text.fs, cg-text.fs,
 \           sg6-text.fs
+\
+\ Build:   make           (no Makefile yet — see issue #442)
+\ Load:    LOADM"VDGMODES":EXEC
 
 INCLUDE ../../forth/lib/vdg.fs
 INCLUDE ../../forth/lib/font5x7.fs
@@ -221,8 +225,8 @@ VARIABLE qt                   \ quarter-size scratch
   BEGIN
     switch-hw
     show-content
-    KEY DROP
+    KEY DUP $03 = IF DROP bye THEN DROP
     mi @ 1 + NMODES /MOD DROP mi !
   AGAIN ;
 
-main HALT
+main

@@ -9,6 +9,9 @@
 \   Rows 11-12 : [1][2][3][-]      — 4-button rows, cols 1/7/13/19
 \   Rows 13-14 : [0][C][=][+]
 \   Row  15    : OP: / MEM: status line
+\
+\ Build:   make
+\ Load:    LOADM"CALC":EXEC
 
 \ ── Shared libraries ─────────────────────────────────────────────────────────
 

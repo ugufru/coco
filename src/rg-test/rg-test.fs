@@ -2,6 +2,9 @@
 \
 \ Tests rg-pset, rg-line, and sprite draw/erase.
 \ Press any key between tests.  Run in XRoar with NTSC artifacts.
+\
+\ Build:   make
+\ Load:    LOADM"RG-TEST":EXEC
 
 INCLUDE ../../forth/lib/vdg.fs
 INCLUDE ../../forth/lib/screen.fs
