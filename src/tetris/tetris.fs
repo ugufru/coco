@@ -6,9 +6,9 @@
 \ Controls:  LEFT/RIGHT = move, UP = rotate, DOWN = soft drop,
 \            SPACE = hard drop.
 \
-\ Board state array at $4000 (16-byte stride x 16 rows = 256 bytes).
-\ Piece rotation table at $4100 (7 pieces x 4 rotations x 4 bytes).
-\ High score table at $4200 (5 entries x 2 bytes = 10 bytes).
+\ Board state array at $5000 (16-byte stride x 16 rows = 256 bytes).
+\ Piece rotation table at $5100 (7 pieces x 4 rotations x 4 bytes).
+\ High score table at $5200 (5 entries x 2 bytes = 10 bytes).
 \
 \ Rendering: zero-flicker "draw first, clean stale" approach.
 \ Text uses normal video (green on black) via vemit instead of EMIT.
@@ -68,28 +68,28 @@ VARIABLE n0  VARIABLE n1  VARIABLE n2  VARIABLE n3
 VARIABLE sg-byte   \ precomputed SG4 byte for current piece
 
 \ ── Piece color table ─────────────────────────────────────────────────────
-\ 7 bytes at $4210.  Maps piece index (0-6) to SG4 color, skipping
+\ 7 bytes at $5210.  Maps piece index (0-6) to SG4 color, skipping
 \ buff (4) which looks white.  Uses green (0) for J instead.
 
 : init-colors  ( -- )
-  1 $4210 C!     \ I = yellow
-  2 $4211 C!     \ O = blue
-  3 $4212 C!     \ T = red
-  5 $4213 C!     \ S = cyan
-  6 $4214 C!     \ Z = magenta
-  7 $4215 C!     \ L = orange
-  3 $4216 C! ;   \ J = red
+  1 $5210 C!     \ I = yellow
+  2 $5211 C!     \ O = blue
+  3 $5212 C!     \ T = red
+  5 $5213 C!     \ S = cyan
+  6 $5214 C!     \ Z = magenta
+  7 $5215 C!     \ L = orange
+  3 $5216 C! ;   \ J = red
 
-: piece-color  ( idx -- color )  $4210 + C@ ;
+: piece-color  ( idx -- color )  $5210 + C@ ;
 
 \ ── Piece table ─────────────────────────────────────────────────────────────
-\ 7 pieces x 4 rotations x 4 bytes = 112 bytes at $4100.
+\ 7 pieces x 4 rotations x 4 bytes = 112 bytes at $5100.
 \ Each byte encodes a block offset: byte = dx*4 + dy.
 \ Decode: byte 4 /MOD  ( -- dy dx )  — dx on top, ready for px @ +
 \ Piece colors: piece_index + 1 (1=yellow .. 7=orange).
 
 : init-pieces
-  $4100 tp !
+  $5100 tp !
   \ Piece 0: I
   0 tb 4 tb 8 tb 12 tb     \ R0: ####
   0 tb 1 tb 2 tb 3 tb      \ R1: vertical
@@ -128,12 +128,12 @@ VARIABLE sg-byte   \ precomputed SG4 byte for current piece
 
 \ ── Board operations ────────────────────────────────────────────────────────
 
-: board-addr  ( col row -- addr )  16 * + $4000 + ;
-: clear-board  ( -- )  256 0 DO  0 $4000 I + C!  LOOP ;
+: board-addr  ( col row -- addr )  16 * + $5000 + ;
+: clear-board  ( -- )  256 0 DO  0 $5000 I + C!  LOOP ;
 
 \ ── Piece data access ───────────────────────────────────────────────────────
 
-: piece-addr  ( -- addr )  pp @ 16 * pr @ 4 * + $4100 + ;
+: piece-addr  ( -- addr )  pp @ 16 * pr @ 4 * + $5100 + ;
 
 \ ── Random piece (0-6) ──────────────────────────────────────────────────────
 
@@ -259,20 +259,20 @@ VARIABLE sg-byte   \ precomputed SG4 byte for current piece
 
 : row-full?  ( row -- flag )
   1 full-f !
-  16 * $4000 +
+  16 * $5000 +
   10 0 DO
     DUP I + C@ 0= IF  0 full-f !  THEN
   LOOP
   DROP full-f @ ;
 
 : copy-row-down  ( row -- )
-  DUP 16 * $4000 + dst-a !
-  1 - 16 * $4000 + src-a !
+  DUP 16 * $5000 + dst-a !
+  1 - 16 * $5000 + src-a !
   10 0 DO
     src-a @ I + C@  dst-a @ I + C!
   LOOP ;
 
-: clear-top  ( -- )  10 0 DO  0 $4000 I + C!  LOOP ;
+: clear-top  ( -- )  10 0 DO  0 $5000 I + C!  LOOP ;
 
 : remove-row  ( row -- )
   BEGIN
@@ -326,15 +326,15 @@ VARIABLE sg-byte   \ precomputed SG4 byte for current piece
   13 7 AT  lns @ vu. ;
 
 \ ── High scores ─────────────────────────────────────────────────────────────
-\ 5 entries at $4200 (16-bit each).  Persists across restarts.
+\ 5 entries at $5200 (16-bit each).  Persists across restarts.
 
 : init-high  ( -- )
-  0 $4200 !  0 $4202 !  0 $4204 !  0 $4206 !  0 $4208 ! ;
+  0 $5200 !  0 $4202 !  0 $4204 !  0 $4206 !  0 $4208 ! ;
 
 : insert-high  ( -- )
-  score @ $4200 @ > IF
-    $4206 @ $4208 !  $4204 @ $4206 !  $4202 @ $4204 !  $4200 @ $4202 !
-    score @ $4200 !  EXIT
+  score @ $5200 @ > IF
+    $4206 @ $4208 !  $4204 @ $4206 !  $4202 @ $4204 !  $5200 @ $4202 !
+    score @ $5200 !  EXIT
   THEN
   score @ $4202 @ > IF
     $4206 @ $4208 !  $4204 @ $4206 !  $4202 @ $4204 !
@@ -355,7 +355,7 @@ VARIABLE sg-byte   \ precomputed SG4 byte for current piece
 : show-high  ( -- )
   24 9 AT   72 vemit 73 vemit 71 vemit 72 vemit                       \ HIGH
   23 10 AT  83 vemit 67 vemit 79 vemit 82 vemit 69 vemit 83 vemit    \ SCORES
-  23 11 AT  CHAR 1 vemit CHAR ) vemit .6sp  25 11 AT  $4200 @ vu.
+  23 11 AT  CHAR 1 vemit CHAR ) vemit .6sp  25 11 AT  $5200 @ vu.
   23 12 AT  CHAR 2 vemit CHAR ) vemit .6sp  25 12 AT  $4202 @ vu.
   23 13 AT  CHAR 3 vemit CHAR ) vemit .6sp  25 13 AT  $4204 @ vu.
   23 14 AT  CHAR 4 vemit CHAR ) vemit .6sp  25 14 AT  $4206 @ vu.
@@ -383,7 +383,7 @@ VARIABLE sg-byte   \ precomputed SG4 byte for current piece
 : draw-next  ( -- )
   clear-next
   np @ piece-color dc-tmp !
-  np @ 16 * $4100 + p-a !
+  np @ 16 * $5100 + p-a !
   4 0 DO
     p-a @ I + C@ 4 /MOD
     14 + SWAP 10 +
