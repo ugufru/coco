@@ -226,7 +226,7 @@ VARIABLE qt                   \ quarter-size scratch
   BEGIN
     switch-hw
     show-content
-    KEY DUP $03 = IF DROP bye THEN DROP
+    KEY DUP $03 = IF DROP exit-basic THEN DROP
     mi @ 1 + NMODES /MOD DROP mi !
   AGAIN ;
 

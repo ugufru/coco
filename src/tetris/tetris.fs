@@ -552,4 +552,4 @@ VARIABLE sg-byte   \ precomputed SG4 byte for current piece
 
   AGAIN ;  \ restart
 
-tetris HALT
+tetris HALT  \ tetris loops forever; HALT unreachable

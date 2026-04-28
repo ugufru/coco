@@ -18,13 +18,17 @@
 \ ── Font write helpers ────────────────────────────────────────────────────────
 
 VARIABLE fp                          \ font write pointer
+VARIABLE font-base                   \ font load address ($6000 default)
+$6000 font-base !
 
 : fb  ( byte -- )  fp @ C!  fp @ 1 + fp ! ;
 : fg  ( b6 b5 b4 b3 b2 b1 b0 -- )  fb fb fb fb fb fb fb ;
 
 \ ── Glyph address lookup ──────────────────────────────────────────────────────
 \ Layout: index 0=space, 1-26=A-Z, 27-36=0-9
-\ Each glyph is 7 bytes.  Font base = $6000.
+\ Each glyph is 7 bytes, stored at font-base + index*7.
+\ Default base is $6000 (high all-RAM); ROM-mode demos that need the
+\ space at $6000 for VRAM can call font-base ! before init-font.
 
 : glyph-addr  ( char -- addr )
   DUP $41 < IF
@@ -36,7 +40,7 @@ VARIABLE fp                          \ font write pointer
   ELSE
     $40 -                 \ 'A'→1, 'Z'→26
   THEN
-  7 * $6000 + ;
+  7 * font-base @ + ;
 
 \ ── Font data ─────────────────────────────────────────────────────────────────
 \ Each line: <row6> <row5> <row4> <row3> <row2> <row1> <row0> fg
@@ -51,7 +55,7 @@ VARIABLE fp                          \ font write pointer
 \   $20=..#.. $10=...#. $08=....# $00=.....
 
 : init-font
-  $6000 fp !
+  font-base @ fp !
 
   \ --- Space (index 0) ---
   \ .....  .....  .....  .....  .....  .....  .....

@@ -57,7 +57,7 @@ CODE rg-char
 
 \ ── Ball sprite data at $8000 ────────────────────────────────────────
 
-$8000 CONSTANT BALL-SPR
+$4000 CONSTANT BALL-SPR        \ ROM mode: $8000 is BASIC ROM, relocate to app data area
 VARIABLE bp
 : b,  ( byte -- )  bp @ C!  1 bp +! ;
 
@@ -77,7 +77,7 @@ VARIABLE bp
 \ Per ball: +0=x(2) +2=y(2) +4=dx(2) +6=dy(2) +8=ox(2) +10=oy(2)
 
 4 CONSTANT NBALLS
-$8020 CONSTANT BTBL
+$4020 CONSTANT BTBL
 
 VARIABLE use-wpr       \ mode: 0/1/2
 VARIABLE bl-offset     \ blanking offset (tunable)
@@ -94,11 +94,12 @@ VARIABLE bl-offset     \ blanking offset (tunable)
 
 : init-bounce  ( -- )
   set-sam-v set-sam-f set-pia
-  rg-init
+  $5800 font-base !            \ ROM mode: font goes below VRAM
+  $6000 rg-init-at             \ ROM mode: VRAM at $6000-$77FF
   init-font
-  $6000 KVAR-RGFONT !  0 KVAR-RGCHARMIN C!  7 KVAR-RGGLYPHSZ C!  7 KVAR-RGNROWS C!  32 KVAR-RGBPR C!  8 KVAR-RGROWH C!
+  $5800 KVAR-RGFONT !  0 KVAR-RGCHARMIN C!  7 KVAR-RGGLYPHSZ C!  7 KVAR-RGNROWS C!  32 KVAR-RGBPR C!  8 KVAR-RGROWH C!
   init-ball-spr
-  $0600 6144 0 FILL
+  $6000 6144 0 FILL
   60  90  2  1  0 init-one
   30  40  3  2  1 init-one
  100 130 -1 -2  2 init-one
@@ -202,7 +203,7 @@ VARIABLE hx                   \ HUD cursor column
 \ ── Main loop ────────────────────────────────────────────────────────
 
 : check-quit  ( -- )
-  key? IF key $03 = IF bye THEN THEN ;
+  key? IF key $03 = IF exit-basic THEN THEN ;
 
 : bounce  ( -- )
   init-bounce

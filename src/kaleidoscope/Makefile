@@ -1,3 +1,4 @@
-NAME = kaleidoscope
+NAME           = kaleidoscope
+KERNEL_VARIANT = rom
 
 include ../../make/demo.mk

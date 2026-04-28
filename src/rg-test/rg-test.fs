@@ -8,6 +8,7 @@
 
 INCLUDE ../../forth/lib/vdg.fs
 INCLUDE ../../forth/lib/screen.fs
+INCLUDE ../../forth/lib/bye.fs
 INCLUDE ../../forth/lib/rg-pixel.fs
 INCLUDE ../../forth/lib/datawrite.fs
 INCLUDE ../../forth/lib/sprite.fs
@@ -148,7 +149,7 @@ VARIABLE ax  VARIABLE ay  VARIABLE fc
 \ ── Main ─────────────────────────────────────────────────────────────────
 
 : main  ( -- )
-  rg-init
+  $6000 rg-init-at         \ ROM-mode: VRAM at $6000-$77FF (32K layout)
   init-sprites
 
   test-bars
@@ -166,7 +167,6 @@ VARIABLE ax  VARIABLE ay  VARIABLE fc
   test-angles
   KEY DROP
 
-  reset-text
-  HALT ;
+  exit-basic ;
 
 main

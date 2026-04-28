@@ -96,7 +96,7 @@ VARIABLE saved-char
   BEGIN
     KEY
     cursor-off
-    DUP $03 = IF  DROP  reset-text cls-black basic-cold  THEN
+    DUP $03 = IF  DROP  exit-basic              THEN
     DUP $0D = IF  DROP  cr                      ELSE
     DUP $0C = IF  DROP  cls                     ELSE
     DUP $1E = IF  DROP  backspace                ELSE

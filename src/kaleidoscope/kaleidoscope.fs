@@ -125,7 +125,7 @@ VARIABLE dx    VARIABLE dy    VARIABLE dc
     step step step step
     $FF $FFD6 C!                  \ SAM normal speed (display refresh)
     vsync
-    key? IF key $03 = IF bye THEN THEN
+    key? IF key $03 = IF exit-basic THEN THEN
   0 UNTIL ;
 
 kaleidoscope

@@ -1,6 +1,6 @@
 \ bye.fs — Clean program exit
 \
-\ Provides: bye, basic-cold
+\ Provides: bye, basic-cold, exit-basic
 \ Requires: vdg.fs (reset-text), screen.fs (cls-black), kernel halt
 \
 \ bye          — restore VDG text mode, clear screen black, halt.
@@ -13,6 +13,9 @@
 \                ONLY call this from kernels built with -DROM_MODE=1
 \                (BASIC ROMs are alive at $A000).  In all-RAM mode
 \                $A027 is RAM and a JMP there will crash.
+\
+\ exit-basic   — Cleanup + basic-cold.  ROM-mode-only, equivalent to
+\                'bye' but actually returns to BASIC.
 
 INCLUDE vdg.fs
 INCLUDE screen.fs
@@ -25,3 +28,8 @@ INCLUDE screen.fs
 CODE basic-cold
         JMP     $A027
 ;CODE
+
+: exit-basic  ( -- )
+  reset-text
+  cls-black
+  basic-cold ;
