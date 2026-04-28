@@ -7,7 +7,7 @@
 #   make dsks         build both DSKs
 #   make clean        remove all build artifacts
 
-DEMOS        = bounce calculator kaleidoscope rain tetris rg-test typewriter
+DEMOS        = bounce calculator kaleidoscope rain tetris rg-test typewriter vdg-modes
 KERNEL       = forth/kernel
 DSK          = build/demos.dsk
 TUTORIAL_DSK = build/tutorial.dsk
@@ -46,8 +46,9 @@ dsk: demos
 	decb copy src/tetris/tetris.bin                $(DSK),TETRIS.BIN -2
 	decb copy src/rg-test/rg-test.bin              $(DSK),RG-TEST.BIN -2
 	decb copy src/typewriter/typewriter.bin        $(DSK),TYPEWRTR.BIN -2
+	decb copy src/vdg-modes/vdg-modes.bin          $(DSK),VDGMODES.BIN -2
 	@echo ""
-	@echo "  $(DSK) created with 7 programs."
+	@echo "  $(DSK) created with 8 programs."
 	@echo "  Copy to SD card for FujiNet, or load in XRoar."
 	@echo "  In DECB:  LOADM\"BOUNCE\":EXEC"
 
