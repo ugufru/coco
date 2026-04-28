@@ -58,7 +58,6 @@ def kernel_words(symbols):
     names = {
         'emit': 'CFA_EMIT',
         'halt': 'CFA_HALT',
-        'bye':  'CFA_BYE',
         'exit': 'CFA_EXIT',
         '+':    'CFA_ADD',
         '-':    'CFA_SUB',
@@ -97,7 +96,6 @@ def kernel_words(symbols):
         '2drop':    'CFA_2DROP',
         '2dup':     'CFA_2DUP',
         'rot':      'CFA_ROT',
-        'prox-scan': 'CFA_PROX_SCAN',
         '>r':       'CFA_TOR',
         'r>':       'CFA_FROMR',
         'r@':       'CFA_RAT',
@@ -128,7 +126,6 @@ def kernel_words(symbols):
         'rg-char':     'CFA_RG_CHAR',
         'beam-trace':  'CFA_BEAM_TRACE',
         'beam-draw-slice': 'CFA_BEAM_DRAW_SLICE',
-        'beam-restore-slice': 'CFA_BEAM_RESTORE_SLICE',
         'beam-find-obstacle': 'CFA_BEAM_FIND_OBSTACLE',
         'beam-scrub-pos': 'CFA_BEAM_SCRUB_POS',
     }
@@ -757,6 +754,22 @@ def compile_forth(definitions, variables, main_thread, code_definitions,
     CFA_BRANCH   = symbols['CFA_BRANCH']
     kwords       = kernel_words(symbols)
 
+    # Small-integer literal compression.  Compiling `0`, `1`, `2` into a
+    # thread can emit the dedicated CFA_LIT0/LIT1/LIT2 cell (2 bytes)
+    # instead of a generic CFA_LIT + inline value (4 bytes).  The symbol-
+    # presence guard makes this a graceful no-op when building against an
+    # older kernel that lacks the primitives.
+    LIT_PRIMS = {0: 'CFA_LIT0', 1: 'CFA_LIT1', 2: 'CFA_LIT2'}
+    lit_prim_cfa = {v: symbols[s] for v, s in LIT_PRIMS.items() if s in symbols}
+
+    def lit_size(value):
+        return 2 if value in lit_prim_cfa else 4
+
+    def sized(item):
+        if item[0] == 'lit':
+            return lit_size(item[1])
+        return item_size(item)
+
     # Assemble CODE words to get their sizes.
     # Provide dummy variable addresses (all $0000) so FVAR_* symbols resolve.
     # Real addresses are computed in Pass 1 and CODE words are re-assembled.
@@ -777,7 +790,7 @@ def compile_forth(definitions, variables, main_thread, code_definitions,
         for item in items:
             if item[0] == 'label':
                 label_map[item[1]] = cursor
-            cursor += item_size(item)
+            cursor += sized(item)
         return cursor
 
     cursor = scan(main_thread, app_base)
@@ -791,7 +804,7 @@ def compile_forth(definitions, variables, main_thread, code_definitions,
     word_cfa = {}   # name → address of the word's CFA cell in the output
     for name, items in definitions.items():
         cursor = skip_hole(cursor)
-        def_size = 2 + sum(item_size(it) for it in items) + 2
+        def_size = 2 + sum(sized(it) for it in items) + 2
         if would_cross_hole(cursor, def_size):
             cursor = hole_end
         word_cfa[name] = cursor
@@ -840,8 +853,13 @@ def compile_forth(definitions, variables, main_thread, code_definitions,
     def resolve(item):
         kind = item[0]
         if kind == 'lit':
-            emit_word(CFA_LIT)
-            emit_word(item[1])
+            value = item[1]
+            short_cfa = lit_prim_cfa.get(value)
+            if short_cfa is not None:
+                emit_word(short_cfa)
+            else:
+                emit_word(CFA_LIT)
+                emit_word(value)
         elif kind == 'slit':
             text = item[1]
             slen = len(text)
@@ -1327,7 +1345,7 @@ def analyze_kernel_primitives(kernel_asm_path):
     # Build reverse mapping: CFA_xxx → Forth name
     # Use the same names dict from kernel_words()
     cfa_to_forth = {
-        'CODE_EMIT': 'emit', 'CODE_HALT': 'halt', 'CODE_BYE': 'bye', 'CODE_EXIT': 'exit',
+        'CODE_EMIT': 'emit', 'CODE_HALT': 'halt', 'CODE_EXIT': 'exit',
         'CODE_ADD': '+', 'CODE_SUB': '-', 'CODE_CR': 'cr',
         'CODE_DUP': 'dup', 'CODE_DROP': 'drop', 'CODE_SWAP': 'swap',
         'CODE_OVER': 'over', 'CODE_FETCH': '@', 'CODE_STORE': '!',
@@ -1345,7 +1363,7 @@ def analyze_kernel_primitives(kernel_asm_path):
         'CODE_NEGATE': 'negate', 'CODE_QDUP': '?dup',
         'CODE_TYPE': 'type', 'CODE_COUNT': 'count',
         'CODE_PLUS_STORE': '+!', 'CODE_2DROP': '2drop', 'CODE_2DUP': '2dup',
-        'CODE_ROT': 'rot', 'CODE_PROX_SCAN': 'prox-scan',
+        'CODE_ROT': 'rot',
         'CODE_TOR': '>r', 'CODE_FROMR': 'r>', 'CODE_RAT': 'r@',
         'CODE_MIN': 'min', 'CODE_MAX': 'max', 'CODE_ABS': 'abs',
         'CODE_MDIST': 'mdist', 'CODE_UNLOOP': 'unloop',
@@ -1565,6 +1583,10 @@ def main():
                         help='application load address (default: 0x2000)')
     parser.add_argument('--hole',           default=None,
                         help='reserved address hole, e.g. 0x4000,6144 (start,size)')
+    parser.add_argument('--stage-base',     default=None,
+                        help='pin kernel staging address (default: auto-pack '
+                             'after bootstrap).  Use to decouple binary layout '
+                             'from coco kernel size churn.')
     parser.add_argument('--cycles',        action='store_true',
                         help='print per-word 6809 cycle cost estimates')
     args = parser.parse_args()
@@ -1638,14 +1660,18 @@ def main():
 
         # Remap kernel records at $E000+ to staging address.
         # The bootstrap code copies them to their final location at runtime.
-        # Stage immediately after the bootstrap record to maximise headroom
-        # before APP_BASE.  The bootstrap at $0E00 is small (~25 bytes);
-        # packing the kernel right after it reclaims ~$0E19–$0FFF.
-        boot_end = 0x0E00
-        for addr, payload in kernel_records:
-            if addr < 0xE000:
-                boot_end = max(boot_end, addr + len(payload))
-        KERNEL_STAGE_ADDR = boot_end
+        # Default: pack immediately after the bootstrap record to maximise
+        # headroom before APP_BASE.  --stage-base pins the address instead,
+        # so downstream projects can keep KCODE landing at a stable address
+        # across coco kernel growth/shrink.
+        if args.stage_base is not None:
+            KERNEL_STAGE_ADDR = int(args.stage_base, 0)
+        else:
+            boot_end = 0x0E00
+            for addr, payload in kernel_records:
+                if addr < 0xE000:
+                    boot_end = max(boot_end, addr + len(payload))
+            KERNEL_STAGE_ADDR = boot_end
         staged_records = []
         stage_cursor = KERNEL_STAGE_ADDR
         for addr, payload in kernel_records:

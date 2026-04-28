@@ -20,6 +20,7 @@ INCLUDE ../../forth/lib/datawrite.fs
 INCLUDE ../../forth/lib/font-art.fs
 INCLUDE ../../forth/lib/trig.fs
 INCLUDE ../../forth/lib/fujinet.fs
+INCLUDE ../../forth/lib/beam.fs
 
 
 \ ── Forth helpers ────────────────────────────────────────────────────

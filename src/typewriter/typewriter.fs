@@ -17,6 +17,8 @@
 \ Build:   make
 \ Load:    LOADM"TYPEWRTR":EXEC
 
+INCLUDE ../../forth/lib/bye.fs
+
 \ ── Variables ────────────────────────────────────────────────────────────────
 
 \ VAR_CUR is the kernel's cursor variable at KVAR-CUR (2 bytes).

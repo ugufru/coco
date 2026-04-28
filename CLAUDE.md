@@ -123,6 +123,7 @@ Do not access, search, or modify files outside these paths. If a task appears to
 - Pre-decrement by 1 illegal for stores — STA ,-S / CLR ,-S undefined; use PSHS A instead
 - Update docs before code — write theoretical analysis first, then implement, then re-measure
 - Autonomous workflow — don't pause unless judgement/visual/physical feedback needed
+- decb tool location — `~/bin/decb` (from Toolshed 2.2). The top-level `make dsk` target shells out to bare `decb` and will fail with "decb not found on PATH" if `~/bin` isn't on PATH. Use `PATH=~/bin:$PATH make dsk` (or invoke `~/bin/decb` directly when scripting) — do NOT report it as missing.
 
 ## Project
 CoCo Renovation — on-device Forth development environment for the TRS-80 Color Computer.

@@ -8,7 +8,7 @@ Motorola 6809 CPU. Write Forth on a modern machine, cross-compile with
 
 - **Threading**: Indirect Threaded Code (ITC)
 - **CPU**: Motorola 6809 (X=IP, U=DSP, S=RSP, Y=scratch)
-- **Kernel**: ~4K of 6809 assembly — 80+ primitives including graphics, sprites, beam tracing
+- **Kernel**: ~4K of 6809 assembly — 80+ primitives including graphics, sprites, beam tracing, and small-int literal compression (LIT0/LIT1/LIT2)
 - **Compiler**: Python cross-compiler (`fc.py`) — Forth source to DECB binary
 - **Target**: TRS-80 Color Computer 1/2/3, 64K RAM
 

@@ -17,6 +17,7 @@ INCLUDE ../../forth/lib/screen.fs
 INCLUDE ../../forth/lib/rg-pixel.fs
 INCLUDE ../../forth/lib/sprite.fs
 INCLUDE ../../forth/lib/font5x7.fs
+INCLUDE ../../forth/lib/bye.fs
 
 \ ── rg-char ( char cx cy -- ) from rg-text.fs ──────────────────────
 \ Render a font glyph into RG-mode VRAM.  Uses kernel config vars $75-$7B.

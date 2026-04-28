@@ -20,6 +20,7 @@
 
 INCLUDE ../../forth/lib/rng.fs
 INCLUDE ../../forth/lib/screen.fs
+INCLUDE ../../forth/lib/bye.fs
 
 \ ── Semigraphics-4 pixel operations ───────────────────────────────────
 

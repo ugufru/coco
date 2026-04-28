@@ -152,9 +152,11 @@ DOVAR
 
 CFA_EXIT        FDB     CODE_EXIT
 CFA_LIT         FDB     CODE_LIT
+CFA_LIT0        FDB     CODE_LIT0
+CFA_LIT1        FDB     CODE_LIT1
+CFA_LIT2        FDB     CODE_LIT2
 CFA_EMIT        FDB     CODE_EMIT
 CFA_HALT        FDB     CODE_HALT
-CFA_BYE         FDB     CODE_BYE
 CFA_ADD         FDB     CODE_ADD
 CFA_SUB         FDB     CODE_SUB
 CFA_CR          FDB     CODE_CR
@@ -196,7 +198,6 @@ CFA_PLUS_STORE  FDB     CODE_PLUS_STORE
 CFA_2DROP       FDB     CODE_2DROP
 CFA_2DUP        FDB     CODE_2DUP
 CFA_ROT         FDB     CODE_ROT
-CFA_PROX_SCAN   FDB     CODE_PROX_SCAN
 CFA_TOR         FDB     CODE_TOR
 CFA_FROMR       FDB     CODE_FROMR
 CFA_RAT         FDB     CODE_RAT
@@ -331,6 +332,33 @@ CODE_LIT
         LDD     ,X++            ; fetch literal from thread, advance IP past it
         STD     ,--U            ; push onto data stack (A=high, B=low)
         LDY     ,X++            ; NEXT
+        JMP     [,Y]
+
+;;; ─── LIT0 / LIT1 / LIT2 ( -- n ) ────────────────────────────────────────────
+;;; Small-integer literal compression.  Compiling `0`, `1`, or `2` into a
+;;; thread emits the corresponding CFA cell (2 bytes) instead of a generic
+;;; CFA_LIT cell + inline value (4 bytes).  These three constants dominate
+;;; the literal frequency of any non-trivial Forth program; collapsing them
+;;; saves real bytes for a tiny, fixed kernel cost.  fc.py's compile_forth
+;;; emits these CFAs when the symbols are present (graceful fallback if
+;;; building against an older kernel).
+
+CODE_LIT0
+        LDD     #0
+        STD     ,--U
+        LDY     ,X++
+        JMP     [,Y]
+
+CODE_LIT1
+        LDD     #1
+        STD     ,--U
+        LDY     ,X++
+        JMP     [,Y]
+
+CODE_LIT2
+        LDD     #2
+        STD     ,--U
+        LDY     ,X++
         JMP     [,Y]
 
 ;;; ─── EMIT ( c -- ) ───────────────────────────────────────────────────────────
@@ -1408,69 +1436,6 @@ CODE_ROT
         LDY     ,X++
         JMP     [,Y]
 
-;;; ─── PROX-SCAN ( cx cy radius array count -- bitmask ) ─────────────────────
-;;; Spatial proximity query.  Scan count (x,y) byte pairs at array.
-;;; Return 16-bit bitmask: bit N set if entry N is within Manhattan
-;;; distance radius of (cx,cy).  Max 16 entries (bits 0–15).
-;;;
-;;; Stack on entry: count(TOS), array, radius, cy, cx (deepest)
-;;; Uses return stack for loop parameters; saves/restores IP.
-
-CODE_PROX_SCAN
-        PSHS    X               ; save IP
-        LDB     1,U             ; B = count (low byte of TOS)
-        BEQ     PS_ZERO         ; count=0 → return 0
-        LDX     2,U             ; X = array pointer
-        LDA     5,U             ; A = radius (low byte)
-        PSHS    A               ; S: [rad, IP]
-        LDA     7,U             ; A = cy (low byte)
-        PSHS    A               ; S: [cy, rad, IP]
-        LDA     9,U             ; A = cx (low byte)
-        PSHS    A               ; S: [cx, cy, rad, IP]
-        LEAU    10,U            ; pop all 5 args
-        PSHS    B               ; S: [count, cx, cy, rad, IP]
-        LDY     #0              ; Y = result bitmask
-        LDD     #1
-        PSHS    D               ; S: [bit_hi, bit_lo, count, cx, cy, rad, IP]
-        ;;; Offsets: 0=bit_hi, 1=bit_lo, 2=count, 3=cx, 4=cy, 5=rad
-PS_LOOP
-        LDA     ,X+             ; A = entry x
-        SUBA    3,S             ; A = x - cx
-        BPL     PS_AX
-        NEGA
-PS_AX   LDB     ,X+             ; B = entry y
-        SUBB    4,S             ; B = y - cy
-        BPL     PS_AY
-        NEGB
-PS_AY   PSHS    A               ; save |dx|
-        ADDB    ,S+             ; B = |dx| + |dy|, pop |dx|
-        BCS     PS_SKIP         ; overflow > 255, definitely out of range
-        CMPB    5,S             ; compare with radius
-        BHS     PS_SKIP         ; B >= radius → out of range
-        ;;; In range — OR bit into Y
-        TFR     Y,D
-        ORA     ,S              ; OR bit_hi
-        ORB     1,S             ; OR bit_lo
-        TFR     D,Y
-PS_SKIP
-        LSL     1,S             ; bit <<= 1
-        ROL     ,S
-        DEC     2,S             ; count--
-        BNE     PS_LOOP
-        ;;; Done — clean up and return
-        LEAS    6,S             ; pop [bit, count, cx, cy, rad]
-        STY     ,--U            ; push bitmask result
-        PULS    X               ; restore IP
-        LDY     ,X++
-        JMP     [,Y]
-PS_ZERO
-        LEAU    10,U            ; pop all 5 args
-        LDD     #0
-        STD     ,--U            ; push 0
-        PULS    X               ; restore IP
-        LDY     ,X++
-        JMP     [,Y]
-
 ;;; ─── >R ( n -- ) (R: -- n ) ─────────────────────────────────────────────────
 ;;; Move TOS to return stack.
 
@@ -1500,36 +1465,6 @@ CODE_RAT
 
 CODE_HALT
         BRA     CODE_HALT
-
-;;; ─── BYE ────────────────────────────────────────────────────────────────────
-;;; Exit the application: restore VDG to default text mode, clear the
-;;; screen, then spin.  Honest about what it is — the program has ended,
-;;; press RESET to restart.  Proper BASIC ROM handoff: see issue #474.
-
-CODE_BYE
-        ; SAM V bits = 000 (text/SG4 mode)
-        STA     $FFC0           ; clear V0
-        STA     $FFC2           ; clear V1
-        STA     $FFC4           ; clear V2
-        ; SAM F bits = 2 (display offset $0400 = default text VRAM)
-        STA     $FFC6           ; clear F0
-        STA     $FFC9           ; set   F1
-        STA     $FFCA           ; clear F2
-        STA     $FFCC           ; clear F3
-        STA     $FFCE           ; clear F4
-        STA     $FFD0           ; clear F5
-        STA     $FFD2           ; clear F6
-        ; PIA1 $FF22 bits 7-3 = 0 (A*/G=0 → alpha; preserve bits 2-0)
-        LDA     $FF22
-        ANDA    #$07
-        STA     $FF22
-        ; Clear $0400-$05FF to normal-alpha space (black background)
-        LDA     #$60
-        LDX     #$0400
-@cls    STA     ,X+
-        CMPX    #$0600
-        BNE     @cls
-@hold   BRA     @hold
 
 ;;; ─── START ─────────────────────────────────────────────────────────────────
 ;;; Hardware initialisation and application entry.
@@ -2195,71 +2130,6 @@ CODE_BEAM_DRAW_SLICE
         ADDA    #6
         PSHS    A
         LDA     VAR_LINE_COL
-        LDB     ,S
-        BEQ     @ns
-@sh     ASLA
-        DECB
-        BNE     @sh
-@ns     PSHS    A
-        LDA     #$03
-        LDB     1,S
-        BEQ     @nm
-@sm     ASLA
-        DECB
-        BNE     @sm
-@nm     COMA
-        ANDA    ,Y
-        ORA     ,S
-        STA     ,Y
-        LEAS    2,S
-        PULS    X
-        LEAX    3,X
-        LDD     VAR_BEAM_CNT
-        SUBD    #1
-        STD     VAR_BEAM_CNT
-        BNE     @ploop
-@done   PULS    X
-        LDY     ,X++
-        JMP     [,Y]
-
-;;; ─── beam-restore-slice ( buf start count -- ) ────────────────────────────
-CFA_BEAM_RESTORE_SLICE FDB CODE_BEAM_RESTORE_SLICE
-CODE_BEAM_RESTORE_SLICE
-        PSHS    X
-        LDD     ,U
-        STD     VAR_BEAM_CNT
-        LDD     2,U
-        PSHS    D
-        ASLB
-        ROLA
-        ADDD    ,S++
-        ADDD    4,U
-        STD     VAR_BEAM_BUF
-        LEAU    6,U
-        LDD     VAR_BEAM_CNT
-        BEQ     @done
-        LDX     VAR_BEAM_BUF
-@ploop  LDA     ,X
-        LDB     1,X
-        PSHS    X
-        PSHS    A
-        LDA     #32
-        MUL
-        ADDD    VAR_RGVRAM
-        TFR     D,Y
-        LDA     ,S
-        LSRA
-        LSRA
-        LEAY    A,Y
-        LDA     ,S+
-        ANDA    #$03
-        ASLA
-        NEGA
-        ADDA    #6
-        PSHS    A
-        LDX     1,S
-        LDA     2,X
-        ANDA    #$03
         LDB     ,S
         BEQ     @ns
 @sh     ASLA

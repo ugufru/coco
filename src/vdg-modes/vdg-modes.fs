@@ -19,6 +19,7 @@ INCLUDE ../../forth/lib/datawrite.fs
 INCLUDE ../../forth/lib/rg-text.fs
 INCLUDE ../../forth/lib/cg-text.fs
 INCLUDE ../../forth/lib/sg6-text.fs
+INCLUDE ../../forth/lib/bye.fs
 
 \ -- Constants -----------------------------------------------------------
 
