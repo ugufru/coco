@@ -8,10 +8,24 @@
 # then includes this file.
 
 KERNEL_DIR   = ../../forth/kernel
-KERNEL_MAP   = $(KERNEL_DIR)/build/kernel.map
-KERNEL_BIN   = $(KERNEL_DIR)/build/kernel.bin
 FC           = python3 ../../forth/tools/fc.py
 XROAR_ROMS   = -bas ~/.xroar/roms/bas12.rom -extbas ~/.xroar/roms/extbas11.rom
+
+# KERNEL_VARIANT selects which kernel build to link against:
+#   (unset)  = all-RAM kernel at $E000 (default, 64K machine)
+#   rom      = ROM-mode kernel at $1000 (BASIC ROMs alive, fits 32K)
+KERNEL_VARIANT ?=
+ifeq ($(KERNEL_VARIANT),rom)
+KERNEL_STEM   = kernel-rom
+KERNEL_TARGET = rom
+XROAR_RAM    ?= 32
+else
+KERNEL_STEM   = kernel
+KERNEL_TARGET =
+XROAR_RAM    ?= 64
+endif
+KERNEL_MAP   = $(KERNEL_DIR)/build/$(KERNEL_STEM).map
+KERNEL_BIN   = $(KERNEL_DIR)/build/$(KERNEL_STEM).bin
 
 SRC         ?= $(NAME).fs
 XROAR_EXTRA ?= -kbd-translate
@@ -27,11 +41,14 @@ $(BIN): $(SRC) $(EXTRA_DEPS) $(KERNEL_MAP) $(KERNEL_BIN)
 	    --kernel-bin $(KERNEL_BIN) \
 	    --output    $(BIN)
 
+$(KERNEL_MAP) $(KERNEL_BIN):
+	$(MAKE) -C $(KERNEL_DIR) $(KERNEL_TARGET)
+
 run: $(BIN)
-	xroar -machine coco2bus -ram 64 $(XROAR_ROMS) $(XROAR_EXTRA) -run $(BIN)
+	xroar -machine coco2bus -ram $(XROAR_RAM) $(XROAR_ROMS) $(XROAR_EXTRA) -run $(BIN)
 
 kernel:
-	$(MAKE) -C $(KERNEL_DIR)
+	$(MAKE) -C $(KERNEL_DIR) $(KERNEL_TARGET)
 
 clean:
 	rm -rf build $(BIN)

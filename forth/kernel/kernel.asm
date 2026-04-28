@@ -91,6 +91,44 @@ KERN_VERSION    EQU     $0100   ; kernel version 1.0 (major.minor, BCD)
 SCREEN  EQU     $0400           ; video RAM base (32×16 alphanumeric text)
 NSCR    EQU     512             ; 32 cols × 16 rows
 
+;;; ─── Build-time configuration ─────────────────────────────────────────────
+;;; The kernel supports two build profiles:
+;;;
+;;;   all-RAM (default): KERNEL_ORG=$E000, ROM_MODE undefined.
+;;;     Bootstrap enables SAM TY (all-RAM) and copies staged kernel from
+;;;     $1000 to $E000.  Stacks live just below the kernel.
+;;;
+;;;   ROM mode (lwasm -DROM_MODE=1): KERNEL_ORG=$1000 by default.
+;;;     SAM stays in ROM-mapped mode; BASIC at $A000 stays alive.  No
+;;;     staging copy.  Bootstrap is just hardware init + JMP START.
+;;;     Stacks live high in available RAM (RSP_INIT/DSP_INIT).
+;;;     Override RAM-top defaults for 16K machines:
+;;;       lwasm -DROM_MODE=1 -DRSP_INIT=$4000 -DDSP_INIT=$3E00
+;;;
+;;; Override any of these on the lwasm command line via -DNAME=VALUE.
+
+        IFDEF   ROM_MODE
+                IFNDEF  KERNEL_ORG
+KERNEL_ORG      EQU     $1000
+                ENDC
+                IFNDEF  RSP_INIT
+RSP_INIT        EQU     $8000           ; 32K machine: stack top in last RAM word
+                ENDC
+                IFNDEF  DSP_INIT
+DSP_INIT        EQU     $7E00
+                ENDC
+        ELSE
+                IFNDEF  KERNEL_ORG
+KERNEL_ORG      EQU     $E000
+                ENDC
+                IFNDEF  RSP_INIT
+RSP_INIT        EQU     $E000
+                ENDC
+                IFNDEF  DSP_INIT
+DSP_INIT        EQU     $DE00
+                ENDC
+        ENDC
+
 ;;; ─── Bootstrap ──────────────────────────────────────────────────────────────
 ;;; DECB exec address points here.  Runs once at load time, then never again.
 ;;;
@@ -110,18 +148,20 @@ NSCR    EQU     512             ; 32 cols × 16 rows
 
 BOOTSTRAP
         ORCC    #$50            ; mask IRQ/FIRQ
+        IFNDEF  ROM_MODE
         STA     $FFDF           ; all-RAM mode
         LDX     #$1000          ; source: staged kernel
-        LDY     #$E000          ; dest: final location
+        LDY     #KERNEL_ORG     ; dest: final location
 BOOT_LP LDD     ,X++
         STD     ,Y++
         CMPY    #KERN_END
         BLO     BOOT_LP
+        ENDC
         JMP     START
 
 ;;; ─── Kernel ──────────────────────────────────────────────────────────────────
 
-        ORG     $E000
+        ORG     KERNEL_ORG
 
 ;;; DOCOL — enter a colon definition
 ;;;   Called via JMP [,Y] where Y = address of the word's CFA.
@@ -1507,8 +1547,8 @@ START
         CLRA
         TFR     A,DP            ; direct page register = $00
 
-        LDS     #$E000          ; RSP: first push lands at $DFFE (below kernel)
-        LDU     #$DE00          ; DSP: first push lands at $DDFE
+        LDS     #RSP_INIT       ; RSP: first push lands at RSP_INIT-2
+        LDU     #DSP_INIT       ; DSP: first push lands at DSP_INIT-2
 
         ; ── PIA0 init (bare-metal keyboard scan) ─────────────────────────────
         ; The 6821 PIA shares each data address between the Data Direction

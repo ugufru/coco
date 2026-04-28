@@ -1,13 +1,18 @@
 \ bye.fs — Clean program exit
 \
-\ Provides: bye
+\ Provides: bye, basic-cold
 \ Requires: vdg.fs (reset-text), screen.fs (cls-black), kernel halt
 \
-\ Restores the VDG to default alpha/SG4 text mode, clears VRAM to a
-\ black background, and halts.  In a cartridge-delivered system the
-\ physical RESET button is the real restart path — bye gives a clean
-\ visual landing while we wait for it.  Proper Color BASIC ROM handoff
-\ is tracked in issue #474.
+\ bye          — restore VDG text mode, clear screen black, halt.
+\                Safe in any build profile.  In all-RAM mode this is
+\                the only sane exit because the BASIC ROMs are paged
+\                out (issue #474).
+\
+\ basic-cold   — ROM-mode-only.  JMPs to Color BASIC's cold-start
+\                entry at $A027, returning the user to the OK prompt.
+\                ONLY call this from kernels built with -DROM_MODE=1
+\                (BASIC ROMs are alive at $A000).  In all-RAM mode
+\                $A027 is RAM and a JMP there will crash.
 
 INCLUDE vdg.fs
 INCLUDE screen.fs
@@ -16,3 +21,7 @@ INCLUDE screen.fs
   reset-text
   cls-black
   halt ;
+
+CODE basic-cold
+        JMP     $A027
+;CODE

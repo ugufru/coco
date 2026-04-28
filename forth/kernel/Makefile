@@ -2,12 +2,20 @@ BUILD  = build
 TOOLS  = ../tools
 HELLO  = ../hello
 
-.PHONY: all clean run
+.PHONY: all clean run rom
 
 all: $(BUILD)/combined.bin
 
 $(BUILD)/kernel.bin: kernel.asm | $(BUILD)
 	lwasm --format=decb --output=$(BUILD)/kernel.bin --map=$(BUILD)/kernel.map --list=$(BUILD)/kernel.lst kernel.asm
+
+# ROM-mode kernel: kernel ORGs at $1000, no all-RAM dance, BASIC stays alive.
+# Defaults target a 32K machine (RSP_INIT=$8000, DSP_INIT=$7E00).
+# Override on the command line for 16K builds.
+rom: $(BUILD)/kernel-rom.bin
+
+$(BUILD)/kernel-rom.bin: kernel.asm | $(BUILD)
+	lwasm --format=decb --output=$(BUILD)/kernel-rom.bin --map=$(BUILD)/kernel-rom.map --list=$(BUILD)/kernel-rom.lst -DROM_MODE=1 kernel.asm
 
 $(BUILD)/combined.bin: $(HELLO)/hello.fs $(BUILD)/kernel.bin
 	python3 $(TOOLS)/fc.py $(HELLO)/hello.fs \

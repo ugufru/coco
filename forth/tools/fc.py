@@ -1661,73 +1661,92 @@ def main():
         # BASIC loads both blocks in a single CLOADM, then executes bootstrap.
         kernel_records, exec_addr = read_decb(args.kernel_bin)
 
-        # Remap kernel records at $E000+ to staging address.
-        # The bootstrap code copies them to their final location at runtime.
-        # Default: pack immediately after the bootstrap record to maximise
-        # headroom before APP_BASE.  --stage-base pins the address instead,
-        # so downstream projects can keep KCODE landing at a stable address
-        # across coco kernel growth/shrink.
-        if args.stage_base is not None:
-            KERNEL_STAGE_ADDR = int(args.stage_base, 0)
-        else:
-            boot_end = 0x0E00
-            for addr, payload in kernel_records:
-                if addr < 0xE000:
-                    boot_end = max(boot_end, addr + len(payload))
-            KERNEL_STAGE_ADDR = boot_end
-        staged_records = []
-        stage_cursor = KERNEL_STAGE_ADDR
-        for addr, payload in kernel_records:
-            if addr >= 0xE000:
-                staged_records.append((stage_cursor, payload))
-                stage_cursor += len(payload)
-            else:
-                staged_records.append((addr, payload))
-        kernel_records = staged_records
+        # Detect ROM-mode kernel: no records at $E000+ means the kernel was
+        # assembled to live in low RAM (KERNEL_ORG=$1000 typical).  In that
+        # case there's no all-RAM dance — kernel records are already at
+        # their final addresses, and the bootstrap is a tiny stub that just
+        # JMPs to START.  Skip staging entirely.
+        rom_mode = not any(addr >= 0xE000 for addr, _ in kernel_records)
 
-        # Patch bootstrap's LDX #$1000 to point at new staging address.
-        # The bootstrap has: LDX #<stage_addr> (opcode 8E xx xx)
-        OLD_STAGE = 0x1000
-        if KERNEL_STAGE_ADDR != OLD_STAGE:
-            old_hi = (OLD_STAGE >> 8) & 0xFF
-            old_lo = OLD_STAGE & 0xFF
-            new_hi = (KERNEL_STAGE_ADDR >> 8) & 0xFF
-            new_lo = KERNEL_STAGE_ADDR & 0xFF
-            for idx, (addr, payload) in enumerate(kernel_records):
-                if addr < 0xE000:       # bootstrap record
+        if rom_mode:
+            # Find the high-water mark of kernel records to know where KCODE
+            # would be appended.  No remap, no patching needed.
+            kern_end_actual = max(addr + len(payload) for addr, payload in kernel_records)
+            stage_cursor = kern_end_actual
+            KERNEL_STAGE_ADDR = kern_end_actual  # for diagnostics only
+        else:
+            # Remap kernel records at $E000+ to staging address.
+            # The bootstrap code copies them to their final location at runtime.
+            # Default: pack immediately after the bootstrap record to maximise
+            # headroom before APP_BASE.  --stage-base pins the address instead,
+            # so downstream projects can keep KCODE landing at a stable address
+            # across coco kernel growth/shrink.
+            if args.stage_base is not None:
+                KERNEL_STAGE_ADDR = int(args.stage_base, 0)
+            else:
+                boot_end = 0x0E00
+                for addr, payload in kernel_records:
+                    if addr < 0xE000:
+                        boot_end = max(boot_end, addr + len(payload))
+                KERNEL_STAGE_ADDR = boot_end
+            staged_records = []
+            stage_cursor = KERNEL_STAGE_ADDR
+            for addr, payload in kernel_records:
+                if addr >= 0xE000:
+                    staged_records.append((stage_cursor, payload))
+                    stage_cursor += len(payload)
+                else:
+                    staged_records.append((addr, payload))
+            kernel_records = staged_records
+
+            # Patch bootstrap's LDX #$1000 to point at new staging address.
+            # The bootstrap has: LDX #<stage_addr> (opcode 8E xx xx)
+            OLD_STAGE = 0x1000
+            if KERNEL_STAGE_ADDR != OLD_STAGE:
+                old_hi = (OLD_STAGE >> 8) & 0xFF
+                old_lo = OLD_STAGE & 0xFF
+                new_hi = (KERNEL_STAGE_ADDR >> 8) & 0xFF
+                new_lo = KERNEL_STAGE_ADDR & 0xFF
+                for idx, (addr, payload) in enumerate(kernel_records):
+                    if addr < 0xE000:       # bootstrap record
+                        payload = bytearray(payload)
+                        for j in range(len(payload) - 2):
+                            if (payload[j] == 0x8E and
+                                payload[j+1] == old_hi and payload[j+2] == old_lo):
+                                payload[j+1] = new_hi
+                                payload[j+2] = new_lo
+                                kernel_records[idx] = (addr, bytes(payload))
+                                break
+
+            # Append KCODE bytes to the staged kernel region
+            if kcode_bytes:
+                kernel_records.append((stage_cursor, bytes(kcode_bytes)))
+                new_kern_end = symbols.get('KERN_END', 0xEDB0) + len(kcode_bytes)
+                stage_cursor += len(kcode_bytes)
+
+                # Patch bootstrap's CMPY #KERN_END operand to include KCODE
+                # The bootstrap has: CMPY #KERN_END (opcode 10 8C xx xx)
+                # Find and patch in the staged records
+                old_end = symbols['KERN_END']
+                old_end_hi = (old_end >> 8) & 0xFF
+                old_end_lo = old_end & 0xFF
+                new_end_hi = (new_kern_end >> 8) & 0xFF
+                new_end_lo = new_kern_end & 0xFF
+                for idx, (addr, payload) in enumerate(kernel_records):
                     payload = bytearray(payload)
-                    for j in range(len(payload) - 2):
-                        if (payload[j] == 0x8E and
-                            payload[j+1] == old_hi and payload[j+2] == old_lo):
-                            payload[j+1] = new_hi
-                            payload[j+2] = new_lo
+                    # Search for CMPY immediate: 10 8C <old_hi> <old_lo>
+                    for j in range(len(payload) - 3):
+                        if (payload[j] == 0x10 and payload[j+1] == 0x8C and
+                            payload[j+2] == old_end_hi and payload[j+3] == old_end_lo):
+                            payload[j+2] = new_end_hi
+                            payload[j+3] = new_end_lo
                             kernel_records[idx] = (addr, bytes(payload))
                             break
 
-        # Append KCODE bytes to the staged kernel region
-        if kcode_bytes:
+        if rom_mode and kcode_bytes:
+            # In ROM mode, KCODE just appends after the kernel at its final address.
             kernel_records.append((stage_cursor, bytes(kcode_bytes)))
-            new_kern_end = symbols.get('KERN_END', 0xEDB0) + len(kcode_bytes)
             stage_cursor += len(kcode_bytes)
-
-            # Patch bootstrap's CMPY #KERN_END operand to include KCODE
-            # The bootstrap has: CMPY #KERN_END (opcode 10 8C xx xx)
-            # Find and patch in the staged records
-            old_end = symbols['KERN_END']
-            old_end_hi = (old_end >> 8) & 0xFF
-            old_end_lo = old_end & 0xFF
-            new_end_hi = (new_kern_end >> 8) & 0xFF
-            new_end_lo = new_kern_end & 0xFF
-            for idx, (addr, payload) in enumerate(kernel_records):
-                payload = bytearray(payload)
-                # Search for CMPY immediate: 10 8C <old_hi> <old_lo>
-                for j in range(len(payload) - 3):
-                    if (payload[j] == 0x10 and payload[j+1] == 0x8C and
-                        payload[j+2] == old_end_hi and payload[j+3] == old_end_lo):
-                        payload[j+2] = new_end_hi
-                        payload[j+3] = new_end_lo
-                        kernel_records[idx] = (addr, bytes(payload))
-                        break
 
         # Patch kernel's LDX #APP_BASE if --base differs from default.
         # START has: LDX #$2000 (opcode 8E 20 00).
