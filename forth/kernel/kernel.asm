@@ -155,6 +155,9 @@ CFA_LIT         FDB     CODE_LIT
 CFA_LIT0        FDB     CODE_LIT0
 CFA_LIT1        FDB     CODE_LIT1
 CFA_LIT2        FDB     CODE_LIT2
+CFA_LIT3        FDB     CODE_LIT3
+CFA_LIT4        FDB     CODE_LIT4
+CFA_LITM1       FDB     CODE_LITM1
 CFA_EMIT        FDB     CODE_EMIT
 CFA_HALT        FDB     CODE_HALT
 CFA_ADD         FDB     CODE_ADD
@@ -334,14 +337,14 @@ CODE_LIT
         LDY     ,X++            ; NEXT
         JMP     [,Y]
 
-;;; ─── LIT0 / LIT1 / LIT2 ( -- n ) ────────────────────────────────────────────
-;;; Small-integer literal compression.  Compiling `0`, `1`, or `2` into a
-;;; thread emits the corresponding CFA cell (2 bytes) instead of a generic
-;;; CFA_LIT cell + inline value (4 bytes).  These three constants dominate
-;;; the literal frequency of any non-trivial Forth program; collapsing them
-;;; saves real bytes for a tiny, fixed kernel cost.  fc.py's compile_forth
-;;; emits these CFAs when the symbols are present (graceful fallback if
-;;; building against an older kernel).
+;;; ─── LIT0 / LIT1 / LIT2 / LIT3 / LIT4 / LITM1 ( -- n ) ──────────────────────
+;;; Small-integer literal compression.  Compiling 0, 1, 2, 3, 4, or -1 into
+;;; a thread emits the corresponding CFA cell (2 bytes) instead of a
+;;; generic CFA_LIT cell + inline value (4 bytes).  These six constants
+;;; dominate the literal frequency of any non-trivial Forth program (-1
+;;; doubles as TRUE).  fc.py's compile_forth emits these CFAs when the
+;;; symbols are present (graceful fallback if building against an older
+;;; kernel that lacks them).
 
 CODE_LIT0
         LDD     #0
@@ -357,6 +360,24 @@ CODE_LIT1
 
 CODE_LIT2
         LDD     #2
+        STD     ,--U
+        LDY     ,X++
+        JMP     [,Y]
+
+CODE_LIT3
+        LDD     #3
+        STD     ,--U
+        LDY     ,X++
+        JMP     [,Y]
+
+CODE_LIT4
+        LDD     #4
+        STD     ,--U
+        LDY     ,X++
+        JMP     [,Y]
+
+CODE_LITM1
+        LDD     #-1
         STD     ,--U
         LDY     ,X++
         JMP     [,Y]

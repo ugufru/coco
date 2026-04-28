@@ -759,7 +759,10 @@ def compile_forth(definitions, variables, main_thread, code_definitions,
     # instead of a generic CFA_LIT + inline value (4 bytes).  The symbol-
     # presence guard makes this a graceful no-op when building against an
     # older kernel that lacks the primitives.
-    LIT_PRIMS = {0: 'CFA_LIT0', 1: 'CFA_LIT1', 2: 'CFA_LIT2'}
+    LIT_PRIMS = {
+        0: 'CFA_LIT0', 1: 'CFA_LIT1', 2: 'CFA_LIT2',
+        3: 'CFA_LIT3', 4: 'CFA_LIT4', -1: 'CFA_LITM1',
+    }
     lit_prim_cfa = {v: symbols[s] for v, s in LIT_PRIMS.items() if s in symbols}
 
     def lit_size(value):

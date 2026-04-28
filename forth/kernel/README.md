@@ -61,7 +61,7 @@ processors where Forth fits naturally without compromise.
 | `DOVAR` | `( -- addr )` | Enter a variable: push address of data cell, NEXT |
 | `EXIT` | — | Return from colon definition: pop IP from return stack |
 | `LIT` | `( -- n )` | Push the next cell in the thread as a 16-bit literal |
-| `LIT0` / `LIT1` / `LIT2` | `( -- n )` | Push 0 / 1 / 2.  Compiler-emitted only — `0`, `1`, `2` in source compile to a single 2-byte CFA cell instead of the generic 4-byte `LIT` + value, shaving ~50–300 bytes off every non-trivial app. |
+| `LIT0` / `LIT1` / `LIT2` / `LIT3` / `LIT4` / `LITM1` | `( -- n )` | Push 0 / 1 / 2 / 3 / 4 / -1 (TRUE).  Compiler-emitted only — these six constants in source compile to a single 2-byte CFA cell instead of the generic 4-byte `LIT` + value, shaving hundreds of bytes off every non-trivial app. |
 
 ### Stack
 
@@ -298,7 +298,7 @@ $1F00–$7FFF   application code (APP_BASE configurable via --base)
 $8000–$DDFF   runtime RAM (24K — variables, tables, buffers)
 $DE00         data stack base (U, grows downward)
 $E000–$E012   DOCOL, DOVAR entry points (final location)
-$E013–$E0xx   CFA table (83 entries × 2 bytes, includes DOVAR data blocks)
+$E013–$E0xx   CFA table (86 entries × 2 bytes, includes DOVAR data blocks)
 $E0xx–$E829   primitive machine code + font/sprite FCB data + key table
 $E82A–$E869   START: hardware init + app entry
 $E86A–$EF02   promoted library primitives (graphics, sprites, beams)
@@ -324,7 +324,7 @@ runtime (after the bootstrap enables all-RAM) but cannot hold loaded code.
 | Runtime RAM | 24K | variables, tables, buffers (`$8000–$DDFF`; not CLOADM-loadable) |
 | Data stack | 512B | grows down from `$DE00` |
 | Return stack | 512B | grows down from `$E000` (below kernel) |
-| Kernel code | ~3.7K | 81 primitives (incl. LIT0/LIT1/LIT2 small-int compression) + graphics/beam/sprite + font/sprite data + startup (`$E000–$EE30`) |
+| Kernel code | ~3.7K | 84 primitives (incl. LIT0/1/2/3/4/-1 small-int compression) + graphics/beam/sprite + font/sprite data + startup (`$E000–$EE30`) |
 | Post-kernel | ~4.3K | free at final location (`$EE30–$FEFF`), but **staging limit is 4K** (see below) |
 
 ---
