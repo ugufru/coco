@@ -1,5 +1,6 @@
-NAME        = clock
-EXTRA_DEPS  = ../../forth/lib/vdg.fs \
+NAME           = clock
+KERNEL_VARIANT = allram
+EXTRA_DEPS     = ../../forth/lib/vdg.fs \
               ../../forth/lib/screen.fs \
               ../../forth/lib/rg-pixel.fs \
               ../../forth/lib/datawrite.fs \

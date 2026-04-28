@@ -94,30 +94,21 @@ NSCR    EQU     512             ; 32 cols × 16 rows
 ;;; ─── Build-time configuration ─────────────────────────────────────────────
 ;;; The kernel supports two build profiles:
 ;;;
-;;;   all-RAM (default): KERNEL_ORG=$E000, ROM_MODE undefined.
-;;;     Bootstrap enables SAM TY (all-RAM) and copies staged kernel from
-;;;     $1000 to $E000.  Stacks live just below the kernel.
-;;;
-;;;   ROM mode (lwasm -DROM_MODE=1): KERNEL_ORG=$1000 by default.
+;;;   ROM mode (default): KERNEL_ORG=$1000, ALL_RAM undefined.
 ;;;     SAM stays in ROM-mapped mode; BASIC at $A000 stays alive.  No
 ;;;     staging copy.  Bootstrap is just hardware init + JMP START.
-;;;     Stacks live high in available RAM (RSP_INIT/DSP_INIT).
-;;;     Override RAM-top defaults for 16K machines:
-;;;       lwasm -DROM_MODE=1 -DRSP_INIT=$4000 -DDSP_INIT=$3E00
+;;;     Stacks live high in available RAM (RSP_INIT/DSP_INIT, default
+;;;     32K layout).  Override RAM-top defaults for 16K machines:
+;;;       lwasm -DRSP_INIT=$4000 -DDSP_INIT=$3E00
+;;;
+;;;   all-RAM (lwasm -DALL_RAM=1): KERNEL_ORG=$E000.
+;;;     Bootstrap enables SAM TY (all-RAM) and copies staged kernel from
+;;;     $1000 to $E000.  Stacks live just below the kernel.  Required
+;;;     for apps that need the full 64K (e.g. spacewarp).
 ;;;
 ;;; Override any of these on the lwasm command line via -DNAME=VALUE.
 
-        IFDEF   ROM_MODE
-                IFNDEF  KERNEL_ORG
-KERNEL_ORG      EQU     $1000
-                ENDC
-                IFNDEF  RSP_INIT
-RSP_INIT        EQU     $8000           ; 32K machine: stack top in last RAM word
-                ENDC
-                IFNDEF  DSP_INIT
-DSP_INIT        EQU     $7E00
-                ENDC
-        ELSE
+        IFDEF   ALL_RAM
                 IFNDEF  KERNEL_ORG
 KERNEL_ORG      EQU     $E000
                 ENDC
@@ -126,6 +117,16 @@ RSP_INIT        EQU     $E000
                 ENDC
                 IFNDEF  DSP_INIT
 DSP_INIT        EQU     $DE00
+                ENDC
+        ELSE
+                IFNDEF  KERNEL_ORG
+KERNEL_ORG      EQU     $1000
+                ENDC
+                IFNDEF  RSP_INIT
+RSP_INIT        EQU     $8000           ; 32K machine: stack top in last RAM word
+                ENDC
+                IFNDEF  DSP_INIT
+DSP_INIT        EQU     $7E00
                 ENDC
         ENDC
 
@@ -148,7 +149,7 @@ DSP_INIT        EQU     $DE00
 
 BOOTSTRAP
         ORCC    #$50            ; mask IRQ/FIRQ
-        IFNDEF  ROM_MODE
+        IFDEF   ALL_RAM
         STA     $FFDF           ; all-RAM mode
         LDX     #$1000          ; source: staged kernel
         LDY     #KERNEL_ORG     ; dest: final location

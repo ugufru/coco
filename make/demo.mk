@@ -12,17 +12,17 @@ FC           = python3 ../../forth/tools/fc.py
 XROAR_ROMS   = -bas ~/.xroar/roms/bas12.rom -extbas ~/.xroar/roms/extbas11.rom
 
 # KERNEL_VARIANT selects which kernel build to link against:
-#   (unset)  = all-RAM kernel at $E000 (default, 64K machine)
-#   rom      = ROM-mode kernel at $1000 (BASIC ROMs alive, fits 32K)
+#   (unset)  = ROM-mode kernel at $1000 (default, BASIC ROMs alive, fits 32K)
+#   allram   = all-RAM kernel at $E000 (requires 64K, BASIC ROMs paged out)
 KERNEL_VARIANT ?=
-ifeq ($(KERNEL_VARIANT),rom)
-KERNEL_STEM   = kernel-rom
-KERNEL_TARGET = rom
-XROAR_RAM    ?= 32
+ifeq ($(KERNEL_VARIANT),allram)
+KERNEL_STEM   = kernel-allram
+KERNEL_TARGET = allram
+XROAR_RAM    ?= 64
 else
 KERNEL_STEM   = kernel
 KERNEL_TARGET =
-XROAR_RAM    ?= 64
+XROAR_RAM    ?= 32
 endif
 KERNEL_MAP   = $(KERNEL_DIR)/build/$(KERNEL_STEM).map
 KERNEL_BIN   = $(KERNEL_DIR)/build/$(KERNEL_STEM).bin
