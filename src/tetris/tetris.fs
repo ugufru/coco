@@ -442,35 +442,42 @@ VARIABLE sg-byte   \ precomputed SG4 byte for current piece
 
 : do-gravity  ( -- )
   gcnt @ 1 - DUP gcnt !
-  IF EXIT THEN
-  grav @ gcnt !
-  py @ 1 + py !
-  can-place? 0= IF
-    py @ 1 - py !
-    1 locked !
+  0= IF
+    grav @ gcnt !
+    py @ 1 + py !
+    can-place? 0= IF
+      py @ 1 - py !
+      1 locked !
+    THEN
   THEN ;
 
 \ ── Input ───────────────────────────────────────────────────────────────────
 
 : do-dispatch  ( key -- )
-  DUP $1E = IF DROP do-left    EXIT THEN
-  DUP $1F = IF DROP do-right   EXIT THEN
-  DUP $1D = IF DROP do-down    EXIT THEN
-  DUP $1C = IF DROP do-rotate  EXIT THEN
-      $20 = IF      do-hdrop        THEN ;
+  DUP $1E = IF DROP do-left
+  ELSE DUP $1F = IF DROP do-right
+  ELSE DUP $1D = IF DROP do-down
+  ELSE DUP $1C = IF DROP do-rotate
+  ELSE $20 = IF do-hdrop
+  ELSE THEN THEN THEN THEN THEN ;
 
 : poll-input  ( -- )
   KEY? key-v !
-  key-v @ 0= IF  0 prev-k !  EXIT  THEN
-  key-v @ prev-k @ = IF
-    key-t @ 1 - key-t !
-    key-t @ 0= 0= IF EXIT THEN
-    4 key-t !
+  key-v @ 0= IF
+    0 prev-k !
   ELSE
-    key-v @ prev-k !
-    12 key-t !
-  THEN
-  key-v @ do-dispatch ;
+    key-v @ prev-k @ = IF
+      key-t @ 1 - key-t !
+      key-t @ 0= IF
+        4 key-t !
+        key-v @ do-dispatch
+      THEN
+    ELSE
+      key-v @ prev-k !
+      12 key-t !
+      key-v @ do-dispatch
+    THEN
+  THEN ;
 
 \ ── Title screen ────────────────────────────────────────────────────────────
 
