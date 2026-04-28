@@ -2,9 +2,14 @@
 \
 \ Provides: init-font, glyph-addr
 \ Requires: kernel primitives C!, +, -, *, <, AND, IF/ELSE/THEN, DO/LOOP
+\          fc.py-injected constant: font-base
 \
 \ 37 glyphs: space, A-Z, 0-9.  Each glyph is 7 bytes, pixels in bits 7-3
-\ (the leftmost 5 of 8 bits).  Font data lives at $6000 (259 bytes).
+\ (the leftmost 5 of 8 bits).  Font data lives at font-base (259 bytes).
+\
+\ font-base is set by the kernel build profile: $5800 in ROM mode (just
+\ below the conventional VRAM at $6000), $9000 in all-RAM mode.  Apps
+\ should not override this — wherever the kernel goes, the font goes.
 \
 \ In RG modes (1 bit/pixel), each font byte maps directly to 8 screen pixels
 \ (5 character pixels + 3 blank).  In CG modes (2 bits/pixel), the caller
@@ -12,14 +17,12 @@
 \
 \ Usage:
 \   INCLUDE lib/font5x7.fs
-\   init-font                        \ write glyphs to $6000 (call once)
-\   CHAR A glyph-addr                \ → $6007 (start of 7-byte A glyph)
+\   init-font                        \ write glyphs to font-base (call once)
+\   CHAR A glyph-addr                \ → font-base+7 (start of 7-byte A glyph)
 
 \ ── Font write helpers ────────────────────────────────────────────────────────
 
 VARIABLE fp                          \ font write pointer
-VARIABLE font-base                   \ font load address ($6000 default)
-$6000 font-base !
 
 : fb  ( byte -- )  fp @ C!  fp @ 1 + fp ! ;
 : fg  ( b6 b5 b4 b3 b2 b1 b0 -- )  fb fb fb fb fb fb fb ;
@@ -27,8 +30,6 @@ $6000 font-base !
 \ ── Glyph address lookup ──────────────────────────────────────────────────────
 \ Layout: index 0=space, 1-26=A-Z, 27-36=0-9
 \ Each glyph is 7 bytes, stored at font-base + index*7.
-\ Default base is $6000 (high all-RAM); ROM-mode demos that need the
-\ space at $6000 for VRAM can call font-base ! before init-font.
 
 : glyph-addr  ( char -- addr )
   DUP $41 < IF
@@ -40,7 +41,7 @@ $6000 font-base !
   ELSE
     $40 -                 \ 'A'→1, 'Z'→26
   THEN
-  7 * font-base @ + ;
+  7 * font-base + ;
 
 \ ── Font data ─────────────────────────────────────────────────────────────────
 \ Each line: <row6> <row5> <row4> <row3> <row2> <row1> <row0> fg
@@ -55,7 +56,7 @@ $6000 font-base !
 \   $20=..#.. $10=...#. $08=....# $00=.....
 
 : init-font
-  font-base @ fp !
+  font-base fp !
 
   \ --- Space (index 0) ---
   \ .....  .....  .....  .....  .....  .....  .....

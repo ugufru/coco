@@ -1613,11 +1613,17 @@ def main():
     # Inject kernel symbols as Forth CONSTANTs:
     #   VAR_*        → KVAR-*        (variable addresses)
     #   KERN_VERSION → KERN-VERSION  (version constant)
+    #   FONT_BASE    → font-base     (build-mode font load address)
+    EXPOSED_CONSTS = {
+        'FONT_BASE': 'font-base',
+    }
     for sym, addr in symbols.items():
         if sym.startswith('VAR_'):
             forth_name = 'kvar-' + sym[4:].lower().replace('_', '-')
         elif sym == 'KERN_VERSION':
             forth_name = 'kern-version'
+        elif sym in EXPOSED_CONSTS:
+            forth_name = EXPOSED_CONSTS[sym]
         else:
             continue
         if forth_name not in defs:

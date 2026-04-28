@@ -940,8 +940,7 @@ VARIABLE _dc  VARIABLE _dr
 \ ── Init RG6 mode + font ───────────────────────────────────────────
 
 : init-rg-font  ( -- )
-  init-font
-  $9000 KVAR-RGFONT !
+  init-font                    \ kernel auto-inits VAR_RGFONT to font-base
   $20   KVAR-RGCHARMIN C!
   8     KVAR-RGGLYPHSZ C!
   7     KVAR-RGNROWS   C!

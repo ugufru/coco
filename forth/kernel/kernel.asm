@@ -118,6 +118,9 @@ RSP_INIT        EQU     $E000
                 IFNDEF  DSP_INIT
 DSP_INIT        EQU     $DE00
                 ENDC
+                IFNDEF  FONT_BASE
+FONT_BASE       EQU     $9000           ; high all-RAM region, well past VRAM
+                ENDC
         ELSE
                 IFNDEF  KERNEL_ORG
 KERNEL_ORG      EQU     $1000
@@ -127,6 +130,9 @@ RSP_INIT        EQU     $8000           ; 32K machine: stack top in last RAM wor
                 ENDC
                 IFNDEF  DSP_INIT
 DSP_INIT        EQU     $7E00
+                ENDC
+                IFNDEF  FONT_BASE
+FONT_BASE       EQU     $5800           ; below the conventional ROM-mode VRAM at $6000
                 ENDC
         ENDC
 
@@ -2318,7 +2324,7 @@ VAR_SPR_SRC     FDB     0       ; current sprite data pointer
 VAR_SPR_DBYTE   FCB     0       ; current data byte
 VAR_SPR_SHIFT   FCB     0       ; pixel shift within byte
 ;;; RG-CHAR text rendering config (used by rg-char CODE word in rg-text.fs)
-VAR_RGFONT      FDB     $7400   ; font table base address
+VAR_RGFONT      FDB     FONT_BASE       ; font table base (build-mode dependent)
 VAR_RGCHARMIN   FCB     $20     ; minimum ASCII code (chars below → this)
 VAR_RGGLYPHSZ   FCB     8       ; bytes per glyph
 VAR_RGNROWS     FCB     8       ; rows to copy per glyph

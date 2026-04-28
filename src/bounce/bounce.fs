@@ -94,10 +94,9 @@ VARIABLE bl-offset     \ blanking offset (tunable)
 
 : init-bounce  ( -- )
   set-sam-v set-sam-f set-pia
-  $5800 font-base !            \ ROM mode: font goes below VRAM
-  $6000 rg-init-at             \ ROM mode: VRAM at $6000-$77FF
-  init-font
-  $5800 KVAR-RGFONT !  0 KVAR-RGCHARMIN C!  7 KVAR-RGGLYPHSZ C!  7 KVAR-RGNROWS C!  32 KVAR-RGBPR C!  8 KVAR-RGROWH C!
+  $6000 rg-init-at             \ VRAM at $6000-$77FF (32K ROM mode)
+  init-font                    \ font goes to kernel font-base ($5800 ROM, $9000 all-RAM)
+  0 KVAR-RGCHARMIN C!  7 KVAR-RGGLYPHSZ C!  7 KVAR-RGNROWS C!  32 KVAR-RGBPR C!  8 KVAR-RGROWH C!
   init-ball-spr
   $6000 6144 0 FILL
   60  90  2  1  0 init-one
