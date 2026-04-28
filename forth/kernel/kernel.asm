@@ -92,25 +92,45 @@ SCREEN  EQU     $0400           ; video RAM base (32×16 alphanumeric text)
 NSCR    EQU     512             ; 32 cols × 16 rows
 
 ;;; ─── Build-time configuration ─────────────────────────────────────────────
-;;; The kernel supports two build profiles:
+;;; The kernel supports two build profiles.  All addresses below are
+;;; defaults; any of them can be overridden on the lwasm command line
+;;; via -DNAME=VALUE.
 ;;;
-;;;   ROM mode (default): KERNEL_ORG=$1000, ALL_RAM undefined.
-;;;     SAM stays in ROM-mapped mode; BASIC at $A000 stays alive.  No
-;;;     staging copy.  Bootstrap is just hardware init + JMP START.
-;;;     Stacks live high in available RAM (RSP_INIT/DSP_INIT, default
-;;;     32K layout).  Override RAM-top defaults for 16K machines:
-;;;       lwasm -DRSP_INIT=$4000 -DDSP_INIT=$3E00
+;;;   ROM mode (default; ALL_RAM undefined)            32K CoCo
+;;;     $0050-$007F   kernel direct-page vars
+;;;     $0400-$05FF   text/SG VRAM (32x16, 512B)
+;;;     $0600-$1DFF   RG6 VRAM reservation (6K, single buffer)
+;;;     $2000-$2DFF   kernel (ORG'd here, ~3.6K, room to grow to ~$2EFF)
+;;;     $3000-$57FF   app code + variables (~10K)
+;;;     $5800-$59D7   font glyphs (font5x7 256B / font-art 472B)
+;;;     $5A00-$7DFF   app heap / extra data (~9K)
+;;;     $7E00-$7FFF   data + return stacks (grow down)
+;;;     SAM stays ROM-mapped; BASIC at $A000+ alive; clean BREAK -> OK.
+;;;     No bootstrap, no staging copy: DECB exec goes straight to START.
 ;;;
-;;;   all-RAM (lwasm -DALL_RAM=1): KERNEL_ORG=$E000.
-;;;     Bootstrap enables SAM TY (all-RAM) and copies staged kernel from
-;;;     $1000 to $E000.  Stacks live just below the kernel.  Required
-;;;     for apps that need the full 64K (e.g. spacewarp).
-;;;
-;;; Override any of these on the lwasm command line via -DNAME=VALUE.
+;;;   all-RAM mode (-DALL_RAM=1)                       64K CoCo
+;;;     $0050-$007F   kernel direct-page vars
+;;;     $0400-$05FF   text/SG VRAM
+;;;     $0600-$1DFF   RG6 VRAM reservation (6K)
+;;;     $0E00         bootstrap (enables all-RAM, copies kernel)
+;;;     $1000-$1EAF   staged kernel (CLOADM target)
+;;;     $2000-$8FFF   app code + variables (24K of contiguous space)
+;;;     $9000-$91D7   font glyphs (font-art 472B)
+;;;     $9200-$DDFF   app heap / extra data
+;;;     $DE00-$DFFF   data + return stacks (grow down)
+;;;     $E000-$EEAF   kernel (final location after copy)
+;;;     SAM in TY=1 (all-RAM); BASIC ROMs paged out.
+;;;     Required when an app needs >18K of contiguous code.
 
         IFDEF   ALL_RAM
                 IFNDEF  KERNEL_ORG
 KERNEL_ORG      EQU     $E000
+                ENDC
+                IFNDEF  APP_BASE
+APP_BASE        EQU     $2000
+                ENDC
+                IFNDEF  VRAM_BASE
+VRAM_BASE       EQU     $0600
                 ENDC
                 IFNDEF  RSP_INIT
 RSP_INIT        EQU     $E000
@@ -119,11 +139,17 @@ RSP_INIT        EQU     $E000
 DSP_INIT        EQU     $DE00
                 ENDC
                 IFNDEF  FONT_BASE
-FONT_BASE       EQU     $9000           ; high all-RAM region, well past VRAM
+FONT_BASE       EQU     $9000
                 ENDC
         ELSE
                 IFNDEF  KERNEL_ORG
-KERNEL_ORG      EQU     $1000
+KERNEL_ORG      EQU     $2000
+                ENDC
+                IFNDEF  APP_BASE
+APP_BASE        EQU     $3000
+                ENDC
+                IFNDEF  VRAM_BASE
+VRAM_BASE       EQU     $0600
                 ENDC
                 IFNDEF  RSP_INIT
 RSP_INIT        EQU     $8000           ; 32K machine: stack top in last RAM word
@@ -132,7 +158,7 @@ RSP_INIT        EQU     $8000           ; 32K machine: stack top in last RAM wor
 DSP_INIT        EQU     $7E00
                 ENDC
                 IFNDEF  FONT_BASE
-FONT_BASE       EQU     $5800           ; below the conventional ROM-mode VRAM at $6000
+FONT_BASE       EQU     $5800           ; just below app heap on 32K
                 ENDC
         ENDC
 
@@ -151,11 +177,10 @@ FONT_BASE       EQU     $5800           ; below the conventional ROM-mode VRAM a
 ;;; The bootstrap itself sits at $0E00, safely below the staged kernel
 ;;; at $1000 and the application at $2000.
 
+        IFDEF   ALL_RAM
         ORG     $0E00
-
 BOOTSTRAP
         ORCC    #$50            ; mask IRQ/FIRQ
-        IFDEF   ALL_RAM
         STA     $FFDF           ; all-RAM mode
         LDX     #$1000          ; source: staged kernel
         LDY     #KERNEL_ORG     ; dest: final location
@@ -163,8 +188,8 @@ BOOT_LP LDD     ,X++
         STD     ,Y++
         CMPY    #KERN_END
         BLO     BOOT_LP
-        ENDC
         JMP     START
+        ENDC
 
 ;;; ─── Kernel ──────────────────────────────────────────────────────────────────
 
@@ -1548,9 +1573,12 @@ CODE_HALT
 ;;;   - Cursor position zeroed
 ;;; Then enters the Forth application thread at APP_BASE via NEXT.
 
-APP_BASE EQU    $2000           ; application binary loaded here
+;;; APP_BASE is set in the build-time configuration block at the top of
+;;; this file (default $3000 in ROM mode, $2000 in all-RAM mode).
 
 START
+        ORCC    #$50            ; mask IRQ/FIRQ (was in bootstrap; ROM mode
+                                ; jumps straight here so we mask first)
         CLRA
         TFR     A,DP            ; direct page register = $00
 
@@ -2297,7 +2325,7 @@ VAR_KEY_PREV    FCB     0       ; last accepted key ASCII (KEY debounce)
 VAR_KEY_SHIFT   FCB     0       ; SHIFT flag (nonzero = shift held)
 VAR_KEY_RELCNT  FCB     0       ; release debounce counter
 VAR_KEY_REPDLY  FDB     0       ; auto-repeat countdown (16-bit)
-VAR_RGVRAM      FDB     $0600   ; RG6 VRAM base address (written by rg-init)
+VAR_RGVRAM      FDB     VRAM_BASE       ; RG6 VRAM base (build-mode dependent)
 ;;; Bresenham line drawing scratch (used by rg-line CODE word in rg-pixel.fs)
 VAR_LINE_CX     FCB     0       ; current x
 VAR_LINE_CY     FCB     0       ; current y
@@ -2337,4 +2365,8 @@ VAR_BEAM_CNT    FDB     0       ; pixel count / loop counter scratch
 
 KERN_END                        ; end marker — bootstrap copies $E000..KERN_END-1
 
-        END     BOOTSTRAP       ; DECB exec address = BOOTSTRAP ($0E00)
+        IFDEF   ALL_RAM
+        END     BOOTSTRAP       ; DECB exec = BOOTSTRAP ($0E00) in all-RAM mode
+        ELSE
+        END     START           ; DECB exec = START in ROM mode (no bootstrap)
+        ENDC

@@ -24,8 +24,9 @@ INCLUDE ../../forth/lib/bye.fs
 \ -- Constants -----------------------------------------------------------
 
 11 CONSTANT NMODES
-$5800 CONSTANT MTAB           \ mode table base (11 x 16 = 176 bytes)
-$3000 CONSTANT GVRAM          \ graphics VRAM (safe: app code < $3000)
+$5A00 CONSTANT MTAB           \ mode table (11 x 16 = 176 bytes), past font-base
+\ Graphics VRAM uses the kernel-reserved RG6 region (vram-base from kernel
+\ build profile: $0600 in both ROM and all-RAM modes, 6K reserved).
 
 \ -- Variables -----------------------------------------------------------
 
@@ -58,35 +59,35 @@ VARIABLE qt                   \ quarter-size scratch
   CHAR S tb CHAR G tb CHAR 6 tb $20 tb $20 tb $20 tb $20 tb $20 tb
 
   \ 3: CG1 -- 64x64, 4 colors, 1024B
-  GVRAM tw 1024 tw 1 tb $80 tb 3 tb 16 tb
+  vram-base tw 1024 tw 1 tb $80 tb 3 tb 16 tb
   CHAR C tb CHAR G tb CHAR 1 tb $20 tb $20 tb $20 tb $20 tb $20 tb
 
   \ 4: RG1 -- 128x64, 2 colors, 1024B
-  GVRAM tw 1024 tw 1 tb $90 tb 4 tb 16 tb
+  vram-base tw 1024 tw 1 tb $90 tb 4 tb 16 tb
   CHAR R tb CHAR G tb CHAR 1 tb $20 tb $20 tb $20 tb $20 tb $20 tb
 
   \ 5: CG2 -- 128x64, 4 colors, 1536B
-  GVRAM tw 1536 tw 2 tb $A0 tb 3 tb 32 tb
+  vram-base tw 1536 tw 2 tb $A0 tb 3 tb 32 tb
   CHAR C tb CHAR G tb CHAR 2 tb $20 tb $20 tb $20 tb $20 tb $20 tb
 
   \ 6: RG2 -- 128x96, 2 colors, 1536B
-  GVRAM tw 1536 tw 3 tb $B0 tb 4 tb 16 tb
+  vram-base tw 1536 tw 3 tb $B0 tb 4 tb 16 tb
   CHAR R tb CHAR G tb CHAR 2 tb $20 tb $20 tb $20 tb $20 tb $20 tb
 
   \ 7: CG3 -- 128x96, 4 colors, 3072B
-  GVRAM tw 3072 tw 4 tb $C0 tb 3 tb 32 tb
+  vram-base tw 3072 tw 4 tb $C0 tb 3 tb 32 tb
   CHAR C tb CHAR G tb CHAR 3 tb $20 tb $20 tb $20 tb $20 tb $20 tb
 
   \ 8: RG3 -- 128x192, 2 colors, 3072B
-  GVRAM tw 3072 tw 5 tb $D0 tb 4 tb 16 tb
+  vram-base tw 3072 tw 5 tb $D0 tb 4 tb 16 tb
   CHAR R tb CHAR G tb CHAR 3 tb $20 tb $20 tb $20 tb $20 tb $20 tb
 
   \ 9: CG6 -- 128x192, 4 colors, 6144B
-  GVRAM tw 6144 tw 6 tb $E0 tb 3 tb 32 tb
+  vram-base tw 6144 tw 6 tb $E0 tb 3 tb 32 tb
   CHAR C tb CHAR G tb CHAR 6 tb $20 tb $20 tb $20 tb $20 tb $20 tb
 
   \ 10: RG6 -- 256x192, 2 colors, 6144B
-  GVRAM tw 6144 tw 6 tb $F0 tb 4 tb 32 tb
+  vram-base tw 6144 tw 6 tb $F0 tb 4 tb 32 tb
   CHAR R tb CHAR G tb CHAR 6 tb $20 tb $20 tb $20 tb $20 tb $20 tb
 ;
 

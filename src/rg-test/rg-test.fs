@@ -149,7 +149,7 @@ VARIABLE ax  VARIABLE ay  VARIABLE fc
 \ ── Main ─────────────────────────────────────────────────────────────────
 
 : main  ( -- )
-  $6000 rg-init-at         \ ROM-mode: VRAM at $6000-$77FF (32K layout)
+  rg-init
   init-sprites
 
   test-bars

@@ -20,9 +20,8 @@ $8730 CONSTANT MSKTAB
   $3F MSKTAB     C!  $CF MSKTAB 1 + C!  $F3 MSKTAB 2 + C!  $FC MSKTAB 3 + C! ;
 
 \ rg-init-at points the VDG at an arbitrary $0200-aligned VRAM base
-\ and clears 6K of pixel memory.  All-RAM builds use $0600 (rg-init);
-\ ROM-mode builds need a high base (e.g. $6000 on 32K) so the kernel
-\ at $1000 isn't smashed.
+\ and clears 6K of pixel memory.  rg-init uses the kernel-defined
+\ vram-base ($0600 in both ROM and all-RAM modes by default).
 : rg-init-at  ( base -- )
   init-tables
   DUP rv !  KVAR-RGVRAM !
@@ -31,7 +30,7 @@ $8730 CONSTANT MSKTAB
   $F8 set-pia
   rv @ 6144 0 FILL ;
 
-: rg-init  ( -- )  $0600 rg-init-at ;
+: rg-init  ( -- )  vram-base rg-init-at ;
 
 : rg-pcls  ( -- )  rv @ 6144 0 FILL ;
 

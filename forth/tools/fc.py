@@ -1582,8 +1582,9 @@ def main():
                         help='kernel DECB binary to combine with app output')
     parser.add_argument('--output',         default=None,
                         help='output binary (default: <source>.bin)')
-    parser.add_argument('--base',           default='0x2000',
-                        help='application load address (default: 0x2000)')
+    parser.add_argument('--base',           default=None,
+                        help='application load address '
+                             '(default: APP_BASE from kernel map, else 0x2000)')
     parser.add_argument('--hole',           default=None,
                         help='reserved address hole, e.g. 0x4000,6144 (start,size)')
     parser.add_argument('--stage-base',     default=None,
@@ -1594,7 +1595,6 @@ def main():
                         help='print per-word 6809 cycle cost estimates')
     args = parser.parse_args()
 
-    app_base = int(args.base, 16)
     out_file = args.output or str(Path(args.source).with_suffix('.bin'))
 
     hole_start = hole_end = None
@@ -1605,6 +1605,10 @@ def main():
         hole_end   = hole_start + hole_size
 
     symbols              = load_symbols(args.kernel)
+    if args.base is not None:
+        app_base = int(args.base, 0)
+    else:
+        app_base = symbols.get('APP_BASE', 0x2000)
     src_path             = Path(args.source)
     source               = src_path.read_text()
     tokens               = tokenize(source, base_dir=src_path.parent)
@@ -1616,6 +1620,8 @@ def main():
     #   FONT_BASE    → font-base     (build-mode font load address)
     EXPOSED_CONSTS = {
         'FONT_BASE': 'font-base',
+        'VRAM_BASE': 'vram-base',
+        'APP_BASE':  'app-base',
     }
     for sym, addr in symbols.items():
         if sym.startswith('VAR_'):

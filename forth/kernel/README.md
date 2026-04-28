@@ -223,8 +223,21 @@ processors where Forth fits naturally without compromise.
 
 ## Boot sequence
 
-The kernel is assembled at `$E000` but BASIC's `CLOADM` can't write there
-(ROM is mapped at `$8000–$FEFF`).  A bootstrap solves this:
+### ROM mode (default)
+
+In ROM mode the kernel ORGs at `$2000` — directly loadable by `LOADM` —
+so there's no staging copy and no bootstrap. `fc.py` packs the kernel
+and app into a single DECB binary; DECB exec points straight at `START`.
+
+1. `LOADM` writes the binary into low RAM (`$2000+` for kernel, `$3000+`
+   for app).
+2. `EXEC` jumps to `START`, which masks interrupts, clears DP, sets up
+   stacks, initializes PIA0, and enters the application thread.
+
+### All-RAM mode
+
+The all-RAM kernel is assembled at `$E000` but BASIC's `CLOADM` can't
+write there (ROM is mapped at `$8000–$FEFF`). A bootstrap solves this:
 
 1. `fc.py` remaps the kernel DECB record from `$E000` to the staging area
    (immediately after the bootstrap, typically `$0E19`).
@@ -234,24 +247,9 @@ The kernel is assembled at `$E000` but BASIC's `CLOADM` can't write there
 4. `JMP START` enters the kernel at its final location.
 
 **[Open the interactive boot animation](boot-animation.html)** for a visual
-step-by-step walkthrough.
+step-by-step walkthrough of the all-RAM boot.
 
-### DECB record layout
-
-| Record | Addr | Size | Content |
-|---|---|---|---|
-| 1 | `$0E00` | ~25 B | Bootstrap |
-| 2 | `$0E19` | ~3.9K | Staged kernel + variables (remapped from `$E000`) |
-| 3 | `$2000` | varies | Application code |
-| Exec | `$0E00` | — | Bootstrap entry point |
-
-All DECB records target the lower 32K (`$0000–$7FFF`). Kernel variables live
-inside the kernel (at `$EF03+`), not in low RAM, so binaries are LOADM-safe
-under Disk BASIC.
-
-**Staging area:** The kernel is staged at `$0E19` (right after the bootstrap)
-and extends to just below `APP_BASE`. `fc.py` dynamically computes the staging
-address and patches the bootstrap accordingly.
+DECB record layouts for both profiles are documented under [Memory map](#memory-map).
 
 ### SAM all-RAM mode
 
@@ -270,62 +268,100 @@ Requires 64K×1 DRAM (4164 chips).  XRoar: use `-ram 64`.
 
 ## Memory map
 
-### Kernel variables ($EF03+)
+The kernel ships in two build profiles. ROM mode is the default; all-RAM
+mode is opt-in for apps that need >18K of contiguous code (`spacewarp`,
+larger demos, FujiNet apps).
 
-Scratch variables in kernel space, accessed via extended addressing. Copied to
-all-RAM with the kernel by the bootstrap. Forth source accesses them via
-`KVAR-*` constants injected by `fc.py` from the kernel map.
+| Profile | Build flag | RAM | Kernel | App base | BASIC ROMs |
+|---|---|---|---|---|---|
+| ROM mode (default) | (none) | 32K minimum | `$2000` | `$3000` | live at `$A000+` |
+| all-RAM | `lwasm -DALL_RAM=1` / `KERNEL_VARIANT=allram` | 64K | `$E000` | `$2000` | paged out |
+
+Build-mode constants exposed to Forth source via `fc.py`:
+
+| Forth name | Source | ROM | all-RAM |
+|---|---|---|---|
+| `app-base` | `APP_BASE` EQU | `$3000` | `$2000` |
+| `vram-base` | `VRAM_BASE` EQU | `$0600` | `$0600` |
+| `font-base` | `FONT_BASE` EQU | `$5800` | `$9000` |
+
+Apps refer to these constants instead of hardcoding addresses, so a single
+source builds against either profile (e.g. `rg-init` uses `vram-base`,
+font libraries write glyphs to `font-base`).
+
+### ROM mode (default)
+
+32K CoCo. SAM stays in ROM-mapped mode; BASIC at `$A000+` stays alive.
+No staging copy: DECB exec goes straight to `START`. `BREAK` exits
+cleanly to the BASIC `OK` prompt via `exit-basic` (`JMP $A027`).
 
 ```
-$EF03  VAR_CUR          cursor offset into video RAM (0–511)
-$EF05  VAR_KEY_PREV     last accepted key ASCII (debounce)
-       ...              (keyboard, line, sprite, text, beam scratch — 50 bytes total)
-$EF34  VAR_BEAM_CNT     last variable
-$EF35  KERN_END         end of kernel (bootstrap copy range)
+$0050–$007F   kernel direct-page variables (44 bytes, $0050+ scratch)
+$0400–$05FF   VDG text/SG VRAM (32×16, 512B; default for alpha and SG modes)
+$0600–$1DFF   RG6 VRAM reservation (6K, 1 screen single-buffered)
+$2000–$2EAF   kernel (~3.7K, ORG'd here, room to grow to ~$2FFF)
+$3000–$57FF   app code + variables (~10K)
+$5800–$59D7   font glyphs (font5x7 ~256B / font-art 472B at font-base)
+$5A00–$7DFF   app heap / extra data (~9K)
+$7E00         data stack base (U, grows down)
+$8000         return stack base (S, grows down)
+$8000–$BFFF   Extended Color BASIC ROM (read-only; 16K)
+$C000–$DFFF   Disk Extended Color BASIC ROM (read-only; 8K)
+$FF00–$FFFF   I/O registers + hardware vectors (always mapped)
 ```
 
-Addresses are resolved from `kernel.map` — do not hardcode them in Forth
-source. Use `KVAR-CUR`, `KVAR-RGVRAM`, `KVAR-RGFONT`, etc.
+DECB record layout:
+| Record | Addr | Size | Content |
+|---|---|---|---|
+| 1 | `$2000` | varies | kernel + app + variables (single contiguous record) |
+| Exec | `START` | — | direct entry, no bootstrap |
 
-### Full address space
+### All-RAM mode
+
+64K CoCo. Bootstrap at `$0E00` enables all-RAM (`STA $FFDF`) and copies
+the kernel from `$1000` to `$E000`. ROMs are paged out — `BREAK` cannot
+return to BASIC; `bye` halts the CPU instead.
 
 ```
-$0400–$05FF   VDG text VRAM (32×16, boot only)
-$0600–$1FFF   RG6 VRAM (6144 bytes, set by rg-init after boot)
-              ├ $0E00  bootstrap (dead after boot, overwritten by VRAM)
-              └ $0E19  staged kernel (dead after boot, overwritten by VRAM)
-$1F00–$7FFF   application code (APP_BASE configurable via --base)
-$8000–$DDFF   runtime RAM (24K — variables, tables, buffers)
-$DE00         data stack base (U, grows downward)
-$E000–$E012   DOCOL, DOVAR entry points (final location)
-$E013–$E0xx   CFA table (86 entries × 2 bytes, includes DOVAR data blocks)
-$E0xx–$E829   primitive machine code + font/sprite FCB data + key table
-$E82A–$E869   START: hardware init + app entry
-$E86A–$EF02   promoted library primitives (graphics, sprites, beams)
-$EF03–$EF34   kernel variables (50 bytes, see above)
-$EF35         KERN_END (end of bootstrap copy range)
-$EF35–$FEFF   free RAM for kernel growth (~4.3K)
-$FF00–$FFFF   I/O registers + hardware vectors (always mapped, never RAM)
+$0050–$007F   kernel direct-page variables (44 bytes)
+$0400–$05FF   VDG text VRAM
+$0600–$1DFF   RG6 VRAM reservation (6K)
+$0E00         bootstrap (~25 bytes; dead after boot, overwritten by VRAM)
+$1000–$1EAF   staged kernel (CLOADM target; copied to $E000 at boot)
+$2000–$8FFF   app code + variables (24K of contiguous space)
+$9000–$91D7   font glyphs at font-base (font-art 472B)
+$9200–$DDFF   app heap / extra data (~19K)
+$DE00         data stack base (U, grows down)
+$E000–$EEAF   kernel (~3.7K, final location after bootstrap copy)
+$EEB0–$FEFF   free RAM for kernel growth (~4.3K)
+$FF00–$FFFF   I/O registers + hardware vectors (always mapped)
 ```
 
-All-RAM mode is enabled at boot (`STA $FFDF`), giving full 64K RAM from
-`$0000–$FEFF`.  `$FF00–$FFFF` is always I/O regardless of mode.
+DECB record layout:
+| Record | Addr | Size | Content |
+|---|---|---|---|
+| 1 | `$0E00` | ~25B | bootstrap |
+| 2 | `$1000` | ~3.7K | staged kernel (remapped from $E000 by `fc.py`) |
+| 3 | `$2000` | varies | application |
+| Exec | `$0E00` | — | bootstrap entry point |
 
 **CLOADM constraint:** BASIC runs with ROM at `$8000–$FEFF`, so CLOADM can
-only load data to the lower 32K.  The `$8000–$DDFF` region is writable at
+only load to the lower 32K. The `$8000–$DDFF` region becomes writable at
 runtime (after the bootstrap enables all-RAM) but cannot hold loaded code.
 
-### Memory budget
+### Kernel variables (DP)
 
-| Region | Size | Contents |
-|---|---|---|
-| VRAM | 6K | RG6 display (`$0600–$1FFF`, set by rg-init) |
-| App (loadable) | ~23K | Forth thread + CODE words (`$2000–$7FFF`) |
-| Runtime RAM | 24K | variables, tables, buffers (`$8000–$DDFF`; not CLOADM-loadable) |
-| Data stack | 512B | grows down from `$DE00` |
-| Return stack | 512B | grows down from `$E000` (below kernel) |
-| Kernel code | ~3.7K | 84 primitives (incl. LIT0/1/2/3/4/-1 small-int compression) + graphics/beam/sprite + font/sprite data + startup (`$E000–$EE30`) |
-| Post-kernel | ~4.3K | free at final location (`$EE30–$FEFF`), but **staging limit is 4K** (see below) |
+Scratch variables live in direct page (`$0050–$007F`). Forth source
+accesses them via `KVAR-*` constants injected by `fc.py` from the
+kernel map — never hardcode addresses.
+
+| Symbol | Use |
+|---|---|
+| `KVAR-CUR` | text cursor offset (0–511) |
+| `KVAR-RGVRAM` | RG VRAM base (initialized to `vram-base`) |
+| `KVAR-RGFONT` | RG font base (initialized to `font-base`) |
+| `KVAR-RGCHARMIN`, `KVAR-RGGLYPHSZ`, ... | rg-char rendering config |
+| ...50+ keyboard / line / sprite / beam scratch bytes | |
 
 ---
 
