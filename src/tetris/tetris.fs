@@ -329,37 +329,37 @@ VARIABLE sg-byte   \ precomputed SG4 byte for current piece
 \ 5 entries at $5200 (16-bit each).  Persists across restarts.
 
 : init-high  ( -- )
-  0 $5200 !  0 $4202 !  0 $4204 !  0 $4206 !  0 $4208 ! ;
+  0 $5200 !  0 $5202 !  0 $5204 !  0 $5206 !  0 $5208 ! ;
 
 : insert-high  ( -- )
   score @ $5200 @ > IF
-    $4206 @ $4208 !  $4204 @ $4206 !  $4202 @ $4204 !  $5200 @ $4202 !
+    $5206 @ $5208 !  $5204 @ $5206 !  $5202 @ $5204 !  $5200 @ $5202 !
     score @ $5200 !  EXIT
   THEN
-  score @ $4202 @ > IF
-    $4206 @ $4208 !  $4204 @ $4206 !  $4202 @ $4204 !
-    score @ $4202 !  EXIT
+  score @ $5202 @ > IF
+    $5206 @ $5208 !  $5204 @ $5206 !  $5202 @ $5204 !
+    score @ $5202 !  EXIT
   THEN
-  score @ $4204 @ > IF
-    $4206 @ $4208 !  $4204 @ $4206 !
-    score @ $4204 !  EXIT
+  score @ $5204 @ > IF
+    $5206 @ $5208 !  $5204 @ $5206 !
+    score @ $5204 !  EXIT
   THEN
-  score @ $4206 @ > IF
-    $4206 @ $4208 !
-    score @ $4206 !  EXIT
+  score @ $5206 @ > IF
+    $5206 @ $5208 !
+    score @ $5206 !  EXIT
   THEN
-  score @ $4208 @ > IF
-    score @ $4208 !
+  score @ $5208 @ > IF
+    score @ $5208 !
   THEN ;
 
 : show-high  ( -- )
   24 9 AT   72 vemit 73 vemit 71 vemit 72 vemit                       \ HIGH
   23 10 AT  83 vemit 67 vemit 79 vemit 82 vemit 69 vemit 83 vemit    \ SCORES
   23 11 AT  CHAR 1 vemit CHAR ) vemit .6sp  25 11 AT  $5200 @ vu.
-  23 12 AT  CHAR 2 vemit CHAR ) vemit .6sp  25 12 AT  $4202 @ vu.
-  23 13 AT  CHAR 3 vemit CHAR ) vemit .6sp  25 13 AT  $4204 @ vu.
-  23 14 AT  CHAR 4 vemit CHAR ) vemit .6sp  25 14 AT  $4206 @ vu.
-  23 15 AT  CHAR 5 vemit CHAR ) vemit .6sp  25 15 AT  $4208 @ vu. ;
+  23 12 AT  CHAR 2 vemit CHAR ) vemit .6sp  25 12 AT  $5202 @ vu.
+  23 13 AT  CHAR 3 vemit CHAR ) vemit .6sp  25 13 AT  $5204 @ vu.
+  23 14 AT  CHAR 4 vemit CHAR ) vemit .6sp  25 14 AT  $5206 @ vu.
+  23 15 AT  CHAR 5 vemit CHAR ) vemit .6sp  25 15 AT  $5208 @ vu. ;
 
 \ ── Border ──────────────────────────────────────────────────────────────────
 
@@ -442,42 +442,35 @@ VARIABLE sg-byte   \ precomputed SG4 byte for current piece
 
 : do-gravity  ( -- )
   gcnt @ 1 - DUP gcnt !
-  0= IF
-    grav @ gcnt !
-    py @ 1 + py !
-    can-place? 0= IF
-      py @ 1 - py !
-      1 locked !
-    THEN
+  IF EXIT THEN
+  grav @ gcnt !
+  py @ 1 + py !
+  can-place? 0= IF
+    py @ 1 - py !
+    1 locked !
   THEN ;
 
 \ ── Input ───────────────────────────────────────────────────────────────────
 
 : do-dispatch  ( key -- )
-  DUP $1E = IF DROP do-left
-  ELSE DUP $1F = IF DROP do-right
-  ELSE DUP $1D = IF DROP do-down
-  ELSE DUP $1C = IF DROP do-rotate
-  ELSE $20 = IF do-hdrop
-  ELSE THEN THEN THEN THEN THEN ;
+  DUP $1E = IF DROP do-left    EXIT THEN
+  DUP $1F = IF DROP do-right   EXIT THEN
+  DUP $1D = IF DROP do-down    EXIT THEN
+  DUP $1C = IF DROP do-rotate  EXIT THEN
+      $20 = IF      do-hdrop        THEN ;
 
 : poll-input  ( -- )
   KEY? key-v !
-  key-v @ 0= IF
-    0 prev-k !
+  key-v @ 0= IF  0 prev-k !  EXIT  THEN
+  key-v @ prev-k @ = IF
+    key-t @ 1 - key-t !
+    key-t @ 0= 0= IF EXIT THEN
+    4 key-t !
   ELSE
-    key-v @ prev-k @ = IF
-      key-t @ 1 - key-t !
-      key-t @ 0= IF
-        4 key-t !
-        key-v @ do-dispatch
-      THEN
-    ELSE
-      key-v @ prev-k !
-      12 key-t !
-      key-v @ do-dispatch
-    THEN
-  THEN ;
+    key-v @ prev-k !
+    12 key-t !
+  THEN
+  key-v @ do-dispatch ;
 
 \ ── Title screen ────────────────────────────────────────────────────────────
 
@@ -559,4 +552,4 @@ VARIABLE sg-byte   \ precomputed SG4 byte for current piece
 
   AGAIN ;  \ restart
 
-tetris HALT  \ tetris loops forever; HALT unreachable
+tetris HALT
