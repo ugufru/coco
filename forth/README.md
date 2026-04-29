@@ -29,18 +29,22 @@ No interactive REPL or on-device compiler. The host compiles; the CoCo executes.
 
 ```
 forth/
-├── kernel/         6809 assembly kernel (lwasm)
-│   ├── kernel.asm  source — primitives, build profiles, variables
-│   ├── Makefile    'make' = ROM kernel; 'make allram' = all-RAM kernel
-│   └── README.md   full primitive reference and memory maps (both profiles)
+├── kernel/             6809 assembly kernel (lwasm)
+│   ├── kernel.asm      source — primitives, build profiles, variables
+│   ├── Makefile        'make' = ROM kernel; 'make allram' = all-RAM kernel
+│   └── README.md       full primitive reference and memory maps (both profiles)
 ├── tools/
-│   ├── fc.py       Forth cross-compiler
-│   └── README.md   compiler pipeline docs
-├── lib/            shared Forth libraries (.fs)
-├── hello/          hello world example
-├── LICENSE         BSD 2-clause
-└── README.md       this file
+│   ├── fc.py           Forth cross-compiler
+│   └── README.md       compiler pipeline docs
+├── lib/                shared Forth libraries (.fs)
+├── hello/              hello world example
+├── PROJECT_SETUP.md    setting up your own project — Makefile, fc.py options,
+│                       kernel build overrides, common scenarios
+├── LICENSE             BSD 2-clause
+└── README.md           this file
 ```
+
+For starting a new project of your own, see [`PROJECT_SETUP.md`](PROJECT_SETUP.md).
 
 ## Quick Start
 
