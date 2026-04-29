@@ -68,7 +68,7 @@ Each SG4 cell is rendered as `$80 | (color << 4) | $0F` — all four sub-pixels 
 
 ### Piece Encoding
 
-All 7 pieces × 4 rotations × 4 blocks = 112 bytes, stored at `$4100`. Each byte encodes one block's offset from the piece origin as `dx*4 + dy`. To decode: `4 /MOD` yields `( dy dx )` — dx on top of the stack, ready to add to the piece's column. Maximum offset is 3 in either axis, so one byte per block suffices.
+All 7 pieces × 4 rotations × 4 blocks = 112 bytes, stored at `$5100`. Each byte encodes one block's offset from the piece origin as `dx*4 + dy`. To decode: `4 /MOD` yields `( dy dx )` — dx on top of the stack, ready to add to the piece's column. Maximum offset is 3 in either axis, so one byte per block suffices.
 
 ### Zero-Flicker Rendering
 
@@ -107,10 +107,10 @@ The title screen counts vsync frames in a tight loop until the player presses a 
 
 | Address | Contents |
 |---------|----------|
-| `$4000`–`$40FF` | Board state array (16-byte stride × 16 rows, cols 10–15 unused padding) |
-| `$4100`–`$416F` | Piece rotation table (7 pieces × 4 rotations × 4 bytes = 112 bytes) |
-| `$4200`–`$4209` | High score table (5 entries × 2 bytes) |
-| `$4210`–`$4216` | Piece color table (7 bytes, maps piece index to SG4 color) |
+| `$5000`–`$50FF` | Board state array (16-byte stride × 16 rows, cols 10–15 unused padding) |
+| `$5100`–`$516F` | Piece rotation table (7 pieces × 4 rotations × 4 bytes = 112 bytes) |
+| `$5200`–`$5209` | High score table (5 entries × 2 bytes) |
+| `$5210`–`$5216` | Piece color table (7 bytes, maps piece index to SG4 color) |
 
 ## Build
 

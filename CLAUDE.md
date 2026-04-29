@@ -129,12 +129,17 @@ Do not access, search, or modify files outside these paths. If a task appears to
 CoCo Renovation — on-device Forth development environment for the TRS-80 Color Computer.
 Primary doc: `COCO_RENOVATION.md`. Tech reference: `coco_technical_reference.pdf`.
 
-## Current State (2026-04-13)
+## Current State (2026-04-28)
 Tutorial series complete: Getting Started ch1–13, all demos, calculator.
-Kernel: 80 primitives + 9 KCODE words (427 bytes). Font at $9000.
-fc.py: inline_constants(), FVAR_* EQU export. Lacks BEGIN/WHILE/REPEAT.
-fc.py quirks: preprocess_asm strips blank CODE block lines; ASCII-only comments.
-fc.py entry point: top-level `main` call required at end of .fs file (not just `: main`).
+Kernel: 80+ primitives, parameterized for ROM mode (default) and all-RAM mode.
+ROM-mode kernel ORGs at $2000, no bootstrap, BREAK→BASIC OK via exit-basic.
+All 10 demos run in ROM mode on 32K (clock+fujinet-time need HDB-DOS-CC cart).
+fc.py: inline_constants(), FVAR_* EQU export, auto-detect ROM vs all-RAM,
+exposes build constants (font-base, vram-base, app-base, trig-base) as Forth
+literals. Lacks BEGIN/WHILE/REPEAT.
+fc.py quirks: preprocess_asm strips blank CODE block lines; ASCII-only
+comments; CONSTANT requires a literal (not another constant).
+fc.py entry point: top-level `main` call required at end of .fs file.
 
 ## Getting Started — Layout
 - `getting-started/style.css` — landscape format, max-width: 1100px
@@ -161,27 +166,51 @@ Images live in `getting-started/images/`. To replace a placeholder `div.illustra
 - ROMs: `~/.xroar/roms/bas12.rom` + `~/.xroar/roms/extbas11.rom`
 - Run: `xroar -machine coco2bus -bas bas12.rom -extbas extbas11.rom -run build/combined.bin`
 
-## Memory Map (current, 2026-03-23)
-- `$0050–$0082` — Kernel variables (direct page, 51 bytes)
-- `$0600–$1FFF` — RG6 VRAM (6144 bytes, set by rg-init after boot)
-- `$0E00` — Bootstrap (copies staged kernel to $E000, enables all-RAM)
-- `$1000` — Staged kernel (DECB load addr; copied to $E000 at boot)
-- `$2000–$7FFF` — App code (24K available)
-- `$8000+` — App data (all-RAM region, available for larger apps)
-- `$9000–$91D8` — Font glyphs (59 glyphs × 8 bytes, all-RAM region)
-- `$DE00` — Data stack base (U, grows down)
-- `$E000` — Return stack init (S, grows down from $DFFF)
-- `$E000–$EE30` — Kernel code (final location, all-RAM mode, 80 primitives incl. graphics/beam/sprite + DOVAR data)
-- `$EE30–$FEFF` — Free at final location (~4.3K), but staging limit is 4K ($1000–$1FFF); ~452 bytes remain
-- fc.py remaps kernel DECB records from $E000+ to $1000 (staging)
-- All-RAM mode via `STA $FFDF` (NOT $FFDE — $FFDF sets TY, $FFDE clears)
+## Memory Map (current, 2026-04-28)
 
-## Architecture
-- Threading: ITC (Indirect Threaded Code)
-- X = IP, U = DSP, S = RSP, Y = scratch
-- Kernel at $E000 (all-RAM mode); bootstrap at $0E00 copies staged kernel from $1000
-- App at $2000 is cross-compiled Forth; combined into single DECB binary
-- VRAM at $0600 (set by rg-init); app is contiguous (no --hole needed)
+Two build profiles. ROM mode is the default; all-RAM is opt-in.
+
+### ROM mode (default — 32K CoCo, BASIC ROMs alive)
+- `$0050–$007F` — Kernel direct-page variables
+- `$0400–$05FF` — VDG text/SG VRAM
+- `$0600–$1DFF` — RG6 VRAM reservation (6 KB, kernel-reserved)
+- `$2000–$2EAF` — Kernel code (KERNEL_ORG, ~3.7 KB)
+- `$3000–$57FF` — App code + variables (APP_BASE, ~10 KB)
+- `$5800–$59D7` — Font glyphs (FONT_BASE)
+- `$5A00–$7DFF` — App heap / extra data (~9 KB)
+- `$7800` — TRIG_BASE (sin table, 91 B)
+- `$7E00` — Data stack base (U, grows down)
+- `$8000` — Return stack base (S, grows down)
+- `$8000–$BFFF` — Extended Color BASIC ROM
+- `$C000–$DFFF` — Disk Extended Color BASIC ROM / cart ROM
+- DECB exec = `START`, no bootstrap, no staging copy
+- Built by `make` (default) — selects via `KERNEL_VARIANT=` (unset)
+
+### All-RAM mode (opt-in — 64K CoCo, ROMs paged out)
+- `$0050–$007F` — Kernel DP vars
+- `$0400–$05FF` — VDG text VRAM
+- `$0600–$1DFF` — RG6 VRAM reservation
+- `$0E00` — Bootstrap (enables all-RAM via `STA $FFDF`, copies kernel)
+- `$1000–$1EAF` — Staged kernel (DECB load addr)
+- `$2000–$8FFF` — App code + vars (APP_BASE, 24 KB contiguous)
+- `$9000–$91D7` — Font glyphs (FONT_BASE)
+- `$86CC` — TRIG_BASE (sin table)
+- `$DE00` — Data stack
+- `$E000` — Return stack + kernel final location after copy
+- DECB exec = `BOOTSTRAP`, fc.py remaps `$E000+` records to `$1000` staging
+- Built by `make allram` — selects via `KERNEL_VARIANT=allram`
+
+### Architecture
+- Threading: ITC (Indirect Threaded Code), X=IP U=DSP S=RSP Y=scratch
+- Kernel parameterized via lwasm `-DALL_RAM=1` flag and `KERNEL_ORG`,
+  `APP_BASE`, `VRAM_BASE`, `FONT_BASE`, `TRIG_BASE`, `RSP_INIT`,
+  `DSP_INIT` overrides
+- fc.py auto-detects mode (no records ≥ `$E000` → ROM mode), reads
+  `APP_BASE` from kernel.map, exposes build constants as Forth literals
+  (`app-base`, `vram-base`, `font-base`, `trig-base`)
+- `IFEQ KERNEL_ORG-$E000` in `fujinet.fs` gates SAM TY toggles to
+  all-RAM only
+- All-RAM SAM register: `STA $FFDF` sets TY (NOT `$FFDE` — even=clear)
 
 ## CoCo Keyboard Matrix
 Each key has its OWN column — keys are NOT grouped by column as keyboard.fs claims.

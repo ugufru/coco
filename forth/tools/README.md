@@ -242,8 +242,21 @@ python3 fc.py source.fs \
 | `--kernel` | `build/kernel.map` | lwasm map file for CFA address lookup |
 | `--kernel-bin` | *(none)* | kernel DECB binary to prepend (produces combined binary) |
 | `--output` | `<source>.bin` | output binary path |
-| `--base` | `0x2000` | application load address |
+| `--base` | from kernel map (`APP_BASE` symbol) | application load address |
+| `--hole` | *(none)* | reserved region (`addr,size`) — app binary skips this range |
+| `--stage-base` | auto | pin all-RAM kernel staging address |
 
-With `--kernel-bin`, the output contains both the kernel block and the app
-block in a single DECB binary. BASIC loads both in one `LOADM` and jumps to
-`START`.
+With `--kernel-bin`, the output contains the kernel and the app in a single
+DECB binary. fc.py auto-detects which kernel profile is in use:
+
+- **ROM mode** (no kernel records ≥ `$E000`): kernel loads at its assembled
+  address (`$2000`), app loads at `APP_BASE` (`$3000`), DECB exec is `START`
+  directly. No staging copy. BASIC ROMs stay alive on a 32K machine.
+- **All-RAM mode** (kernel records at `$E000+`): kernel records get remapped
+  to a staging area (default just past the bootstrap at `$0E00`), app at
+  `$2000`, DECB exec is the bootstrap. Bootstrap enables all-RAM and
+  copies the kernel to its final `$E000` location. Requires 64K.
+
+fc.py exposes several kernel build constants as Forth constants in source:
+`font-base`, `vram-base`, `app-base`, `trig-base`. These vary per profile
+(see `forth/kernel/README.md`) so apps can be profile-agnostic.

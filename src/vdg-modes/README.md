@@ -62,10 +62,10 @@ Offset  Size  Field
 | Address | Contents |
 |---------|----------|
 | `$0400` | Text/SG VRAM (512 bytes, shared by Alpha, SG4, SG6) |
-| `$3000` | Graphics VRAM (up to 6144 bytes for CG6/RG6) |
-| `$5800` | Mode table (176 bytes) |
-| `$58B0` | CG nibble-expand table (16 bytes) |
-| `$6000` | Font data (37 glyphs x 7 bytes = 259 bytes) |
+| `$0600` | Graphics VRAM = `vram-base` (up to 6144 bytes for CG6/RG6) |
+| `$5800` | Font data = `font-base` (37 glyphs x 7 bytes = 259 bytes) |
+| `$5A00` | Mode table (176 bytes, just past font) |
+| `$5AB0` | CG nibble-expand table (16 bytes) |
 
 ## Build
 

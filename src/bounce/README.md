@@ -37,10 +37,10 @@ The HUD at the bottom displays the current blanking offset (3 digits) and mode (
 
 ## Architecture
 
-- **Ball table** at $8020: 4 balls x 12 bytes (x, y, dx, dy, old-x, old-y).
+- **Ball table** at $4020: 4 balls x 12 bytes (x, y, dx, dy, old-x, old-y).
 - **Time-sliced rendering**: 2 balls are moved and drawn per frame, alternating pairs. Each ball updates at 30fps; the loop runs at 60fps.
-- **Sprite**: 7x7 artifact-color ball at $8000 (white circle, 2bpp encoding).
-- **Font**: 5x7 bitmap font (font5x7.fs) for HUD digit display.
+- **Sprite**: 7x7 artifact-color ball at $4000 (white circle, 2bpp encoding).
+- **Font**: 5x7 bitmap font (font5x7.fs) for HUD digit display, written to `font-base` ($5800 in ROM mode).
 
 ## Building
 

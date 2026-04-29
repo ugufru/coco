@@ -1304,12 +1304,15 @@ CODE fast-plot   ( x y -- )
         <h3>FujiNet Device</h3>
         <p class="lib-path">INCLUDE lib/fujinet.fs</p>
         <p>Talks to a FujiNet cartridge over the HDB-DOS DriveWire
-        bit-banger. Each primitive briefly switches SAM TY back to ROM
-        mode so the cart vectors at <code>$D93F</code> (read) and
-        <code>$D941</code> (write) are visible, then restores all-RAM
-        on return. The kernel return stack <code>S</code> lives inside
-        the ROM overlay window, so a small temp stack inside each CODE
-        word body is used during the call.</p>
+        bit-banger. The cart vectors at <code>$D93F</code> (read) and
+        <code>$D941</code> (write) live in cart ROM space. In all-RAM
+        kernel builds each primitive briefly switches SAM TY back to
+        ROM-mapped (<code>STA $FFDE</code>), JSRs through the vector,
+        and restores TY=1 (<code>STA $FFDF</code>); a small temp stack
+        is used during the call because the kernel <code>S</code> sits
+        inside the ROM overlay window. In ROM-mode builds (the default)
+        the cart ROM is always visible, so the SAM toggle and stack
+        switch compile out via <code>IFEQ KERNEL_ORG-$E000</code>.</p>
         <table class="ref-table">
           <tr>
             <th style="width:110px">Word</th>
@@ -1444,76 +1447,138 @@ CODE fast-plot   ( x y -- )
       <h2>Memory Map</h2>
       <!-- ================================================================== -->
 
-      <p>Default layout (text mode, tutorials):</p>
+      <p>The kernel ships in two build profiles. ROM mode is the default;
+      all-RAM mode is opt-in for apps that need the upper 32K.</p>
+
+      <h3>ROM mode (default &mdash; 32K CoCo)</h3>
+      <p>SAM stays in ROM-mapped mode; BASIC ROMs at <code>$A000+</code> stay
+      alive. No bootstrap, no staging copy &mdash; DECB exec goes straight to
+      <code>START</code>. <code>BREAK</code> exits cleanly to the BASIC
+      <code>OK</code> prompt via <code>exit-basic</code>.</p>
       <table class="ref-table">
         <tr>
           <th style="width:160px">Address</th>
           <th>Contents</th>
         </tr>
         <tr>
-          <td class="word-name">$0050&ndash;$0082</td>
-          <td>Kernel variables (cursor, key state, line/sprite scratch, text config)</td>
+          <td class="word-name">$0050&ndash;$007F</td>
+          <td>Kernel direct-page variables (cursor, key state, scratch)</td>
         </tr>
         <tr>
           <td class="word-name">$0400&ndash;$05FF</td>
-          <td>Video RAM &mdash; 32 columns &times; 16 rows, VDG alphanumeric mode</td>
+          <td>VDG text/SG VRAM (32&times;16, 512 bytes)</td>
         </tr>
         <tr>
-          <td class="word-name">$1000</td>
-          <td>Kernel code begins (DOCOL, DOVAR, CFA table, primitives, START)</td>
+          <td class="word-name">$0600&ndash;$1DFF</td>
+          <td>RG6 VRAM reservation (6 KB, single buffer)</td>
         </tr>
         <tr>
-          <td class="word-name">$2000</td>
-          <td>Application load address (APP_BASE) &mdash; cross-compiled Forth thread</td>
+          <td class="word-name">$2000&ndash;$2EAF</td>
+          <td>Kernel code (KERNEL_ORG, ~3.7 KB)</td>
         </tr>
         <tr>
-          <td class="word-name">$6000&ndash;$6102</td>
-          <td>Font data (if <code>init-font</code> is called) &mdash; 37 glyphs &times; 7 bytes</td>
+          <td class="word-name">$3000&ndash;$57FF</td>
+          <td>Application code + variables (APP_BASE, ~10 KB)</td>
+        </tr>
+        <tr>
+          <td class="word-name">$5800&ndash;$59D7</td>
+          <td>Font glyphs (font-base; font5x7 ~256 B / font-art 472 B)</td>
+        </tr>
+        <tr>
+          <td class="word-name">$5A00&ndash;$7DFF</td>
+          <td>App heap / extra data (~9 KB)</td>
         </tr>
         <tr>
           <td class="word-name">$7E00</td>
-          <td>Data stack base (U register, grows downward)</td>
+          <td>Data stack base (U register, grows down)</td>
         </tr>
         <tr>
-          <td class="word-name">$7FFE</td>
-          <td>Return stack init (S register, grows downward)</td>
+          <td class="word-name">$8000</td>
+          <td>Return stack base (S register, grows down)</td>
+        </tr>
+        <tr>
+          <td class="word-name">$8000&ndash;$BFFF</td>
+          <td>Extended Color BASIC ROM (read-only, 16 KB)</td>
+        </tr>
+        <tr>
+          <td class="word-name">$C000&ndash;$DFFF</td>
+          <td>Disk Extended Color BASIC ROM / cart ROM (8 KB)</td>
+        </tr>
+        <tr>
+          <td class="word-name">$FF00&ndash;$FFFF</td>
+          <td>I/O registers + hardware vectors (always mapped)</td>
         </tr>
       </table>
 
-      <p>All-RAM layout (graphics mode):</p>
+      <h3>All-RAM mode (<code>-DALL_RAM=1</code> / <code>KERNEL_VARIANT=allram</code> &mdash; 64K CoCo)</h3>
+      <p>Bootstrap at <code>$0E00</code> enables all-RAM
+      (<code>STA $FFDF</code>) and copies the kernel from <code>$1000</code>
+      to <code>$E000</code>. ROMs are paged out &mdash; <code>BREAK</code>
+      cannot return to BASIC; <code>bye</code> halts the CPU instead.
+      Required when an app needs &gt;18 KB of contiguous code.</p>
       <table class="ref-table">
         <tr>
           <th style="width:160px">Address</th>
           <th>Contents</th>
         </tr>
         <tr>
-          <td class="word-name">$0050&ndash;$0082</td>
-          <td>Kernel variables</td>
+          <td class="word-name">$0050&ndash;$007F</td>
+          <td>Kernel direct-page variables</td>
+        </tr>
+        <tr>
+          <td class="word-name">$0400&ndash;$05FF</td>
+          <td>VDG text VRAM</td>
         </tr>
         <tr>
           <td class="word-name">$0600&ndash;$1DFF</td>
-          <td>Video RAM &mdash; RG6 mode (256&times;192, 6144 bytes)</td>
+          <td>RG6 VRAM reservation (6 KB)</td>
         </tr>
         <tr>
           <td class="word-name">$0E00</td>
-          <td>Bootstrap (copies staged kernel to $E000, enables all-RAM via <code>STA $FFDF</code>)</td>
+          <td>Bootstrap (copies staged kernel, enables all-RAM)</td>
         </tr>
         <tr>
-          <td class="word-name">$2000</td>
-          <td>Application code (APP_BASE)</td>
+          <td class="word-name">$1000&ndash;$1EAF</td>
+          <td>Staged kernel (CLOADM target; copied to $E000 at boot)</td>
         </tr>
         <tr>
-          <td class="word-name">$8000+</td>
-          <td>Game data region (all-RAM, above ROM shadow)</td>
+          <td class="word-name">$2000&ndash;$8FFF</td>
+          <td>Application code + variables (24 KB contiguous)</td>
+        </tr>
+        <tr>
+          <td class="word-name">$9000&ndash;$91D7</td>
+          <td>Font glyphs (font-base; font-art 472 B)</td>
+        </tr>
+        <tr>
+          <td class="word-name">$9200&ndash;$DDFF</td>
+          <td>App heap / extra data (~19 KB)</td>
         </tr>
         <tr>
           <td class="word-name">$DE00</td>
-          <td>Data stack base (U register, grows downward)</td>
+          <td>Data stack base (U, grows down)</td>
+        </tr>
+        <tr>
+          <td class="word-name">$E000&ndash;$EEAF</td>
+          <td>Kernel (final location after copy)</td>
         </tr>
         <tr>
           <td class="word-name">$E000</td>
-          <td>Kernel code (final location, all-RAM mode) / Return stack init (S, grows down from $DFFF)</td>
+          <td>Return stack base (S, grows down from $DFFF)</td>
         </tr>
+        <tr>
+          <td class="word-name">$FF00&ndash;$FFFF</td>
+          <td>I/O registers + hardware vectors</td>
+        </tr>
+      </table>
+
+      <p>Kernel build constants exposed to Forth source by fc.py
+      (use these instead of hardcoded addresses):</p>
+      <table class="ref-table">
+        <tr><th style="width:160px">Forth name</th><th>ROM</th><th>All-RAM</th></tr>
+        <tr><td class="word-name">app-base</td><td>$3000</td><td>$2000</td></tr>
+        <tr><td class="word-name">vram-base</td><td>$0600</td><td>$0600</td></tr>
+        <tr><td class="word-name">font-base</td><td>$5800</td><td>$9000</td></tr>
+        <tr><td class="word-name">trig-base</td><td>$7800</td><td>$86CC</td></tr>
       </table>
 
       <!-- ================================================================== -->

@@ -10,7 +10,18 @@ Motorola 6809 CPU. Write Forth on a modern machine, cross-compile with
 - **CPU**: Motorola 6809 (X=IP, U=DSP, S=RSP, Y=scratch)
 - **Kernel**: ~4K of 6809 assembly — 80+ primitives including graphics, sprites, beam tracing, and small-int literal compression (LIT0/1/2/3/4/-1)
 - **Compiler**: Python cross-compiler (`fc.py`) — Forth source to DECB binary
-- **Target**: TRS-80 Color Computer 1/2/3, 64K RAM
+- **Target**: TRS-80 Color Computer 1/2/3, 32K minimum (64K for all-RAM apps)
+
+The kernel ships in two build profiles:
+
+| Profile | Build flag | Kernel ORG | App base | RAM | BASIC ROMs |
+|---|---|---|---|---|---|
+| ROM mode (default) | (none) | `$2000` | `$3000` | 32K | live at `$A000+` |
+| all-RAM | `-DALL_RAM=1` / `KERNEL_VARIANT=allram` | `$E000` | `$2000` | 64K | paged out |
+
+ROM mode is the default — apps run on a stock 32K CoCo, BREAK exits cleanly to
+the BASIC `OK` prompt, and there's no staging copy. All-RAM mode is opt-in for
+apps that need >18K of contiguous code.
 
 No interactive REPL or on-device compiler. The host compiles; the CoCo executes.
 
@@ -19,9 +30,9 @@ No interactive REPL or on-device compiler. The host compiles; the CoCo executes.
 ```
 forth/
 ├── kernel/         6809 assembly kernel (lwasm)
-│   ├── kernel.asm  source — primitives, bootstrap, variables
-│   ├── Makefile    assembles kernel.bin + kernel.map
-│   └── README.md   full primitive reference and memory map
+│   ├── kernel.asm  source — primitives, build profiles, variables
+│   ├── Makefile    'make' = ROM kernel; 'make allram' = all-RAM kernel
+│   └── README.md   full primitive reference and memory maps (both profiles)
 ├── tools/
 │   ├── fc.py       Forth cross-compiler
 │   └── README.md   compiler pipeline docs
@@ -44,8 +55,10 @@ forth/
 
 ```sh
 cd kernel
-make          # assemble kernel → build/kernel.bin + kernel.map
-make run      # compile hello.fs + kernel → launch in XRoar
+make          # assemble ROM-mode kernel → build/kernel.bin + kernel.map
+make run      # compile hello.fs + kernel → launch in XRoar (32K)
+
+make allram   # also build the all-RAM kernel → build/kernel-allram.{bin,map}
 ```
 
 ### Compile Your Own Program
@@ -56,13 +69,14 @@ python3 tools/fc.py myapp.fs \
     --kernel-bin kernel/build/kernel.bin \
     --output     myapp.bin
 
-xroar -machine coco2bus -ram 64 \
+xroar -machine coco2bus -ram 32 \
     -bas ~/.xroar/roms/bas12.rom \
     -extbas ~/.xroar/roms/extbas11.rom \
     -run myapp.bin
 ```
 
-The `-ram 64` flag is required — the kernel uses all-RAM mode.
+For all-RAM apps (e.g. clock with FujiNet, or anything needing >18K of code),
+add `KERNEL_VARIANT=allram` to your demo Makefile and use `-ram 64` in XRoar.
 
 ### Load from Disk (DECB)
 
