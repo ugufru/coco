@@ -51,9 +51,16 @@ CODE dw-write
         LEAS    @stk_top,PCR            ; switch to local temp stack
 
         ORCC    #$50                    ; mask IRQ + FIRQ for timing
+        ;;; All-RAM kernels live in TY=1; toggle to TY=0 so cart ROM
+        ;;; is visible for the JSR, then back to TY=1.  ROM-mode kernels
+        ;;; are already TY=0, so these toggles are skipped.
+        IFEQ    KERNEL_ORG-$E000
         STA     $FFDE                   ; SAM TY=0 — cart ROM visible
+        ENDC
         JSR     [$D941]                 ; HDB-DOS DWWrite vector
+        IFEQ    KERNEL_ORG-$E000
         STA     $FFDF                   ; SAM TY=1 — all-RAM restored
+        ENDC
 
         LDS     @save_s,PCR             ; restore kernel S
         PULS    X                       ; restore IP
@@ -78,10 +85,14 @@ CODE dw-read
         LEAS    @stk_top,PCR
 
         ORCC    #$50
-        STA     $FFDE
+        IFEQ    KERNEL_ORG-$E000
+        STA     $FFDE                   ; SAM TY=0 (all-RAM only)
+        ENDC
         JSR     [$D93F]                 ; HDB-DOS DWRead vector
         TFR     CC,B                    ; capture status flags before STA
+        IFEQ    KERNEL_ORG-$E000
         STA     $FFDF                   ; back to all-RAM
+        ENDC
 
         LDS     @save_s,PCR             ; restore kernel S
 

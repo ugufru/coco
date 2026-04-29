@@ -49,7 +49,7 @@ INCLUDE ../../forth/lib/beam.fs
 \ and kernel at $E000+).  SAM-F flips between them at vsync.
 
 $0600 CONSTANT VRAM-A
-$A000 CONSTANT VRAM-B
+$6000 CONSTANT VRAM-B
 
 \ ── Beam path buffers — one set per VRAM ────────────────────────────
 \ Each hand stroke is ~50 px × 3 bytes = 150 bytes; reserve 256.
@@ -58,12 +58,12 @@ $A000 CONSTANT VRAM-B
 \ $9000+; the gap $8000-$9000 is free).  They used to live at $4000 but
 \ the app outgrew that — issue #455's CODE words pushed the binary past
 \ $4000, and the buffers were silently overwriting our own code.
-$8000 CONSTANT BUF-A-HR
-$8100 CONSTANT BUF-A-MN
-$8200 CONSTANT BUF-A-SC
-$8300 CONSTANT BUF-B-HR
-$8400 CONSTANT BUF-B-MN
-$8500 CONSTANT BUF-B-SC
+$5100 CONSTANT BUF-A-HR
+$5200 CONSTANT BUF-A-MN
+$5300 CONSTANT BUF-A-SC
+$5400 CONSTANT BUF-B-HR
+$5500 CONSTANT BUF-B-MN
+$5600 CONSTANT BUF-B-SC
 
 
 \ ── Fast SAM-F write (~110 cycles, fits inside the ~680-cycle vblank) ─
@@ -265,7 +265,7 @@ CODE time-buf
 
 \ ── Days in month (no leap-year handling — close enough) ───────────
 
-$8500 CONSTANT MO-DAYS
+$5700 CONSTANT MO-DAYS
 
 : init-mo-days  ( -- )
   MO-DAYS tp !

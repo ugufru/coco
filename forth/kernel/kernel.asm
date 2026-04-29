@@ -141,6 +141,9 @@ DSP_INIT        EQU     $DE00
                 IFNDEF  FONT_BASE
 FONT_BASE       EQU     $9000
                 ENDC
+                IFNDEF  TRIG_BASE
+TRIG_BASE       EQU     $86CC
+                ENDC
         ELSE
                 IFNDEF  KERNEL_ORG
 KERNEL_ORG      EQU     $2000
@@ -159,6 +162,9 @@ DSP_INIT        EQU     $7E00
                 ENDC
                 IFNDEF  FONT_BASE
 FONT_BASE       EQU     $5800           ; just below app heap on 32K
+                ENDC
+                IFNDEF  TRIG_BASE
+TRIG_BASE       EQU     $7800           ; high in 32K RAM, below stacks
                 ENDC
         ENDC
 

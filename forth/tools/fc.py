@@ -1622,6 +1622,7 @@ def main():
         'FONT_BASE': 'font-base',
         'VRAM_BASE': 'vram-base',
         'APP_BASE':  'app-base',
+        'TRIG_BASE': 'trig-base',
     }
     for sym, addr in symbols.items():
         if sym.startswith('VAR_'):

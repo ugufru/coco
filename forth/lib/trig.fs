@@ -20,10 +20,12 @@
 \ sin(0)=0 through sin(90)=127, in 1-degree steps.
 \ Values = round(sin(deg) * 127).
 
-$86CC CONSTANT SINTAB
+\ Sine table location is set by the kernel build (trig-base from fc.py:
+\ $86CC in all-RAM mode, $7800 in ROM mode).  Used directly below since
+\ fc.py's CONSTANT requires a literal value.
 
 : init-sin  ( -- )
-  SINTAB tp !
+  trig-base tp !
   \  0- 9: sin(0)..sin(9)
     0 tb   2 tb   4 tb   7 tb   9 tb  11 tb  13 tb  15 tb  18 tb  20 tb
   \ 10-19
@@ -68,16 +70,16 @@ VARIABLE sa-tmp
   sa-tmp @ 180 < IF
     \ Quadrant 1 or 2: sin is positive
     sa-tmp @ 90 > IF
-      180 sa-tmp @ - SINTAB + C@
+      180 sa-tmp @ - trig-base + C@
     ELSE
-      sa-tmp @ SINTAB + C@
+      sa-tmp @ trig-base + C@
     THEN
   ELSE
     \ Quadrant 3 or 4: sin is negative
     sa-tmp @ 270 > IF
-      360 sa-tmp @ - SINTAB + C@ NEGATE
+      360 sa-tmp @ - trig-base + C@ NEGATE
     ELSE
-      sa-tmp @ 180 - SINTAB + C@ NEGATE
+      sa-tmp @ 180 - trig-base + C@ NEGATE
     THEN
   THEN ;
 
