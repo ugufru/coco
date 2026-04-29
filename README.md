@@ -3,7 +3,7 @@
 A cross-compiled Forth toolchain for the TRS-80 Color Computer. Write Forth
 on a modern machine. Run it natively on the CoCo's 6809.
 
-![Six demos running simultaneously in XRoar](demos.png)
+![Ten demos running on the CoCo](demos.png)
 
 ---
 
@@ -26,22 +26,46 @@ executes natively. The CoCo never sees source text.
 
 A kernel, a compiler, a tutorial, and a growing library of programs that prove it all works.
 
+### Toolchain
+
 | Path | What it is |
 |---|---|
 | `forth/kernel/kernel.asm` | 6809 ITC Forth executor kernel |
 | `forth/tools/fc.py` | Forth cross-compiler (source → DECB binary) |
 | `forth/hello/hello.fs` | Hello World — the first application |
 | `forth/run.sh` | One-command build and run script |
-| `forth/kernel/README.md` | Kernel architecture, primitives, memory layout |
-| `forth/tools/README.md` | Cross-compiler internals and usage |
-| `forth/lib/` | Shared Forth libraries (RNG, screen, printing) |
-| `src/tetris/` | Bare Naked Tetris — SG4 semigraphics game |
-| `src/kaleidoscope/` | Kaleidoscope — SG4 symmetric pattern generator |
-| `src/calculator/` | RPN calculator |
-| `docs/` | Tutorial book: *Getting Started with Bare Naked Forth* |
-| `docs/reference.html` | [Language Reference](docs/reference.html) — all words, stack effects, and memory map |
+| `forth/lib/` | Shared Forth libraries (graphics, fonts, sprites, RNG, sound, FujiNet) |
+| `make/demo.mk` | Shared per-demo build rules (kernel selection, XRoar launch) |
+
+### Documentation
+
+| Path | What it is |
+|---|---|
+| `forth/PROJECT_SETUP.md` | **Project setup guide** — Makefile, fc.py options, kernel build overrides, common scenarios |
+| `forth/kernel/README.md` | Kernel architecture, primitives, memory maps (both build profiles) |
+| `forth/tools/README.md` | Cross-compiler internals, ITC threading, inline `CODE` syntax |
+| `docs/tutorial.html` | Tutorial book: *Getting Started with Bare Naked Forth* (13 chapters) |
+| `docs/reference.html` | Language reference — all words, stack effects, memory maps |
 | `COCO_RENOVATION.md` | Original vision document |
+| `ROADMAP.md` | Phased roadmap, organized by theme |
 | `coco_technical_reference.pdf` | TRS-80 CoCo technical reference |
+
+### Demos (`src/`)
+
+All ten ship in `build/demos.dsk` (run `make dsk`).
+
+| Path | Demo | Mode |
+|---|---|---|
+| `src/bounce/` | Four bouncing balls with HUD scoring | RG6 |
+| `src/calculator/` | RPN calculator — 1234-key entry, M/R memory | text + SG4 digits |
+| `src/clock/` | Analog + digital clock, FujiNet RTC sync | RG6 (double-buffered) |
+| `src/fujinet-time/` | FujiNet wall-clock probe | text |
+| `src/kaleidoscope/` | Symmetric pattern generator | SG4 |
+| `src/rain/` | Digital rain (Matrix-style falling glyphs) | text |
+| `src/rg-test/` | RG6 + sprite/line/sin-fan visual test | RG6 |
+| `src/tetris/` | Bare Naked Tetris | SG4 |
+| `src/typewriter/` | Bare-metal keyboard echo (PIA0 scan) | text |
+| `src/vdg-modes/` | Cycles all 11 MC6847 display modes | every mode |
 
 ---
 
@@ -54,17 +78,29 @@ images (`bas12.rom`, `extbas11.rom`) in `~/.xroar/roms/`.
 
 ```sh
 cd forth
-./run.sh hello/hello.fs
+./run.sh hello/hello.fs           # cross-compile + launch hello.fs
 ```
-
-That builds the kernel (once), cross-compiles `hello.fs`, and launches XRoar
-with the result. "HELLO, WORLD!" appears on a CoCo 2 screen.
 
 To run any Forth program:
 
 ```sh
 ./run.sh path/to/program.fs
 ```
+
+To build and run a specific demo:
+
+```sh
+cd src/tetris && make run
+cd src/clock  && make run         # clock needs HDB-DOS-CC cart, see Makefile
+```
+
+To build all ten demos as a CoCo disk image (`build/demos.dsk`):
+
+```sh
+make dsk                          # from project root; needs Toolshed's `decb`
+```
+
+For starting your own project, see [`forth/PROJECT_SETUP.md`](forth/PROJECT_SETUP.md).
 
 ---
 
@@ -84,26 +120,42 @@ default) and all-RAM (kernel at `$E000`, opt-in via `KERNEL_VARIANT=allram`).
 Kernel-driven build constants (`font-base`, `vram-base`, `app-base`,
 `trig-base`) keep apps profile-agnostic. See [`forth/PROJECT_SETUP.md`](forth/PROJECT_SETUP.md).
 
-### Kernel primitives
+### Kernel primitives (84 words)
 
 | Group | Words |
 |---|---|
-| Threading | DOCOL, DOVAR, EXIT, LIT |
-| Stack | DUP, DROP, SWAP, OVER, ?DUP, 2DUP, 2DROP, ROT |
-| Arithmetic | +, -, \*, /MOD, NEGATE, MIN, MAX, ABS |
+| Threading | DOCOL, DOVAR, EXIT, LIT, LIT0, LIT1, LIT2, LIT3, LIT4, LITM1 |
+| Stack | DUP, DROP, SWAP, OVER, ?DUP, 2DUP, 2DROP, ROT, PICK |
+| Arithmetic | +, -, \*, /MOD, NEGATE, MIN, MAX, ABS, 2\*, 2/, 0MAX, 0MIN, WITHIN |
 | Memory | @, !, C@, C!, FILL, CMOVE, +! |
-| Bitwise | AND, OR, LSHIFT, RSHIFT |
-| I/O | EMIT, CR, KEY, KEY?, KBD-SCAN |
-| Control flow | 0BRANCH, BRANCH, DO, LOOP, I |
-| Comparison | =, <>, <, >, 0= |
+| Bitwise | AND, OR, XOR, INVERT, LSHIFT, RSHIFT |
+| I/O | EMIT, CR, TYPE, COUNT, KEY, KEY?, KBD-SCAN |
+| Control flow | 0BRANCH, BRANCH, DO, LOOP, +LOOP, I, J, UNLOOP |
+| Comparison | =, <>, <, >, U<, 0= |
 | Return stack | >R, R>, R@ |
 | Screen | AT, VSYNC, WAIT-PAST-ROW, COUNT-BLANKING |
-| String | TYPE, COUNT |
 | RG6 graphics | RG-PSET, RG-LINE, RG-CHAR, SPR-DRAW, SPR-ERASE-BOX |
-| Beam system | BEAM-TRACE, BEAM-DRAW-SLICE, BEAM-RESTORE-SLICE, BEAM-FIND-OBSTACLE, BEAM-SCRUB-POS |
-| Spatial | PROX-SCAN, MDIST |
+| Beam system | BEAM-TRACE, BEAM-DRAW-SLICE, BEAM-FIND-OBSTACLE, BEAM-SCRUB-POS |
+| Spatial | MDIST |
 | Data | sprite-data, font-data |
 | System | HALT |
+
+Library-level CODE words (not in kernel) include `prox-scan`, `beam-restore-slice`,
+`basic-cold`, the `dw-write`/`dw-read` FujiNet primitives, and per-app
+inline assembly. See [`forth/lib/`](forth/lib/) and individual demo
+sources for examples.
+
+### Build-mode constants
+
+`fc.py` exposes these as Forth literals so source builds against either
+profile unchanged:
+
+| Forth name | What it locates | ROM mode | All-RAM |
+|---|---|---|---|
+| `app-base` | App code start | `$3000` | `$2000` |
+| `vram-base` | RG6 VRAM (kernel-reserved 6K) | `$0600` | `$0600` |
+| `font-base` | `init-font` glyph table | `$5800` | `$9000` |
+| `trig-base` | `init-sin` sine lookup | `$7800` | `$86CC` |
 
 ### Cross-compiler (fc.py)
 
