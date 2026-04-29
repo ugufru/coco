@@ -86,7 +86,7 @@
 
         PRAGMA  6809
 
-KERN_VERSION    EQU     $0100   ; kernel version 1.0 (major.minor, BCD)
+KERN_VERSION    EQU     $0101   ; kernel version 1.1 (major.minor, BCD)
 
 SCREEN  EQU     $0400           ; video RAM base (32×16 alphanumeric text)
 NSCR    EQU     512             ; 32 cols × 16 rows

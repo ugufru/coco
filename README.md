@@ -1,4 +1,4 @@
-# Bare Naked Forth 1.0 — Modern Bytecode for the Color Computer
+# Bare Naked Forth 1.1 — Modern Bytecode for the Color Computer
 
 A cross-compiled Forth toolchain for the TRS-80 Color Computer. Write Forth
 on a modern machine. Run it natively on the CoCo's 6809.
@@ -70,13 +70,19 @@ To run any Forth program:
 
 ## Status
 
-**Version 1.0** — Released April 2026.
+**Version 1.1** — Released April 2026.
 
 The foundation is solid. The kernel boots, the compiler works, and real programs run on real (emulated) hardware.
 
 Working: kernel boots, clears screen, executes cross-compiled Forth bytecode.
 All 13 tutorial chapters complete with working example programs.
-Six demo applications: Tetris, Kaleidoscope, Rain, Bounce, Typewriter, and RPN Calculator.
+Ten demo applications: Tetris, Kaleidoscope, Rain, Bounce, Typewriter, RPN Calculator, RG-Test, VDG Modes, Clock, FujiNet Time.
+
+**1.1 highlights:** ROM-mode default kernel (32K CoCo, BASIC ROMs alive,
+clean BREAK to OK prompt). Build profiles: ROM (kernel at `$2000`,
+default) and all-RAM (kernel at `$E000`, opt-in via `KERNEL_VARIANT=allram`).
+Kernel-driven build constants (`font-base`, `vram-base`, `app-base`,
+`trig-base`) keep apps profile-agnostic. See [`forth/PROJECT_SETUP.md`](forth/PROJECT_SETUP.md).
 
 ### Kernel primitives
 

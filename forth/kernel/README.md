@@ -1,4 +1,4 @@
-# CoCo Forth Executor Kernel — Version 1.0
+# CoCo Forth Executor Kernel — Version 1.1
 
 A minimal ITC Forth executor kernel for the TRS-80 Color Computer 2, written
 in 6809 assembly. Assembled with `lwasm`, tested under XRoar.

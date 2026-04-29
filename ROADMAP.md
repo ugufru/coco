@@ -1,9 +1,10 @@
 # CoCo Renovation — Roadmap
 
-Forth kernel 1.0 shipped. Tutorial complete (13 chapters). FujiNet
-integration and the analog clock demo are live on real hardware. This
-roadmap organizes the 71 open issues in `issues.jsonl` into phases by
-theme and impact. Phases are not strictly sequential — work can flow
+Forth kernel 1.1 shipped — ROM mode default (32K, BASIC ROMs alive),
+all-RAM mode opt-in for >18K apps. Tutorial complete (13 chapters).
+FujiNet integration and the analog clock demo are live on real hardware.
+This roadmap organizes the 71 open issues in `issues.jsonl` into phases
+by theme and impact. Phases are not strictly sequential — work can flow
 in parallel where dependencies allow.
 
 For per-issue detail, see `issues.jsonl` (each item below references

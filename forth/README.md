@@ -1,4 +1,4 @@
-# CoCo Forth — Version 1.0
+# CoCo Forth — Version 1.1
 
 A cross-compiled Forth system for the TRS-80 Color Computer, targeting the
 Motorola 6809 CPU. Write Forth on a modern machine, cross-compile with
