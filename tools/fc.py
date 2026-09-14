@@ -275,6 +275,7 @@ def tokenize(source, base_dir=None):
                 # Skip all remaining split tokens that came from this string
                 # by finding which tokens are past the closing quote
                 rest_of_line = line[end + 1:]
+                line = rest_of_line     # later literals on this line search only unconsumed text
                 tokens_on_line = rest_of_line.split()
                 i = 0
                 continue
