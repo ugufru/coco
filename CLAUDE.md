@@ -360,6 +360,12 @@ Branch on flags first, then load result.
 
 ## Reference
 - XRoar interaction — osascript keystroke injection, testing loop
+- osascript key injection that works (2026-10-12): target the process, not
+  the app (`tell application "XRoar"` fails), and HOLD each key, because a
+  plain `keystroke` is released before the CoCo's KEY scan sees it:
+  `tell application "System Events"` / `set frontmost of process "xroar" to true`
+  / `key down "y"` / `delay 0.2` / `key up "y"`. Wait ~3 s after launch first.
+- Screen captures right after launch are often blank green; capture again.
 
 ## ASCII → VDG Encoding
 `screen_byte = $40 | (ascii & $3F)`
