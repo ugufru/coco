@@ -19,24 +19,28 @@ For per-issue detail, see `issues.jsonl` (statuses: `open`, `in-progress`,
 
 ---
 
-## Open strategic question (deliberately undecided)
+## North star: on-device, self-hosting Forth (decided 2026-07-19)
 
-Before committing to a multi-month direction, one fork needs an owner's call —
-it is **not** resolved here:
+*This section previously described the direction as an open fork. It is not
+open. See #551, which is the epic.*
 
-- **On-device, self-hosting Forth** — the `COCO_RENOVATION.md` vision:
-  *program the machine on the machine.* Today everything is cross-compiled from
-  a laptop via `fc.py`; the CoCo runs pre-compiled threads but cannot compile on
-  itself. The elegant path is not a separate 6809 assembler — Forth is natively
-  self-hosting, so this means an on-device interpreter/compiler. **Unstarted; no
-  epic filed yet.**
-- **Cross-developed, published, on real hardware** — accept the current model;
-  make it excellent, browser-explorable, and running on iron, without an
-  on-device compiler.
+**The CoCo compiles on itself.** The `COCO_RENOVATION.md` vision, *program the
+machine on the machine*: today everything is cross-compiled from a laptop via
+`fc.py`, and the CoCo runs pre-compiled threads but cannot compile on itself.
+Forth is natively self-hosting, so the path is an on-device interpreter and
+compiler rather than a separate 6809 assembler.
 
-The tracks below advance the project under *either* answer. Track 3 in
-particular is where the fork bites — pick the north star before committing to
-on-device-compiler epics.
+**#551** carries the settled design: headerless ITC threads stay byte-identical
+to cross-compiled images with names in a detached `.sym` sidecar; symbols are
+RAM-resident during a session and persisted to the filesystem at session
+boundaries; the live dictionary is the working artifact and source is stored per
+word; the editor is a definition editor, not a file editor; an on-device postfix
+6809 assembler is critical, and its indexed-addressing postbyte encoder is the
+risk-carrying nugget. The first spike is that encoder, proved by diffing
+on-device output against lwasm for the same instructions.
+
+Sub-epics get filed as #551 starts. Track 3 below is its seed, and remains worth
+building on its own terms.
 
 ---
 
@@ -47,15 +51,13 @@ return on effort right now — the project is good but hard to *experience*.
 
 - **409 (high)** — embed runnable **XRoar (WASM)** in the HTML docs (run demos
   in-browser while reading)
-- **410 (high)** — host the docs as a static website
 - **467 (high)** — audit + bulletproof the shipped demos (the per-demo
   standardization sweep is done; this is the final polish pass)
 - **407** — tutorial flow audit (re-read all 13 chapters against the current kernel)
-- **408** — demo appendix (a featured page per demo)
-- **413** — "Working with Claude" guide (the modern, AI-assisted workflow — a
-  genuinely novel angle worth telling well)
-- **412** — document the DSK build & distribution workflow
 - **411 (low)** — bespoke tutorial artwork (owner: Paul)
+
+Done: **410** (static site hosted, #547), **408** (demo appendix), **413**
+("Working with Claude" guide), **412** (DSK build & distribution docs).
 
 ---
 
@@ -73,8 +75,8 @@ Important but not urgent; no committed timeline.
 
 ## Track 3 — Interactive / on-device tooling
 
-Small, useful introspection words that pay off regardless of the fork — and
-that become the seed of the on-device experience if that north star is chosen.
+Small, useful introspection words that are worth having on their own, and that
+seed the on-device experience #551 is heading for. Prerequisites named in #551.
 
 - **27** — `WORDS` (word lister)
 - **26** — `.S` stack viewer
@@ -128,8 +130,14 @@ there's a reason to build it.
 
 ## Suggested next move
 
-Track 1 is the obvious place to start regardless of the fork: **409 + 410**
-(browser-runnable docs) turn the whole project from "clone a repo and install a
-toolchain" into "click a link and play." Highest leverage, no dependency on the
-strategic decision. Resolve the on-device-Forth fork before opening Track 3
-epics.
+The site is now hosted (410 done, #547), so the remaining Track 1 leverage is
+**409** — embed runnable XRoar (WASM) so the docs go from "click a link and
+read" to "click a link and play." Highest-value item left here, and independent
+of #551.
+
+The north star is settled (#551, on-device self-hosting). Its first spike is the
+postfix assembler's indexed-postbyte encoder, verified against lwasm. Track 3
+(#27, #26, #25) is the seed and can start whenever. See also
+`proposals/UMBILICAL_FORTH_PROPOSAL.md` (#552) for a cartridge-based host-to-
+target link that would give that spike an automated verification loop on real
+hardware.

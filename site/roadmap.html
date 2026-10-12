@@ -44,23 +44,24 @@ hardware. Released as <strong>v1.2</strong>.</p>
 <p>For per-issue detail, see <code>issues.jsonl</code> (statuses: <code>open</code>, <code>in-progress</code>,
 <code>done</code>, <code>icebox</code>, <code>closed</code>).</p>
 <hr />
-<h2>Open strategic question (deliberately undecided)</h2>
-<p>Before committing to a multi-month direction, one fork needs an owner's call —
-it is <strong>not</strong> resolved here:</p>
-<ul>
-<li><strong>On-device, self-hosting Forth</strong> — the <code>COCO_RENOVATION.md</code> vision:
-<em>program the machine on the machine.</em> Today everything is cross-compiled from
-a laptop via <code>fc.py</code>; the CoCo runs pre-compiled threads but cannot compile on
-itself. The elegant path is not a separate 6809 assembler — Forth is natively
-self-hosting, so this means an on-device interpreter/compiler. <strong>Unstarted; no
-epic filed yet.</strong></li>
-<li><strong>Cross-developed, published, on real hardware</strong> — accept the current model;
-make it excellent, browser-explorable, and running on iron, without an
-on-device compiler.</li>
-</ul>
-<p>The tracks below advance the project under <em>either</em> answer. Track 3 in
-particular is where the fork bites — pick the north star before committing to
-on-device-compiler epics.</p>
+<h2>North star: on-device, self-hosting Forth (decided 2026-07-19)</h2>
+<p><em>This section previously described the direction as an open fork. It is not
+open. See #551, which is the epic.</em></p>
+<p><strong>The CoCo compiles on itself.</strong> The <code>COCO_RENOVATION.md</code> vision, <em>program the
+machine on the machine</em>: today everything is cross-compiled from a laptop via
+<code>fc.py</code>, and the CoCo runs pre-compiled threads but cannot compile on itself.
+Forth is natively self-hosting, so the path is an on-device interpreter and
+compiler rather than a separate 6809 assembler.</p>
+<p><strong>#551</strong> carries the settled design: headerless ITC threads stay byte-identical
+to cross-compiled images with names in a detached <code>.sym</code> sidecar; symbols are
+RAM-resident during a session and persisted to the filesystem at session
+boundaries; the live dictionary is the working artifact and source is stored per
+word; the editor is a definition editor, not a file editor; an on-device postfix
+6809 assembler is critical, and its indexed-addressing postbyte encoder is the
+risk-carrying nugget. The first spike is that encoder, proved by diffing
+on-device output against lwasm for the same instructions.</p>
+<p>Sub-epics get filed as #551 starts. Track 3 below is its seed, and remains worth
+building on its own terms.</p>
 <hr />
 <h2>Track 1 — Publish &amp; polish (highest leverage)</h2>
 <p>Goal: make what already exists excellent and reachable. This is the best
@@ -68,16 +69,13 @@ return on effort right now — the project is good but hard to <em>experience</e
 <ul>
 <li><strong>409 (high)</strong> — embed runnable <strong>XRoar (WASM)</strong> in the HTML docs (run demos
 in-browser while reading)</li>
-<li><strong>410 (high)</strong> — host the docs as a static website</li>
 <li><strong>467 (high)</strong> — audit + bulletproof the shipped demos (the per-demo
 standardization sweep is done; this is the final polish pass)</li>
 <li><strong>407</strong> — tutorial flow audit (re-read all 13 chapters against the current kernel)</li>
-<li><strong>408</strong> — demo appendix (a featured page per demo)</li>
-<li><strong>413</strong> — &quot;Working with Claude&quot; guide (the modern, AI-assisted workflow — a
-genuinely novel angle worth telling well)</li>
-<li><strong>412</strong> — document the DSK build &amp; distribution workflow</li>
 <li><strong>411 (low)</strong> — bespoke tutorial artwork (owner: Paul)</li>
 </ul>
+<p>Done: <strong>410</strong> (static site hosted, #547), <strong>408</strong> (demo appendix), <strong>413</strong>
+(&quot;Working with Claude&quot; guide), <strong>412</strong> (DSK build &amp; distribution docs).</p>
 <hr />
 <h2>Track 2 — Real hardware</h2>
 <p>Goal: escape the emulator — the cartridge thesis from <code>COCO_RENOVATION.md</code>.
@@ -89,8 +87,8 @@ Important but not urgent; no committed timeline.</p>
 <p><em>(RP2350 co-processor parked — see Icebox; revisit after 404/405.)</em></p>
 <hr />
 <h2>Track 3 — Interactive / on-device tooling</h2>
-<p>Small, useful introspection words that pay off regardless of the fork — and
-that become the seed of the on-device experience if that north star is chosen.</p>
+<p>Small, useful introspection words that are worth having on their own, and that
+seed the on-device experience #551 is heading for. Prerequisites named in #551.</p>
 <ul>
 <li><strong>27</strong> — <code>WORDS</code> (word lister)</li>
 <li><strong>26</strong> — <code>.S</code> stack viewer</li>
@@ -137,11 +135,16 @@ fallback or a clear message.</li>
 </ul>
 <hr />
 <h2>Suggested next move</h2>
-<p>Track 1 is the obvious place to start regardless of the fork: <strong>409 + 410</strong>
-(browser-runnable docs) turn the whole project from &quot;clone a repo and install a
-toolchain&quot; into &quot;click a link and play.&quot; Highest leverage, no dependency on the
-strategic decision. Resolve the on-device-Forth fork before opening Track 3
-epics.</p>
+<p>The site is now hosted (410 done, #547), so the remaining Track 1 leverage is
+<strong>409</strong> — embed runnable XRoar (WASM) so the docs go from &quot;click a link and
+read&quot; to &quot;click a link and play.&quot; Highest-value item left here, and independent
+of #551.</p>
+<p>The north star is settled (#551, on-device self-hosting). Its first spike is the
+postfix assembler's indexed-postbyte encoder, verified against lwasm. Track 3
+(#27, #26, #25) is the seed and can start whenever. See also
+<code>proposals/UMBILICAL_FORTH_PROPOSAL.md</code> (#552) for a cartridge-based host-to-
+target link that would give that spike an automated verification loop on real
+hardware.</p>
 
     </article>
   </div>
