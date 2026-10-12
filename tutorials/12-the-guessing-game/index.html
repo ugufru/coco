@@ -70,7 +70,7 @@ loop:
   KEY 31 * 3 + 9 /MOD DROP 1 + SECRET ! ;</pre>
 
       <p>
-        Multiply the ASCII code by 31, add 7, take the remainder
+        Multiply the ASCII code by 31, add 3, take the remainder
         mod 9, add 1. The result is 1–9. Different keys give
         different numbers; the same key always gives the same
         number, but players don't think about that.
@@ -286,7 +286,7 @@ PLAY HALT</pre>
         <div class="learned-cols">
           <div class="learned-col">
             <h4>Patterns</h4>
-            <p>Seed RNG from keypress: <code>KEY 31 * 7 + 9 /MOD DROP 1 +</code></p>
+            <p>Seed RNG from keypress: <code>KEY 31 * 3 + 9 /MOD DROP 1 +</code></p>
             <p>One word per screen region keeps game logic clean</p>
             <p>Trailing spaces in messages erase leftover characters</p>
           </div>

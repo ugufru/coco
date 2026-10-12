@@ -208,7 +208,7 @@
         <p><strong>Compile</strong> it — this turns your Forth source into a
         binary that your CoCo can execute.</p>
         <p><strong>Run</strong> it in XRoar (or load it onto real hardware
-        in Chapter 11). See the result. Then go back to step one.</p>
+        in Chapter 13). See the result. Then go back to step one.</p>
       </div>
 
       <!-- Behind-the-scenes callout -->
@@ -225,8 +225,9 @@
           </p>
           <p>
             We've wrapped all three steps into a single script:
-            <code>run.sh</code>. Here's the full script so you can
-            see exactly what it does — nothing is hidden:
+            <code>run.sh</code>. Here is a simplified version of it so
+            you can see exactly what it does (the real script also
+            rebuilds the kernel whenever <code>kernel.asm</code> changes):
           </p>
 <pre class="shell"><span class="comment"># Build kernel if needed, compile .fs → .bin, launch XRoar</span>
 <span class="comment"># Full source: run.sh</span>

@@ -132,7 +132,7 @@
       <p>
         Pushes 0, swaps it beneath the number, then subtracts:
         <code>0 − n = −n</code>. Already works with
-        <code>SWAP</code> and <code>-</code> from Chapter 2.
+        <code>SWAP</code> and <code>-</code> from Chapters 3 and 4.
       </p>
 
       <h3>?DUP — duplicate only if non-zero</h3>
@@ -186,12 +186,16 @@ output: 42</pre>
 
       <div class="tip">
         <p>
-          These four words are not in the kernel — they live in
-          your Forth source. This is the Forth way: start with
-          a small kernel of machine-code primitives, then build
-          everything else as defined words. <code>NEGATE</code>
-          didn't need new assembly; it needed only
-          <code>SWAP</code> and <code>-</code>.
+          You are building these four words yourself to see how
+          they work. This is the Forth way: start with a small
+          kernel of machine-code primitives, then build everything
+          else as defined words. <code>NEGATE</code> didn't need
+          new assembly; it needed only <code>SWAP</code> and
+          <code>-</code>. (The kernel has since grown its own
+          <code>NEGATE</code> and <code>?DUP</code> primitives, and
+          <code>lib/print.fs</code> provides <code>U.</code> and
+          <code>.</code>. When your program defines a word with the
+          same name, your definition is the one that gets used.)
         </p>
       </div>
 

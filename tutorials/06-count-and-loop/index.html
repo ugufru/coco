@@ -101,8 +101,9 @@
 
       <div class="rule-box">
         <h3>I &nbsp;<span style="font-weight:normal; font-size:0.85em;">( -- n )</span></h3>
-        <p>Push the current loop index. Valid only inside a
-        <code>DO … LOOP</code>.</p>
+        <p>Push the current loop index. Use it inside a
+        <code>DO … LOOP</code>, either in the loop body itself or in a
+        word that the loop body calls.</p>
       </div>
 
       <p>
@@ -266,7 +267,11 @@ MAIN HALT</pre>
               </li>
               <li>
                 What happens if you write <code>0 0 DO I LETTER LOOP</code>?
-                Think about it first — does the body run once, or never?
+                Think about it first: does the body run once, never, or
+                something else? (Answer: something else. <code>LOOP</code>
+                adds 1 before it compares with the limit, so the index goes
+                1, 2, 3 and only stops when it wraps all the way round to 0,
+                65,536 passes later.)
                 <div class="answer-line"></div>
               </li>
             </ol>

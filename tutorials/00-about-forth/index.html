@@ -117,9 +117,9 @@
         Forth compiler on the CoCo, we run it on a modern machine — your
         Mac or Linux computer. You write Forth source in a plain text file.
         The cross-compiler (<code>fc.py</code>) compiles it into
-        <strong>threaded bytecode</strong>: a compact binary where every
-        word reference is a 2-byte address pointing into the kernel's
-        dispatch table. That binary is loaded onto the CoCo, where a small
+        <strong>threaded code</strong>: a compact binary where every
+        word reference is the 2-byte address of that word's code field,
+        either a kernel primitive or one of your own definitions. That binary is loaded onto the CoCo, where a small
         kernel (about 4 KB of 6809 assembly) executes it.
       </p>
 
@@ -140,10 +140,10 @@
       </div>
 
       <p>
-        This is sometimes called <strong>token-threaded</strong> Forth in
-        the literature. Word references in the compiled binary are tokens —
-        fixed addresses in a kernel dispatch table — rather than
-        self-describing dictionary entries. It's closer in spirit to how a
+        This is called <strong>indirect-threaded</strong> Forth in the
+        literature. Word references in the compiled binary are bare
+        addresses, with no names or dictionary headers stored alongside
+        them (the names exist only on the computer you compiled on). It's closer in spirit to how a
         JVM or Lua bytecode VM works than to how traditional Forth works.
       </p>
 

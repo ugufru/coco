@@ -127,10 +127,10 @@
       </p>
 
 <pre class="forth">: DIVIDER  ( row -- )
-  22  SWAP  HBAR         \ 22 dashes from col 4
-   4  OVER AT            \ back to col 4, same row
+  DUP 22 SWAP 4 SWAP HBAR   \ 22 dashes from col 4
+  DUP  4 SWAP AT            \ back to col 4, same row
   CHAR [ EMIT
-  22  OVER 1 + AT        \ col 22, same row
+  DUP 25 SWAP AT            \ col 25 (the last dash), same row
   CHAR ] EMIT
   DROP ;</pre>
 
