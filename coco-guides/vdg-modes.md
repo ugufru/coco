@@ -22,7 +22,7 @@ The VDG has no writable registers of its own. Its mode pins are directly wired t
 Bit 7  A*/G     0 = alpha/semigraphics, 1 = full graphics
 Bit 6  GM2      \
 Bit 5  GM1       > graphics mode select (3 bits)
-Bit 4  GM0      /  (also doubles as INT*/EXT for SG6)
+Bit 4  GM0      /  (also INT*/EXT: SG6 on a plain 6847, lowercase on the T1)
 Bit 3  CSS      color set select (0 or 1)
 ────────────────────────────────────────────────────
 Bit 2  RAM size input (read-only, not VDG-related)
@@ -72,7 +72,7 @@ These share the alphanumeric character cell grid. Bit 7 of each data byte select
 |------|-----------|--------|------|-------------|---------------|-----------------|
 | **Alpha** | 32×16 chars | 2 (CSS selects green or orange) | 512 | bit 7=0, bit 6=INV, bits 5–0=char | 000 | 0XX0 |
 | **SG4** | 64×32 | 8 + black | 512 | bit 7=1, bits 6–4=color, bits 3–0=quadrants | 000 | 0XXX |
-| **SG6** | 64×48 | 4 + black | 512 | bit 7=1, bit 6=C1, bits 5–0=six elements | 000 | 0XX1 |
+| **SG6** | 64×48 | 2 + black (per CSS) | 512 | bit 7=1, bit 6=colour, bits 5–0=six elements | 000 | 0XX1 (plain 6847 only) |
 | **SG8** | 64×64 | 8 + black | 2048 | Like SG4 but 4 bytes per cell position | 010 | 0XX0 |
 | **SG12** | 64×96 | 8 + black | 3072 | 6 bytes per cell position | 100 | 0XX0 |
 | **SG24** | 64×192 | 8 + black | 6144 | 12 bytes per cell position | 110 | 0XX0 |
@@ -89,9 +89,9 @@ True bitmap modes. No text mixing — every byte is pixel data.
 | **RG1** | 128×64 | 2 | 1024 | 1 | 001 | 1001 |
 | **CG2** | 128×64 | 4 | 1536 | 2 | 010 | 1010 |
 | **RG2** | 128×96 | 2 | 1536 | 1 | 011 | 1011 |
-| **CG3** | 128×96 | 4 | 3072 | 2 | 011 | 1100 |
-| **RG3** | 128×192 | 2 | 3072 | 1 | 100 | 1101 |
-| **CG6** | 128×192 | 4 | 6144 | 2 | 101 | 1110 |
+| **CG3** | 128×96 | 4 | 3072 | 2 | 100 | 1100 |
+| **RG3** | 128×192 | 2 | 3072 | 1 | 101 | 1101 |
+| **CG6** | 128×192 | 4 | 6144 | 2 | 110 | 1110 |
 | **RG6** | 256×192 | 2 | 6144 | 1 | 110 | 1111 |
 
 **CG** (Color Graphics): 2 bits per pixel → 4 colors, 4 pixels per byte.
@@ -156,6 +156,21 @@ In RG (2-color) modes, 0 = black background, 1 = foreground (Green if CSS=0, Buf
 ### Semigraphics-4
 
 SG4 ignores CSS — it has its own 3-bit color field per cell, selecting from all 8 colors: Green(0), Yellow(1), Blue(2), Red(3), Buff(4), Cyan(5), Magenta(6), Orange(7).
+
+### Semigraphics-6
+
+The 6847 picks an SG6 cell's colour from two data bits, C1 C0 (bits 7 and 6), plus CSS. On the CoCo, data bit 7 is also wired to A*/S, so it is always 1 in a graphics cell. Only bit 6 is left to choose with, which gives two colours plus black per screen:
+
+| Bit 6 | CSS=0 | CSS=1 |
+|-------|-------|-------|
+| 0 | Blue | Magenta |
+| 1 | Red | Orange |
+
+Elements: bits 5–0 = top-left, top-right, middle-left, middle-right, bottom-left, bottom-right (a cell is 2 elements wide by 3 tall; each element is 4 dots wide by 4 lines high).
+
+**The CoCo 2B's MC6847T1 has no SG6.** On the T1, `$FF22` bit 4 switches the character set to true lowercase instead, and graphics cells stay SG4. `lib/console.fs` sets that bit for lowercase, so anything drawn under the console (the Claude Code terminal, `src/vader`) must be SG4.
+
+Measured 2026-10-12 in XRoar (#573) with a probe that fills cells with `$8C` and `$CC`. These bytes look different in each mode: SG4 lights the top half, in green and buff; SG6 lights the middle third, in blue and red. On `cocous` (plain 6847) with bit 4 set: SG6, blue/red at CSS=0, magenta/orange at CSS=1. On `coco2bus` (T1) with bit 4 set: SG4, green/buff, identical to bit 4 clear. Not yet confirmed on real hardware.
 
 ### Artifact Colors
 
