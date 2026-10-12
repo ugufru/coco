@@ -31,8 +31,9 @@
       <p>
         Every program in this book was cross-compiled on your modern
         computer and tested in XRoar. The output is a standard
-        DECB <code>.bin</code> file — the same format the CoCo's
-        BASIC uses for <code>CLOADM</code>. Getting it to real
+        DECB <code>.bin</code> file — the same machine-language
+        format the CoCo's BASIC loads with <code>LOADM</code>
+        (or <code>CLOADM</code> from tape). Getting it to real
         hardware means copying that file somewhere the CoCo can
         read it.
       </p>
@@ -55,16 +56,18 @@
             SD card on your modern computer.</li>
         <li>Insert the SD card in the CoCoSDC.</li>
         <li>At the BASIC prompt, type:
-<pre class="forth">CLOADM"GUESS.BIN"</pre>
-            BASIC loads both the kernel block and the app block,
-            then executes at the kernel's <code>START</code> address.</li>
+<pre class="forth">LOADM"GUESS":EXEC</pre>
+            <code>LOADM</code> reads both the kernel block and the app
+            block from disk; the <code>:EXEC</code> clause then jumps to
+            the kernel's <code>START</code> address.</li>
       </ol>
 
       <p>
         The <code>.bin</code> file contains two data blocks (kernel
-        at <code>$1000</code>, app at <code>$2000</code>) and an
-        end block with the exec address. <code>CLOADM</code> loads
-        them all and jumps to the exec address automatically.
+        at <code>$2000</code>, app at <code>$3000</code>) and an
+        end block carrying the exec address. <code>LOADM</code> copies
+        each block to its load address, and <code>:EXEC</code> runs the
+        program.
       </p>
 
       <h2>Path 2 — DriveWire 4</h2>
@@ -81,9 +84,9 @@
         <li>Connect the USB-serial adapter between computer and
             CoCo's serial port (or bit-banger port).</li>
         <li>At the BASIC prompt:
-<pre class="forth">CLOADM"GUESS.BIN"</pre>
+<pre class="forth">LOADM"GUESS":EXEC</pre>
             BASIC fetches the file over the serial link exactly
-            as if it were a physical disk drive.</li>
+            as if it were a physical disk drive, then runs it.</li>
       </ol>
 
     </div>
@@ -116,13 +119,14 @@
         a standard audio cable.
       </p>
 
-      <h2>What CLOADM Does</h2>
+      <h2>What the Loader Does</h2>
 
       <p>
-        Regardless of the path, <code>CLOADM</code> does the same
-        thing: it reads data blocks from the source, copies each
-        block's payload to the specified load address in RAM,
-        then jumps to the exec address in the end block.
+        Regardless of the path, the loader does the same thing:
+        it reads data blocks from the source, copies each block's
+        payload to the specified load address in RAM, then jumps to
+        the exec address in the end block. (On disk that loader is
+        <code>LOADM</code>; on cassette it is <code>CLOADM</code>.)
         For Bare Naked Forth binaries:
       </p>
 
@@ -135,16 +139,15 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td style="padding:5px 20px 5px 0;">Cursor init</td><td style="padding:5px 20px 5px 0;"><code>$0050</code></td><td style="padding:5px 0;">2-byte cursor variable (0)</td></tr>
-          <tr><td style="padding:5px 20px 5px 0;">Kernel</td>     <td style="padding:5px 20px 5px 0;"><code>$1000</code></td><td style="padding:5px 0;">DOCOL, CFAs, primitives, START</td></tr>
-          <tr><td style="padding:5px 20px 5px 0;">Application</td><td style="padding:5px 20px 5px 0;"><code>$2000</code></td><td style="padding:5px 0;">Compiled Forth thread</td></tr>
-          <tr><td style="padding:5px 20px 5px 0;">Exec</td>       <td style="padding:5px 20px 5px 0;"><code>$1225</code> (approx)</td><td style="padding:5px 0;">Jumps to START in kernel</td></tr>
+          <tr><td style="padding:5px 20px 5px 0;">Kernel</td>     <td style="padding:5px 20px 5px 0;"><code>$2000</code></td><td style="padding:5px 0;">DOCOL, CFAs, primitives, START</td></tr>
+          <tr><td style="padding:5px 20px 5px 0;">Application</td><td style="padding:5px 20px 5px 0;"><code>$3000</code></td><td style="padding:5px 0;">Compiled Forth thread</td></tr>
+          <tr><td style="padding:5px 20px 5px 0;">Exec</td>       <td style="padding:5px 20px 5px 0;"><code>$2981</code></td><td style="padding:5px 0;">Jumps to START in kernel</td></tr>
         </tbody>
       </table>
 
       <p>
         START clears the screen, initialises the stacks, and
-        begins executing the application thread at <code>$2000</code>.
+        begins executing the application thread at <code>$3000</code>.
         BASIC is gone — the CoCo is running your Forth program.
       </p>
 
@@ -154,13 +157,13 @@
         XRoar is a full-speed, cycle-accurate CoCo 2 emulator.
         For development purposes it is indistinguishable from
         real hardware. The <code>-run</code> flag loads and
-        executes the binary exactly as <code>CLOADM</code> would:
+        executes the binary exactly as <code>LOADM"…":EXEC</code> would:
       </p>
 
 <pre class="shell"><span class="prompt">$</span> xroar -machine coco2bus \
         -bas ~/.xroar/roms/bas12.rom \
         -extbas ~/.xroar/roms/extbas11.rom \
-        -run getting-started/examples/12/guess.bin</pre>
+        -run tutorials/12-the-guessing-game/examples/guess.bin</pre>
 
     </div>
 
@@ -179,7 +182,7 @@
       </p>
 
 <pre class="shell"><span class="comment"># 1. Write or edit your Forth source</span>
-<span class="prompt">$</span> edit getting-started/examples/12/guess.fs
+<span class="prompt">$</span> edit tutorials/12-the-guessing-game/examples/guess.fs
 
 <span class="comment"># 2. Build the kernel (only needed if kernel.asm changed)</span>
 <span class="prompt">$</span> cd kernel &amp;&amp; make
@@ -227,6 +230,18 @@
             the CoCo prompt and execute them immediately.</li>
       </ul>
 
+      <p>
+        Many of these ideas are already explored in the
+        <a href="../demos/index.html">demo gallery</a> — fifteen
+        complete programs, from a Tetris clone to a multi-voice sound
+        engine, each with source and notes on the toolchain features
+        it exercises. And once you have a diskful of programs to
+        share, the
+        <a href="../dsk-workflow/index.html">disk build &amp;
+        distribution guide</a> shows how to package them into a
+        single <code>.dsk</code> image for a real CoCo.
+      </p>
+
       <div class="tip">
         <p>
           Every program in this book was written with the tools
@@ -249,8 +264,8 @@
           <div class="learned-col">
             <h4>The Binary</h4>
             <p>DECB <code>.bin</code> format: data blocks + exec block</p>
-            <p><code>CLOADM</code> loads and jumps to exec address</p>
-            <p>Kernel at <code>$1000</code>, app at <code>$2000</code></p>
+            <p><code>LOADM"…":EXEC</code> loads and jumps to exec address</p>
+            <p>Kernel at <code>$2000</code>, app at <code>$3000</code></p>
           </div>
           <div class="learned-col">
             <h4>The Workflow</h4>
