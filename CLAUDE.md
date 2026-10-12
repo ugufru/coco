@@ -68,7 +68,7 @@ Do NOT use the `~/.claude/projects/*/memory/` system. Do not create MEMORY.md or
 
 What if the TRS-80 Color Computer had shipped with real developer tools instead of a cramped BASIC prompt? That's the question driving **CoCo Renovation** — a from-scratch development environment delivered on a ROM cartridge, giving the CoCo the toolchain it deserved in 1982 but never got. The real hardware runs. Only the software gets an upgrade.
 
-The project includes a **Forth kernel and cross-compiler** (the project root), a growing collection of **SG4 semigraphics demos** (`src/`), and a **tutorial series** (`getting-started/`) that walks through building programs from scratch. The long-term vision lives in `COCO_RENOVATION.md`.
+The project includes a **Forth kernel and cross-compiler** (the project root), a growing collection of **SG4 semigraphics demos** (`src/`), and a **tutorial series** (`tutorials/`) that walks through building programs from scratch. The long-term vision lives in `COCO_RENOVATION.md`.
 
 ## Target Platform
 
@@ -164,6 +164,10 @@ Do not access, search, or modify files outside these paths. If a task appears to
 
 ## User
 - Collaboration style — how we work best together
+- Writing style: do NOT use em-dashes to carry excitement or cadence, in
+  chat replies or in any prose/docs/site copy produced for this project.
+  Use periods, commas, colons, parentheses, and shorter sentences instead.
+  Applies generally, across sessions.
 
 ## Feedback
 - Issues are in issues.jsonl, not GitHub
@@ -223,6 +227,64 @@ Images live in `getting-started/images/`. To replace a placeholder `div.illustra
 - `kernel/Makefile` — `make` builds, `make run` launches XRoar
 - `tools/fc.py` — Forth cross-compiler (Forth source → DECB binary)
 - `src/hello/hello.fs` — Hello World source
+
+## CoCo Terminal (talking to Paul on the CoCo itself)
+
+Full docs: `src/terminal/README.md`. Read that before changing anything
+in `src/terminal/`, `tools/cocoterm_bridge.py`, or `tools/cocoterm_mcp.py`.
+
+### IMPORTANT: output format when the session is on the CoCo
+If the `peek`/`poke` MCP tools are present, Paul is reading replies on a
+**32 column x 16 row** screen: about 512 characters, and the oldest lines
+scroll off the top. Treat that as a hard budget.
+
+- Keep the whole reply to ~10 lines of ~32 columns. Paul's typed line, its
+  echo and blank lines also use rows, so 14 lines already scrolls. Shorter
+  is better.
+- Plain ASCII only. No markdown, no tables, no code fences, no box drawing.
+- Simple `-` lists. Short sentences. No em dashes (global rule anyway).
+- Don't restate the question or add a preamble. Lead with the answer.
+- If something genuinely needs more room, say so and write it to a file
+  instead of paging it through the terminal.
+
+### How the link works
+- CoCo runs `src/terminal/terminal.fs`, a dumb terminal in Bare Naked Forth.
+- Becker port: `$FF41` status (bit 1 = byte waiting), `$FF42` data. TCP 65504.
+- `tools/cocoterm_bridge.py` owns the line: echo, backspace, submit on ENTER,
+  one `claude -p` turn per line, reply reflowed to 32 columns.
+- Start the bridge FIRST (`cd src/terminal && make bridge`), then `make run`.
+  XRoar's Becker port is a TCP client that connects once at cartridge create.
+- `--cps` (default 400) throttles output; XRoar drops Becker bytes if faster.
+- Nobody can approve a permission prompt from the CoCo, so tools that would
+  prompt are refused. Don't reach for them.
+
+### peek / poke
+- MCP tools carried as ESC frames on the same byte stream, max 64 bytes each.
+- Tool calls print nothing on the CoCo screen, so drawings survive until the
+  reply text scrolls them away.
+- Use them to draw straight into text VRAM at `$0400-$05FF` (32x16 bytes).
+- Screen bytes are T1 codes, NOT plain ASCII:
+  `$60-$7E` -> AND $1F, `$40-$5F` unchanged, `$20-$3F` -> OR $40, space = $60.
+- Never poke the kernel (`$2000-$2EAF`), the terminal (`$3000+`) or the
+  stacks (below `$7E00` / `$8000`). It kills the link.
+- Never peek `$FF40-$FF4F`. Reading the Becker port breaks the link.
+
+### SG4 semigraphics in text VRAM
+Set bit 7 and the cell becomes 2x2 chunky pixels instead of a character.
+Byte layout is `1 C C C L3 L2 L1 L0`:
+- `CCC` = colour 0-7: green, yellow, blue, red, buff, cyan, magenta, orange.
+- `L3` upper-left, `L2` upper-right, `L1` lower-left, `L0` lower-right.
+- One colour per cell. Art has to land on 2x2 boundaries; a detail cannot
+  straddle a cell edge in a different colour.
+- Whole screen is 64x32 pixels. Bases: `$C0` buff, `$A0` blue, `$B0` red.
+- Worked examples: `src/vader/`, and `tools/r2d2.py` (art grid -> poke hex).
+
+### Known limits (open issues)
+- No key auto-repeat; a new key pressed while another is held can be missed (#562).
+- 32x16 only. CoCo 3 40/80-column is #559, cursor-addressing escapes are #558.
+- T1 font quirks: `_` draws as a left arrow, and `{ | }` look like `( ! )`.
+- Needs a T1 VDG for lowercase (`coco2bus`). Plain MC6847 shows inverse garbage.
+- Console lives in `lib/console.fs`, not the kernel; ROM kernel has ~125 B free (#561).
 
 ## XRoar Setup
 - Machine: `coco2bus` (CoCo 2, NTSC)
@@ -302,3 +364,16 @@ Branch on flags first, then load result.
 ## ASCII → VDG Encoding
 `screen_byte = $40 | (ascii & $3F)`
 For uppercase A-Z: screen_byte == ascii (no change needed).
+
+## RP2350 Umbilical Forth
+Design notes moved to `proposals/UMBILICAL_FORTH_PROPOSAL.md` (issue #552).
+Cartridge on the bus as a live host-to-target compile link. It is development
+infrastructure for #551, NOT an alternative to on-device self-hosting.
+Key enabling fact: our dictionary is headerless (tools/fc.py:864), so adding a
+word to a running target needs no target-side linking.
+
+## Stale doc warning
+ROADMAP.md still presents the on-device-Forth strategic fork as undecided. It is
+not. Issue #551 (2026-07-19) settled it in favor of on-device self-hosting and is
+the epic. Do not argue the fork from ROADMAP.md or COCO_RENOVATION.md alone;
+check issues.jsonl. Tracked as #553.
