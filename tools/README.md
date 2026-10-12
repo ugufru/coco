@@ -4,11 +4,13 @@
 |--------|------|
 | [`fc.py`](#fcpy--forth-cross-compiler) | Forth cross-compiler (`.fs` source → DECB binary) — the main toolchain piece |
 | [`gen-lib-readme.py`](#gen-lib-readmepy--lib-word-index-generator) | Regenerates `lib/README.md` from `lib/*.fs` headers |
+| [`cocoterm_bridge.py`](#cocoterm_bridgepy-coco-terminal-bridge-to-claude-code) | Bridges the CoCo terminal (`src/terminal`) to Claude Code over XRoar's Becker port |
+| [`cocoterm_mcp.py`](#cocoterm_mcppy-peek-and-poke-tools-for-live-coco-memory) | MCP server giving Claude `peek` and `poke` tools for live CoCo memory |
 
-The bulk of this README documents `fc.py`. `gen-lib-readme.py` is
-covered in a shorter section at the end.
+The bulk of this README documents `fc.py`. `gen-lib-readme.py` and the
+two terminal tools are covered in shorter sections at the end.
 
-Both scripts use only the Python 3 standard library — no third-party
+These scripts use only the Python 3 standard library, with no third-party
 dependencies. The project as a whole depends only on Python 3 (host)
 and `lwasm` from [lwtools](https://www.lwtools.ca/) (assembler).
 
@@ -347,3 +349,101 @@ variables, intra-file utility words, internal lookup-table addresses.
 
 **Output is deterministic.** Repeated runs over unchanged sources
 produce byte-identical `lib/README.md`. CI / `make` can rely on this.
+
+---
+
+# `cocoterm_bridge.py`: CoCo Terminal Bridge to Claude Code
+
+Connects the CoCo terminal (`src/terminal/terminal.fs`) running in XRoar to
+Claude Code on the host. The CoCo side is a dumb terminal; this script owns
+the line, runs Claude, and sends back text the 32x16 VDG screen can show.
+User-facing setup is in `src/terminal/README.md`.
+
+**Connection.** XRoar's Becker port (`-cart rsdos -cart-becker`) is a TCP
+*client* that connects once, when the cartridge is created, to
+`127.0.0.1:65504`. The bridge is the server, so start it first. It serves one
+client at a time and goes back to listening when XRoar disconnects.
+
+**Line discipline.** Bytes from the CoCo are keystrokes:
+
+| Byte | Action |
+|---|---|
+| `$20`-`$7E` | Append to the line and echo |
+| `$08` | Remove the last character and echo `$08` |
+| `$0D` | Submit the line as one Claude turn |
+| `$03` (BREAK) | Kill the running turn, or clear the line; send `^C` and a prompt |
+| `$0C` (CLEAR) | Clear the screen and reprompt |
+
+Typing is ignored while a turn is running, except BREAK.
+
+**Turns.** Each line runs
+`claude -p <line> --output-format stream-json --verbose --include-partial-messages`
+in `--cwd`, with `--permission-mode` (default `plan`), an appended system
+prompt asking for short plain-ASCII answers, and `--resume <session_id>` after
+the first turn. The id comes from the stream, not `--continue`, which would
+pick up whatever conversation was most recent in that directory. Events are
+handled as follows:
+
+- `text_delta` events stream through the reflow as they arrive.
+- `tool_use` blocks print a one-line `* Tool arg` note, except the `peek` and
+  `poke` memory tools, which print nothing so drawings are not scrolled away.
+- The `result` event ends the turn. On an error, the reason comes from the
+  result's `result` text. Its `subtype` can still say `success` when the API
+  rejected the request.
+
+**Reflow and sanitizer (`Reflow`).** A streaming word-wrapper whose output is
+the same however the input is chunked. It maps common Unicode punctuation to
+ASCII (dashes, smart quotes, ellipsis, arrows), folds accents, drops markdown
+`*`, backticks and leading `#`, replaces anything else outside `$20`-`$7E`
+with `?`, wraps words at `--cols` (32), and hard-breaks words that are too
+long. Line breaks are sent as CR. A line that exactly fills 32 columns gets no
+CR, because the CoCo console has already moved to the next row.
+`--selftest` checks all of this.
+
+**Pacing.** A single writer thread sends output at `--cps` (default 400)
+characters per second, because XRoar drops Becker bytes when its receive
+buffer is full.
+
+**Authentication.** If `ANTHROPIC_API_KEY` is set, it takes precedence over the
+claude.ai login, and turns are billed to that key. `--no-api-key` removes it
+from the environment of the `claude` processes only.
+
+**Testing without XRoar.** `--nc` sends CRLF, turns off echo and autowrap, and
+maps backspace and clear screen to terminal equivalents, so
+`nc 127.0.0.1 65504` works from a normal terminal.
+
+---
+
+# `cocoterm_mcp.py`: Peek and Poke Tools for Live CoCo Memory
+
+A stdio MCP server that gives Claude two tools, `peek` (read up to 1024 bytes)
+and `poke` (write up to 1024 bytes). The bridge passes it to every turn with
+`--mcp-config` and allows `mcp__coco__peek` and `mcp__coco__poke`.
+
+**Path of a request.**
+
+1. Claude calls the tool. The MCP server sends one JSON line to the bridge's
+   control port, `127.0.0.1:65505` (`--mem-port`):
+   `{"op": "peek", "addr": 1024, "len": 16}` or
+   `{"op": "poke", "addr": 1024, "data": "<hex>"}`.
+2. The bridge splits the request into frames of at most 64 bytes and sends
+   them to the CoCo inline with terminal output:
+   `ESC P addrH addrL n` to read, `ESC W addrH addrL n data...` to write.
+3. `terminal.fs` handles the frame and answers `ESC` plus the bytes read, or a
+   bare `ESC` after a write. The bridge separates these replies from
+   keystrokes and returns `{"ok": true, "data": "<hex>"}` or
+   `{"ok": false, "error": "..."}`.
+
+A request fails with an error if no CoCo is connected or no reply arrives
+within 5 seconds. The tool descriptions include the ROM-mode memory map and
+warn Claude away from `$FF40`-`$FF4F`, since reading the Becker port itself
+breaks the link.
+
+---
+
+# `fc.py` note: string literals
+
+Two `S"` or `."` literals on one source line used to hang the tokenizer (#563);
+that is fixed. One limitation remains: comment stripping runs before literal
+extraction, so `(`, `)` and `\` inside a string are still removed. Keep them
+out of string literals.

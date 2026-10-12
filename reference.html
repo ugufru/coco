@@ -1394,6 +1394,110 @@ CODE fast-plot   ( x y -- )
         </table>
       </div>
 
+      <!-- console.fs -->
+      <div class="ref-section">
+        <h3>Lowercase Console</h3>
+        <p class="lib-path">INCLUDE lib/console.fs</p>
+        <p>A scrolling 32&times;16 text console with true lowercase for the
+        CoCo 2B&rsquo;s MC6847T1 VDG. Setting PIA1 <code>$FF22</code> bit 4
+        (GM0) drives the T1&rsquo;s INT/EXT pin, so the VDG uses all 7 bits of
+        each text byte as the glyph index: <code>$01</code>&ndash;<code>$1A</code>
+        are a&ndash;z, <code>$40</code>&ndash;<code>$5F</code> are
+        <code>@</code>, A&ndash;Z and <code>[\]^_</code>, and
+        <code>$60</code>&ndash;<code>$7F</code> are space, digits and
+        punctuation. ASCII maps as <code>c&nbsp;AND&nbsp;$1F</code> for
+        <code>c&nbsp;&gt;=&nbsp;$60</code>, unchanged for
+        <code>$40</code>&ndash;<code>$5F</code>, and
+        <code>c&nbsp;OR&nbsp;$40</code> for <code>$20</code>&ndash;<code>$3F</code>.
+        The kernel <code>EMIT</code> is uppercase-only and wraps; this library
+        lives outside the kernel because the ROM-mode kernel has no room to
+        grow. It shares the kernel cursor (<code>KVAR-CUR</code>), so
+        <code>AT</code> still positions it. On a plain 6847 (CoCo 1, early
+        CoCo 2) lowercase shows as garbage; run on <code>coco2bus</code>.
+        T1 font quirks: <code>_</code> draws as a left arrow, and
+        <code>{ | }</code> look like <code>( ! )</code>.</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">lower-on</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Enable MC6847T1 true lowercase by setting PIA1 <code>$FF22</code> bit 4 (GM0).</td>
+          </tr>
+          <tr>
+            <td class="word-name">lower-off</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Return to the standard 6847 character set by clearing <code>$FF22</code> bit 4.</td>
+          </tr>
+          <tr>
+            <td class="word-name">con-emit</td>
+            <td class="stack-effect">( c -- )</td>
+            <td>Print one character with T1 lowercase; handles CR, BS and CLEAR, scrolls past the bottom row.
+            <code>$20</code>&ndash;<code>$7E</code> are drawn, <code>$0D</code> moves to the next row,
+            <code>$08</code> backs up and blanks one cell, <code>$0C</code> clears the screen; other
+            control bytes are ignored. <em>CODE word.</em></td>
+          </tr>
+          <tr>
+            <td class="word-name">con-type</td>
+            <td class="stack-effect">( addr len -- )</td>
+            <td>Print a string (addr len) through con-emit.</td>
+          </tr>
+          <tr>
+            <td class="word-name">con-cls</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Clear the text screen and home the cursor.</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- becker.fs -->
+      <div class="ref-section">
+        <h3>Becker Port</h3>
+        <p class="lib-path">INCLUDE lib/becker.fs</p>
+        <p>Raw byte I/O over XRoar&rsquo;s Becker port, a two-register pseudo
+        device that XRoar attaches to a disk cartridge and forwards to a TCP
+        connection. <code>$FF41</code> is status (bit 1 set means a received
+        byte is waiting) and <code>$FF42</code> is data. XRoar is the TCP
+        <em>client</em>: it connects once, when the cartridge is created, to
+        <code>127.0.0.1:65504</code> (override with <code>-becker-ip</code>
+        and <code>-becker-port</code>), so the server must already be
+        listening. Enable it without HDB-DOS with
+        <code>-cart rsdos -cart-becker</code>. No DriveWire protocol is
+        involved, no ROM calls are made, and it works the same in ROM-mode and
+        all-RAM builds. XRoar drops writes when its buffer is full, so the far
+        end should pace what it sends. See <code>src/terminal</code>.</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">bk?</td>
+            <td class="stack-effect">( -- flag )</td>
+            <td>Nonzero if a received byte is waiting (<code>$FF41</code> bit 1).</td>
+          </tr>
+          <tr>
+            <td class="word-name">bk@</td>
+            <td class="stack-effect">( -- c )</td>
+            <td>Read the next received byte from <code>$FF42</code> (check bk? first).</td>
+          </tr>
+          <tr>
+            <td class="word-name">bk!</td>
+            <td class="stack-effect">( c -- )</td>
+            <td>Send one byte by writing it to <code>$FF42</code>.</td>
+          </tr>
+          <tr>
+            <td class="word-name">bk-type</td>
+            <td class="stack-effect">( addr len -- )</td>
+            <td>Send a buffer (addr len) byte by byte.</td>
+          </tr>
+        </table>
+      </div>
+
       <!-- sound.fs -->
       <div class="ref-section">
         <h3>Sound Effects</h3>

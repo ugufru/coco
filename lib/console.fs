@@ -34,10 +34,14 @@
 \ con-cls   ( -- )          clear screen, home cursor
 
 
+\ lower-on -- Enable MC6847T1 true lowercase by setting PIA1 $FF22 bit 4 (GM0).
 : lower-on   ( -- )  $FF22 C@ $10 OR  $FF22 C! ;
+\ lower-off -- Return to the standard 6847 character set by clearing $FF22 bit 4.
 : lower-off  ( -- )  $FF22 C@ $EF AND $FF22 C! ;
 
 
+\ con-emit ( c -- )
+\ con-emit -- Print one character with T1 lowercase; handles CR, BS and CLEAR, scrolls past the bottom row.
 CODE con-emit
         ;;; ( c -- )  T1-lowercase console output with scroll
         LDB     1,U                     ; B = character
@@ -108,6 +112,7 @@ CODE con-emit
 ;CODE
 
 
+\ con-type -- Print a string (addr len) through con-emit.
 : con-type  ( addr len -- )
   DUP IF
     OVER + SWAP DO  I C@ con-emit  LOOP
@@ -115,4 +120,5 @@ CODE con-emit
     2DROP
   THEN ;
 
+\ con-cls -- Clear the text screen and home the cursor.
 : con-cls  ( -- )  $0C con-emit ;

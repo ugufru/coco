@@ -12,8 +12,10 @@ Each file shows a description list (what each word does) followed by a cost tabl
 
 - [`async-sound.fs`](#async-soundfs)
 - [`beam.fs`](#beamfs)
+- [`becker.fs`](#beckerfs)
 - [`bye.fs`](#byefs)
 - [`cg-text.fs`](#cg-textfs)
+- [`console.fs`](#consolefs)
 - [`dac.fs`](#dacfs)
 - [`datawrite.fs`](#datawritefs)
 - [`font-art.fs`](#font-artfs)
@@ -127,6 +129,28 @@ Beam pixel-save/restore system for artifact-free rendering
 
 ---
 
+## `becker.fs`
+
+Byte I/O over XRoar's Becker port
+
+**Provides:** bk?, bk@, bk!, bk-type
+
+**Requires:** kernel C@ C! AND DO/LOOP
+
+- **`bk?`** — Nonzero if a received byte is waiting ($FF41 bit 1).
+- **`bk@`** — Read the next received byte from $FF42 (check bk? first).
+- **`bk!`** — Send one byte by writing it to $FF42.
+- **`bk-type`** — Send a buffer (addr len) byte by byte. *(has DO/LOOP)*
+
+| Word | Stack | Kind | Bytes | Cycles |
+|------|-------|------|-------|--------|
+| `bk?` | `( -- flag )` | colon | 14 | 182 |
+| `bk@` | `( -- c )` | colon | 10 | 112 |
+| `bk!` | `( c -- )` | colon | 10 | 115 |
+| `bk-type` | `( addr len -- )` | colon | 34 | 647 |
+
+---
+
 ## `bye.fs`
 
 Clean program exit
@@ -166,6 +190,30 @@ CG mode text rendering (2 bits/pixel)
 | `expand-hi` | `( byte -- cg-byte )` | colon | 16 | 250 |
 | `expand-lo` | `( byte -- cg-byte )` | colon | 24 | 280 |
 | `cg-char` | `( char cx cy -- )` | colon | 108 | 3432 |
+
+---
+
+## `console.fs`
+
+Scrolling text console with MC6847T1 true lowercase
+
+**Provides:** lower-on, lower-off, con-emit, con-type, con-cls
+
+**Requires:** kernel symbols SCREEN, NSCR, VAR_CUR
+
+- **`lower-on`** — Enable MC6847T1 true lowercase by setting PIA1 $FF22 bit 4 (GM0).
+- **`lower-off`** — Return to the standard 6847 character set by clearing $FF22 bit 4.
+- **`con-emit`** — Print one character with T1 lowercase; handles CR, BS and CLEAR, scrolls past the bottom row. *(loop: ~53cy/iter, loop: ~66cy/iter, loop: ~13cy/iter, loop: ~18cy/iter, loop: ~13cy/iter)*
+- **`con-type`** — Print a string (addr len) through con-emit. *(has DO/LOOP)*
+- **`con-cls`** — Clear the text screen and home the cursor.
+
+| Word | Stack | Kind | Bytes | Cycles |
+|------|-------|------|-------|--------|
+| `lower-on` | `( -- )` | colon | 22 | 248 |
+| `lower-off` | `( -- )` | colon | 22 | 248 |
+| `con-emit` | `( c -- )` | CODE |  | 250 |
+| `con-type` | `( addr len -- )` | colon | 34 | 782 |
+| `con-cls` | `( -- )` | colon | 10 | 330 |
 
 ---
 
@@ -422,8 +470,8 @@ RG mode text rendering (1 bit/pixel)
 |------|-------|------|-------|--------|
 | `cv` |  | var | 4 |  |
 | `cb` |  | var | 4 |  |
-| `rg-char` | `( char cx cy -- )` | colon | 70 | 2195 |
-| `rg-type` | `( addr len cx cy -- )` | colon | 44 | 2914 |
+| `rg-char` | `( char cx cy -- )` | colon | 78 | 2297 |
+| `rg-type` | `( addr len cx cy -- )` | colon | 44 | 3016 |
 
 ---
 

@@ -11,6 +11,14 @@ Motorola 6809 CPU. Write Forth on a modern machine, cross-compile with
 > kernel changes. See `src/sound-async`, `proposals/SOUND_ENGINE_PROPOSAL.md`,
 > and `proposals/hsync_polling_budget_chart.html`.
 
+> **Also new: a CoCo terminal for Claude Code.** `src/terminal` is a Forth
+> terminal that talks to Claude Code on the Mac over XRoar's Becker port.
+> `lib/console.fs` adds a scrolling console with true lowercase for the
+> CoCo 2B's MC6847T1, and `lib/becker.fs` provides the byte I/O.
+> `tools/cocoterm_bridge.py` runs Claude and reflows its replies to 32
+> columns, and `tools/cocoterm_mcp.py` gives Claude `peek` and `poke` tools
+> for live CoCo memory, which it used to draw `src/vader`.
+
 ## Architecture
 
 - **Threading**: Indirect Threaded Code (ITC)
@@ -41,10 +49,16 @@ kernel/                 6809 assembly kernel (lwasm)
 └── README.md           full primitive reference and memory maps (both profiles)
 tools/
 ├── fc.py               Forth cross-compiler
-└── README.md           compiler pipeline docs
+├── cocoterm_bridge.py  Becker-port bridge from the CoCo terminal to Claude Code
+├── cocoterm_mcp.py     peek/poke MCP tools for live CoCo memory
+└── README.md           compiler pipeline and tool docs
 lib/                    shared Forth libraries (.fs)
+├── console.fs          scrolling console with MC6847T1 true lowercase
+└── becker.fs           XRoar Becker port byte I/O
 src/                    demo programs (each with its own Makefile)
-└── hello/              hello world example
+├── hello/              hello world example
+├── terminal/           CoCo terminal for Claude Code
+└── vader/              SG4 art Claude pokes into video RAM
 make/demo.mk            shared per-demo build rules
 PROJECT_SETUP.md        setting up your own project — Makefile, fc.py options,
                         kernel build overrides, common scenarios

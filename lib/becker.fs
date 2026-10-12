@@ -24,10 +24,14 @@
 \ bk!     ( c -- )           send one byte
 \ bk-type ( addr len -- )    send a buffer
 
+\ bk? -- Nonzero if a received byte is waiting ($FF41 bit 1).
 : bk?  ( -- flag )  $FF41 C@ 2 AND ;
+\ bk@ -- Read the next received byte from $FF42 (check bk? first).
 : bk@  ( -- c )     $FF42 C@ ;
+\ bk! -- Send one byte by writing it to $FF42.
 : bk!  ( c -- )     $FF42 C! ;
 
+\ bk-type -- Send a buffer (addr len) byte by byte.
 : bk-type  ( addr len -- )
   DUP IF
     OVER + SWAP DO  I C@ bk!  LOOP
