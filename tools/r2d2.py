@@ -3,6 +3,9 @@
 Each SG4 byte is 1 C C C L3 L2 L1 L0: colour 0-7 plus four quadrant bits
 (L3 upper-left, L2 upper-right, L1 lower-left, L0 lower-right). One colour
 per cell, so the art below is laid out on 2x2 pixel boundaries.
+
+SG4 is the right format for the CoCo terminal: the CoCo 2B's MC6847T1 stays
+in SG4 with lowercase on ($FF22 bit 4), it has no SG6 (#573).
 """
 
 ART = """

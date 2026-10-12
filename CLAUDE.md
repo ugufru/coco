@@ -277,6 +277,12 @@ Byte layout is `1 C C C L3 L2 L1 L0`:
 - One colour per cell. Art has to land on 2x2 boundaries; a detail cannot
   straddle a cell edge in a different colour.
 - Whole screen is 64x32 pixels. Bases: `$C0` buff, `$A0` blue, `$B0` red.
+- It really is SG4, not SG6 (#573, measured 2026-10-12). `lower-on` sets
+  `$FF22` bit 4, which on a plain 6847 would select SG6, but the CoCo 2B's
+  MC6847T1 uses it for lowercase and has no SG6. Ignore `tools/sg6_*.py`
+  for the terminal. To tell the modes apart, never probe with solid blocks
+  (`$BF`/`$FF` look the same in both); use `$8C` (SG4 = top half lit, SG6 =
+  middle third lit).
 - Worked examples: `src/vader/`, and `tools/r2d2.py` (art grid -> poke hex).
 
 ### Known limits (open issues)

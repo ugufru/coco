@@ -1,5 +1,13 @@
 """Death Star in SG6 semigraphics, poke-ready for the CoCo terminal (#573).
 
+CORRECTION (2026-10-12, #573): the red/orange palette below came from a
+flawed probe that used solid blocks, which look the same in SG4 and SG6.
+The CoCo terminal runs on the CoCo 2B's MC6847T1, which has no SG6: with
+lowercase on it stays in SG4, so these bytes come out scrambled there.
+This script is only right on a plain-6847 CoCo with $FF22 bit 4 set, and
+there bit 6 gives blue/red (CSS=0) or magenta/orange (CSS=1), not
+red/orange. See coco-guides/vdg-modes.md, Semigraphics-6.
+
 SG6 byte is 1 C1 L5 L4 L3 L2 L1 L0: a 2 wide x 3 tall cell, one colour bit.
 C1=1 orange, C1=0 red (measured 2026-09-17; CSS makes no difference).
 

@@ -1,5 +1,13 @@
 """Pittsburgh's three rivers in SG6 semigraphics, for the CoCo terminal (#573).
 
+CORRECTION (2026-10-12, #573): the red/orange palette below came from a
+flawed probe that used solid blocks, which look the same in SG4 and SG6.
+The CoCo terminal runs on the CoCo 2B's MC6847T1, which has no SG6: with
+lowercase on it stays in SG4, so these bytes come out scrambled there.
+This script is only right on a plain-6847 CoCo with $FF22 bit 4 set, and
+there bit 6 gives blue/red (CSS=0) or magenta/orange (CSS=1), not
+red/orange. See coco-guides/vdg-modes.md, Semigraphics-6.
+
 The Point is where the Allegheny (from the north east) and the Monongahela
 (from the south east) meet to form the Ohio (heading west). Rivers are red,
 the Golden Triangle downtown is orange, everything else is black.
