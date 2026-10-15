@@ -12,7 +12,8 @@
 \ the bottom). $FF41 is also the Becker port: no Becker cart alongside.
 \
 \ Songs are byte streams built on the host by
-\ src/sound-sn76489/sn76489.py, which documents the format:
+\ src/sound-sn76489/sn76489.py and midi2sng.py. The format is specified in
+\ src/sound-sn76489/SNG-FORMAT.md; in short:
 \   $00        end of song
 \   $01-$7F    wait that many frames
 \   $E8 $E9    mark / repeat-once

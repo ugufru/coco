@@ -18,7 +18,9 @@ make run          # builds, then xroar ... -cart gmc -run badinerie.bin
 | File | Role |
 |------|------|
 | `badinerie.py` | The hand transcription (flute, inner line, bass) and the drum pattern |
-| `sn76489.py`   | Score text to SN76489 byte stream; the format is documented at the top |
+| `sn76489.py`   | Score text to SN76489 byte stream |
+| `midi2sng.py`  | MIDI file to the same stream (`make songs` converts `midi/*.mid`) |
+| `SNG-FORMAT.md` | The song stream (.SNG) format spec |
 | `badinerie.fs` | The demo: banner, play-again prompt, and the song spliced in with `DATA[PY` |
 | `../../lib/sn76489.fs` | Chip words (`sn!`, `sn-tone`, `sn-vol`, `cart-audio`, ...) and the player (`sn-play`, or `sn-start` + `sn-frame` per vsync) (#581) |
 

@@ -12,7 +12,8 @@ spaces:
 
 Durations are note values: 1 2 4 8 16 32, with an optional dot.
 
-The stream the player (badinerie.fs) walks is a run of bytes:
+The stream the player (lib/sn76489.fs) walks is a run of bytes. The full
+spec, with a worked example, is SNG-FORMAT.md next to this file:
 
     $00          end of song
     $01-$7F      wait this many frames (60 Hz) before reading on
