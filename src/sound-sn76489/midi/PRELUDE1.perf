@@ -1,0 +1,62 @@
+# Prelude No. 1 in C major, Well-Tempered Clavier I, BWV 846 (J. S. Bach)
+#
+# Character: one broken-chord figure, the same in every bar, through a
+# slow-moving chord progression. There is no melody to bring out: the
+# music is the harmony, one chord per bar, so the shaping follows the
+# tension and release of the chords, quiet and unhurried.
+#
+# Time signature and bars: 4/4, 35 bars, as in the Bach-Gesellschaft
+# text and this Mutopia edition (no Schwencke bar between 22 and 23).
+# Bar numbers match the score and the MIDI.
+#
+# Tempo: quarter = 64. 35 bars is 140 quarters (the last bar held). From
+# catalogue listings: Michael Houstoun 2:17 (about 61), Robert Silverman
+# 2:27 (about 57), Daniel Barenboim (2006) 1:40 (about 84). Two listings
+# credited to Glenn Gould give 2:22 and 2:24 (about 58), but I could not
+# confirm which Gould recording they are, and I found no confirmed
+# per-prelude timings for Schiff, Hewitt, Richter, Tureck, Gulda,
+# Leonhardt or Gilbert. 64 sits a little above the measured piano middle
+# (57 to 61): the chip plucks like a harpsichord, and the figure should
+# flow, not drag.
+#
+# Structure (harmony, bar by bar):
+#   1-4    C: I, ii 4/2, V 6/5, I. The tonic stated.
+#   5-11   outward to G: A minor (5), D7 over C (6), G (7), and a
+#          cadence in G major at 11.
+#   12-19  back home by a descending, chromatic bass: diminished chords
+#          (12, 14), D minor, F, to the cadence in C at 19.
+#   20-23  C7 (20) opens a last push: F major 7 (21), then diminished
+#          sevenths on F sharp (22) and G sharp (23), the darkest point.
+#   24-31  the dominant pedal on G: G7, 6/4 chords, a diminished seventh
+#          over the pedal at 28, rising tension held over the low G.
+#   32-35  the tonic pedal on C: C7 (32), the figure changes (33-34) and
+#          the final C major chord (35).
+#
+# Voicing: every note of the figure starts as the highest sounding pitch
+# (the held bass and tenor start first, then each sixteenth lies above
+# them), so the converter ranks almost every note "top" and voice
+# balance cannot separate the lines here. The terraces below do the work,
+# with a light accent on each bar's first note, the bass, which carries
+# the change of harmony.
+#
+# Range: the chip's lowest note is about B2, so the low bass of bars 18
+# and 21-35 (G2, F2, F sharp 2, G sharp 2, C2) is lifted an octave. The
+# dominant and tonic pedals therefore sound at G3 and C3, inside the
+# texture rather than under it; the terraces have to carry the weight
+# the low pedal would give on a keyboard.
+
+tempo 64
+
+accent 1          # the bass on each downbeat: the new chord, felt
+
+dyn 1 mp          # bars 1-4: the tonic stated, quietly
+dyn 5 mf          # bars 5-11: opening out toward G
+dyn 12 mp         # bars 12-19: the chromatic way back to C, darker
+dyn 20 mf         # bars 20-23: C7 and the diminished chords, tension
+ramp 24-31 f      # bars 24-31: the dominant pedal, the one long build
+dyn 32 mp         # bars 32-35: the tonic pedal, release
+
+broaden 11 0.95   # into the cadence in G
+broaden 19 0.95   # into the cadence in C
+
+rit 3 0.7         # bars 33-35: the closing figure and the final chord

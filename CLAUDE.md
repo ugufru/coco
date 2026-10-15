@@ -292,6 +292,19 @@ Byte layout is `1 C C C L3 L2 L1 L0`:
 - Needs a T1 VDG for lowercase (`coco2bus`). Plain MC6847 shows inverse garbage.
 - Console lives in `lib/console.fs`, not the kernel; ROM kernel has ~125 B free (#561).
 
+## Music library (SN76489 songs)
+- Every song added to the library ships with a researched performance:
+  tempo from respected recordings, structure read from the score, and
+  terraced dynamics, voicing and timing shaped from that, with the
+  reasons in comments. User direction 2026-10-15 (#614): "every song we
+  add to the project needs to give the piece the respect it deserves".
+- MIDI imports: `src/sound-sn76489/midi/NAME.perf` beside `NAME.mid`;
+  the Badinerie: `src/sound-sn76489/badinerie.perf`. Format and
+  principles: `src/sound-sn76489/PERFORMANCE.md`. `midi2sng.py` refuses
+  a song without one (`--draft` only for trying an import out).
+- Public Domain sources only (record them in `midi/SOURCES.md`); Mutopia
+  editions under CC BY-SA are skipped.
+
 ## XRoar Setup
 - Machine: `coco2bus` (CoCo 2, NTSC)
 - ROMs: `~/.xroar/roms/bas12.rom` + `~/.xroar/roms/extbas11.rom`
@@ -372,6 +385,8 @@ Branch on flags first, then load result.
   `tell application "System Events"` / `set frontmost of process "xroar" to true`
   / `key down "y"` / `delay 0.2` / `key up "y"`. Wait ~3 s after launch first.
 - Screen captures right after launch are often blank green; capture again.
+- Paul often presses keys in XRoar while Claude is testing. A key the
+  program saw that Claude did not send is Paul, not a phantom or a bug.
 
 ## ASCII → VDG Encoding
 `screen_byte = $40 | (ascii & $3F)`

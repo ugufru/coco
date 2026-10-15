@@ -1,0 +1,57 @@
+# Badinerie, Orchestral Suite No. 2 in B minor, BWV 1067 (J. S. Bach)
+#
+# Character: the suite's last movement, a quick, playful dance in 2/4
+# ("badinerie": a jest) for solo flute over strings. Running sixteenths
+# in the flute, violin II and continuo in light eighths beneath. It must
+# sparkle and keep a steady motor pulse; it is not a race.
+#
+# Bars as performed: A A B B written out (badinerie.py performed()), with
+# a quarter-note upbeat, numbered straight through:
+#   A first pass  bars 1-15     A repeat  bars 17-31
+#   B first pass  bars 33-55    B repeat  bars 57-79
+#   bars 16, 32 and 56 hold one half's closing beat and the next upbeat;
+#   bar 80 is the final closing quarter.
+# Score bar Ax is performed bar x (first pass) and 16+x (repeat); score
+# bar Bx is 32+x (first pass) and 56+x (repeat).
+#
+# Tempo: quarter = 112. Performed with both repeats it is 160 quarters.
+# One download listing of Pinnock and the English Concert gives 1:32, and
+# Last.fm lists 1:30 for an unnamed recording, both about quarter = 105.
+# Many period-instrument readings and flautists (Pahud, Rampal, Kuijken,
+# Il Giardino Armonico, Freiburger Barockorchester) are often taken
+# faster, but I could not confirm their timings. 112 is a little quicker
+# than Pinnock and keeps every sixteenth clear on the chip (8 frames
+# each, the thirty-seconds in B17-B18 and B22 still 4).
+#
+# Structure (score bars; Bach-Gesellschaft vol. 31, as transcribed):
+#   A1-A6    B minor, the theme: falling arpeggios
+#   A7-A9    sequence in eighths
+#   A10-A15  to F sharp minor, sixteenth figures; cadence at the end of A
+#   B1-B5    the theme in F sharp minor, then through E minor
+#   B6-B12   sixteenth runs to a cadence in D major (B12)
+#   B13-B16  sequence back toward B minor
+#   B17-B19  over an E pedal, with C natural (B19)
+#   B20-B23  the final cadence in B minor
+#
+# Plan: as on a harpsichord with two manuals, or as period bands often
+# do, each half is played full the first time and echoed softer on the
+# repeat. In the B repeat the full sound returns at the E pedal (B17,
+# bar 73) for the close. The drums follow these levels automatically.
+
+pickup 4
+
+tempo 112
+
+voice top 0       # the flute leads throughout
+voice mid 3       # violin II, the inner filler, well back
+voice bottom 2    # the continuo between the two
+
+dyn 1 f           # bars 1-16.5: A, first time, full
+dyn 16.5 mp       # bars 16.5-32.5: A repeat (from its upbeat), an echo
+dyn 32.5 f        # bars 32.5-56.5: B, first time, full
+dyn 56.5 mp       # bars 56.5-72: B repeat, an echo
+dyn 73 f          # bars 73-80: B17 on, the E pedal and the final
+                  # cadence, full again to close
+
+rit 2 0.85        # from the middle of bar 78: a modest final broadening
+                  # into the last cadence and the closing quarter

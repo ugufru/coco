@@ -1,0 +1,47 @@
+# Sinfonia 12 in A major, BWV 798 (4/4, 31 bars)
+#
+# Character: bright, open and cheerful. A short subject (a turn around
+# the tonic, then a leap and running sixteenths) answered cleanly in
+# each voice; two long sequential episodes of falling suspensions over
+# a broken-chord bass. Light, even, never rushed.
+#
+# Tempo: quarter = 84, about 1:30.
+# Basis: Andras Schiff (ECM, clavichord) 1:29, about 84; Angela Hewitt
+# (Hyperion, 1994) 1:23, about 90; Glenn Gould (1964) 1:16, about 98.
+# Taken at the steadier end so the sixteenths stay clear on the chip.
+# Durations from retailer and artist track lists, so approximate.
+#
+# Structure (from the Mutopia score):
+#   1-2    Subject in the top, A major, over a walking eighth-note bass.
+#   3-4    Answer in the mid, in E major.
+#   5-6    Subject in the bass, A major.
+#   7-9    Cadence in E major, bar 9.
+#   9-13   Episode: suspensions falling by step in top and mid over a
+#          broken-chord bass; C-sharp held in the bass at 13.
+#   14-16  Subject in the bass in F-sharp minor (15), cadence there, 16.
+#   16-20  Rising bass, then an E pedal (18-20).
+#   20-23  Second episode, like 9-13, turning through D major.
+#   24-27  Return: subject in the bass in A major (24), then in the top
+#          (25, second half).
+#   28-31  E pedal in the bass (28-30), final cadence in A major.
+
+tempo 84 4
+
+dyn 1 mf              # bars 1-8: exposition
+lead 1-2 top          # bars 1-2: subject in the top
+lead 3-4 mid          # bars 3-4: answer in the mid, in E major
+lead 5-6 bottom       # bars 5-6: subject in the bass
+
+dyn 9 mp              # bars 9-14: first episode after the E major cadence, a lighter manual
+
+dyn 15 mf             # bars 15-19: subject in the bass, F-sharp minor
+lead 15-16 bottom     # bars 15-16: bring that bass entry forward
+ramp 16-19 f          # bars 16-19: rising bass into the E pedal
+
+dyn 20 mp             # bars 20-23: second episode, an echo of the first
+
+dyn 24 f              # bars 24-31: the subject returns in the home key
+lead 24-25 bottom     # bars 24-25: subject in the bass, A major
+lead 25.5-26 top      # bars 25-26: subject in the top, from the middle of bar 25
+
+rit 2 0.75            # last 2 bars into the final cadence

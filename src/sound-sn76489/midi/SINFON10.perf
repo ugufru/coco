@@ -1,0 +1,42 @@
+# Sinfonia No. 10 in G major, BWV 796 (J. S. Bach)
+#
+# Character: bright and buoyant 3/4. The subject starts with a dotted
+# figure (G, F#) and runs off in sixteenths, first over a bass in plain
+# quarter notes (G B G, C D D). Mostly long sequences of running
+# sixteenths, so the pulse must stay even.
+#
+# Tempo: quarter = 80. 33 bars of 3/4 is 99 quarters. Leonhardt
+# (harpsichord) takes 1:17, about 77 to the quarter; Schiff (Decca) 1:05,
+# about 91. 80 is close to Leonhardt, so the sixteenths stay clean.
+#
+# Structure (bars as in the MIDI and score):
+#   1-2    subject in the soprano, G major
+#   3-4    alto answers in D
+#   5      cadence in D major; bars 5-6 a two-voice run (bass silent)
+#   7-8    subject in the bass, G major; 8-10 bass sequence
+#   11     cadence in E minor
+#   12-15  A minor episode
+#   16-19  falling sequence: soprano sixteenths, alto broken chords,
+#          bass in tied half notes A, G, F#, E
+#   22     cadence in B minor
+#   23-25  through A minor
+#   26     arrival back in G; subject (its sixteenth run) in the alto 26-27
+#   27-30  falling sequence of suspensions in the soprano
+#   31-32  subject's run in the soprano, final cadence in G (33)
+
+tempo 80
+
+dyn 1 mf          # bars 1-4: exposition, bright
+dyn 5 mp          # bars 5-6: two voices only, an echo
+dyn 7 mf          # bars 7-10: full texture, subject in the bass
+dyn 11 mp         # bars 11-25: after the E minor cadence, the minor-key
+                  # middle section
+dyn 26 mf         # bars 26-33: back home in G for the last section
+
+lead 1-2 top      # bars 1-2: soprano subject
+lead 3-4 mid      # bars 3-4: alto answer
+lead 7-8 bottom   # bars 7-8: bass subject
+lead 26-27 mid    # bars 26-27: alto, the return to G
+lead 31-32 top    # bars 31-32: soprano, final statement
+
+rit 2 0.7         # bars 32-33: final cadence

@@ -1,0 +1,56 @@
+# Sinfonia No. 7 in E minor, BWV 793 (J. S. Bach)
+#
+# Character: grave and singing, a slow 3/4 in E minor. The subject rises
+# a fourth and holds (B E F# G, tied), then falls back in eighths; the
+# bass answers it with a steady stepping counterline. Later passages run
+# in sixteenths, but the pulse stays a calm three.
+#
+# Tempo: quarter = 54. 44 bars of 3/4 is 132 quarters. Leonhardt
+# (harpsichord) takes 2:31, about 52 to the quarter; Schiff (Decca) 2:10,
+# about 61. Gould's 1964 track is listed at 1:33 (about 85), much quicker
+# than the others and not used. 54 is close to Leonhardt: slow enough to
+# sing, not so slow that the held notes die away on the chip.
+#
+# Structure (bars as in the MIDI and score, which agree):
+#   1-2    subject in the soprano, E minor
+#   3-4    alto answers, B minor
+#   5-6    soprano again, head of the subject
+#   7-8    bass (in a high register), E minor
+#   9-13   episode; cadence in B minor at 14
+#   14-15  subject in the alto, bass in running sixteenths
+#   16-17  soprano, B minor; cadence in B minor at 19
+#   19-24  falling sequence, sixteenths in the upper voices then the bass
+#   25     cadence in D major; subject in the soprano (25-26)
+#   27-30  bass entries in D major (27-28) and B minor (29-30)
+#   31-36  alto entries in a modulating sequence (31, 33, 35) under
+#          soprano sixteenths, through A minor
+#   37-38  return: subject in the soprano in E minor
+#   39-41  bass sixteenths fall while the soprano climbs to the high C
+#          in bar 41, the peak of the piece
+#   42-44  dominant pedal on B (42), final cadence, E major chord (44)
+
+tempo 54
+
+dyn 1 mp          # bars 1-13: the exposition, a quiet singing level
+dyn 14 p          # bars 14-24: after the B minor cadence the soprano
+                  # drops out, alto and running bass alone, softer
+dyn 25 mf         # bars 25-30: D major, the brightest key of the piece
+dyn 31 mp         # bars 31-36: minor-key sequence, held back again
+dyn 37 mf         # bars 37-44: the return of the subject in E minor,
+                  # carried through the climb to bar 41
+broaden 43 0.85   # bar 43: the cadential trill, before the final rit
+
+lead 1-2 top      # bars 1-2: soprano subject
+lead 3-4 mid      # bars 3-4: alto answer in B minor
+lead 5-6 top      # bars 5-6: soprano
+lead 7-8 bottom   # bars 7-8: bass
+lead 14-15 top    # bars 14-15: alto subject; the soprano is silent,
+                  # so the alto ranks as the top voice here
+lead 16-17 top    # bars 16-17: soprano, B minor
+lead 25-26 top    # bars 25-26: soprano, D major
+lead 27-28 bottom # bars 27-28: bass, D major
+lead 29-30 bottom # bars 29-30: bass, B minor
+lead 31-32 mid    # bars 31-32: alto, start of the sequence
+lead 37-38 top    # bars 37-38: soprano, the return
+
+rit 2 0.7         # bars 43-44: final cadence and the E major chord

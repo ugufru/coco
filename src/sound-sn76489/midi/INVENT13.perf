@@ -1,0 +1,61 @@
+# Invention No. 13 in A minor, BWV 784 (J. S. Bach)
+#
+# Character: restless and lyrical at once, built on a broken-chord
+# subject: half a bar of sixteenths (after a sixteenth rest, an A minor
+# arpeggio with a turn) and half a bar of leaping eighths. The two hands
+# trade it every half bar, so the music never stops moving. It wants a
+# flowing, singing tempo, with weight on the harmony that changes each
+# half bar.
+#
+# Time signature: 4/4, 25 bars in the Mutopia score and in the MIDI;
+# the first note (the bass A) is on the downbeat of bar 1.
+#
+# Tempo: quarter = 76, 100 quarters, about 1:19.
+# Track times (approximate): Gustav Leonhardt (harpsichord, Apple Music
+# reissue) 1:19, about 76; Andras Schiff (ECM, clavichord) 1:22, about
+# 73; Angela Hewitt (Hyperion) 1:10, about 86; Glenn Gould (Sony, 1964)
+# 0:45, about 133, a fast, detached outlier not followed. 76 is
+# Leonhardt's tempo, between Schiff and Hewitt.
+#
+# Structure (read from the Mutopia score and checked against the MIDI;
+# the last return of the subject at 18, the coda and the Neapolitan in
+# bar 23 follow the teoria.com analysis (Jose Rodriguez Alvira); the
+# division into two halves with two subject statements in the first
+# follows the Japanese Piano Encyclopedia (PTNA) entry):
+#   1-2    Subject in the top on each first half bar, in the bass on
+#          each second half (the two hands alternate), A minor.
+#   3-6    Sequence by falling fifths on the inverted figure, cadence in
+#          C major at bar 6, beat 3.
+#   7-8    Subject in C major, alternating as in bars 1-2.
+#   9-12   Sequence by falling fifths, toward E minor.
+#   13     Cadence in E minor (end of the first half).
+#   14-17  Second half: diminished-seventh arpeggios in the top over
+#          leaping bass eighths, with a bass echo at each bar end,
+#          falling by step (D minor, C, toward A minor).
+#   18     Subject returns in A minor, top, then bass (its last full
+#          return, as in bar 1).
+#   19-21  Sequence over a falling bass, on the dominant (E) in 20.
+#   22     The hands cross: the bass plays its arpeggio above the top,
+#          then the top has the subject once more (second half).
+#   23-25  Coda: a rising chromatic bass, a Neapolitan B-flat (23),
+#          final cadence in A minor with a fermata, no Picardy third.
+
+tempo 76
+
+voice mid 0          # two voices only: there is no middle voice to set back
+
+# No lead marks in bars 1-2, 7-8 and 18: the subject changes hands every
+# half bar there, and a lead mark lasts at least a bar, so it would lift
+# the wrong voice half the time. Even balance is right. Bar 22 has the
+# hands crossed, so it is left alone too.
+
+dyn 1 mf             # bars 1-6: exposition, up to the C major cadence
+dyn 7 mp             # bars 7-8: the subject again in C major, an echo
+dyn 9 mf             # bars 9-13: sequence to the E minor cadence
+ramp 14-17 f         # bars 14-17: the diminished-seventh descent, the
+                     # one long build, into the return
+                     # (bars 18-25 stay at f to the end)
+lead 23 bottom       # bar 23: the rising chromatic bass into the
+                     # Neapolitan B-flat
+
+rit 1.5 0.7          # from the middle of bar 24 into the final fermata

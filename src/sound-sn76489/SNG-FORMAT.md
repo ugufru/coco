@@ -5,15 +5,47 @@ cartridge, and the CoCo Zero's built-in chip), stored as a timed list of
 chip commands. This is the format `lib/sn76489.fs` plays, `sn76489.py`
 and `midi2sng.py` write, and `src/jukebox` loads from disk (#597).
 
-Version: 1 (the only one so far). The file has no version mark.
+Version: 2. A v2 file is a v1 stream with a short header in front
+(title, composer, length); a v1 file has no header and no version mark.
+Players read both (#600).
 
 ## At a glance
 
-- A flat stream of bytes. No header, no length field, no checksum.
+- A flat stream of bytes, with an optional header (v2) for the title,
+  composer and length. No checksum.
 - The player reads it one 60 Hz video frame at a time.
 - Each byte is either a **wait**, a **chip command**, or one of two
   **repeat markers**, and `$00` ends the song.
 - It contains no addresses, so a song can be loaded anywhere in memory.
+
+## The v2 header
+
+A v2 file starts with `$EA`, a byte reserved in v1 and so never the
+first byte of a v1 file:
+
+| Offset | Size | Meaning |
+|--------|------|---------|
+| 0 | 1 | `$EA`: this file has a header |
+| 1 | 1 | header version, 2 |
+| 2 | 2 | length in frames, big-endian, unsigned, repeats included (up to about 18 minutes) |
+| 4 | 1+n | title: a length byte, then n printable ASCII characters (n up to 63) |
+| | 1+m | composer: the same, may be empty |
+| | | the v1 stream follows |
+
+`sn-start` skips the header, so a v2 song plays anywhere a v1 song does.
+`lib/sn76489.fs` reads it with `sng-v2?`, `sng-frames`, `sng-title`,
+`sng-composer` and `sng-body`. The tools work the length out by walking
+the stream (`sn76489.frames()`), so it always matches what plays.
+
+Real start of `AIR.SNG`:
+
+```
+EA 02               v2 header
+1E 9F               7839 frames: 130.7 s
+29 "Air from Orchestral Suite No. 3, BWV 1068"
+0A "J. S. Bach"
+89 0A ...           the stream
+```
 
 ## Byte codes
 
@@ -42,7 +74,7 @@ Command bytes use the chip's own register encoding:
 | `$80-$8F` `$A0-$AF` `$C0-$CF` | tone, channel 0 / 1 / 2 | low 4 bits of the divider; **the next byte** (`$00-$3F`) holds the top 6 bits | sends both bytes to the chip |
 | `$E0-$E7` | noise control | bit 2: 1 white, 0 periodic. Bits 1-0: rate 0 = N/512, 1 = N/1024, 2 = N/2048, 3 = follow tone channel 2 | sends it to the chip |
 | `$90-$9F` `$B0-$BF` `$D0-$DF` `$F0-$FF` | volume, channel 0 / 1 / 2 / 3 | attenuation, 0 loudest to 15 off, 2 dB a step | **does not** send it; sets that channel's envelope level (see below) |
-| `$EA-$EF` | (reserved) | | sent to the chip as noise control; don't use |
+| `$EA-$EF` | (reserved) | | `$EA` as the first byte of a file marks the v2 header; anywhere in the stream these are sent to the chip as noise control, so don't use them |
 
 ### Pitch
 
@@ -89,8 +121,10 @@ explicit `$FF`.
 
 ## Timing
 
-- The player calls `sn-frame` once per 60 Hz frame (`sn-play` does this
-  on vsync).
+- The player steps once per 60 Hz frame: `sn-frame` called on vsync
+  (`sn-play` does this), or the field-sync interrupt handler that
+  `sn-irq-on` installs, which keeps the steps even however busy the
+  program is (#604).
 - On a frame where the wait has run out, the player handles every
   command up to the next wait byte. All the commands between two waits
   take effect on the same frame.
@@ -143,14 +177,14 @@ end so the last notes can ring out.
 
 ## A worked example
 
-The first bytes of `BADINERI.SNG`:
+The first bytes of the stream in `BADINERI.SNG`, after its header
+(`EA 02 14 42`: 5186 frames, 86.4 s, then the title and composer):
 
 ```
-E8                  mark: the first half repeats
 8F 07               ch0 tone N = $07F (127)   984 Hz, B5 (flute)
 91                  ch0 volume 1
 A9 0A               ch1 tone N = $0A9 (169)   740 Hz, F#5 (violin)
-B5                  ch1 volume 5
+B4                  ch1 volume 4
 C4 3F               ch2 tone N = $3F4 (1012)  123 Hz, B2 (bass)
 D3                  ch2 volume 3
 0F                  wait 15 frames
@@ -161,12 +195,14 @@ D3                  ch2 volume 3
 ...
 ```
 
-and the last bytes:
+The volumes come from its performance file (`badinerie.perf`): the
+flute forward, violin II three steps back, the bass two. Its repeats are
+written out rather than marked with `$E8`/`$E9`, so the second time
+through each half can be played as an echo. The last bytes:
 
 ```
 9F BF DF            all three tone channels off
 01                  wait 1 frame
-E9                  repeat: play the second half again
 20                  wait 32 frames to let it ring
 00                  end
 ```
@@ -174,20 +210,21 @@ E9                  repeat: play the second half again
 ## Making and playing songs
 
 - `sn76489.py`: `parse()` reads a hand-written text score (one string per
-  voice, e.g. `b5:16 f#5 d5:8.`), and `stream()` builds the bytes. See
-  `badinerie.py` for a full score.
-- `midi2sng.py in.mid out.sng [--speed X] [--transpose N]`: converts a
-  Standard MIDI File, putting notes on the three tone channels.
-  `make songs` converts everything in `midi/`.
+  voice, e.g. `b5:16 f#5 d5:8.`), `stream()` builds the bytes and
+  `header()` adds the v2 header. See `badinerie.py` for a full score.
+- `midi2sng.py in.mid out.sng [--speed X] [--transpose N] [--title T]
+  [--composer C]`: converts a Standard MIDI File, putting notes on the
+  three tone channels, and writes the v2 header. Titles come from
+  `midi/TITLES.txt` by file name. `make songs` converts everything in
+  `midi/`.
 - `lib/sn76489.fs`: `addr sn-play ( -- brk? )` plays a song to the end,
-  or call `addr sn-start`, then `sn-frame` once per frame.
+  or call `addr sn-start`, then `sn-frame` once per frame. `n sn-skip`
+  jumps ahead n frames without playing them (for seeking), and
+  `sn-atten` is a master volume.
 
-## Known limits (ideas for a version 2)
+## Known limits (ideas for a version 3)
 
-- No title: the menu shows the 8.3 file name.
 - No envelope settings in the file: every song uses the player's
-  tables, so held notes (the Air) pluck when they should sustain.
+  tables, so held notes (the Air) pluck when they should sustain. A
+  later header version could carry them.
 - Pitch stops at B2, and tempo is quantised to 60 Hz frames.
-- No version mark. A v2 should start with a byte no v1 file starts
-  with, such as one of the reserved `$EA-$EF`, so a player can tell the
-  two apart.

@@ -1,0 +1,49 @@
+# Sinfonia 14 in B-flat major, BWV 800 (4/4, 24 bars)
+#
+# Character: warm, lyrical and ornate. A short subject (a held note,
+# a falling sixteenth turn, a dotted-sounding cadence figure) treated in
+# close imitation, with florid sixteenth and thirty-second lines. Calm,
+# singing, unhurried.
+#
+# Tempo: quarter = 72, about 1:20.
+# Basis: Angela Hewitt (Hyperion, 1994) 1:18, about 74; Andras Schiff
+# (ECM, clavichord) 1:18, about 74; Glenn Gould (1964) 1:09, about 83.
+# A touch under Hewitt and Schiff for the thirty-seconds in bar 23.
+# Durations from retailer and artist track lists, so approximate.
+#
+# Structure (from the Mutopia score):
+#   1      Subject in the mid, B-flat major, over a walking bass.
+#   2      Answer in the top, on F.
+#   4      Subject in the bass, B-flat major; falling sequence in 5.
+#   7      Arrival back on B-flat; subject in the mid turning to
+#          G minor (7), answer in the top in C minor (8).
+#   10     Cadence in C minor; subject in the bass (10).
+#   12-14  Subject in the top toward D minor; cadence in D minor, 14.
+#   14-19  Episode through G minor, C minor and E-flat.
+#   20-21  Return to B-flat: subject in the mid (20) and in the top
+#          (20, second half), close together.
+#   22-24  Closing bars over a broken bass; florid run in 23; final
+#          cadence in B-flat major.
+# The cadence points in 7, 10, 14 and 20 are my reading of the score;
+# I found no published analysis to confirm them.
+
+tempo 72 4
+
+dyn 1 mp              # bars 1-6: exposition, quiet and singing
+lead 1 mid            # bar 1: subject in the mid
+lead 2 top            # bar 2: answer in the top, on F
+lead 4 bottom         # bar 4: subject in the bass
+
+dyn 7 mf              # bars 7-14: after the return to B-flat, entries toward the minor keys
+lead 7 mid            # bar 7: subject in the mid, turning to G minor
+lead 8 top            # bar 8: answer in the top, C minor
+lead 10 bottom        # bar 10: subject in the bass after the C minor cadence
+lead 12 top           # bar 12: subject in the top, toward D minor
+
+dyn 15 mp             # bars 15-19: episode after the D minor cadence, a softer manual
+
+dyn 20 f              # bars 20-24: the subject returns in the home key
+lead 20 mid           # bar 20: subject in the mid, B-flat
+lead 20.5-21 top      # bars 20-21: subject in the top, from the middle of bar 20
+
+rit 2 0.7             # last 2 bars: the florid run and the final chord

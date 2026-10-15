@@ -1,0 +1,80 @@
+# Invention No. 4 in D minor, BWV 775 (J. S. Bach)
+#
+# Character: a taut, energetic perpetuum mobile in 3/8, felt one beat
+# to the bar. The subject is one bar of rising D minor scale (D to B-flat)
+# and a bar that drops a diminished seventh to C-sharp and runs back down;
+# it answers itself in canon at the octave, over plain broken-chord
+# eighths. It wants a steady, dancing pulse in one, never rushed.
+#
+# Time signature: 3/8, 52 bars in the Mutopia score and in the MIDI;
+# the first note falls on the downbeat of bar 1, so bar numbers match.
+#
+# Tempo: dotted quarter = 60 (eighth = 180), about 52 seconds.
+# Track times (approximate, they include a little silence):
+# Glenn Gould (Sony, 1964) 0:47, about 66 bars a minute; Angela Hewitt
+# (Hyperion) 0:45, about 69; Andras Schiff (ECM, clavichord) 0:45,
+# about 69. Gustav Leonhardt (harpsichord, Apple Music reissue) lists
+# 1:18, about 40, a slow outlier. 60 sits a little under the pianists
+# so the sixteenths stay clean on the chip and the music does not
+# hurry, but keeps the one-in-a-bar swing.
+#
+# Structure (read from the Mutopia score and checked against the MIDI;
+# the cadences at 17, 37, 48 and 51 and the inversion at 22-25 agree
+# with the Japanese Piano Encyclopedia (PTNA) analysis):
+#   1-2    Subject, top, alone, D minor.
+#   3-4    Subject, bottom, in canon at the octave; top has broken chords.
+#   5-6    Subject, top again, an octave higher.
+#   7-10   Episode: the subject's second bar as a falling sequence in
+#          the top over bass eighths.
+#   11-16  Episode: subject shapes in the bass, falling sequence (on G,
+#          F, C) against the top's figure.
+#   17     Cadence in F major, the relative major.
+#   18-21  Subject in the bass in F (18-19) and again on A (20-21), under
+#          a long trilled C held in the top.
+#   22-25  Episode: the subject's halves in inverted order, top, over a
+#          broken pedal-like bass.
+#   26-27  Subject, top, in A minor.
+#   29-33  Dominant pedal: a long E in the bass, while the top, alone
+#          above it, runs subject sequences (on C 30-31, on E 32-33).
+#   34-37  Imitation in both voices, cadence in A minor at 37-38.
+#   38-39  Subject, bottom, in G minor.
+#   40-41  Subject, top, on G, turning toward D minor.
+#   42-43  Subject, bottom, on F with B and C-sharp, back to D minor.
+#   44-45  Subject, top, D minor: bars 5-6 return.
+#   46-47  Subject, bottom: bars 3-4 return.
+#   48-49  Interrupted (deceptive) cadence, V7 to VI (A to B-flat).
+#   50-52  Final cadence in D minor (51-52), no Picardy third.
+
+tempo 60 4.          # dotted quarter, one beat to the bar, see above
+
+voice mid 0          # two voices only: there is no middle voice to set back
+
+dyn 1 mf             # bars 1-17: exposition up to the F major cadence
+lead 3-4 bottom      # subject, bass, in canon
+lead 5-6 top         # subject, top, an octave higher
+lead 11-16 bottom    # subject shapes in the bass, falling sequence
+                     # (bars 1-2 have the top alone, no lead needed)
+
+dyn 18 mp            # bars 18-25: after the F major cadence, a softer
+                     # manual for the bass entries under the held C
+lead 18-21 bottom    # subject in the bass, in F and on A
+
+dyn 26 mf            # bars 26-37: A minor, the dominant region
+lead 26-27 top       # subject, top, A minor
+ramp 30-33 f         # bars 30-33: the top climbs over the E pedal, the
+                     # one long build in the piece
+broaden 37 0.92      # bar 37: hold back into the A minor cadence, the
+                     # main mid-point arrival
+
+dyn 38 mp            # bars 38-43: after the cadence, a quieter start on
+                     # G minor, working back toward the tonic
+lead 38-39 bottom    # subject, bass, G minor
+lead 40-41 top       # subject, top, on G
+lead 42-43 bottom    # subject, bass, back to D minor
+
+dyn 44 f             # bars 44-52: the opening returns in the tonic
+lead 44-45 top       # subject, top (as bars 5-6)
+lead 46-47 bottom    # subject, bass (as bars 3-4)
+
+rit 4 0.7            # the last 4 short bars, from the deceptive cadence
+                     # into the final D

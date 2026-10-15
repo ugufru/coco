@@ -1,0 +1,64 @@
+# Invention No. 8 in F major, BWV 779 (J. S. Bach)
+#
+# Character: bright and playful, a strict canon at the octave for its
+# first seven bars. The subject is a leaping F major arpeggio in eighths
+# (after an eighth rest) and a bar of falling sixteenth turns; the bass
+# follows the top one bar later, an octave lower. It wants lightness and
+# an even, buoyant pulse rather than speed.
+#
+# Time signature: 3/4. The Mutopia score has 33 full bars and a final
+# bar 34 of a single quarter (the closing chord). The piece starts with
+# an eighth rest inside bar 1, and the MIDI keeps that rest (first note
+# an eighth into bar 1), so bar numbers here match the score and no
+# pickup is needed.
+#
+# Tempo: quarter = 96. About 100 quarters in all, so about 1:03.
+# Track times (approximate): Glenn Gould (Sony, 1964) 1:05, about 92;
+# Gustav Leonhardt (harpsichord, Apple Music reissue) 1:06, about 91;
+# Andras Schiff (ECM, clavichord) 0:56, about 107; Angela Hewitt
+# (Hyperion, her own discography page) 0:44, about 136, the fastest.
+# 96 sits with Gould and Leonhardt, a touch quicker: unhurried, so the
+# sixteenth turns sparkle without blurring.
+#
+# Structure (read from the Mutopia score and checked against the MIDI;
+# the binary division at bar 12 and the key areas C major (8), D minor
+# (22-23), B-flat (26) and F (29-30) follow Rachel Hocking's study guide;
+# teoria.com notes that 19-26 only sounds like canon):
+#   1-2    Subject, top, F major (the bass is silent in bar 1).
+#   2-3    Subject, bottom, in canon at the octave, one bar behind.
+#   4-7    The canon goes on: a three-bar broken-chord sequence, both
+#          hands a bar apart, moving to C major.
+#   8-11   Episode in C major: falling sixteenth turns against arpeggios,
+#          cadence in C major at 11-12 (end of the first half).
+#   12-13  Second half: subject in the bass, C major.
+#   13-14  Subject, top, C major, now the top follows the bass.
+#   15     Diminished-seventh exchange, turning to G minor.
+#   16-17  Subject, top, G minor.
+#   17-18  Subject, bottom, G minor.
+#   19-23  Episode: imitation that only sounds like canon, a cycle of
+#          fifths to D minor (22-23).
+#   24-25  Falling sequence from D minor to B-flat.
+#   26-29  Bars 4-7 return a fifth lower, starting in B-flat (the
+#          subdominant) and leading home.
+#   30-34  Bars 8-12 return in F major: final cadence at 33-34.
+
+tempo 96
+
+voice mid 0          # two voices only: there is no middle voice to set back
+
+dyn 1 mf             # bars 1-11: the first half, F major to C major
+lead 2-3 bottom      # the canon entry in the bass (bar 1 is the top alone)
+
+dyn 12 mp            # bars 12-15: the second half starts with the
+                     # subject again, now in C: an echo, a softer manual
+lead 12-13 bottom    # subject, bass, C major
+lead 13-14 top       # subject, top, C major (bar 13 shared: canon)
+
+dyn 16 mf            # bars 16-25: G minor and the sequences to D minor
+lead 16-17 top       # subject, top, G minor
+lead 17-18 bottom    # subject, bass, G minor (bar 17 shared: canon)
+
+dyn 26 f             # bars 26-34: the return of bars 4-11, home to F
+
+rit 2 0.75           # only into the final cadence; bar 34 is a single
+                     # quarter, so this starts early in bar 32

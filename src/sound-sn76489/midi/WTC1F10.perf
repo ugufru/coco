@@ -1,0 +1,63 @@
+# Fugue No. 10 in E minor, BWV 855 (J. S. Bach, WTC I)
+#
+# Character: the only two-voice fugue in the Well-Tempered Clavier, a
+# brisk, fiery toccata-like piece in 3/4 that behaves almost like a
+# two-part invention. The subject is two bars of unbroken sixteenths:
+# an E minor arpeggio, then a chromatic descent against a repeated E.
+# Twice (bars 19 and 38) the two hands race down in bare octaves. It
+# wants energy and a rock-steady pulse.
+#
+# Tempo: quarter = 104. The score has 41 full bars of 3/4 and a short
+# final bar 42 (just the closing E major arpeggio), about 123 quarters.
+# Per-fugue track times (MusicBrainz track lists): Angela Hewitt
+# (Hyperion, 1998) 1:10, about 106; Sviatoslav Richter 1:09, about
+# 107; Glenn Gould 1:01, about 121. Rosalyn Tureck (2:00, about 62) is
+# a slow outlier and was not followed. 104 is just under Hewitt and
+# Richter, so the sixteenths stay even on the chip.
+#
+# Structure (Mutopia score, entries found by a pattern search on the
+# voices and checked against the MIDI). The piece is in two halves:
+# from bar 22 the first half comes back, the subject in the top again
+# but now with its countersubject below it, and from bar 24 the two
+# parts exchanged and transposed.
+#   1-2    Subject, top, E minor.
+#   3-4    Answer, bottom, B minor (the exposition is just these two).
+#   5-10   Episode: sequences on the subject's figures.
+#   11-12  Subject, top, G major (cadence in G major, bar 11).
+#   13-14  Subject, bottom, on D.
+#   15-19  Episode: falling broken chords in eighths against sixteenths,
+#          ending in the first octave run (19).
+#   20-21  Subject, bottom, A minor; leads back to E minor.
+#   22-23  Second half: subject, top, E minor, with the countersubject
+#          (first heard in the top at bar 3) now in the bass.
+#   24-29  Episode, as bars 5-10 with the parts exchanged.
+#   30-31  Subject, bottom, D minor.
+#   32-33  Subject, top, A minor.
+#   34-38  Episode, as bars 15-19, ending in the second octave run (38).
+#   39-40  Subject, top, E minor; the bass starts the subject's
+#          chromatic half at 40 but turns away.
+#   41-42  Final cadence and the closing E major arpeggio (Picardy
+#          third), alone in the top part.
+
+tempo 104
+
+voice mid 0        # two voices only: there is no middle voice to set back
+
+dyn 1 mf           # bars 1-21: the first half
+dyn 22 mp          # bars 22-29: the opening comes back with the parts
+                   # exchanged; play it as an echo, as on a second manual
+dyn 30 mf          # bars 30-38: subject in the bass, then the run-up to
+                   # the second octave passage
+dyn 39 f           # bars 39-42: the last entry and the close
+
+lead 3-4 bottom    # answer, bass
+lead 11-12 top     # subject, top, G major
+lead 13-14 bottom  # subject, bass
+lead 20-21 bottom  # subject, bass, A minor
+lead 22-23 top     # subject, top, E minor (second half)
+lead 30-31 bottom  # subject, bass, D minor
+lead 32-33 top     # subject, top, A minor
+lead 39-40 top     # last subject, top, E minor
+
+rit 1.5 0.7        # only into the final cadence; the pulse stays firm
+                   # until then

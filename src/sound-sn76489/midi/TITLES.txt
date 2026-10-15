@@ -1,0 +1,32 @@
+# Header text for each import (#600): NAME | title | composer
+# midi2sng.py looks a .mid up here by its file name stem.
+INVENT04 | Two-Part Invention No. 4 in D minor, BWV 775 | J. S. Bach
+INVENT08 | Two-Part Invention No. 8 in F major, BWV 779 | J. S. Bach
+INVENT10 | Two-Part Invention No. 10 in G major, BWV 781 | J. S. Bach
+INVENT13 | Two-Part Invention No. 13 in A minor, BWV 784 | J. S. Bach
+SINFON02 | Sinfonia No. 2 in C minor, BWV 788 | J. S. Bach
+SINFON11 | Sinfonia No. 11 in G minor, BWV 797 | J. S. Bach
+PRELUDE1 | Prelude No. 1 in C major, WTC I, BWV 846 | J. S. Bach
+AIR | Air from Orchestral Suite No. 3, BWV 1068 | J. S. Bach
+SINFON01 | Sinfonia No. 1 in C major, BWV 787 | J. S. Bach
+SINFON03 | Sinfonia No. 3 in D major, BWV 789 | J. S. Bach
+SINFON04 | Sinfonia No. 4 in D minor, BWV 790 | J. S. Bach
+SINFON05 | Sinfonia No. 5 in E-flat major, BWV 791 | J. S. Bach
+SINFON06 | Sinfonia No. 6 in E major, BWV 792 | J. S. Bach
+SINFON07 | Sinfonia No. 7 in E minor, BWV 793 | J. S. Bach
+SINFON08 | Sinfonia No. 8 in F major, BWV 794 | J. S. Bach
+SINFON09 | Sinfonia No. 9 in F minor, BWV 795 | J. S. Bach
+SINFON10 | Sinfonia No. 10 in G major, BWV 796 | J. S. Bach
+SINFON12 | Sinfonia No. 12 in A major, BWV 798 | J. S. Bach
+SINFON13 | Sinfonia No. 13 in A minor, BWV 799 | J. S. Bach
+SINFON14 | Sinfonia No. 14 in B-flat major, BWV 800 | J. S. Bach
+SINFON15 | Sinfonia No. 15 in B minor, BWV 801 | J. S. Bach
+WTC1F03 | Fugue No. 3 in C-sharp major, WTC I, BWV 848 | J. S. Bach
+WTC1F06 | Fugue No. 6 in D minor, WTC I, BWV 851 | J. S. Bach
+WTC1F08 | Fugue No. 8 in D-sharp minor, WTC I, BWV 853 | J. S. Bach
+WTC1F10 | Fugue No. 10 in E minor, WTC I, BWV 855 | J. S. Bach
+WTC1F11 | Fugue No. 11 in F major, WTC I, BWV 856 | J. S. Bach
+WTC2F01 | Fugue No. 1 in C major, WTC II, BWV 870 | J. S. Bach
+FUGUE952 | Fugue in C major, BWV 952 | J. S. Bach
+AOF3A | Art of Fugue: Mirror Fugue a 3, rectus, BWV 1080 | J. S. Bach
+AOF3B | Art of Fugue: Mirror Fugue a 3, inversus, BWV 1080 | J. S. Bach

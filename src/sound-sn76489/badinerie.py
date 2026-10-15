@@ -18,7 +18,8 @@ Editorial choices:
     the bass under it is a marked C natural with 4/2 figures (D7 over C),
     so C sharp would clash.
 Bar labels below: A = first half, B = second half, numbered from the
-first full bar.
+first full bar. As performed (badinerie.perf) the halves play A A B B,
+written out, and the performance numbers bars straight through.
 
 Run as a script to write build/badinerie.snd, the byte stream that
 badinerie.fs splices in with DATA[PY.
@@ -29,10 +30,12 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sn76489  # noqa: E402
+import midi2sng  # noqa: E402
 
 BAR = 16             # 2/4 in thirty-seconds
 PICKUP = 8           # each half starts on a quarter-note upbeat
-FRAMES_PER_32ND = 4  # sixteenth = 8 frames, quarter = 112.5 bpm
+QUARTER_BPM = 112.5  # the transcription's own pace; badinerie.perf sets the tempo
+PERF = os.path.join(os.path.dirname(os.path.abspath(__file__)), "badinerie.perf")
 
 # Each voice: upbeat, full bars, closing quarter; for both halves.
 FLUTE = {
@@ -184,7 +187,7 @@ BASS = {
 
 
 def unroll(v):
-    """Each half once; the stream repeats them (see sections())."""
+    """Each half once, as written; performed() plays each twice."""
     bars = ([v["a_pick"]] + v["a"] + [v["a_end"] + " " + v["b_pick"]]
             + v["b"] + [v["b_end"]])
     return " | ".join(bars)
@@ -196,7 +199,7 @@ def sections():
     return [(0, a), (a, a + b)]
 
 
-PEAKS = [1, 5, 3]    # note-on attenuation per channel (2 dB a step)
+PEAKS = [1, 5, 3]    # fallback note-on attenuation (notes carry their own)
 
 HAT, KICK = 4, 6     # noise control: white noise, rate N/512 and N/2048
 
@@ -214,7 +217,27 @@ def drums(total):
     return [h for h in hits if h[0] < total]
 
 
-def build():
+def performed(voice):
+    """A voice as performed: A, A, B, B, each pass written out (#614).
+
+    The stream used to repeat each half with $E8/$E9; writing the passes
+    out lets the second time through be shaped differently (an echo),
+    and the closing ritardando fall only on the very end."""
+    (a0, a1), (b0, b1) = sections()
+    out = []
+    for lo, hi, offsets in ((a0, a1, (0, a1 - a0)), (b0, b1, (a1 - a0, a1 - a0 + b1 - b0))):
+        for s, l, m in voice:
+            if lo <= s < hi:
+                if s + l > hi:
+                    raise ValueError(f"note at {s}/32 crosses the end of its half")
+                for off in offsets:
+                    out.append((s + off, l, m))
+    return sorted(out)
+
+
+def build(perf_path=PERF):
+    """The performed stream: the notes run through the performance layer
+    in badinerie.perf (tempo, dynamics, voicing), as for the MIDI imports."""
     voices = [sn76489.parse(unroll(v), BAR, PICKUP, name)
               for v, name in ((FLUTE, "flute"), (VIOLIN2, "violin2"), (BASS, "bass"))]
     total = sections()[-1][1]
@@ -222,14 +245,35 @@ def build():
         end = max(s + l for s, l, _ in v)
         if end != total:
             raise ValueError(f"{name} ends at {end}/32, want {total}/32")
-    return sn76489.stream(voices, FRAMES_PER_32ND, PEAKS, drums(total),
-                          sections=sections())
+    if not os.path.exists(perf_path):
+        sys.exit(f"no performance file {perf_path} (PERFORMANCE.md, #614)")
+    perf = midi2sng.Performance.load(perf_path)
+    voices = [performed(v) for v in voices]
+    length = 2 * total
+    division = 8                      # thirty-seconds per quarter
+    us = 60e6 / QUARTER_BPM
+    conv = perf.timing(division, [(0, us)], BAR, length, 1.0)
+    flat = [(c, s, s + l, m) for c, v in enumerate(voices) for s, l, m in v
+            if m is not None]                    # rests are silence
+    atts = perf.attenuations([(s, e, m) for _, s, e, m in flat], division, BAR)
+    out = [[], [], []]
+    for (c, s, e, m), att in zip(flat, atts):
+        f0 = conv(s)
+        out[c].append((f0, conv(e) - f0, m, att))
+    hits = []
+    for t, ctrl, att, gate in drums(length):
+        # The drums follow the dynamics: f is as written, each step
+        # softer takes them a step down too.
+        lvl = round(perf.level(perf.pos(t, division, BAR)))
+        hits.append((conv(t), ctrl, max(0, min(15, att + lvl - 1)), gate))
+    return sn76489.stream(out, 1, PEAKS, hits)
 
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "build/badinerie.snd"
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
-    data = build()
+    data = sn76489.header(build(), "Badinerie from Orchestral Suite No. 2, BWV 1067",
+                          "J. S. Bach")
     with open(out, "wb") as f:
         f.write(data)
     print(f"{out}: {len(data)} bytes")

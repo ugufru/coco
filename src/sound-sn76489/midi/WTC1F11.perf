@@ -1,0 +1,71 @@
+# Fugue No. 11 in F major, BWV 856 (J. S. Bach, WTC I)
+#
+# Character: a cheerful, light-footed three-voice fugue in 3/8, close
+# to a passepied. The subject starts on an upbeat C, steps down
+# (D C B-flat C), skips up in sixteenths and runs down again to a trill
+# on B natural: a complete little tune in itself. In the middle it
+# turns to D minor and G minor with close stretto, then comes home to
+# F major. It should lilt in one beat to the bar.
+#
+# Tempo: dotted quarter = 50 (eighth = 150). 72 bars of 3/8 is 216
+# eighths. Per-fugue track times (MusicBrainz track lists): Angela
+# Hewitt (Hyperion, 1998) 1:35, about 45 to the dotted quarter;
+# Rosalyn Tureck (2002 issue) 1:22, about 53; Sviatoslav Richter and
+# Glenn Gould both 1:19, about 55. 50 is the unhurried side of that.
+#
+# Bar numbers: the score begins with an eighth-note upbeat, which the
+# MIDI puts at its very start. So the bars below (the MIDI's, which
+# this file uses) each begin on the upbeat: bar N here is the last
+# eighth of score bar N-1 plus the first two eighths of score bar N,
+# and every subject entry starts right at the start of one of these
+# bars. That is also why there is no "accent": it would fall on the
+# third eighth of the score's bar, not the downbeat.
+#
+# Structure (Mutopia score, entries found with a pattern search on the
+# MIDI):
+#   1-9    Exposition, F major: subject in the alto (1, alone), answer
+#          in the soprano (5), subject in the bass (10).
+#   13-17  Episode over a rising bass, to C.
+#   18-21  Subject, soprano, F major.
+#   22-25  Answer in the alto, C major; the bass rests (two voices).
+#   26-29  Subject in the bass (in the tenor register), then the alto
+#          (28): stretto at two bars.
+#   30-35  Episode, turning to D minor.
+#   36-46  Dominant pedal on A in the bass (36-40) under a stretto in
+#          D minor: soprano 37, alto 39, then the bass itself (41).
+#          Cadence in D minor, bar 46.
+#   47-56  Stretto in G minor: bass 47, alto 49, soprano 51 (varied).
+#          Cadence in G minor, bar 56.
+#   57-61  Episode: a rising sequence back toward F.
+#   62-72  Closing section in F major over a falling bass; final
+#          cadence with a fermata. I found no full subject entry after
+#          bar 51; the subject's rising eighths run through this part.
+
+tempo 50 4.
+
+dyn 1 mf           # bars 1-21: exposition and the soprano's re-entry
+dyn 22 mp          # bars 22-25: the bass drops out, a lighter texture
+dyn 26 mf          # bars 26-35: the bass returns with the subject
+ramp 36-41 f       # bars 36-41: the A pedal and the D minor stretto
+                   # build to the bass entry
+dyn 47 mf          # bars 47-56: after the D minor cadence, G minor
+dyn 57 mp          # bars 57-61: after the G minor cadence, the episode
+dyn 62 f           # bars 62-72: home to F major, full to the end
+
+lead 5 top         # answer, soprano (only its first bar: the subject's
+                   # sixteenth run dips below the alto in the next bar)
+lead 10-12 bottom  # subject, bass
+lead 18 top        # subject, soprano (first bar only, for the same reason)
+lead 22-24 bottom  # answer in the alto, the lowest voice while the bass rests
+lead 28-30 mid     # subject, alto (the bass entry at 26 crosses the
+                   # alto, so it gets no lead)
+lead 37-39 top     # D minor stretto: soprano
+lead 39-41 mid     # D minor stretto: alto
+lead 41-43 bottom  # D minor stretto: bass
+lead 47-49 bottom  # G minor stretto: bass
+lead 49-51 mid     # G minor stretto: alto
+lead 51-53 top     # G minor stretto: soprano
+
+broaden 45 0.95    # bar 45: a breath into the D minor cadence, the
+                   # turning point of the piece
+rit 4 0.75         # last four (short) bars into the final F major chord

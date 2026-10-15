@@ -1,0 +1,77 @@
+# Fugue No. 8 in D-sharp minor, BWV 853 (J. S. Bach, WTC I)
+#
+# Character: grave, vocal and intensely concentrated, three voices in
+# 4/4, in the old contrapuntal style. The subject rises a fifth
+# (D#, A#), turns on its upper neighbour and walks down and back up in
+# eighths. There are almost no free episodes: Bach works the subject
+# upright, inverted, in augmentation (twice as slow) and in stretto,
+# building step by step to the augmented entries at the end. It needs
+# a slow, steady, singing pulse and no hurry anywhere.
+#
+# Tempo: quarter = 58. 87 bars of 4/4 is 348 quarters. Per-fugue track
+# times (MusicBrainz track lists): Angela Hewitt (Hyperion, 1998) 5:36,
+# about 62; Glenn Gould 5:14, about 66; Sviatoslav Richter 6:31, about
+# 53; Rosalyn Tureck (2002 issue) 7:17, about 48. 58 sits between
+# Richter and Hewitt.
+#
+# Structure. Entries found with a pattern search on the voices of the
+# Mutopia score (parsed and checked note for note against the MIDI);
+# the plan of sections follows the Earsense commentary on this fugue
+# (earsense.org, WTC I No. 8), which lists the sections but gives no
+# bar numbers. "x.5" is the middle of the bar.
+#   1-19   Exposition, four entries, the bass taking two in a row:
+#          alto 1 (D-sharp minor), soprano 3.5 (answer), bass 8,
+#          bass 12.25 (answer). Cadence in A-sharp minor, bar 19.
+#   19-30  Three stretto pairs in the upper voices only:
+#          alto 19.5 / soprano 20; soprano 24 / alto 24.25;
+#          soprano 25.5 / alto 27.25 (toward G-sharp and C-sharp minor).
+#          Cadence in F-sharp major, bar 30.
+#   30-44  Re-exposition with the inversion: soprano 30, alto 36 (after
+#          a cadence in G-sharp minor, bar 35), bass 44.5 (after a
+#          cadence in D-sharp minor, bar 44).
+#   44-51  Inverted entries in stretto pairs: bass 44.5 / soprano 45,
+#          alto 47.5 / soprano about 49.75 (this last one is varied and
+#          I am not sure of it).
+#   52-56  Stretto in all three voices a quarter apart, upright (bass
+#          52, alto 52.25, soprano 52.5), then inverted (bass 54, alto
+#          54.25, soprano 54.5).
+#   57-61  A lone entry in the soprano (57.5, with a shortened first
+#          note), echoed in the alto (61.5); half cadence on A-sharp.
+#   62-80  Augmentation: the bass (62-65), the alto (67.5-70) and at the
+#          climax the soprano (77.5-80) sing the subject at half speed,
+#          with the subject at normal speed and in varied rhythm around
+#          them. Half cadence on A-sharp before the soprano (76).
+#   81-87  Coda: a falling sequence in dotted rhythm in all voices, then
+#          the final cadence on a D-sharp major chord (Picardy third).
+
+tempo 58
+
+dyn 1 p            # bars 1-19: the exposition, grave and quiet
+dyn 19.5 mp        # bars 19-29: after the A-sharp minor cadence, the
+                   # first strettos
+dyn 30 p           # bars 30-43: after the F-sharp major cadence the
+                   # inversion begins, a new (softer) colour
+dyn 44 mp          # bars 44-51: after the D-sharp minor cadence, the
+                   # inverted strettos
+dyn 52 mf          # bars 52-61: three-voice strettos
+ramp 62-77 f       # bars 62-77: the augmentation section builds to the
+                   # soprano's augmented entry, the climax
+dyn 81 mf          # bars 81-87: the coda, a step down after the climax
+
+                   # bars 1-3: the alto's subject sounds alone, no lead needed
+lead 3-5 top       # answer, soprano
+lead 8-9 bottom    # subject, bass
+lead 12-13 bottom  # answer, bass (second bass entry in a row)
+lead 19-20 mid     # stretto pair: alto
+lead 20-21 top     # stretto pair: soprano
+lead 30-31 top     # inversion, soprano
+lead 36-37 mid     # inversion, alto (hidden in the middle)
+lead 44-45 bottom  # inversion, bass
+lead 62 bottom     # augmentation, bass (in bar 63 the bass rises above
+lead 64-65 bottom  # the alto for a beat, so that bar is left out)
+lead 67-70 mid     # augmentation, alto
+lead 77-80 top     # augmentation, soprano: the climax
+
+broaden 76 0.93    # bar 76: hold back on the A-sharp half cadence before
+                   # the soprano's augmentation
+rit 2 0.7          # the last two bars into the D-sharp major chord

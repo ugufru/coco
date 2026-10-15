@@ -1,0 +1,64 @@
+# Air, Orchestral Suite No. 3 in D major, BWV 1068 (J. S. Bach)
+#
+# Character: the slow movement of a festive suite, for strings alone. A
+# long singing melody over a bass that walks in steady eighths, the
+# "Air on the G string" in its original key and shape. It needs a broad,
+# calm line that never stops moving forward; the walking eighths are the
+# pulse and should stay even.
+#
+# This arrangement: Mutopia's version for flute and guitar (Mike
+# Blackstock, after the Bach-Gesellschaft), 4/4, D major. The flute has
+# the melody (our top voice), the guitar's lower voice the walking bass
+# (our bottom voice), and its upper voice the inner parts. Where the
+# guitar plays chords there are more than three parts, so the converter
+# drops some inner notes; melody and bass survive.
+#
+# Bar numbering: as the MIDI plays it, 19 bars, first note at tick 0, so
+# there is no pickup. The score's Air is 18 bars, a first half of 6 and a
+# second half of 12, both repeated. This MIDI plays NO repeats. Instead
+# the first half's first and second endings are both played in turn:
+#   MIDI 1-6    score 1-6 (bar 6 is the first ending: the A major
+#               cadence, with the bass running back toward the opening)
+#   MIDI 7      the second ending: the same cadence bar again
+#   MIDI 8-19   score 7-18, the second half, once
+# So every bar number below is the MIDI's; subtract 1 from bar 8 on for
+# the score's number.
+#
+# Tempo: quarter = 36 (eighth = 72, the walking bass). Pinnock and the
+# English Concert (Archiv) take 4:47 in one catalogue listing; with both
+# repeats (144 quarters) that is about quarter = 30. A listing credited to
+# Koopman gives 5:34 (about 26), but I could not confirm which recording
+# it is. Romantic orchestral readings run slower still (Ruzicka 6:42),
+# and I found no confirmed timings for Richter, Munchinger, Savall or
+# Suzuki. I take it a little quicker than Pinnock: the chip's notes start
+# loud and sink to a floor, so a long held note (the opening F sharp is
+# four and a half beats) only stays alive if the line keeps moving.
+#
+# Structure (MIDI bars):
+#   1-6    D major, the long opening F sharp, to the cadence in A (6)
+#   7      the cadence again (second ending)
+#   8-11   second half: through E minor to the cadence in B minor (11)
+#   12-13  to a cadence in A major (13, beat 3)
+#   14-15  the bass rises chromatically, F sharp to B, under climbing
+#          suspensions, arriving on E minor (15)
+#   16-17  A7 back to D; the melody climbs to the high C natural (17),
+#          the top of the piece
+#   18-19  the final cadence in D
+
+tempo 36
+
+voice top 0       # the melody sings on top
+voice mid 2       # the guitar's inner chords stay well back
+voice bottom 1    # the walking bass a step back, but clear: it is the
+                  # second line that matters
+
+dyn 1 mp          # bars 1-6: the first half, calm and singing
+dyn 7 p           # bar 7: the repeated cadence bar played as an echo
+dyn 8 mp          # bars 8-13: second half, out through B minor and A
+dyn 14 mf         # bars 14-19: the chromatic climb in the bass, the high
+                  # C at 17 and the close, the one fuller terrace
+
+broaden 7 0.92    # the end of the first half: a breath before the second
+broaden 11 0.95   # into the B minor cadence
+
+rit 2 0.7         # bars 18-19: the final cadence settles

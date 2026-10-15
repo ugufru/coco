@@ -28,6 +28,10 @@ spec, with a worked example, is SNG-FORMAT.md next to this file:
                  chip: the player records it as the channel's new level
                  and its envelope decays it from there.
 
+A v2 song puts a header in front of that stream (header() below):
+$EA, version 2, the length in frames (big-endian), a counted title and
+a counted composer.
+
 Chip facts: 4 MHz clock (XRoar gmc.c, and the GameMaster), so a tone
 divider is N = 4000000 / (32 * f) = 125000 / f, 10 bits. N = 1023 is
 122 Hz, about B2; anything lower is lifted an octave with a warning.
@@ -106,7 +110,8 @@ MARK, REPEAT = 0xE8, 0xE9
 def stream(voices, frames_per_32nd, peaks, drums=(), gap=1, sections=None):
     """Build the byte stream.
 
-    voices    list of up to three parse() results, channel 0..2
+    voices    list of up to three parse() results, channel 0..2; a note
+              may carry a 4th field, its own note-on attenuation
     peaks     note-on attenuation per channel (0 loudest, 15 off)
     drums     [(start_tick, noise_ctrl, attenuation[, gate])] on channel 3;
               gate, in frames, cuts the hit off that long after it starts,
@@ -123,7 +128,9 @@ def stream(voices, frames_per_32nd, peaks, drums=(), gap=1, sections=None):
 
     lifted = 0
     for ch, notes in enumerate(voices):
-        for start, length, midi in notes:
+        for note in notes:
+            start, length, midi = note[:3]
+            att = note[3] if len(note) > 3 else peaks[ch]
             if midi is None:
                 continue
             n = divider(midi)
@@ -136,7 +143,7 @@ def stream(voices, frames_per_32nd, peaks, drums=(), gap=1, sections=None):
             f1 = (start + length) * frames_per_32nd
             off = f1 - gap if f1 - f0 > gap + 1 else f1
             at(f0, 1, bytes([0x80 | ch << 5 | (n & 0x0F), n >> 4,
-                             0x90 | ch << 5 | peaks[ch]]))
+                             0x90 | ch << 5 | att]))
             at(off, 0, bytes([0x90 | ch << 5 | 0x0F]))
 
     if lifted:
@@ -183,3 +190,41 @@ def stream(voices, frames_per_32nd, peaks, drums=(), gap=1, sections=None):
     wait(32)  # let the last notes ring out
     out.append(0)
     return bytes(out)
+
+
+V2 = 0xEA
+
+
+def frames(data):
+    """Playing time of a v1 stream in frames, repeats included."""
+    i, total, mark, owed = 0, 0, None, False
+    while True:
+        b = data[i]
+        i += 1
+        if b == 0:
+            return total
+        if b < 0x80:
+            total += b
+        elif b == MARK:
+            mark, owed = i, True
+        elif b == REPEAT:
+            if owed:
+                owed, i = False, mark
+        elif b & 0x90 == 0x80 and b < 0xE0:
+            i += 1   # tone latch: skip its data byte
+
+
+def text(s):
+    """A counted string for the header, at most 63 printable ASCII."""
+    b = s.encode("ascii")
+    if len(b) > 63 or any(c < 0x20 or c > 0x7E for c in b):
+        raise ValueError(f"bad header string {s!r}")
+    return bytes([len(b)]) + b
+
+
+def header(data, title, composer):
+    """Put the v2 header in front of a v1 stream."""
+    n = frames(data)
+    if n > 0xFFFF:
+        raise ValueError(f"{title}: {n} frames is too long for the header")
+    return bytes([V2, 2, n >> 8, n & 0xFF]) + text(title) + text(composer) + data

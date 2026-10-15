@@ -1,7 +1,7 @@
 \ decb.fs - Read files from a DECB (RS-DOS) floppy, no Disk BASIC needed
 \
 \ Provides: dk-open, dk-open-fname, dk-getc, dk-load, dk-load-open,
-\           dk-close, dk-entry, dk-sector, dk-name,
+\           dk-close, dk-entry, dk-sector, dk-name, dk-ready?, dk-select,
 \           dk-drive, dk-err, dk-buf, dk-fname
 \
 \ Requires: kernel primitives only. IRQs must be masked (the kernel does
@@ -71,7 +71,9 @@ VARIABLE dk-err
 VARIABLE _dk-done     \ NMI handler target while a transfer runs, else 0
 VARIABLE _dk-nmi0     \ saved $0109 (opcode, low byte)
 VARIABLE _dk-nmi1     \ saved $010A-$010B (address)
-VARIABLE _dk-ready    \ NMI installed and heads restored
+VARIABLE _dk-ready    \ NMI handler installed
+VARIABLE _dk-homed    \ dk-drive's head restored, track register valid
+VARIABLE _dk-ekey     \ directory sector dk-entry last left in dk-buf
 VARIABLE _dk-spun     \ motor already running
 VARIABLE _dk-b        \ dk-sector arguments, kept for retries
 VARIABLE _dk-t
@@ -190,9 +192,20 @@ CODE _dk-read  \ ( buf sec latch -- status )
   _dk-latch $FF40 C!
   _dk-spun @ 0= IF 60 _dk-frames  1 _dk-spun ! THEN ;
 
-\ Wait until the controller is not busy; leave its status.
+VARIABLE _dk-n
+
+\ Wait until the controller is not busy; leave its status. A command
+\ that never finishes (no disk, so no index pulses for a verify) is
+\ stopped with Force Interrupt after about 3 seconds, which is longer
+\ than a restore from the last track takes at 30 ms a step, and leaves
+\ $99: not ready, seek error, CRC error, busy (#612).
 : _dk-wait  ( -- st )
-  BEGIN $FF48 C@ DUP 1 AND IF DROP 0 ELSE 1 THEN UNTIL ;
+  0 _dk-n !
+  BEGIN
+    $FF48 C@ DUP 1 AND 0= IF EXIT THEN DROP
+    1 _dk-n +!  _dk-n @ 6000 >
+  UNTIL
+  $D0 $FF48 C!  $FF48 C@ DROP  $99 ;
 
 \ Head to track 0. Leaves 0, or $10 if the controller could not find it.
 : _dk-restore  ( -- st )
@@ -209,13 +222,14 @@ CODE _dk-read  \ ( buf sec latch -- status )
   SWAP _dk-latch _dk-read ;
 
 : _dk-start  ( -- )
-  _dk-ready @ IF EXIT THEN
-  _dk-nmi-on  0 _dk-done !  0 _dk-spun !
-  _dk-restore DROP  1 _dk-ready ! ;
+  _dk-ready @ 0= IF
+    _dk-nmi-on  0 _dk-done !  0 _dk-spun !  1 _dk-ready !
+  THEN
+  _dk-homed @ 0= IF  _dk-restore DROP  1 _dk-homed !  THEN ;
 
 \ dk-sector -- read track/sector (1-18) of dk-drive into buf; 0 or 3
 : dk-sector  ( buf trk sec -- err )
-  _dk-start
+  0 _dk-ekey !  _dk-start
   _dk-s ! _dk-t ! _dk-b !
   5 0 DO
     _dk-b @ _dk-t @ _dk-s @ _dk-try  0= IF 0 EXIT THEN
@@ -223,9 +237,34 @@ CODE _dk-read  \ ( buf sec latch -- status )
   LOOP
   3 ;
 
+VARIABLE _dk-hi
+VARIABLE _dk-lo
+
+\ dk-ready? -- true if a disk is turning in dk-drive (#612). The index
+\ hole passes the sensor once a turn, five times a second, so the index
+\ bit of the Type I status goes on and off; with no disk it never
+\ changes. READY is no help: Tandy's controller (and XRoar's rsdos
+\ cart) ties it on. Spins the motor (a second, unless it is already
+\ running), lets a turn pass, then samples for about two turns. NMI
+\ stays disabled in the latch throughout.
+: dk-ready?  ( -- f )
+  0 _dk-latch $DF AND $FF40 C!
+  _dk-spun @ 0= IF 60 _dk-frames 1 _dk-spun ! THEN
+  15 _dk-frames     \ a full turn, so no pulse left from the last drive
+  $D0 $FF48 C!  $FF48 C@ DROP  $D0 $FF48 C!
+  0 _dk-hi !  0 _dk-lo !
+  2000 0 DO
+    $FF48 C@ 2 AND IF 1 _dk-hi ! ELSE 1 _dk-lo ! THEN
+  LOOP
+  _dk-hi @ _dk-lo @ AND ;
+
 \ dk-close -- stop the motor and give the NMI vector back
+\ dk-select -- switch to drive d (0-3); its head is re-homed on the
+\ next access, without stopping the motor or touching the NMI vector
+: dk-select  ( d -- )  dk-drive !  0 _dk-homed !  0 _dk-ekey ! ;
+
 : dk-close  ( -- )
-  0 $FF40 C!  0 _dk-spun !
+  0 $FF40 C!  0 _dk-spun !  0 _dk-homed !  0 _dk-ekey !
   _dk-ready @ IF _dk-nmi-off  0 _dk-ready ! THEN ;
 
 \ ── File names ─────────────────────────────────────────────────────────
@@ -244,7 +283,8 @@ CODE _dk-read  \ ( buf sec latch -- status )
 \ dk-name -- parse NAME.EXT:D into the 8+3 directory form; 0 or error
 : dk-name  ( addr u -- err )
   dk-fname 11 $20 FILL
-  0 dk-drive !  0 _dk-np !  8 _dk-nmax !  0 _dk-nst !  0 _dk-nerr !
+  0 dk-drive !  0 _dk-homed !  0 _dk-ekey !
+  0 _dk-np !  8 _dk-nmax !  0 _dk-nst !  0 _dk-nerr !
   DUP IF 0 DO DUP I + C@ _dk-namec LOOP ELSE DROP THEN DROP
   dk-fname C@ $20 = IF 10 ELSE _dk-nerr @ THEN ;
 
@@ -292,10 +332,15 @@ CODE _dk-read  \ ( buf sec latch -- status )
 
 \ dk-entry -- read directory entry 0-71 into dk-buf; its address, or 0
 \ past the end of the directory or on an error. A deleted entry is
-\ returned too: its first byte is 0.
+\ returned too: its first byte is 0. The sector stays in dk-buf, so
+\ walking the entries in order reads each directory sector once.
 : dk-entry  ( n -- addr | 0 )
   DUP 71 > IF DROP 0 EXIT THEN
-  dk-buf 17  2 PICK 3 RSHIFT 3 +  dk-sector IF DROP 0 EXIT THEN
+  DUP 3 RSHIFT 3 +  dk-drive @ 8 LSHIFT OR  $8000 OR    ( n key )
+  DUP _dk-ekey @ = IF DROP ELSE
+    dk-buf 17  2 PICK $1F AND  dk-sector IF 2DROP 0 EXIT THEN
+    _dk-ekey !
+  THEN
   7 AND 5 LSHIFT dk-buf +
   DUP C@ $FF = IF DROP 0 THEN ;
 

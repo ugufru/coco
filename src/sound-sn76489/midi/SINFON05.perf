@@ -1,0 +1,44 @@
+# Sinfonia No. 5 in E-flat major, BWV 791 (J. S. Bach)
+#
+# Character: a tender, aria-like duet. The two upper voices imitate each
+# other in dotted rhythms over a bass that plays like a continuo (a
+# rising arpeggio, then two quarters, every bar). Like a slow movement
+# from a trio sonata. This Mutopia edition is the plain version, with
+# no written-out ornaments.
+#
+# Tempo: quarter = 50. Timings for 38 bars: Andras Schiff (clavichord,
+# ECM) 2:08, about 53; Angela Hewitt 2:37, about 44; Glenn Gould 3:08,
+# about 36. 50 sits between Schiff and Hewitt; without ornaments the
+# chip line would drag if it went slower.
+#
+# Structure (my reading of the Mutopia score):
+#   1-9    subject top 1.75, answer mid 2.75 (in Bb); cadence in Eb
+#          bar 9.
+#   9-17   cadence in C minor bar 13; entries mid 13.75, top 14.75;
+#          cadence in Bb major bar 17.
+#   17-29  top 17.75 (highest register of the piece), mid 18.75, to a
+#          cadence in F minor bar 25; mid 25.75, top 26.75; cadence in
+#          Ab major bar 29.
+#   29-38  reprise: bars 30-37 repeat bars 1-8 with the upper voices
+#          exchanged (bass identical); final cadence bar 38.
+
+tempo 50
+rit 2 0.7                 # bars 37-38: the final cadence
+broaden 24 0.95           # bar 24: into the F minor cadence, the turning point
+
+voice mid 0               # the two upper voices are equal partners
+voice bottom 1            # the bass accompanies, a step back
+
+dyn 1 mp                  # bars 1-16: the tender opening duet
+dyn 17 mf                 # bars 17-28: middle section, high register, flat keys
+dyn 29 p                  # bars 29-38: reprise, played as an echo of the opening
+
+lead 1.75-2 top           # subject in the top
+lead 2.75-3 mid           # answer in the middle
+lead 13.75-14 mid         # middle entry after the C minor cadence
+lead 14.75-15 top         # top entry
+lead 17.75-18 top         # top entry, high, after the Bb cadence
+lead 18.75-19 mid         # middle entry
+lead 25.75-26 mid         # middle entry after the F minor cadence
+lead 26.75-27 top         # top entry
+lead 30.75-31 mid         # reprise: the subject now in the middle

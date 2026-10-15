@@ -1,0 +1,71 @@
+# Fugue No. 3 in C-sharp major, BWV 848 (J. S. Bach, WTC I)
+#
+# Character: bright, sparkling and good-humoured, three voices in 4/4.
+# The subject starts on the upbeat with a little turning figure
+# (G#, A# G# F# G#, then up to E# and C#) and a leaping second half
+# (E# C#' D# B#' C#): it should dance, light and clean, never rushed.
+# The episodes are canonic chains of tied suspensions over a running
+# bass, a texture Bach comes back to three times.
+#
+# Tempo: quarter = 98. 55 bars of 4/4 is 220 quarters. Per-fugue track
+# times (MusicBrainz track lists): Angela Hewitt (Hyperion, 1998) 2:14,
+# about 98; Rosalyn Tureck (2002 issue) 2:11, about 101; Sviatoslav
+# Richter 2:05 and Glenn Gould 2:04, both about 106. 98 is the
+# unhurried end of that range, so the sixteenths stay clear on the chip.
+#
+# Structure (from the Mutopia score; bar 1 begins with a dotted-quarter
+# rest, the subject enters on beat 2 and a half):
+#   1-7    Exposition, C-sharp major: subject top (1-3), answer in the
+#          alto (3-5, the lowest voice until the bass enters), subject
+#          in the bass (5-7).
+#   7-10   Episode 1: suspensions in the upper voices over running
+#          sixteenths in the bass, a falling sequence.
+#   10-12  Answer in the top, cadence in G-sharp major (12).
+#   12-14  Short link.
+#   14-16  Subject in the bass in A-sharp minor.
+#   16-19  Episode 2: episode 1 again with the parts exchanged.
+#   19-22  Subject in the alto (middle voice), E-sharp minor; cadence
+#          in E-sharp minor on beat 3 of bar 22.
+#   22-25  Episode on the subject head, falling.
+#   25-26  Answer in the top (G-sharp major).
+#   27-28  Subject in the alto, back in C-sharp major.
+#   28-31  Episode with E and B naturals, a darker minor colouring.
+#   31-34  Arpeggio sequence falling by fifths; cadence in C-sharp
+#          major, bar 34 beat 3.
+#   35-41  Two-voice episode (the bass rests nine bars): the head in
+#          sequence, a long trilled G-sharp in the top (38).
+#   42-48  The exposition returns almost note for note: top (42-44),
+#          alto (44-46), bass (46-48).
+#   48-51  Episode 1 once more.
+#   52-53  Last subject, in the top, C-sharp major.
+#   53-55  Coda and final cadence.
+# The entry list was checked against the MIDI with a pattern search on
+# the subject's turning figure. The bar 27 alto entry shares notes with
+# the bass in unison, so the MIDI shows it imperfectly.
+
+tempo 98
+
+dyn 1 mf           # bars 1-11: the exposition and first episode, bright
+dyn 12 mp          # bars 12-22: after the G-sharp cadence the music
+                   # turns to the minor keys (A-sharp minor, E-sharp
+                   # minor): a quieter manual
+dyn 22.5 mf        # bars 22-34: after the E-sharp minor cadence, back
+                   # toward the tonic
+dyn 35 mp          # bars 35-41: after the C-sharp cadence the bass drops
+                   # out; a lighter, two-voice passage
+dyn 42 f           # bars 42-55: the exposition returns, full
+
+lead 1-2 top       # subject, top
+lead 3-4 bottom    # answer in the alto, the lowest voice until bar 5
+lead 5-6 bottom    # subject, bass
+lead 10-11 top     # answer, top, toward G-sharp major
+lead 14-15 bottom  # subject, bass, A-sharp minor
+lead 19-20 mid     # subject in the alto, E-sharp minor: the hidden one
+lead 25-26 top     # answer, top
+lead 27 mid        # subject in the alto, C-sharp major
+lead 44-45 mid     # recapitulation: the answer in the alto, now between
+                   # the outer voices
+lead 46-47 bottom  # recapitulation: subject, bass
+lead 52-53 top     # last subject, top
+
+rit 2 0.75         # last two bars into the final chord

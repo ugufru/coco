@@ -1,0 +1,68 @@
+# Sinfonia No. 6 in E major, BWV 792 (J. S. Bach)
+#
+# Character: a gentle 9/8 pastoral. The subject is a plain rising scale
+# in eighths (E F# G# A B C# B C# A), set against long tied notes that
+# make a chain of suspensions. Nothing in it should feel driven: it flows
+# in three slow beats to the bar.
+#
+# Tempo: dotted quarter = 76. The bar count is 40.67 bars of 9/8, so 122
+# dotted quarters. Leonhardt (harpsichord) takes 1:30, about 81 to the
+# dotted quarter; Schiff (Decca) 1:17, about 95. Gould's 1964 track is
+# listed at 0:52, far quicker than anyone else (not used). 76 sits just
+# under Leonhardt: unhurried, so the plain chip tone does not sound rushed.
+#
+# Structure (bar numbers from the MIDI, which matches the score; the
+# Mutopia source's bar comments drift and were not trusted):
+#   1      subject in the alto, on E (bass holds E, D#)
+#   2      subject in the soprano, on B
+#   3-4    subject in the bass, on B
+#   6-7    alto, then bass, on E again
+#   9-10   alto, then soprano, heading for C# minor
+#   11     cadence in C# minor; bars 11-15 episode of broken thirds
+#          falling in the bass
+#   16     subject in the alto (B major)
+#   18     cadence in B major (the dominant), subject in the bass
+#   19-22  alto, then a rising chain in the soprano (20-22)
+#   23     arrival in C# minor; bars 23-29 the subject inverted
+#          (falling scale): alto 23, soprano 24, bass 25, alto 26, bass 29
+#   30-33  subject upright again, stacked one bar apart over a bass
+#          rising B#, C#, F#, D#: alto 30, soprano 31, alto 32, soprano 33
+#   34     fermata on the dominant seventh with A in the bass
+#   35-37  resolution to E; entries in the alto (35) and bass (36)
+#   38-41  soprano sixteenths, last entry 39, final cadence in E (41)
+
+tempo 76 4.
+
+# Dynamics, terraced and changing at cadences.
+dyn 1 mp          # bars 1-10: opening exposition, quiet and even
+dyn 11 p          # bars 11-17: after the C# minor cadence, the episode
+                  # of broken thirds, a softer second manual
+dyn 18 mf         # bars 18-22: after the B major cadence, the second
+                  # half opens with the subject in the bass
+dyn 23 mp         # bars 23-29: C# minor and the inverted subject, held back
+ramp 30-33 mf     # bars 30-33: entries stack one bar apart and climb
+                  # to the fermata at bar 34; this is the piece's one arc
+broaden 34 0.7    # bar 34: the fermata on the dominant seventh, a real
+                  # pause before the resolution to E at bar 35
+
+# Subject entries brought forward. Voices are ranked by pitch per note,
+# so when the soprano rests the alto counts as "top".
+lead 1 top        # bar 1: alto has the subject, soprano silent
+lead 2 top        # bar 2: soprano answers on B
+lead 3 bottom     # bar 3: bass on B
+lead 6 mid        # bar 6: alto on E
+lead 7 bottom     # bar 7: bass on E
+lead 9 mid        # bar 9: alto, towards C# minor
+lead 10 top       # bar 10: soprano
+lead 16 mid       # bar 16: alto, in B major
+lead 18 bottom    # bar 18: bass, after the B major cadence
+lead 19 top       # bar 19: alto, alone above the bass (soprano rests)
+lead 20-22 top    # bars 20-22: soprano's rising chain
+lead 25 bottom    # bar 25: bass, inverted subject
+lead 29 bottom    # bar 29: bass, inverted subject
+lead 31 top       # bar 31: soprano in the stacked entries
+lead 33 top       # bar 33: soprano, last step before the fermata
+lead 36 bottom    # bar 36: bass entry on A#, the chromatic turn
+
+# Final cadence: the last bar and the short final bar ease to 0.7.
+rit 2 0.7

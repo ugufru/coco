@@ -1,0 +1,50 @@
+# Sinfonia 13 in A minor, BWV 799 (3/8, 64 bars)
+#
+# Character: a plaintive minor-key dance in 3/8. The subject is a
+# simple rising line (a-b-c-d, falling back with a trill) answered by
+# running sixteenths; later statements come in parallel thirds and
+# sixths. Steady and lilting, ends on an A major chord.
+#
+# Tempo: dotted quarter = 38 (eighth = 114), about 1:40.
+# Basis: Angela Hewitt (Hyperion, 1994) 1:40, about 38.4 bars a minute;
+# Andras Schiff (ECM, clavichord) 1:42, about 37.6. Glenn Gould (1964)
+# is slower (2:15, about 28). Durations from retailer and artist track
+# lists, so approximate.
+#
+# Structure (from the Mutopia score):
+#   1-4    Subject in the top, A minor, over a running bass.
+#   5-8    Answer in the mid, E minor; cadence in E minor, bar 8.
+#   9-12   Two-voice episode (the bass rests).
+#   13-16  Subject in the bass, A minor; cadence in A minor, bar 16.
+#   16-20  Episode, rising.
+#   21-24  Subject in the top in C major (mid in parallel), cadence 24.
+#   25-28  Subject in the mid in C major (top in parallel).
+#   29-32  Subject in the top toward D minor, cadence in D minor, bar 32.
+#   33-36  Subject high in the top in D minor, the peak of the range.
+#   36-41  Falling sequence with thirty-second turns, to G major.
+#   41-44  Subject in the bass in G major (mid in parallel).
+#   44-49  Return to A minor, cadence bar 49.
+#   53-56  Subject in the bass in A minor, with the top in parallel.
+#   56-60  Falling sequence, E in the bass at 60.
+#   60-64  Last statement in the top; final cadence, A major chord.
+
+tempo 38 4.           # dotted quarter, see above
+
+dyn 1 mp              # bars 1-12: exposition, quiet
+lead 1-3 top          # bars 1-3: subject in the top
+lead 5-7 mid          # bars 5-7: answer in the mid, E minor
+
+dyn 13 mf             # bars 13-32: the bass enters and the full three voices begin
+lead 13-15 bottom     # bars 13-15: subject in the bass, A minor
+lead 25-27 mid        # bars 25-27: subject in the mid, C major, under the top in thirds
+
+dyn 33 f              # bars 33-36: after the D minor cadence, subject at its highest
+dyn 37 mp             # bars 37-41: falling sequence, a quieter manual
+
+dyn 42 mf             # bars 42-52: after the G major cadence
+lead 41-43 bottom     # bars 41-43: subject in the bass, G major
+
+dyn 53 f              # bars 53-64: last full statement in the home key
+lead 53-55 bottom     # bars 53-55: subject in the bass, A minor
+
+rit 4 0.7             # last 4 bars (short 3/8 bars) into the final cadence

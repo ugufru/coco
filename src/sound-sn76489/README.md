@@ -18,9 +18,11 @@ make run          # builds, then xroar ... -cart gmc -run badinerie.bin
 | File | Role |
 |------|------|
 | `badinerie.py` | The hand transcription (flute, inner line, bass) and the drum pattern |
+| `badinerie.perf` | Its performance: tempo, dynamics, voicing, repeats (#614) |
 | `sn76489.py`   | Score text to SN76489 byte stream |
 | `midi2sng.py`  | MIDI file to the same stream (`make songs` converts `midi/*.mid`) |
 | `SNG-FORMAT.md` | The song stream (.SNG) format spec |
+| `PERFORMANCE.md` | Performance files (`midi/NAME.perf`): tempo shaping, dynamics and voicing for the MIDI imports (#609) |
 | `badinerie.fs` | The demo: banner, play-again prompt, and the song spliced in with `DATA[PY` |
 | `../../lib/sn76489.fs` | Chip words (`sn!`, `sn-tone`, `sn-vol`, `cart-audio`, ...) and the player (`sn-play`, or `sn-start` + `sn-frame` per vsync) (#581) |
 
@@ -30,16 +32,18 @@ How it fits together:
   address in `$FF40-$FF5F` to the SN76489 (`xroar/src/gmc.c`), clocked at
   4 MHz. `$FF41` is also the Becker port, so no Becker cart in the same
   session.
-- Tempo is fixed to whole frames: a sixteenth is 8 frames, so a quarter
-  is 112.5 bpm.
+- Timing is in whole 60 Hz frames; the performance file sets the tempo.
 - The lowest tone at 4 MHz is about B2 (divider 1023). Lower bass notes
   are lifted an octave, with a warning at build time.
 - Volume bytes in the stream set a note's starting level; the player
   decays it toward a per-channel floor (`sn-lvl`, `sn-dmask`, `sn-floor`
   in `lib/sn76489.fs`), so notes pluck rather than drone.
 
-- Each half is stored once and played twice: the stream has `$E8` mark
-  and `$E9` repeat bytes. The whole piece is a 2.9 KB stream, about 86 s.
+- It is performed like the MIDI imports: `badinerie.perf` gives the
+  tempo, dynamics and voicing (#614). Both halves are repeated, and the
+  repeats are written out (A A B B) so the second time through can be
+  shaped differently; the stream is about 6.5 KB. (The `$E8`/`$E9`
+  repeat bytes it used to use are still in the format.)
 - When it ends, any key plays it again and BREAK quits to BASIC (#585).
   BREAK during playback also quits.
 
