@@ -1,5 +1,5 @@
 NAME        = badinerie
-EXTRA_DEPS  = build/badinerie.snd ../../lib/screen.fs ../../lib/bye.fs
+EXTRA_DEPS  = build/badinerie.snd ../../lib/screen.fs ../../lib/bye.fs ../../lib/sn76489.fs
 XROAR_EXTRA = -cart gmc -kbd-translate
 
 include ../../make/demo.mk

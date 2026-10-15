@@ -107,7 +107,9 @@ def stream(voices, frames_per_32nd, peaks, drums=(), gap=1, sections=None):
 
     voices    list of up to three parse() results, channel 0..2
     peaks     note-on attenuation per channel (0 loudest, 15 off)
-    drums     [(start_tick, noise_ctrl, attenuation)] on channel 3
+    drums     [(start_tick, noise_ctrl, attenuation[, gate])] on channel 3;
+              gate, in frames, cuts the hit off that long after it starts,
+              so it ticks instead of hissing through the envelope decay
     gap       frames of silence cut from the end of each note, so
               repeated notes re-strike instead of smearing together
     sections  [(start_tick, end_tick)] each played twice, back to back,
@@ -140,12 +142,16 @@ def stream(voices, frames_per_32nd, peaks, drums=(), gap=1, sections=None):
         print(f"note: {lifted} notes below B2 lifted an octave", file=sys.stderr)
 
     last_ctrl = None
-    for start, ctrl, att in sorted(drums):
+    for hit in sorted(drums):
+        start, ctrl, att = hit[:3]
         data = b""
         if ctrl != last_ctrl:
             data += bytes([0xE0 | ctrl])
             last_ctrl = ctrl
-        at(start * frames_per_32nd, 2, data + bytes([0xF0 | att]))
+        f0 = start * frames_per_32nd
+        at(f0, 2, data + bytes([0xF0 | att]))
+        if len(hit) > 3:
+            at(f0 + hit[3], 0, bytes([0xFF]))
 
     out = bytearray()
 

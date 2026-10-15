@@ -1452,12 +1452,14 @@ CODE_UNLOOP
 
 ;;; ─── PICK ( n -- x ) ──────────────────────────────────────────────────────
 ;;; Copy the nth stack item to TOS. 0 PICK = DUP, 1 PICK = OVER.
+;;; n counts from the item under n itself, which sits at 2,U, so item n
+;;; is at 2(n+1),U. The offset is a signed byte: n must be 0-62 (#591).
 
 CODE_PICK
-        LDD     ,U              ; D = n
-        ASLB
-        ROLA                    ; D = n*2 (byte offset)
-        LDD     D,U             ; D = stack[n]
+        LDB     1,U             ; B = n (low byte)
+        INCB                    ; skip the n cell itself
+        ASLB                    ; B = 2(n+1) (byte offset)
+        LDD     B,U             ; D = stack[n]
         STD     ,U              ; replace TOS
         LDY     ,X++            ; NEXT
         JMP     [,Y]

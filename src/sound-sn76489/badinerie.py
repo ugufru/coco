@@ -202,12 +202,15 @@ HAT, KICK = 4, 6     # noise control: white noise, rate N/512 and N/2048
 
 
 def drums(total):
-    """A light pulse: kick on beat 1, hats on the other eighths."""
+    """A light pulse: kick on beat 1, hats on the other eighths.
+
+    Each hit is gated (last field, frames) so it is a short tick rather
+    than a long hiss through the envelope decay (#590)."""
     hits = []
     for bar_start in range(PICKUP, total, BAR):
-        hits.append((bar_start, KICK, 3))
+        hits.append((bar_start, KICK, 2, 3))
         for off in (4, 8, 12):
-            hits.append((bar_start + off, HAT, 9 if off == 8 else 11))
+            hits.append((bar_start + off, HAT, 5 if off == 8 else 7, 2))
     return [h for h in hits if h[0] < total]
 
 

@@ -19,7 +19,8 @@ make run          # builds, then xroar ... -cart gmc -run badinerie.bin
 |------|------|
 | `badinerie.py` | The hand transcription (flute, inner line, bass) and the drum pattern |
 | `sn76489.py`   | Score text to SN76489 byte stream; the format is documented at the top |
-| `badinerie.fs` | Player: walks the stream once per vsync, runs a per-channel volume envelope |
+| `badinerie.fs` | The demo: banner, play-again prompt, and the song spliced in with `DATA[PY` |
+| `../../lib/sn76489.fs` | Chip words (`sn!`, `sn-tone`, `sn-vol`, `cart-audio`, ...) and the player (`sn-play`, or `sn-start` + `sn-frame` per vsync) (#581) |
 
 How it fits together:
 
@@ -32,11 +33,13 @@ How it fits together:
 - The lowest tone at 4 MHz is about B2 (divider 1023). Lower bass notes
   are lifted an octave, with a warning at build time.
 - Volume bytes in the stream set a note's starting level; the player
-  decays it toward a per-channel floor (`lvl`, `dmask`, `floor` in
-  `badinerie.fs`), so notes pluck rather than drone.
+  decays it toward a per-channel floor (`sn-lvl`, `sn-dmask`, `sn-floor`
+  in `lib/sn76489.fs`), so notes pluck rather than drone.
 
 - Each half is stored once and played twice: the stream has `$E8` mark
   and `$E9` repeat bytes. The whole piece is a 2.9 KB stream, about 86 s.
+- When it ends, any key plays it again and BREAK quits to BASIC (#585).
+  BREAK during playback also quits.
 
 Source: hand-transcribed from the public-domain Bach-Gesellschaft score
 (vol. 31, IMSLP #01467, pp. 15-16). Mutopia has no Badinerie, and no MIDI

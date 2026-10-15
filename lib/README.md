@@ -18,6 +18,7 @@ Each file shows a description list (what each word does) followed by a cost tabl
 - [`console.fs`](#consolefs)
 - [`dac.fs`](#dacfs)
 - [`datawrite.fs`](#datawritefs)
+- [`decb.fs`](#decbfs)
 - [`font-art.fs`](#font-artfs)
 - [`font5x7.fs`](#font5x7fs)
 - [`fujinet.fs`](#fujinetfs)
@@ -29,6 +30,7 @@ Each file shows a description list (what each word does) followed by a cost tabl
 - [`rng.fs`](#rngfs)
 - [`screen.fs`](#screenfs)
 - [`sg6-text.fs`](#sg6-textfs)
+- [`sn76489.fs`](#sn76489fs)
 - [`sound.fs`](#soundfs)
 - [`sprite.fs`](#spritefs)
 - [`trig.fs`](#trigfs)
@@ -268,6 +270,44 @@ Data table construction helpers
 | `tp` |  | var | 4 |  |
 | `tb` | `( byte -- )` | colon | 16 | 247 |
 | `tw` | `( word -- )` | colon | 16 | 249 |
+
+---
+
+## `decb.fs`
+
+Read files from a DECB (RS-DOS) floppy, no Disk BASIC needed
+
+**Provides:** dk-open, dk-open-fname, dk-getc, dk-load, dk-load-open, dk-close, dk-entry, dk-sector, dk-name, dk-drive, dk-err, dk-buf, dk-fname
+
+**Requires:** kernel primitives only. IRQs must be masked (the kernel does this at START). CoCo 1/2 only: the NMI vector is the RAM trampoline at $0109 (a CoCo 3 uses $FEFD; not handled yet).
+
+**Footprint:** ~1.1 KB code + 335 bytes of buffers (sector, FAT, name).
+
+- **`dk-drive`**
+- **`dk-err`** — error number from the last dk-getc that returned -1
+- **`dk-sector`**
+- **`dk-close`** — stop the motor and give the NMI vector back
+- **`dk-name`** — parse NAME.EXT:D into the 8+3 directory form; 0 or error
+- **`dk-entry`** — read directory entry 0-71 into dk-buf; its address, or 0
+- **`dk-open-fname`**
+- **`dk-open`** — open a file for dk-getc / dk-load-open; 0 or an error
+- **`dk-getc`**
+- **`dk-load-open`** — read the rest of the open file to addr, at most max
+- **`dk-load`** — read a whole file to addr, at most max bytes; as dk-load-open
+
+| Word | Stack | Kind | Bytes | Cycles |
+|------|-------|------|-------|--------|
+| `dk-drive` |  | var |  |  |
+| `dk-err` |  | var |  |  |
+| `dk-sector` | `( buf trk sec -- err )` | colon |  |  |
+| `dk-close` | `( -- )` | colon |  |  |
+| `dk-name` | `( addr u -- err )` | colon |  |  |
+| `dk-entry` | `( n -- addr | 0 )` | colon |  |  |
+| `dk-open-fname` | `( -- err )` | colon |  |  |
+| `dk-open` | `( addr u -- err )` | colon |  |  |
+| `dk-getc` | `( -- c | -1 )` | colon |  |  |
+| `dk-load-open` | `( addr max -- len err )` | colon |  |  |
+| `dk-load` | `( addr max c-addr u -- len err )` | colon |  |  |
 
 ---
 
@@ -524,6 +564,38 @@ SG6 mode text rendering (block-pixel font)
 |------|-------|------|-------|--------|
 | `sg6-row` | `( font-byte -- )` | colon | 70 | 978 |
 | `sg6-char` | `( char cx cy -- )` | colon | 54 | 2735 |
+
+---
+
+## `sn76489.fs`
+
+SN76489 sound chip words and song stream player
+
+**Provides:** sn!, sn-silence, cart-audio, sn-tone, sn-vol, sn-noise, sn-start, sn-frame, sn-play, sn-lvl, sn-dmask, sn-floor (envelope tables)
+
+**Requires:** lib/screen.fs (vsync, for sn-play)
+
+- **`sn!`** — write one byte to the SN76489
+- **`sn-silence`** — set all four channels to full attenuation
+- **`cart-audio`** — route the cartridge SND line to the speaker
+- **`sn-tone`**
+- **`sn-vol`** — set channel 0-3 attenuation, 0 loudest, 15 off
+- **`sn-noise`**
+- **`sn-start`** — point the player at a song stream and reset it
+- **`sn-frame`** — advance the song one 60 Hz frame; true once it has ended
+- **`sn-play`** — play a song to the end, one frame per vsync; true if BREAK
+
+| Word | Stack | Kind | Bytes | Cycles |
+|------|-------|------|-------|--------|
+| `sn!` | `( b -- )` | colon |  |  |
+| `sn-silence` | `( -- )` | colon |  |  |
+| `cart-audio` | `( -- )` | colon |  |  |
+| `sn-tone` | `( n ch -- )` | colon |  |  |
+| `sn-vol` | `( att ch -- )` | colon |  |  |
+| `sn-noise` | `( ctrl -- )` | colon |  |  |
+| `sn-start` | `( addr -- )` | colon |  |  |
+| `sn-frame` | `( -- done? )` | colon |  |  |
+| `sn-play` | `( addr -- brk? )` | colon |  |  |
 
 ---
 
