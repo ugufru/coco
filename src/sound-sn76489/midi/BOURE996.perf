@@ -1,0 +1,69 @@
+# Bourree in E minor, from the Suite in E minor, BWV 996 (J. S. Bach)
+#
+# Character: the most famous movement of the suite, a two-part bourree:
+# a quick, cheerful duple dance starting on a quarter upbeat, the tune
+# in eighths and quarters over a bass that walks and answers it. Light
+# and springy, two beats to the bar, with a lute's clarity.
+#
+# The suite: usually called the Lute Suite No. 1 (or in E minor), but no
+# autograph survives. An early copy (J. G. Walther's, about 1710-17,
+# is the one usually cited, though one source places the copy in the
+# Krebs collection) is headed "Praeludio con la Suite da Gio: Bast.
+# Bach", and an unidentified hand added "aufs Lauten Werck": for the
+# lute-harpsichord (Lautenwerk).
+# Most scholars think that was the intended instrument (E minor sits
+# awkwardly on the Baroque lute's D minor tuning), though it is played
+# today mostly on guitar and lute. This Mutopia edition (after the 1921
+# Denkmaeler alter Lautenkunst) names both: "Lute or Lute-Harpsichord".
+#
+# Time signature and bars: 2/2, a quarter upbeat (pickup), 24 bars:
+# first half bars 1-8 (from the upbeat, ending on beat 3 of bar 8),
+# second half from the upbeat in bar 8 to bar 24 (ending on beat 3).
+# The score has both repeat signs; the MIDI plays each half once, so
+# the repeats are written out below with play.
+#
+# Tempo: half note = 72, with both repeats 96 half notes, about 1:20.
+# Track times with repeats (MusicBrainz recording search): Narciso
+# Yepes 1:33 (about 62), Andres Segovia about 1:30 in several releases
+# (64), Hopkinson Smith, lute, 1:31 (63), Konrad Junghaenel, lute, 1:22
+# (70), Jason Vieaux 1:23 (69), Sharon Isbin 1:20 (72), Kazuhito
+# Yamashita 1:10 (82). Gustav Leonhardt (0:56) and Paul Galbraith
+# (0:48) are much shorter, perhaps without all the repeats; not
+# confirmed. I found no listing for Bream or Williams. 72 is at the
+# lively end of the lutenists and guitarists, which suits a plucked
+# chip sound with no sustain.
+#
+# Structure (from the Mutopia score, checked against the MIDI; keys are
+# my reading):
+#   0.75-4   E minor: the tune, its first phrase closing on E (4).
+#   5-8      the tune again, turning to G major; cadence in G at 8.
+#   8.75-12  second half: from G toward A minor (cadence at 12).
+#   13-16    toward B minor, with a trilled cadence (15-16).
+#   17-20    a falling sequence, one bar each, back toward E minor; the
+#            dominant, B, at 20.
+#   21-24    the close in E minor.
+#
+# The performance (play, below):
+#   0.75-8.75    first half              16.75-32.75  second half
+#   8.75-16.75   first half, repeated    32.75-48.75  second half,
+#                                                     repeated
+# so the score's bar N is performed bar N and N+8 in the first half,
+# and N+8 and N+24 in the second.
+#
+# Range: the bass goes down to E2 and D2, below the chip's B2; those
+# notes are lifted an octave, so some bass leaps come out narrower or
+# turned round. The dynamics follow the phrases regardless.
+
+pickup 4
+tempo 72 2           # half note, two beats to the bar
+play 0.75-8.75 0.75-8.75 8.75-24.75 8.75-24.75
+
+voice mid 0          # two parts: tune and bass
+
+dyn 0.75 f           # first half, first time: the dance, full
+dyn 8.75 mp          # first half repeated: an echo
+dyn 16.75 f          # second half, first time
+dyn 32.75 mp         # second half repeated: an echo
+dyn 44.75 mf         # score 21-24: the last close, firmer than the echo
+
+rit 1.5 0.75         # into the final E

@@ -1,0 +1,60 @@
+# Polonaise in G minor, BWV Anh. 119 (anonymous; formerly attributed to
+# J. S. Bach)
+#
+# From the 1725 Notebook for Anna Magdalena Bach (No. 10), one of the
+# pieces of doubtful attribution; the Notebook copy names no composer.
+#
+# Character: a polonaise, the stately Polish processional dance in 3/4,
+# here small and keyboard-sized: dotted and short-long figures (eighth,
+# two sixteenths), cadences that land on the second beat (bars 2, 4).
+# Proud rather than quick.
+#
+# Time signature: 3/4, 16 bars in the Mutopia score and in the MIDI
+# (4 + 12, each half repeated); the first note is on the downbeat.
+# The MIDI does not play the repeats, so they are written out with `play`.
+#
+# Tempo: quarter = 96. With both repeats it is 32 bars, 96 quarters, so
+# the tempo in quarters is about 96 / seconds * 60. MusicBrainz track
+# times: Gustav Leonhardt (harpsichord, 1966) 0:54, about 107; Pieter-Jan
+# Belder 0:53, about 109; Luc Beausejour 0:54, about 107; Justin Taylor
+# 0:48, about 120; Benjamin Alard 0:59, about 98; Igor Kipnis 1:02,
+# about 93; Mahan Esfahani 1:12, about 80 (all assuming both repeats).
+# 96 is between Alard and Kipnis, a little steadier than Leonhardt: it
+# keeps the processional weight, and the sixteenths stay clean.
+#
+# Structure (my reading of the Mutopia score, Bach-Gesellschaft vol. 43):
+#   1-4    G minor, the theme; cadence in G minor (bar 4, beat 2)
+#   5-10   second half, to B-flat: rising figures, cadence in B-flat (10)
+#   11-14  over D (the dominant): a two-bar phrase, stated twice
+#          (11-12, 13-14), detached quarters then a sixteenth figure
+#   15-16  the final cadence in G minor
+#
+# Bars as performed (after `play`):
+#   A 1-4, A repeat 5-8, B 9-20, B repeat 21-32.
+#   Score bar 5+y of B is 9+y (first time) and 21+y (repeat).
+#
+# Plan: terraced. A full, its repeat an echo. In B the two-bar phrase
+# over D is stated twice; the second statement (score 13-14) is an echo,
+# both times. The B repeat is softer until that echo pair, then full for
+# the final cadence.
+
+tempo 96
+play 1-4 1-4 5-16 5-16
+
+voice mid 1        # the mid voice is only passing notes; keep it back
+
+dyn 1 f            # bars 1-4: A, first time, full
+dyn 5 mp           # bars 5-8: A repeat, an echo
+dyn 9 f            # bars 9-14: B, first time (score 5-10)
+dyn 15 f           # bars 15-16: the phrase over D (score 11-12) ...
+dyn 17 mp          # bars 17-18: ... and its echo (score 13-14)
+dyn 19 f           # bars 19-20: cadence (score 15-16)
+dyn 21 mp          # bars 21-26: B repeat, softer (score 5-10)
+dyn 27 mf          # bars 27-28: the phrase over D ...
+dyn 29 p           # bars 29-30: ... and its echo
+dyn 31 f           # bars 31-32: full for the final cadence
+
+broaden 14 0.95    # score bar 10: the cadence in B-flat
+broaden 26 0.95    # and in the repeat
+
+rit 2 0.75         # bars 31-32: the final cadence in G minor

@@ -1,0 +1,52 @@
+# Lute Suite in C minor, BWV 997: Gigue (J. S. Bach), guitar
+# transcription in A minor
+#
+# Character: a gigue in 6/8, two beats to the bar, but rather grave for
+# a gigue: ornamented tune with slurred pairs, rising chromatic
+# sequences, and a walking bass. It is followed by its Double
+# (LUTEDOUB), a variation in sixteenths over the same bass.
+#
+# Time signature: 6/8 with an eighth-note upbeat, 48 bars (A 1-16,
+# B 17-48, each half entered on an upbeat). Mutopia file
+# bwv997-04gigue.mid: checked against bwv997-04gigue.ly, titled "Suite
+# in C Minor for Lute (trans. to A minor)", for guitar, so the MIDI is
+# in A minor. Both halves repeat; the MIDI plays each once, so play
+# writes them out.
+#
+# Range: written for guitar (sounding an octave lower); 49 bass notes
+# below B2 are lifted an octave by the converter.
+#
+# Tempo: dotted quarter = 64, 192 beats with repeats, about 3:00. Track
+# times: John Williams (Sony, "John Williams Plays Bach") 2:50, about
+# 68; Julian Bream 3:22, about 57. Confirmed from track listings,
+# assuming both take the repeats. 64 is between them.
+#
+# Structure (score bars, my reading of the Mutopia score):
+#   A  1-8    A minor, the tune, half close on E (8).
+#      9-14   Rising sequence of slurred pairs.
+#      15-16  Cadence in E minor.
+#   B  17-24  E, A, to D minor; G major (24).
+#      25-32  Sequences to C major (32).
+#      33-36  A minor colour, toward the return.
+#      37-40  The opening tune returns in A minor.
+#      41-48  Falling sequence and final cadence.
+#
+# Bars as performed (play): A 0.83-16.83, A repeat 16.83-32.83,
+# B 32.83-64.83 (score x = x+16), B repeat 64.83-96.83 (score x = x+48).
+
+pickup 8
+tempo 64 4.
+
+play 0.833333-16.833333 0.833333-16.833333 16.833333-48.833333 16.833333-48.833333
+
+voice bottom 1       # the bass under the tune
+voice mid 1
+
+dyn 1 mf             # A first time
+dyn 16.83 mp         # A repeat, an echo
+dyn 32.83 mf         # B first time
+dyn 53 f             # score 37: the tune returns
+dyn 64.83 mp         # B repeat, an echo
+dyn 85 mf            # score 37 in the repeat: the return, to the end
+
+rit 1.5 0.75         # into the final A

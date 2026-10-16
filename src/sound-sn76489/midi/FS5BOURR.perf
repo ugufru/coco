@@ -1,0 +1,50 @@
+# French Suite No. 5 in G major, BWV 816: Bourree (J. S. Bach)
+#
+# Character: a brisk bourree in cut time, two beats to the bar, starting
+# on a quarter upbeat. Eighth-note figures in both hands, the bass
+# often in running arpeggios. Vigorous and rustic, with the bourree's
+# strong half-bar pulse.
+#
+# Time signature: 2/2 (C barred), 30 bars in the Mutopia score and in
+# the MIDI, with a quarter-note upbeat; bar 10 ends the first half on
+# its third beat, and its last quarter is the upbeat to the second half.
+# The MIDI plays each half once.
+#
+# Repeats: both halves repeated from their upbeats, written out with
+# play. About 4 KB.
+#   Performed bars: A 0.75-10.75, A repeat 10.75-20.75 (score x is
+#   x+10), B 20.75-40.75 (score x is x+10), B repeat 40.75-60
+#   (score x is x+30).
+#
+# Tempo: half note = 92, 60 bars with repeats, about 1:20.
+# Track times: Angela Hewitt (Hyperion) 1:17, about half = 94 with both
+# repeats; Murray Perahia (Sony) 1:19, about 91; Alessandra Artifoni
+# 1:23, about 87; Glenn Gould (Sony) 0:46 (repeat plan unknown). 92
+# sits between Hewitt and Perahia; eighths are about 9.8 frames each.
+#
+# Structure (my reading of the Mutopia score):
+#   1-4     G major, the theme with its mordents; bass in eighths.
+#   5-10    the theme again, moving to D major; cadence in D (10).
+#   11-14   D major to E minor (dis, 13-14).
+#   15-18   chromatic sequence (ais, gis), cadence in E minor (18).
+#   19-24   C major and A minor, sequence in the bass.
+#   25-30   G major, the long closing sequence and final cadence.
+#
+# Plan: each half full the first time, echoed on the repeat; the full
+# sound returns for the closing sequence (score 25) in the last pass.
+
+pickup 4
+
+tempo 92 2
+
+play 0.75-10.75 0.75-10.75 10.75-30.75 10.75-30
+
+dyn 1 f            # A first time, from the upbeat
+dyn 10.75 mp       # A repeat, an echo
+dyn 20.75 f        # B first time
+dyn 29 mf          # score 19-24: C major and A minor, a step down
+dyn 35 f           # score 25-30: home to G
+dyn 40.75 mp       # B repeat, an echo
+dyn 55 f           # score 25 on: full for the close
+
+rit 2 0.8          # the last two bars into the final G

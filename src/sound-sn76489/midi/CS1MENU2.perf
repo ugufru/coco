@@ -1,0 +1,44 @@
+# Cello Suite No. 1 in G major, BWV 1007: Menuet II (J. S. Bach)
+#
+# Character: the minor-key trio to Menuet I, in G minor: more inward,
+# with sighing slurred groups and a dark low register. Played a little
+# slower and softer than Menuet I, as is usual.
+#
+# Time signature: 3/4, 24 bars, no upbeat. Mutopia file bwv1007-5.mid,
+# the sixth score: checked against bwv1007_menuet_ii.ly (its key
+# signature is one flat, the old Dorian way of writing G minor; the E
+# flats are written in). The score has repeat bars (:|.|: after bar 8,
+# :|. at the end) that LilyPond's MIDI ignores, so play writes them out.
+# This song is Menuet II alone with its own repeats; the da capo of
+# Menuet I is not added (Menuet I is its own song, CS1MENU1).
+#
+# Range: 17 notes below B2 (the low D and G, bars 8, 13-24, the final
+# G) are lifted an octave by the converter.
+#
+# Tempo: quarter = 104 (dotted half about 35), 144 beats with repeats,
+# about 1:25. From the same combined Menuet I/II track times as Menuet
+# I (Casals 3:02 to 3:14, Fournier 3:28, confirmed); the slightly
+# slower pace for the minor minuet is my judgment, as most players do.
+#
+# Structure (score bars, my reading of the Mutopia score):
+#   A  1-4    G minor, the sighing figure; 5-8 again, ending on D major
+#             (a half close, bar 8).
+#   B  9-12   D7 to G minor, C7 to F.
+#      13-16  B flat major, cadence (16).
+#      17-20  Sequence: to C minor (18), back to B flat (20).
+#      21-24  D7 (21) and the final cadence in G minor, with fermata.
+#
+# Bars as performed (play): A 1-8, A repeat 9-16, B 17-32 (score x =
+# x+8), B repeat 33-48 (score x = x+24).
+
+tempo 104
+
+play 1-8 1-8 9-24 9-24
+
+dyn 1 mp             # A, first time: softer than Menuet I
+dyn 9 p              # A repeat, an echo
+dyn 17 mp            # B, first time
+dyn 33 p             # B repeat, an echo
+dyn 45 mp            # score 21 on: the return to G minor
+
+rit 2 0.75           # the last two bars, into the fermata

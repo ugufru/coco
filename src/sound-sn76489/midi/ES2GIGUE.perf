@@ -1,0 +1,79 @@
+# English Suite No. 2 in A minor, BWV 807: Gigue (J. S. Bach)
+#
+# Identification: Mutopia's file is named bach-english-suite-2-prelude,
+# but the score inside is the Gigue: its header says "English Suite II:
+# Gigue", it is in 6/8 with an eighth upbeat (the Prelude is a long
+# 3/4 movement), and it carries the Gigue's da capo marking (below).
+#
+# Character: the only gigue in the English Suites that is not a fugue;
+# a driving two-part dance in continuous eighths, often compared to a
+# tarantella. The subject (a4 a8 a b c) climbs in broken chords; long
+# sequences follow with the hands in parallel tenths. Fiery and
+# relentless, two strong beats to the bar.
+#
+# Time signature: 6/8, 78 bars in the Mutopia score and in the MIDI,
+# with an eighth upbeat, counting every ending: bar 34 is the first
+# half's first ending (with the upbeat back to bar 1), 35-36 its second
+# ending (36 is the first bar of B); 75-76 the second half's first
+# ending (76 = 36 again), 77 its second ending, and 78 the final bar.
+# The MIDI plays the score once, every ending in a row, so play
+# restores the order.
+#
+# Repeats and the da capo: Bach marks "Da Capo dal Segno senza
+# repetizione al Fine": after both halves with their repeats, the whole
+# gigue is played again without repeats, ending at the final bar. That
+# full plan is 11.8 KB, over the jukebox's 9472-byte limit, so the da
+# capo is left out: both halves with their repeats, then the final bar
+# (78) to close. This is the plan Richard Egarr's timing implies (see
+# below). About 7.9 KB.
+#   play: A to its first ending (0.83-34), A again (1-33), the second
+#   ending and B to its first ending (35-76), B again (37-74), final 78.
+#   Performed bars: A 0.83-35, A repeat 35-68 (score x is x+34),
+#   B 68-110 (score x is x+33), B repeat 110-148 (score x is x+73),
+#   final bar 148.
+#
+# Tempo: dotted quarter = 108, about 2:45 as played here.
+# Track times: Richard Egarr (harpsichord, Harmonia Mundi 2013) 2:45,
+# about dotted quarter = 108 with both repeats and no da capo
+# (confirmed from the Harmonia Mundi track list; the built song is the
+# same length). Angela Hewitt (Hyperion) 3:11 and Andras Schiff (Decca)
+# about 3:20 are consistent with about 130-140 if they take the da capo
+# as well (reviews say Perahia and Pogorelich play it through again);
+# Glenn Gould (Sony) 2:17. 108 follows Egarr: eighths about 9.5 frames,
+# every note clear on the chip.
+#
+# Structure (my reading of the Mutopia score):
+#   1-4     subject, top, A minor, over a bass in long notes.
+#   5-16    rising sequences, the hands in parallel tenths.
+#   17-21   the subject's head on C; C major.
+#   22-28   broken phrases with rests, then falling arpeggios.
+#   29-34   closing scales; cadence in C major.
+#   36-40   B: the subject on C, then on G.
+#   41-47   falling-fifth sequence (B7-E, A-D, G-C).
+#   48-60   rising sequences in tenths to E minor; cadence (60).
+#   61-67   falling arpeggios, from E back to A minor.
+#   68-69   the subject's bars 3-4 return in A minor.
+#   70-74   closing scales; final cadence in A minor.
+#
+# Plan: each half full the first time and echoed on the repeat. In B
+# the falling arpeggios after the E minor cadence (61-67) step down to
+# mf, and the return of the subject (68) is full again, also in the
+# echoed repeat.
+
+pickup 8
+
+tempo 108 4.
+
+play 0.833333-34 1-33 35-76 37-74 78
+
+dyn 1 f              # A first time
+dyn 34.833333 mp     # A repeat from its upbeat, an echo
+broaden 67 0.95      # score 33: the C major cadence before B
+dyn 68.833333 f      # B from its upbeat (score 35, last eighth)
+dyn 94 mf            # score 61-67: falling arpeggios, a step down
+dyn 101 f            # score 68-74: the subject returns, the close
+broaden 108 0.95     # score 75: a breath before the B repeat
+dyn 108.833333 mp    # B repeat from its upbeat, an echo
+dyn 141 f            # score 68 on: full for the close
+
+rit 2 0.8            # the last two bars into the final A

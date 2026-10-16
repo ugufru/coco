@@ -1,0 +1,53 @@
+# Prelude in C minor, BWV 999 (J. S. Bach), here in D minor
+#
+# Identification: Bach wrote this prelude for lute in C minor (it is
+# No. 3 of the "Twelve Little Preludes"). The Mutopia file is a guitar
+# arrangement in D minor ("Prelude in D Minor"), and the MIDI sounds in
+# D minor, so the song is the guitar version, as Julian Bream also plays
+# it.
+#
+# Character: one unbroken arpeggio figure in sixteenths over a bass
+# note on each downbeat, the harmony changing once a bar. Almost all of
+# it rests on long pedals: a tonic pedal at the start, then a long
+# pedal on E (the dominant of A minor) and one on A (the dominant of
+# D minor). It ends on the dominant, A major, open, as Bach left it.
+#
+# Time signature: 3/4, 43 bars in the Mutopia score; the MIDI has 42
+# full bars and the final quarter-note chord in bar 43. The first note
+# is on the downbeat of bar 1. The single MIDI track holds both the bass
+# and the arpeggio. The bass E2 of bars 17-32 lies below B2 and is
+# lifted an octave by the converter, so that pedal sounds an octave
+# higher than written, still the lowest note.
+#
+# Tempo: quarter = 80, 129 quarters, about 1:40.
+# Track times: Julian Bream ("Julian Bream plays Dowland and Bach", the
+# guitar version in D minor, library catalogue listing) 1:43, about 75;
+# Andres Segovia (live on the Ed Sullivan Show, 1956, AllMusic) 1:18,
+# about 99; a Segovia/John Williams compilation (AllMusic) 1:09, about
+# 112. 80 is a little quicker than Bream: the arpeggios ring and the
+# long pedals do not drag.
+#
+# Structure (read from the Mutopia score and checked against the MIDI;
+# my own harmonic reading):
+#   1-6    D pedal: D minor, G minor over D, the leading-tone chord.
+#   7-16   The bass falls by step (D C B-flat A G-sharp ... A F D),
+#          toward A minor (13-14).
+#   17-32  A long pedal on E: diminished sevenths and the dominant of
+#          A minor over it, the tension held for sixteen bars.
+#   33-41  A pedal on A, the dominant of D minor: D minor over A (39),
+#          the diminished seventh on G-sharp (40-41).
+#   42-43  The arpeggio rises to the close on an A major chord, the
+#          dominant, with a fermata.
+
+tempo 80
+
+voice mid 0          # the arpeggio and the bass in one line: no inner
+                     # part to set back
+
+dyn 1 mf             # bars 1-16: the tonic pedal and the falling bass
+dyn 17 mp            # bars 17-32: the E pedal starts quietly
+ramp 25-32 f         # and builds over its second half
+                     # (bars 33-43 stay at f over the A pedal)
+broaden 41 0.94      # bar 41: the last diminished seventh
+
+rit 2 0.75           # into the open A major chord

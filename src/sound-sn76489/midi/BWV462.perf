@@ -1,0 +1,60 @@
+# Gott, wie gross ist deine Guete, BWV 462 (J. S. Bach)
+#
+# Sacred song No. 26 in the Mutopia edition (Franz Wullner's 1893
+# edition of Schemelli's Musicalisches Gesang-Buch, Leipzig 1736); text
+# by Schemelli himself ("God, how great is your goodness"). Melody and
+# figured bass; the bass here is the printed one, the figures not played.
+#
+# Character: a song of thanks in 4/4, B-flat major, the melody in
+# quarters with two-note eighth slurs, the bass in walking eighths. Warm
+# and steady, like a chorale with more movement.
+#
+# Time signature: 4/4, 16 bars in the Mutopia score and in the MIDI; the
+# first note is on the downbeat. The first four bars are repeated
+# (Mutopia notes the form "AABA"; the second couplet of text goes on the
+# repeat); the other twelve are not. The MIDI does not play the repeat;
+# it is written out with `play`.
+#
+# Tempo: quarter = 72. One stanza as performed is 20 bars, 80 quarters.
+# MusicBrainz track times: Aki Matsui and Masaaki Suzuki 1:43; Alice
+# Babs 1:57; Elisabeth Speiser 2:01; Klaus Mertens and Ton Koopman 2:07;
+# Sibylla Rubens 1:40. The song has four stanzas and I could not find how
+# many each recording sings, so these do not convert reliably (one stanza
+# would give about 45, two about 90). 72 is my judgment, near the Mutopia
+# MIDI's 70: the walking bass eighths move at 144 a minute, steady but
+# not hurried, and each line can breathe at its cadence.
+#
+# Structure (Mutopia score and figures; one line of text per four bars):
+#   1-4    line 1, B-flat major, cadence in B-flat (bar 4); repeated for
+#          line 2 ("Ach, wie labt sich mein Gemuete")
+#   5-8    line 3, troubled ("Wenn mich etwas will betrueben"): to G
+#          minor, half close on D (bar 8)
+#   9-12   line 4 ("zeiget sie von deinem Lieben"): through C minor to a
+#          cadence on C (bar 12)
+#   13-16  line 5 ("und Trotz bieten kann der Hoelle"): home to B-flat,
+#          the close of the opening lines returning
+#
+# Bars as performed (after `play`):
+#   A 1-4, A repeat 5-8, then score bars 5-16 as 9-20 (score x is x+4).
+#
+# Plan: shaped by the text, terraced by line: mf, the repeat mp, the
+# troubled line mp, the line of comfort mf, the defiant last line f.
+# Each line's cadence bar gets a short breath, as a congregation does.
+
+tempo 72
+play 1-4 1-16
+
+voice mid 0        # two voices only: no middle voice to set back
+
+dyn 1 mf           # bars 1-4: line 1
+dyn 5 mp           # bars 5-8: the repeat, line 2
+dyn 9 mp           # bars 9-12 (score 5-8): the troubled line
+dyn 13 mf          # bars 13-16 (score 9-12): the line of comfort
+dyn 17 f           # bars 17-20 (score 13-16): defiance, and home
+
+broaden 4 0.9      # line ends: cadence in B-flat
+broaden 8 0.9      # the same after the repeat
+broaden 12 0.88    # score bar 8: half close on D
+broaden 16 0.9     # score bar 12: cadence on C
+
+rit 1.5 0.7        # the final cadence in B-flat

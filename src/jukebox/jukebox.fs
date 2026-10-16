@@ -33,8 +33,8 @@ INCLUDE ../../lib/decb.fs
 $00 CONSTANT disk-io    \ $FF7F value: ROM slot 0, I/O slot 0 (disk)
 $01 CONSTANT sound-io   \ $FF7F value: ROM slot 0, I/O slot 1 (GameMaster)
 
-$5A00 CONSTANT song-buf \ songs load here: free heap up to TRIG_BASE
-$1E00 CONSTANT song-max \ $5A00-$77FF
+$5800 CONSTANT song-buf \ songs load here, above the program (#618); the
+$2500 CONSTANT song-max \ program must end below it. $5800-$7CFF, under the stack
 $0600 CONSTANT cg-vram  \ CG2 screen, 2048 bytes, in the RG6 reservation
 
 
@@ -123,11 +123,11 @@ VARIABLE has-pal
 
 \ ── The song list ──────────────────────────────────────────────────────
 
-48 CONSTANT max-songs
-\ Each song: its 11-byte directory name and the drive it is on.
-DATA[PY names
-bytes(48 * 12)
-]DATA
+99 CONSTANT max-songs
+\ Each song: its 11-byte directory name and the drive it is on. The
+\ table (1188 bytes) sits in the RG6 reservation above the CG2 screen,
+\ so it costs the program nothing (#618).
+$0E00 CONSTANT names
 VARIABLE nsongs
 VARIABLE cur            \ the song playing or loaded, 0-based
 
@@ -154,6 +154,71 @@ VARIABLE cur            \ the song playing or loaded, 0-based
 
 \ Every drive, 0 to 3, so the library can span disks.
 : scan  ( -- )  0 nsongs !  4 0 DO I scan-drive LOOP  dk-close ;
+
+\ ── Rotation, like a radio station (#623) ──────────────────────────────
+\
+\ No fixed order. A round plays every song once in a shuffled order, so
+\ the popular pieces come round no more often than the rest. The next
+\ round keeps the last quarter of this one out of its opening quarter,
+\ and no two songs of one set (the same first two letters: INVENT,
+\ SINFON, CS1 and CS3...) follow each other where that can be helped.
+
+$1300 CONSTANT order    \ the round's play order, a byte a song, above names
+VARIABLE pos            \ where the round has got to, 0-based
+VARIABLE nk             \ songs kept out of the start of this round
+VARIABLE fk             \ the set a swapped-in song must differ from
+VARIABLE fticks         \ frames since start, stirred into the seed
+
+: o@  ( i -- song )  order + C@ ;
+: oswap  ( i j -- )  2DUP o@ SWAP o@ ROT order + C! SWAP order + C! ;
+: song  ( -- i )  pos @ o@ ;
+
+\ The kernel's rng is a 16-bit LCG: its high byte is the useful part.
+: rand  ( n -- 0..n-1 )  rng kvar-seed @ 8 RSHIFT * 8 RSHIFT ;
+: mix  ( n -- )  kvar-seed @ XOR kvar-seed ! ;
+
+\ The disk scan takes as long as the drives do; on real hardware that
+\ varies, so count how far into a frame it finished.
+: stir  ( -- )
+  $FF02 C@ DROP  0 BEGIN 1 + $FF03 C@ $80 AND UNTIL  mix ;
+
+\ Fisher-Yates over positions lo to hi-1.
+: shuffle  ( lo hi -- )
+  OVER - DUP 2 < IF 2DROP EXIT THEN
+  1 DO  DUP I +  OVER I 1 + rand +  oswap  LOOP DROP ;
+
+: set@  ( song -- key )  name@ @ ;
+: oset  ( i -- key )  o@ set@ ;
+
+\ Swap into place i the first later song whose set is not fk's, without
+\ pulling a held-back song into the opening quarter.
+: zone  ( i -- end )  nk @ < IF nk @ ELSE nsongs @ THEN ;
+: fix  ( i key -- )
+  fk !  DUP zone OVER 1 +  2DUP > 0= IF 2DROP DROP EXIT THEN
+  DO  I oset fk @ <> IF DUP I oswap DROP EXIT THEN  LOOP DROP ;
+
+\ key: the set of the song just played, so a round's first song does
+\ not repeat its set either.
+: flow  ( key -- )
+  0 oset OVER = IF 0 OVER fix THEN DROP
+  nsongs @ 2 < IF EXIT THEN
+  nsongs @ 1 DO  I oset I 1 - oset = IF I I 1 - oset fix THEN  LOOP ;
+
+: new-round  ( -- )
+  fticks @ mix
+  nsongs @ DUP 2 RSHIFT nk !
+  0 OVER nk @ - shuffle     \ the songs not played lately open it
+  nk @ SWAP shuffle ;       \ and the last ones mix in behind them
+
+: first-round  ( -- )
+  nsongs @ 0 DO I I order + C! LOOP
+  0 nk !  0 nsongs @ shuffle  0 flow  0 pos ! ;
+
+: advance  ( -- )
+  pos @ 1 + DUP nsongs @ < IF pos ! EXIT THEN DROP
+  song set@  new-round  flow  0 pos ! ;
+
+: retreat  ( -- )  pos @ 1 - 0 MAX pos ! ;
 
 \ ── Screen layout (byte column, pixel row) ─────────────────────────────
 \
@@ -426,7 +491,7 @@ VARIABLE mq-tick
 : track  ( -- )
   lo ink  bg paper  1 y-stat cg-at
   S" TRACK" cg-type  $20 cg-emit
-  cur @ 1 + 2digits  CHAR / cg-emit  nsongs @ 2digits ;
+  pos @ 1 + 2digits  CHAR / cg-emit  nsongs @ 2digits ;
 
 \ Volume bar: 8 bytes of two steps each, bright on the frame colour.
 : vol-byte  ( b -- fill )
@@ -511,8 +576,8 @@ VARIABLE mq-tick
 : stop  ( -- )
   1 sn-hold  sn-silence  stopped mode !  loaded @ IF rewound THEN  4 dirty! ;
 
-: prev  ( -- )  0 flash-btn !  12 flash !  cur @ 1 - tune ;
-: next  ( -- )  4 flash-btn !  12 flash !  cur @ 1 + tune ;
+: prev  ( -- )  0 flash-btn !  12 flash !  retreat song tune ;
+: next  ( -- )  4 flash-btn !  12 flash !  advance song tune ;
 
 \ Seeking runs the stream without playing it. Forward goes on from
 \ here; back restarts the song and runs up to the new time.
@@ -557,7 +622,7 @@ VARIABLE held
     held @ 24 = IF  18 held !  DUP $1C $20 WITHIN IF act EXIT THEN  THEN
     DROP EXIT
   THEN
-  DUP lastk !  0 held !  ?DUP IF act THEN ;
+  DUP lastk !  0 held !  ?DUP IF  fticks @ mix  act  THEN ;
 
 \ ── Main loop ──────────────────────────────────────────────────────────
 
@@ -569,6 +634,7 @@ VARIABLE held
   marquee ;
 
 : frame  ( -- )
+  1 fticks +!
   mode @ playing = IF sn-over? IF next EXIT THEN THEN
   sn-frames 1 RSHIFT 30 /MOD SWAP DROP
   DUP secs @ = IF DROP ELSE secs !  3 dirty! THEN
@@ -581,12 +647,12 @@ VARIABLE held
   cart-audio  sound-io $FF7F C!  sn-silence  1 sn-hold
   colours-on  cg2-on  cls  title-bar  key-letters  vol
   S" SCANNING DISK..." msg
-  >disk  scan  >sound
+  >disk  scan  stir  >sound
   nsongs @ 0= IF
     S" NO .SNG FILES ON ANY DRIVE" msg
     BEGIN sn-vsync KEY? UNTIL  quit
   THEN
-  0 tune
+  first-round  song tune
   BEGIN sn-vsync frame 0 UNTIL ;
 
 main

@@ -169,8 +169,8 @@ end so the last notes can ring out.
   jukebox loads it from disk.
 - **No size field:** the end is the `$00` byte. A loader takes the file
   length from the filesystem.
-- **Jukebox limit:** the jukebox loads songs at `$5A00` and accepts up
-  to `$1E00` (7680) bytes. `midi2sng.py` refuses to write anything
+- **Jukebox limit:** the jukebox loads songs at `$5800` and accepts up
+  to `$2500` (9472) bytes (#618). `midi2sng.py` refuses to write anything
   larger. As a guide, the Badinerie is 3222 bytes for 86 seconds.
 - **On disk:** any DECB file with the extension `SNG`, stored as a binary
   file (type 2). The 8-character name is what the jukebox menu shows.

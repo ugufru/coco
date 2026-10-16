@@ -1,0 +1,54 @@
+# French Suite No. 5 in G major, BWV 816: Sarabande (J. S. Bach)
+#
+# Character: a slow, singing sarabande in 3/4, the melody ornamented in
+# the French manner (mordents, trills, a few triplet turns) over a
+# quiet inner voice and bass. The weight falls on the second beat in
+# many bars (bar 1: B dotted quarter tied over). Tender rather than
+# grave.
+#
+# Time signature: 3/4, 40 bars in the Mutopia score and in the MIDI
+# (16 + 24), no upbeat. The MIDI plays each half once.
+#
+# Repeats: both halves repeated, written out with play. About 4.5 KB.
+#   Performed bars: A 1-16, A repeat 17-32 (score x is x+16),
+#   B 33-56 (score x is x+16), B repeat 57-80 (score x is x+40).
+#
+# Tempo: quarter = 58, 80 bars with repeats, about 4:10.
+# Track times: Angela Hewitt (Hyperion) 5:11, about quarter = 46 with
+# both repeats; Alessandra Artifoni 4:16, about 56 with repeats; Glenn
+# Gould (Sony) 2:51, about 42 if he played it without repeats (his
+# usual habit; not confirmed). 58 is a little quicker than Artifoni and
+# well above Hewitt: on the chip a held note decays and cannot be
+# sustained, so a slow sarabande loses its long notes. 58 keeps the
+# dotted quarters (about 1.6 s) alive while staying unhurried.
+#
+# Structure (my reading of the Mutopia score):
+#   1-8     G major; the opening phrase and its answer, cadence in G (8).
+#   9-16    toward D major, the cadence in D at 15-16.
+#   17-24   D major turning to E minor, cadence in E minor (24).
+#   25-32   the opening phrase returns (25 = bar 1) but with F natural,
+#           leaning to C major; triplet turns in 31-32 to a cadence (32).
+#   33-40   G major, the high climb (33-35), and the final cadence.
+#
+# Plan: terraced and gentle. Each half mf the first time, an echo (mp)
+# on the repeat. In B the return of the opening (score 25) steps down to
+# mp the first time, as a quieter recollection, and back to mf for the
+# close (score 33). Breath before each double bar, and a final rit.
+
+tempo 58
+
+play 1-16 1-16 17-40 17-40
+
+dyn 1 mf           # A first time
+broaden 16 0.92    # the cadence in D before the repeat
+dyn 17 mp          # A repeat, an echo
+broaden 32 0.92    # the D cadence again, before B
+dyn 33 mf          # B first time: D major to E minor
+broaden 40 0.94    # score 24: the E minor cadence
+dyn 41 mp          # score 25: the opening returns, quieter
+dyn 49 mf          # score 33-40: the climb and the close
+broaden 56 0.92    # score 40: the G cadence before the B repeat
+dyn 57 mp          # B repeat, an echo through its opening
+dyn 73 mf          # score 33 on: full for the close
+
+rit 2 0.7          # the last two bars into the final G

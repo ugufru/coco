@@ -1,0 +1,59 @@
+# Partita in A minor for solo flute, BWV 1013: Allemande (J. S. Bach)
+#
+# Character: an unbroken chain of sixteenths with no written rests for
+# breath, implying two or three voices by leaping between registers.
+# Serious and searching rather than dance-like; it ends with a run up
+# to the flute's high A.
+#
+# Time signature: 4/4, 46 bars. The first sixteenth is a rest, so no
+# upbeat. Mutopia file bwv1013.mid, the first score: checked against
+# the allemande in bwv1013.ly. The A half (1-18) has a repeat with
+# first and second endings (score bar 19); the second ending runs on
+# into B (20-46). The Mutopia score marks no repeat for B; the
+# Allemande is a binary dance and players commonly repeat both halves,
+# so it is repeated here from the second ending's lead-in run.
+#
+# MIDI bars: LilyPond's MIDI plays both endings one after the other,
+# so MIDI bar 19 is the first ending, 20 the second, and MIDI bar
+# n (21-47) is score bar n-1.
+#
+# Range: D4 to A6, all within the chip's range; no notes lifted.
+#
+# Tempo: quarter = 72. With both repeats it is 92 bars, about 5:10.
+# I could not confirm track times for Rampal, Kuijken or Pahud. Recital
+# recordings in the Arizona State University library run 3:02 to 4:38,
+# mostly without the second repeat; 3:42 with the first repeat only
+# gives about 70, 4:38 with both about 80. 72 is my judgment: a
+# thoughtful allemande with each sixteenth 12 frames, room for the
+# implied voices to separate.
+#
+# Structure (score bars, my reading of the Mutopia score):
+#   A  1-4    A minor, the leaping arpeggio figure.
+#      5-8    To C major.
+#      9-11   Over C, B flat and C sharp: toward D minor.
+#      12-19  Through G, B major and E minor, cadence in E minor (19).
+#   B  20-25  E minor, toward D minor.
+#      26-31  D minor, then G (29-31) toward C.
+#      32-40  Sequences, chromatic turns, back toward A minor.
+#      41-46  Closing: the high register, final run to A6.
+#
+# Bars as performed (play):
+#   A, first ending           bars 1-19   (MIDI 1-19)
+#   A repeat, second ending   bars 20-38  (score x = x+19; the second
+#                                          ending is bar 38)
+#   B first                   bars 39-65  (score x = x+19)
+#   B repeat                  from 66 (the lead-in run, 7 sixteenths)
+#                             to 93.4     (score x = x+46.44)
+
+tempo 72
+
+play 1-19 1-18 20-47 20.5625-47
+
+dyn 1 mf             # A first time
+dyn 20 mp            # A repeat, an echo
+dyn 39 mf            # B first time
+dyn 60 f             # score 41: the climb to the high register
+dyn 66 mp            # B repeat, an echo
+dyn 87.43 mf         # score 41 in the repeat: full again for the end
+
+rit 2 0.7            # the final run and the high A

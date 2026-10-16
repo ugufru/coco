@@ -6,26 +6,40 @@ drives 0 to 3, one after another, and wraps around to the first. The screen is a
 90s MP3 player in CG2 (128x64, colour set 0: green, yellow, blue, red).
 
 ```
-make run    # builds jukebox.bin, build/songs.dsk and build/fugues.dsk, then
-            # starts XRoar with a Multi-Pak (disk controller in slot 0,
-            # GameMaster in slot 1), songs.dsk in drive 0, fugues.dsk in drive 1
+make run    # builds jukebox.bin and the four song disks, then starts
+            # XRoar with a Multi-Pak (disk controller in slot 0,
+            # GameMaster in slot 1) and the disks in drives 0 to 3
 ```
 
-The library is two disks (#612): `songs.dsk` holds the player, the
-Badinerie, the Air, the Prelude, the Inventions and the Sinfonias;
-`fugues.dsk` holds the fugues (#611). On a CoCo Zero, put them in
-drives 0 and 1 from the F12 menu. One disk alone works too: the jukebox
-plays whatever it finds.
+The library is four disks (#612, #620), 95 songs: `songs.dsk` holds
+the player, the Badinerie, the Air, the Prelude, the Inventions, the
+Sinfonias and the Duetti; `fugues.dsk` holds the fugues (#611), the
+Well-Tempered Clavier preludes and the organ trio sonata; `bach3.dsk`
+holds the Toccata, Sheep May Safely Graze, the Anna Magdalena pieces,
+more Inventions and suite dances; `bach4.dsk` holds cello, flute,
+violin and lute movements, partita movements and chorales and songs. On a CoCo Zero, put them in drives 0 to
+3 from the F12 menu. Fewer disks work too: the jukebox plays whatever
+it finds.
+
+It runs like a radio station (#623): no fixed order. Each round plays
+every song once, shuffled, so the popular pieces come round no more
+often than the rest (95 songs is about three and a half hours). The
+last quarter of a round is kept out of the next round's opening
+quarter, and two songs from one set (Inventions, Sinfonias, one cello
+suite...) do not follow each other where that can be helped. The
+shuffle is seeded from the disk timing and from when keys are pressed;
+on an emulator or a CoCo Zero, an untouched power-on can open the same
+way each time. TRACK shows how far through the round it is.
 
 Keys follow Winamp:
 
 | Key | Does |
 |-----|------|
-| Z | previous song |
+| Z | previous song in the round |
 | X | play (from the start if already playing; resumes when paused) |
 | C | pause / resume |
 | V | stop, back to the start of the song |
-| B | next song |
+| B | next song in the round |
 | left / right | back / forward 5 seconds |
 | up / down | volume (hold to repeat) |
 | M | switch colour theme (see Colours) |
@@ -64,7 +78,8 @@ How it fits together:
 
 - `lib/decb.fs` reads the disk directly through the WD17xx (no Disk BASIC
   calls). `dk-entry` walks the directory; `dk-open-fname` and
-  `dk-load-open` pull a song into `$5A00` (at most `$1E00` bytes).
+  `dk-load-open` pull a song into `$5800` (at most `$2500` bytes,
+  #618). The song list lives at `$0E00`, above the CG2 screen.
 - `lib/sn76489.fs` plays it. Songs are `.SNG` streams
   (`src/sound-sn76489/SNG-FORMAT.md`); a v2 song's header gives the
   title, composer and length. `sn-atten` is the volume and `sn-skip`
@@ -84,9 +99,10 @@ How it fits together:
   numbers, change the `disk-io` and `sound-io` constants. On a CoCo Zero
   `$FF7F` is open bus and both answer without it.
 - At start it checks each drive for a turning disk (`dk-ready?` watches
-  the index pulse, since the controller's READY line is tied on), reads
+  the index pulse, since the controller's READY line is tied on, or
+  asks for a sector where the controller has no pulse, #619), reads
   the directories of those that have one, and remembers each song's
   drive. That takes a few seconds. `dk-select` changes drive without
   stopping the motor.
 - Add songs by copying more `.SNG` files onto either disk (see the
-  Makefile). Up to 48 are played; a disk holds about 30 small songs.
+  Makefile). Up to 99 are played; a disk holds about 30 small songs.

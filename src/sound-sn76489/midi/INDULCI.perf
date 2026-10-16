@@ -1,0 +1,72 @@
+# In dulci jubilo, BWV 751 (attributed to J. S. Bach; by Johann Michael
+# Bach)
+#
+# Attribution: BWV 751 was catalogued under J. S. Bach in the 19th
+# century, but the Neumeister manuscript gives it to Johann Michael
+# Bach (1648-1694), J. S. Bach's father-in-law; Mutopia itself marks it
+# "spurious". The title should credit J. M. Bach.
+#
+# Character: a cradle-song setting of the Christmas chorale for organ:
+# the melody in long notes in the soprano, a quietly rocking alto in
+# quarters, and a drone in the pedal, like a shepherd's bagpipe. Where
+# the chorale sings "Alpha es et O" the pedal leaves its drone and takes
+# up the melody in canon with the soprano. Gentle and luminous, never
+# heavy.
+#
+# Time signature: 3/2, 73 bars in the Mutopia score (Edition Peters) and
+# in the MIDI. Bar 1 is a full bar of rests with the soprano's G as its
+# last half note, so the bar numbers match the score with no pickup.
+# Three MIDI tracks, but the alto changes staff in the source, so many
+# of its notes sit in the soprano's track: track order cannot be used
+# for part priority, and no more than three parts sound anyway.
+# The pedal's E2, F-sharp2, G2 and A2 lie below B2 and are lifted an
+# octave by the converter. The G drone sounds an octave higher than
+# written, still below the manuals, but the pedal canon's B2, C3 and D3
+# are not lifted, so its line jumps down an octave in the middle of
+# each "Alpha es et O" (listen for it in bars 30 and 66).
+#
+# Tempo: half = 132 (dotted whole = 44, one bar), 219 halves, about
+# 1:42. The one confirmed recording timing: Franz Haselboeck (organ,
+# "Collected Organ Chorales", Apple Music) 1:37, about half = 135. I
+# could not find timings for other organists. 132 is close to
+# Haselboeck: a rocking one-in-a-bar, slow enough for the long melody
+# notes, quick enough that they do not fade away on the chip.
+#
+# Structure (read from the Mutopia score and checked against the MIDI;
+# the phrase names are the chorale's; the plan is my own reading):
+#   1-17   G major over a G pedal (G held for 25 bars): "In dulci
+#          jubilo" and "Nun singet und seid froh" (1-9), "Unsers
+#          Herzens Wonne" and "Leit in praesepio" (9-17), soprano.
+#   18-25  The manuals in rocking quarters, the hands interlocking (the
+#          phrases "Und leuchtet als die Sonne / Matris in gremio"
+#          dissolved into figuration), still over the G pedal.
+#   26-37  "Alpha es et O": soprano 26-32, the pedal in canon two bars
+#          behind (28-34); close on D (37).
+#   38-53  The chorale again, now in D major over a D pedal (held
+#          37-61).
+#   54-61  The rocking quarter figuration again, in D.
+#   62-73  "Alpha es et O" in G: soprano 62-68, pedal canon 64-69, then
+#          the G pedal returns under the close.
+
+tempo 132 2          # half note; three to the 3/2 bar
+
+voice top 0          # the chorale melody leads throughout
+voice mid 1          # the rocking alto a step back
+voice bottom 1       # the drone a step back too; the pedal canon is
+                     # brought forward with lead below
+
+dyn 1 mf             # bars 1-17: the chorale's first phrases over the
+                     # G drone
+dyn 18 mp            # bars 18-25: the interlocking figuration, a softer
+                     # manual
+dyn 26 f             # bars 26-37: "Alpha es et O", the pedal canon:
+                     # fuller registration
+lead 28-34 bottom    # the pedal's canon on the melody
+broaden 36-37 0.92   # hold back into the close on D
+
+dyn 38 mf            # bars 38-53: the chorale in D major
+dyn 54 mp            # bars 54-61: the figuration again, softer
+dyn 62 f             # bars 62-73: "Alpha es et O" in G, to the end
+lead 64-69 bottom    # the pedal canon
+
+rit 3 0.7            # bars 71-73: the last phrase and the held G

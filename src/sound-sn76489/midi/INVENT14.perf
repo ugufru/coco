@@ -1,0 +1,53 @@
+# Invention No. 14 in B-flat major, BWV 785 (J. S. Bach)
+#
+# Character: warm and graceful, almost a little aria. The subject is a
+# thirty-second-note turn around B-flat followed by a broken chord in
+# sixteenths, a bar long; the other hand accompanies it with plain
+# broken chords in eighths. Each half of the piece states the subject
+# as a sequence (on B-flat, E-flat, F) and the hands exchange it. It
+# wants a calm, flowing four, not hurried: the turns need space.
+#
+# Time signature: 4/4, 20 bars in the Mutopia score and in the MIDI;
+# the bass B-flat is on the downbeat of bar 1 (the top enters after a
+# sixteenth rest).
+#
+# Tempo: quarter = 56, 80 quarters, about 1:28.
+# Track times: Andras Schiff (ECM, clavichord) 1:20, about 60; Gustav
+# Leonhardt (harpsichord, Apple Music reissue) 1:31, about 53; Angela
+# Hewitt (Hyperion) 1:12, about 67; Glenn Gould (Sony, 1964) 1:37,
+# about 49. 56 sits between Leonhardt and Schiff; at this tempo the
+# thirty-seconds are about 8 frames each, still clear on the chip.
+#
+# Structure (read from the Mutopia score and checked against the MIDI;
+# the key plan is my own reading):
+#   1-3    Subject, top, as a rising sequence on B-flat, E-flat and F
+#          (F7), over broken chords in the bass.
+#   4-5    The turn figure passes between the hands; cadence in F major
+#          at bar 6.
+#   6-8    Subject, bottom, in F, on B-flat and on C, under the top's
+#          broken chords.
+#   9-11   Subject, top, toward G minor (9-10) and C minor (11), over
+#          bass broken chords.
+#   12-13  The turns exchanged; cadence in C minor at bar 12.
+#   14-15  Falling sequence of turns in both hands, back toward B-flat.
+#   16     Arrival on the dominant; then the subject in stretto: the
+#          bass from beat 3, the top a beat later (16-17), B-flat.
+#   18-20  Final cadence in B-flat with a fermata.
+
+tempo 56
+
+voice mid 0          # two voices only: there is no middle voice to set back
+
+dyn 1 mf             # bars 1-5: the subject's first sequence, B-flat
+                     # to F (the bass only accompanies: no lead needed)
+
+dyn 6 mp             # bars 6-8: after the F major cadence the bass takes
+                     # the subject: a softer manual
+lead 6-8 bottom      # subject, bass, on F, B-flat and C
+
+dyn 9 mf             # bars 9-13: G minor and C minor
+ramp 14-16 f         # bars 14-16: the falling sequence, building to
+                     # the stretto (bars 17-20 stay at f)
+lead 17 top          # the top's stretto entry, a beat behind the bass
+
+rit 2 0.7            # bars 19-20 into the final B-flat

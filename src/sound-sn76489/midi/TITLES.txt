@@ -1,14 +1,67 @@
 # Header text for each import (#600): NAME | title | composer
 # midi2sng.py looks a .mid up here by its file name stem.
+AIR | Air from Orchestral Suite No. 3, BWV 1068 | J. S. Bach
+AOF3A | Art of Fugue: Mirror Fugue a 3, rectus, BWV 1080 | J. S. Bach
+AOF3B | Art of Fugue: Mirror Fugue a 3, inversus, BWV 1080 | J. S. Bach
+ARIA515 | So oft ich meine Tabakspfeife, BWV 515 | Anonymous
+ARIA516 | Warum betruebst du dich, BWV 516 | Anonymous
+BOURE996 | Bourree, from Suite in E minor, BWV 996 (lute) | J. S. Bach
+BWV454 | Ermuntre dich, mein schwacher Geist, BWV 454 | J. S. Bach
+BWV462 | Gott, wie gross ist deine Guete, BWV 462 | J. S. Bach
+BWV646 | Wo soll ich fliehen hin, BWV 646 | J. S. Bach
+CS1COUR | Cello Suite No. 1 in G major, BWV 1007: Courante | J. S. Bach
+CS1GIGUE | Cello Suite No. 1 in G major, BWV 1007: Gigue | J. S. Bach
+CS1MENU1 | Cello Suite No. 1 in G major, BWV 1007: Menuet I | J. S. Bach
+CS1MENU2 | Cello Suite No. 1 in G major, BWV 1007: Menuet II | J. S. Bach
+CS1PREL | Cello Suite No. 1 in G major, BWV 1007: Prelude | J. S. Bach
+CS3BOURR | Cello Suite No. 3 in C major, BWV 1009: Bourree I and II | J. S. Bach
+CS3GIGUE | Cello Suite No. 3 in C major, BWV 1009: Gigue | J. S. Bach
+CS3PREL | Cello Suite No. 3 in C major, BWV 1009: Prelude | J. S. Bach
+DUETTO2 | Duetto No. 2 in F major, BWV 803 | J. S. Bach
+DUETTO3 | Duetto No. 3 in G major, BWV 804 | J. S. Bach
+DUETTO4 | Duetto No. 4 in A minor, BWV 805 | J. S. Bach
+ES1BOURR | English Suite No. 1 in A major, BWV 806: Bourree I | J. S. Bach
+ES2BOURR | English Suite No. 2 in A minor, BWV 807: Bourree I | J. S. Bach
+ES2GIGUE | English Suite No. 2 in A minor, BWV 807: Gigue | J. S. Bach
+FLUTEALL | Partita in A minor for solo flute, BWV 1013: Allemande | J. S. Bach
+FLUTEBOU | Partita in A minor for solo flute, BWV 1013: Bourree angloise | J. S. Bach
+FS5BOURR | French Suite No. 5 in G major, BWV 816: Bourree | J. S. Bach
+FS5COURA | French Suite No. 5 in G major, BWV 816: Courante | J. S. Bach
+FS5GAVOT | French Suite No. 5 in G major, BWV 816: Gavotte | J. S. Bach
+FS5GIGUE | French Suite No. 5 in G major, BWV 816: Gigue | J. S. Bach
+FS5SARAB | French Suite No. 5 in G major, BWV 816: Sarabande | J. S. Bach
+FUGUE952 | Fugue in C major, BWV 952 | J. S. Bach
+INDULCI | In dulci jubilo, BWV 751 (attrib. J. S. Bach) | J. M. Bach
+INVENT02 | Two-Part Invention No. 2 in C minor, BWV 773 | J. S. Bach
+INVENT03 | Two-Part Invention No. 3 in D major, BWV 774 | J. S. Bach
 INVENT04 | Two-Part Invention No. 4 in D minor, BWV 775 | J. S. Bach
+INVENT05 | Two-Part Invention No. 5 in E-flat major, BWV 776 | J. S. Bach
+INVENT07 | Two-Part Invention No. 7 in E minor, BWV 778 | J. S. Bach
 INVENT08 | Two-Part Invention No. 8 in F major, BWV 779 | J. S. Bach
 INVENT10 | Two-Part Invention No. 10 in G major, BWV 781 | J. S. Bach
+INVENT11 | Two-Part Invention No. 11 in G minor, BWV 782 | J. S. Bach
 INVENT13 | Two-Part Invention No. 13 in A minor, BWV 784 | J. S. Bach
-SINFON02 | Sinfonia No. 2 in C minor, BWV 788 | J. S. Bach
-SINFON11 | Sinfonia No. 11 in G minor, BWV 797 | J. S. Bach
+INVENT14 | Two-Part Invention No. 14 in B-flat major, BWV 785 | J. S. Bach
+INVENT15 | Two-Part Invention No. 15 in B minor, BWV 786 | J. S. Bach
+LPRELUD2 | Little Prelude in D minor, BWV 926 | J. S. Bach
+LUTEDOUB | Lute Suite BWV 997: Double, guitar version in A minor | J. S. Bach
+LUTEGIGU | Lute Suite BWV 997: Gigue, guitar version in A minor | J. S. Bach
+LUTEPREL | Lute Suite BWV 997: Prelude, guitar version in A minor | J. S. Bach
+MINUET1 | Minuet in G major, BWV Anh. 114 | C. Petzold (attrib.)
+MINUET2 | Minuet in G minor, BWV Anh. 115 | C. Petzold (attrib.)
+MUSETTE | Musette in D major, BWV Anh. 126 | Anonymous
+P1PRELUD | Partita No. 1 in B-flat major, BWV 825: Praeludium | J. S. Bach
+P3FANTAS | Partita No. 3 in A minor, BWV 827: Fantasia | J. S. Bach
+P5GIGUE | Partita No. 5 in G major, BWV 829: Gigue | J. S. Bach
+P5MINUET | Partita No. 5 in G major, BWV 829: Tempo di Minuetta | J. S. Bach
+P5PASSEP | Partita No. 5 in G major, BWV 829: Passepied | J. S. Bach
+POLONAIS | Polonaise in G minor, BWV Anh. 119 | Anonymous
+PRELU999 | Prelude BWV 999, guitar version in D minor | J. S. Bach
 PRELUDE1 | Prelude No. 1 in C major, WTC I, BWV 846 | J. S. Bach
-AIR | Air from Orchestral Suite No. 3, BWV 1068 | J. S. Bach
+SHEEP | Sheep May Safely Graze, from BWV 208 | J. S. Bach
+SICILIAN | Siciliano, from Flute Sonata BWV 1031 | J. S. Bach (attrib.)
 SINFON01 | Sinfonia No. 1 in C major, BWV 787 | J. S. Bach
+SINFON02 | Sinfonia No. 2 in C minor, BWV 788 | J. S. Bach
 SINFON03 | Sinfonia No. 3 in D major, BWV 789 | J. S. Bach
 SINFON04 | Sinfonia No. 4 in D minor, BWV 790 | J. S. Bach
 SINFON05 | Sinfonia No. 5 in E-flat major, BWV 791 | J. S. Bach
@@ -17,16 +70,27 @@ SINFON07 | Sinfonia No. 7 in E minor, BWV 793 | J. S. Bach
 SINFON08 | Sinfonia No. 8 in F major, BWV 794 | J. S. Bach
 SINFON09 | Sinfonia No. 9 in F minor, BWV 795 | J. S. Bach
 SINFON10 | Sinfonia No. 10 in G major, BWV 796 | J. S. Bach
+SINFON11 | Sinfonia No. 11 in G minor, BWV 797 | J. S. Bach
 SINFON12 | Sinfonia No. 12 in A major, BWV 798 | J. S. Bach
 SINFON13 | Sinfonia No. 13 in A minor, BWV 799 | J. S. Bach
 SINFON14 | Sinfonia No. 14 in B-flat major, BWV 800 | J. S. Bach
 SINFON15 | Sinfonia No. 15 in B minor, BWV 801 | J. S. Bach
+TOCCATA | Toccata in D minor, from BWV 565 | J. S. Bach
+TRIO4A | Organ Trio Sonata No. 4 in E minor, BWV 528: Adagio, Vivace | J. S. Bach
+TRIO4B | Organ Trio Sonata No. 4 in E minor, BWV 528: Andante | J. S. Bach
+TRIO4C | Organ Trio Sonata No. 4 in E minor, BWV 528: Un poco allegro | J. S. Bach
+VPBOREA | Violin Partita No. 1 in B minor, BWV 1002: Tempo di Borea | J. S. Bach
 WTC1F03 | Fugue No. 3 in C-sharp major, WTC I, BWV 848 | J. S. Bach
 WTC1F06 | Fugue No. 6 in D minor, WTC I, BWV 851 | J. S. Bach
 WTC1F08 | Fugue No. 8 in D-sharp minor, WTC I, BWV 853 | J. S. Bach
 WTC1F10 | Fugue No. 10 in E minor, WTC I, BWV 855 | J. S. Bach
 WTC1F11 | Fugue No. 11 in F major, WTC I, BWV 856 | J. S. Bach
+WTC1P02 | Prelude No. 2 in C minor, WTC I, BWV 847 | J. S. Bach
+WTC1P03 | Prelude No. 3 in C-sharp major, WTC I, BWV 848 | J. S. Bach
+WTC1P06 | Prelude No. 6 in D minor, WTC I, BWV 851 | J. S. Bach
+WTC1P11 | Prelude No. 11 in F major, WTC I, BWV 856 | J. S. Bach
+WTC1P15 | Prelude No. 15 in G major, WTC I, BWV 860 | J. S. Bach
+WTC1P17 | Prelude No. 17 in A-flat major, WTC I, BWV 862 | J. S. Bach
 WTC2F01 | Fugue No. 1 in C major, WTC II, BWV 870 | J. S. Bach
-FUGUE952 | Fugue in C major, BWV 952 | J. S. Bach
-AOF3A | Art of Fugue: Mirror Fugue a 3, rectus, BWV 1080 | J. S. Bach
-AOF3B | Art of Fugue: Mirror Fugue a 3, inversus, BWV 1080 | J. S. Bach
+WTC2P02 | Prelude No. 2 in C minor, WTC II, BWV 871 | J. S. Bach
+WTC2P06 | Prelude No. 6 in D minor, WTC II, BWV 875 | J. S. Bach

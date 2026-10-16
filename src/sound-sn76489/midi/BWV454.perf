@@ -1,0 +1,69 @@
+# Ermuntre dich, mein schwacher Geist, BWV 454 (J. S. Bach)
+#
+# Sacred song No. 16 in the Mutopia edition (Franz Wullner's 1893
+# edition of Schemelli's Musicalisches Gesang-Buch, Leipzig 1736), a
+# Christmas song ("rouse yourself, my feeble spirit, to receive the little
+# child"). Schemelli prints melody and figured bass; the bass here is the
+# printed one, the figures are not played. This 3/4 melody is not
+# Johann Schop's 4/4 chorale tune for the same text, the one Bach
+# harmonized in the Christmas Oratorio ("Brich an, o schoenes
+# Morgenlicht").
+#
+# Character: a gentle 3/4 song, mostly quarter and half notes, the bass
+# walking under it with a few eighths. Warm, quietly joyful. Fermatas mark
+# the line ends at bars 4, 16 and 19.
+#
+# Time signature: 3/4, 23 bars in the Mutopia score and in the MIDI. The
+# first section (bars 1-8) is repeated, carrying the first two lines of
+# the text; the second section (9-23) is not. The MIDI does not play the
+# repeat; it is written out with `play`. The first note is on the
+# downbeat. Bar 16 is three beats: a half note with a fermata and the
+# quarter upbeat to bar 17.
+#
+# Tempo: quarter = 76 (dotted half about 25). One stanza is 31 bars, 93
+# quarters, as performed. MusicBrainz track times: Klaus Mertens,
+# Christoph Pregardien, Ton Koopman and Jaap ter Linden 1:41; Hilde
+# Roessel-Majdan 2:03; Sibylla Rubens, Michael Behringer and others
+# 2:19. I could not find how many stanzas each recording sings, so these
+# do not convert to a tempo with any confidence (one stanza in 1:41 would
+# be about 55 with the fermatas; two would be about 110). 76 is my
+# judgment: a flowing three-in-a-bar for a lullaby-like Christmas song,
+# slow enough for the half notes to sing on the chip.
+#
+# Structure (Mutopia score and figures):
+#   1-4    F major, line 1; half close on C with a fermata (bar 4)
+#   5-8    line 2, cadence in F (bar 8)
+#   9-12   second section: to G minor, cadence there (bar 12)
+#   13-16  to D minor, cadence with a fermata (bar 16)
+#   17-19  the high F (bar 17) and a half close on C with a fermata (19)
+#   20-23  the last line, cadence in F
+#
+# Bars as performed (after `play`):
+#   section 1 bars 1-8, its repeat 9-16 (score bar x is x+8), section 2
+#   bars 17-31 (score bar 9+y is 17+y).
+#
+# Plan: the first lines mf, their repeat (new words) mp. The second
+# section mf, softer for the turn to D minor, full at the high F, and
+# settling for the last line. Fermata bars broadened.
+
+tempo 76
+play 1-8 1-23
+
+voice mid 0        # two voices only: no middle voice to set back
+
+dyn 1 mf           # bars 1-8: lines 1-2
+dyn 9 mp           # bars 9-16: the repeat, lines 3-4
+dyn 17 mf          # score 9-12: to G minor
+dyn 21 mp          # score 13-16: the turn to D minor
+dyn 25 f           # score 17-19: the high F
+dyn 28 mf          # score 20-23: the last line
+
+broaden 4 0.8      # fermata on C
+broaden 8 0.92     # cadence in F, end of the section
+broaden 12 0.8     # the same in the repeat
+broaden 16 0.92
+broaden 20 0.92    # score bar 12: cadence in G minor
+broaden 24 0.78    # score bar 16: fermata, D minor, and the upbeat after
+broaden 27 0.8     # score bar 19: fermata on C (beat 3)
+
+rit 2 0.7          # score bars 22-23: the final cadence in F

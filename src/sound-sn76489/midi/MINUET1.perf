@@ -1,0 +1,58 @@
+# Minuet in G major, BWV Anh. 114 (attributed to Christian Petzold)
+#
+# From the 1725 Notebook for Anna Magdalena Bach (No. 4). Long played as
+# Bach's, it is now usually given to the Dresden organist Christian
+# Petzold (1677-1733); the Mutopia score says so too ("attributed to
+# Christian Petzold"). The Notebook copy has no attribution.
+#
+# Character: a court minuet, light and graceful, one beat in the bar
+# felt over three quarters. A singing right hand in quarters and eighths
+# over a plain bass in halves and quarters. Two voices only.
+#
+# Time signature: 3/4, 32 bars in the Mutopia score and in the MIDI
+# (16 + 16, each half repeated); the first note is on the downbeat.
+# The MIDI does not play the repeats, so they are written out with
+# `play`, as a harpsichordist plays them.
+#
+# Tempo: quarter = 132 (dotted half = 44). With both repeats the piece
+# is 64 bars, 192 quarters, so a timing converts as 192 / seconds * 60.
+# MusicBrainz track times (harpsichord unless noted): Benjamin Alard
+# 1:20, about 144; Pieter-Jan Belder 1:25, about 136; Justin Taylor
+# 1:26, about 134; Igor Kipnis 1:37, about 119; Kevin Bowyer 1:38,
+# about 118. These assume both repeats are taken (the usual practice;
+# not checked recording by recording). 132 sits with Belder and Taylor:
+# a dance tempo that still lets the quarter notes ring on the chip.
+#
+# Structure (my reading of the Mutopia score, after Bach-Gesellschaft):
+#   1-8    G major, the tune; half close on D (bar 8, the A with a grace)
+#   9-16   the tune again, closing in G (bar 16)
+#   17-24  second half: to D major, perfect cadence in D at bar 24
+#   25-28  a short sequence (G over B, then C), the bass in octaves
+#   29-32  the run up (bar 29) and the final cadence in G
+#
+# Bars as performed (after `play`):
+#   A first time 1-16, A repeat 17-32, B first time 33-48, B repeat 49-64.
+#   Score bar x of A is x and 16+x; score bar 17+y of B is 33+y and 49+y.
+#
+# Plan: as on a two-manual harpsichord, each half full the first time and
+# echoed softer on the repeat. Only one broadening, into the D major
+# cadence that ends the first phrase of the second half; the dance keeps
+# its pulse elsewhere.
+
+tempo 132
+play 1-16 1-16 17-32 17-32
+
+voice mid 1        # the mid voice is only the left hand's thirds (bars 1,
+                   # 16, 25-26, 29): keep it behind the tune
+
+dyn 1 mf           # bars 1-16: A, first time
+dyn 17 mp          # bars 17-32: A repeat, an echo
+dyn 33 mf          # bars 33-48: B, first time
+dyn 49 mp          # bars 49-56: B repeat, an echo ...
+dyn 57 mf          # bars 57-64: ... full again for the sequence and the
+                   # last cadence (score 25-32), to close
+
+broaden 40 0.94    # score bar 24: the cadence in D major (first time)
+broaden 56 0.94    # and in the repeat
+
+rit 2 0.8          # bars 63-64: the final cadence and the closing G

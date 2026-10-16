@@ -1,0 +1,60 @@
+# Wo soll ich fliehen hin, BWV 646 (J. S. Bach), Schuebler Chorale No. 2
+#
+# Character: an organ trio. The right hand (8') and the left hand (16')
+# play a restless ritornello in running sixteenths, imitating each
+# other; the chorale melody, "Where shall I flee", comes in the pedal
+# on a 4' stop in six plain phrases of quarter notes, with ritornello
+# between them. The running lines say the flight; the chorale is calm
+# above them. Steady, with the chorale clearly heard.
+#
+# Time signature: 4/4, 33 bars in the Mutopia score; the MIDI ends
+# after beat 3 of bar 33 (the last beat is a rest). The first note is on
+# the downbeat of bar 1.
+#
+# Voices in the MIDI: track 1 the right hand, track 2 the left hand,
+# track 3 the pedal chorale. The source transposes the left hand an
+# octave down (16') and the pedal two octaves up. A 4' pedal stop sounds
+# only one octave above the written notes, so the chorale here sounds
+# an octave higher than on the organ (E5 to D6), above the right hand:
+# the top voice of the three. That keeps it clear on the chip, but it is
+# a source problem worth knowing. The left hand's notes below B2 are
+# lifted an octave by the converter, which breaks its line in places.
+# Only three parts ever sound, so nothing is dropped and `parts` is not
+# needed.
+#
+# Tempo: quarter = 66, 131 quarters, about 2:00.
+# Track times: Martin Haselboeck (Novalis, 1985, AllMusic) 2:00, about
+# 66; Gerhard Weinberger (CPO, 1996, AllMusic) 2:03, about 64; Kare
+# Nordstoga (2014, Apple Music) 1:59, about 66; Daniel Chorzempa (1983,
+# a catalogue listing) 1:47, about 74. I could not confirm timings for
+# Hurford, Koopman or Bowyer. 66 is where three of the four agree.
+#
+# Structure (read from the Mutopia score and checked against the MIDI):
+#   1-5    Ritornello, manuals alone, E minor.
+#   6-8    Chorale phrase 1 (pedal, from beat 4 of bar 6).
+#   9-11   Phrase 2, ending on F-sharp (11).
+#   11-13  Ritornello, to B minor.
+#   14-16  Phrase 3.
+#   17-19  Phrase 4.
+#   20-23  Ritornello in G major.
+#   24-26  Phrase 5.
+#   27-29  Phrase 6, ending on E (29).
+#   30-33  Ritornello: bars 3-6 return, close in E minor.
+#
+# Plan: a Schuebler trio keeps one registration throughout, so there is
+# no terracing here: one level, and the chorale is lifted over the
+# ritornello while it sounds. Timing gives the phrase ends their breath.
+
+tempo 66
+
+voice mid 1          # whichever manual line sits in the middle under the
+                     # chorale steps back a little
+
+dyn 1 mf             # one registration for the whole trio
+
+lead 6-11 top        # chorale phrases 1 and 2
+lead 14-19 top       # phrases 3 and 4
+lead 24-29 top       # phrases 5 and 6
+broaden 29 0.95      # bar 29: the chorale's last phrase ends
+
+rit 2 0.75           # the closing ritornello's last bars

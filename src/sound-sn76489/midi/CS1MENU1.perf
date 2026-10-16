@@ -1,0 +1,46 @@
+# Cello Suite No. 1 in G major, BWV 1007: Menuet I (J. S. Bach)
+#
+# Character: a graceful, singing minuet in G major, slurred pairs of
+# eighths and a few chords (bar 4, the last bar). Danced in a steady
+# three, not hurried.
+#
+# Time signature: 3/4, 24 bars, no upbeat. Mutopia file bwv1007-4.mid,
+# the fifth score (Prelude, Allemande, Courante, Sarabande, Menuet I):
+# checked against bwv1007_menuet_i.ly. Repeat signs on both halves
+# (A 1-8, B 9-24); the MIDI has no repeats, so play writes them out.
+# This song is Menuet I alone, with its own repeats; Menuet II is a
+# separate song (CS1MENU2), so the da capo is not played here.
+#
+# Range: 13 notes below B2 (the low G and D, bars 4, 8, 16, 24) are
+# lifted an octave by the converter; the final G chord loses its depth.
+#
+# Tempo: quarter = 112 (dotted half about 37), 144 beats with repeats,
+# about 1:20. Track times for Menuet I and II together (with Menuet I
+# da capo): Pablo Casals (1938) 3:02 to 3:14 by transfer; Pierre
+# Fournier (Archiv, 1960) 3:28. Assuming both minuets with repeats and
+# the da capo without, those give about 111 to 118 (Casals) and 104
+# (Fournier). The per-minuet split is my estimate, not a confirmed
+# timing.
+#
+# Structure (score bars, my reading of the Mutopia score):
+#   A  1-4    G major, the opening phrase, half close on D (4).
+#      5-8    To D major, cadence (8).
+#   B  9-12   D major, then toward E minor.
+#      13-16  B7 to E minor, cadence (16).
+#      17-20  C major and A minor sequences, A7.
+#      21-24  D7 and home to G, final cadence.
+#
+# Bars as performed (play): A 1-8, A repeat 9-16, B 17-32 (score x =
+# x+8), B repeat 33-48 (score x = x+24).
+
+tempo 112
+
+play 1-8 1-8 9-24 9-24
+
+dyn 1 mf             # A, first time
+dyn 9 mp             # A repeat, an echo
+dyn 17 mf            # B, first time
+dyn 33 mp            # B repeat, an echo
+dyn 45 mf            # score 21 on: the way home, full again
+
+rit 2 0.8            # the last two bars into the final chord

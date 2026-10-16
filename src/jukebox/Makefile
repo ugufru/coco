@@ -3,14 +3,16 @@ EXTRA_DEPS  = ../../lib/screen.fs ../../lib/bye.fs ../../lib/vdg.fs ../../lib/cg
 # A Multi-Pak with the disk controller in slot 0 and the GameMaster in
 # slot 1, and the song disk in drive 0.
 XROAR_EXTRA = -cart mpi -mpi-load-cart 0=rsdos -mpi-load-cart 1=gmc \
-              -load-fd0 build/songs.dsk -load-fd1 build/fugues.dsk -kbd-translate
+              -load-fd0 build/songs.dsk -load-fd1 build/fugues.dsk \
+              -load-fd2 build/bach3.dsk -load-fd3 build/bach4.dsk -kbd-translate
 
 include ../../make/demo.mk
 
 # The disk carries the player too, first, so a CoCo Zero with autorun on
 # (it runs drive 0's first program) boots straight into the menu (#594).
-all: build/songs.dsk build/fugues.dsk
-run: build/songs.dsk build/fugues.dsk
+DISKS = build/songs.dsk build/fugues.dsk build/bach3.dsk build/bach4.dsk
+all: $(DISKS)
+run: $(DISKS)
 
 DECB = $(shell command -v decb || echo ~/bin/decb)
 SNG  = ../sound-sn76489
@@ -22,8 +24,22 @@ $(SNG)/build/badinerie.snd: $(SNG)/badinerie.py $(SNG)/badinerie.perf $(SNG)/sn7
 # They no longer fit one disk, so the fugues (#611) go on a second disk
 # for drive 1 (#612); the jukebox plays every drive that has a disk.
 SONGS  = $(patsubst $(SNG)/midi/%.mid,$(SNG)/build/songs/%.sng,$(wildcard $(SNG)/midi/*.mid))
-FUGUES = $(filter $(SNG)/build/songs/WTC% $(SNG)/build/songs/FUGUE% $(SNG)/build/songs/AOF%,$(SONGS))
-DISK0  = $(filter-out $(FUGUES),$(SONGS))
+# Two more disks of Bach for drives 2 and 3 (#620), in playing order.
+# The WTC preludes and the organ trio sonata join the fugues on drive 1,
+# and the Duetti join the Inventions on drive 0, so every disk fits.
+BACH3  = TOCCATA SHEEP MINUET1 MINUET2 MUSETTE POLONAIS PRELU999 \
+         BOURE996 SICILIAN INDULCI LPRELUD2 INVENT02 INVENT03 \
+         INVENT05 INVENT07 INVENT11 INVENT14 INVENT15 FS5COURA \
+         FS5SARAB FS5GAVOT FS5BOURR FS5GIGUE ES1BOURR ES2BOURR \
+         ES2GIGUE
+BACH4  = CS1PREL CS1COUR CS1MENU1 CS1MENU2 CS1GIGUE CS3PREL CS3BOURR \
+         CS3GIGUE FLUTEALL FLUTEBOU VPBOREA LUTEPREL LUTEGIGU \
+         LUTEDOUB P1PRELUD P3FANTAS P5MINUET P5PASSEP P5GIGUE BWV646 \
+         BWV454 BWV462 ARIA515 ARIA516
+DISK2  = $(patsubst %,$(SNG)/build/songs/%.sng,$(BACH3))
+DISK3  = $(patsubst %,$(SNG)/build/songs/%.sng,$(BACH4))
+FUGUES = $(filter-out $(DISK2) $(DISK3),$(filter $(SNG)/build/songs/WTC% $(SNG)/build/songs/FUGUE% $(SNG)/build/songs/AOF% $(SNG)/build/songs/TRIO%,$(SONGS)))
+DISK0  = $(filter-out $(FUGUES) $(DISK2) $(DISK3),$(SONGS))
 
 $(SONGS):
 	$(MAKE) -C $(SNG) songs
@@ -46,10 +62,21 @@ build/fugues.dsk: $(FUGUES)
 	    $(DECB) copy $$f $@,$$(basename $$f | tr a-z A-Z) -2 -b || exit 1; \
 	done
 
+build/bach3.dsk: $(DISK2)
+build/bach4.dsk: $(DISK3)
+build/bach3.dsk build/bach4.dsk:
+	mkdir -p build
+	rm -f $@
+	$(DECB) dskini $@
+	for f in $^; do \
+	    $(DECB) copy $$f $@,$$(basename $$f | tr a-z A-Z) -2 -b || exit 1; \
+	done
+
 # The same on a CoCo 3, whose GIME palette the player programs (#603).
 # The theme colours are RGB values, so use the RGB monitor input.
-run3: $(BIN) build/songs.dsk build/fugues.dsk
+run3: $(BIN) $(DISKS)
 	xroar -machine coco3 -tv-input rgb \
 	    -cart mpi -mpi-load-cart 0=rsdos -mpi-load-cart 1=gmc \
-	    -load-fd0 build/songs.dsk -load-fd1 build/fugues.dsk -kbd-translate -run $(BIN)
+	    -load-fd0 build/songs.dsk -load-fd1 build/fugues.dsk \
+	    -load-fd2 build/bach3.dsk -load-fd3 build/bach4.dsk -kbd-translate -run $(BIN)
 .PHONY: run3

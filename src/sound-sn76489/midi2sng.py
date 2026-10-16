@@ -33,7 +33,7 @@ import sn76489  # noqa: E402
 
 FPS = 60
 PEAKS = [2, 3, 2]   # fallback note-on attenuation (notes carry their own)
-MAX_SNG = 0x1E00    # the jukebox's load area ($5A00-$77FF)
+MAX_SNG = 0x2500    # the jukebox's load area ($5800-$7CFF, #618)
 
 
 def read_varlen(data, i):
@@ -50,7 +50,8 @@ def read_midi(path):
     """Return (division, tempo_events, notes, timesig).
 
     tempo_events: [(tick, usec_per_quarter)]
-    notes: [(start_tick, end_tick, pitch)]
+    notes: [(start_tick, end_tick, pitch, track)], track counting from 0
+           in file order (Mutopia's track 0 is the control track)
     timesig: (numerator, denominator) of the first time signature"""
     data = open(path, "rb").read()
     if data[:4] != b"MThd":
@@ -62,7 +63,7 @@ def read_midi(path):
     i = 8 + hlen
     tempos, notes = [], []
     timesig = None
-    for _ in range(ntrk):
+    for trk in range(ntrk):
         if data[i:i + 4] != b"MTrk":
             raise ValueError(f"{path}: bad track chunk")
         tlen = struct.unpack(">I", data[i + 4:i + 8])[0]
@@ -102,7 +103,7 @@ def read_midi(path):
             elif held.get((ch, a)):
                 start = held[(ch, a)].pop(0)
                 if tick > start:
-                    notes.append((start, tick, a))
+                    notes.append((start, tick, a, trk))
         i = end
     tempos.sort()
     if not tempos or tempos[0][0] > 0:
@@ -122,6 +123,7 @@ LEVELS = {"ff": 0, "f": 1, "mf": 2, "mp": 3, "p": 4, "pp": 5}
 UNITS = {"2.": 3.0, "2": 2.0, "4.": 1.5, "4": 1.0, "8.": 0.75, "8": 0.5,
          "16.": 0.375, "16": 0.25}   # note values, in quarter notes
 VOICES = ("top", "mid", "bottom")
+EPS = 1e-6          # bar positions are floats: a mark on a note must catch it
 
 
 def bar_range(text):
@@ -140,6 +142,8 @@ class Performance:
         self.lead = []               # (from bar, to bar, voice)
         self.accent = 0              # steps louder on each downbeat
         self.pickup = 0.0            # upbeat before bar 1, in quarter notes
+        self.play = []               # (from, to) bar positions, in playing order
+        self.parts = []              # MIDI tracks, most important first
 
     @classmethod
     def load(cls, path):
@@ -184,6 +188,14 @@ class Performance:
             self.accent = int(w[1])
         elif cmd == "pickup":            # pickup 8   (an eighth-note upbeat)
             self.pickup = UNITS[w[1]]
+        elif cmd == "play":              # play 1-8 1-8 9-16 9-16
+            for r in w[1:]:
+                a, _, b = r.partition("-")
+                a, b = float(a), float(b or a)
+                # A whole bar number includes that bar; a fraction stops there.
+                self.play.append((a, b + 1 if b == int(b) else b))
+        elif cmd == "parts":             # parts 3 4 1 2
+            self.parts = [int(t) for t in w[1:]]
         else:
             raise ValueError(f"unknown command {cmd!r}")
 
@@ -197,6 +209,26 @@ class Performance:
         if bars > 0 and pos > end_pos - bars:
             f *= 1 + (end - 1) * (pos - (end_pos - bars)) / bars
         return f
+
+    def tick(self, pos, division, bar_ticks):
+        return round((pos - 1) * bar_ticks + self.pickup * division)
+
+    def performed(self, notes, division, bar_ticks):
+        """The notes in playing order (the play command): each range of the
+        score in turn, end to end, so repeats are written out and an
+        excerpt plays alone. The timeline keeps the first range's start,
+        so bar positions still line up with the pickup."""
+        if not self.play:
+            return notes
+        out = []
+        at = self.tick(self.play[0][0], division, bar_ticks)
+        for a, b in self.play:
+            ta, tb = self.tick(a, division, bar_ticks), self.tick(b, division, bar_ticks)
+            for s, e, p, t in notes:
+                if ta <= s < tb:
+                    out.append((at + s - ta, at + min(e, tb) - ta, p, t))
+            at += tb - ta
+        return out
 
     def pos(self, tick, division, bar_ticks):
         """Bar position of a tick: bar 1 starts after the pickup."""
@@ -232,7 +264,7 @@ class Performance:
         if marks and marks[0][1] == "dyn" and marks[0][0] <= 1:
             v = marks[0][2]          # an opening mark covers any upbeat too
         for mark in marks:
-            if mark[0] > pos:
+            if mark[0] > pos + EPS:      # a mark on an upbeat at 18.8333...
                 break
             if mark[1] == "dyn":
                 v = mark[2]
@@ -244,9 +276,9 @@ class Performance:
     def attenuations(self, notes, division, bar_ticks):
         """The starting attenuation (0 loud to 15 off) of each note."""
         out = []
-        for s, e, p in notes:
+        for s, e, p, *_ in notes:
             pos = self.pos(s, division, bar_ticks)
-            sounding = [q for t, u, q in notes if t <= s < u]
+            sounding = [q for t, u, q, *_ in notes if t <= s < u]
             if p >= max(sounding):
                 rank = "top"
             elif p <= min(sounding):
@@ -255,7 +287,7 @@ class Performance:
                 rank = "mid"
             att = self.level(pos) + self.voice[rank]
             for a, b, v in self.lead:
-                if a <= pos < b and v == rank:
+                if a <= pos + EPS < b + EPS and v == rank:
                     att -= 1
             if round(s - self.pickup * division) % bar_ticks == 0:
                 att -= self.accent
@@ -263,19 +295,35 @@ class Performance:
         return out
 
 
-def allocate(notes):
-    """notes: [(start, end, pitch, att)] in frames. Returns three voices
-    of (start, length, pitch, att), each a single line with no overlaps."""
+def allocate(notes, rank=None):
+    """notes: [(start, end, pitch, att, track)] in frames. Returns three
+    voices of (start, length, pitch, att), each a single line with no
+    overlaps. rank maps a track to its importance (0 first, the parts
+    command); with it, the least important of four sounding notes gives
+    way instead of the middle pitch."""
     voices = [[], [], []]
     busy = [0, 0, 0]          # frame each channel is free from
     last = [76, 64, 48]       # previous pitch: seed top, middle, bottom
+    held = [0, 0, 0]          # rank of each channel's note
     dropped = 0
-    for start, end, pitch, att in sorted(notes, key=lambda n: (n[0], -n[2])):
+    for start, end, pitch, att, trk in sorted(notes, key=lambda n: (n[0], -n[2])):
+        r = rank.get(trk, len(rank)) if rank else 0
         if end <= start:
             end = start + 1
         free = [c for c in range(3) if busy[c] <= start]
         if free:
             c = min(free, key=lambda c: abs(last[c] - pitch))
+        elif rank:
+            # Every channel sounds: the least important part gives way.
+            c = max(range(3), key=lambda c: held[c])
+            if held[c] <= r:
+                dropped += 1
+                continue
+            s, _, p, a = voices[c][-1]
+            voices[c][-1] = (s, start - s, p, a)
+            if voices[c][-1][1] <= 0:
+                voices[c].pop()
+            dropped += 1
         else:
             # Every channel sounds. Of the four pitches keep the top and
             # the bottom: an inner new note is dropped; a new top (or
@@ -294,6 +342,7 @@ def allocate(notes):
         voices[c].append((start, end - start, pitch, att))
         busy[c] = end
         last[c] = pitch
+        held[c] = r
     return voices, dropped
 
 
@@ -301,13 +350,17 @@ def convert(path, speed=1.0, transpose=0, perf_path=None):
     division, tempos, raw, (num, den) = read_midi(path)
     perf = Performance.load(perf_path)
     bar_ticks = division * 4 * num // den
-    end_tick = max(e for _, e, _ in raw)
+    raw = perf.performed(raw, division, bar_ticks)
+    if perf.play and not perf.tempo:
+        raise ValueError(f"{path}: play needs a tempo command")
+    end_tick = max(e for _, e, *_ in raw)
     conv = perf.timing(division, tempos, bar_ticks, end_tick, speed)
     atts = perf.attenuations(raw, division, bar_ticks)
-    t0 = min(s for s, _, _ in raw)
-    notes = [(conv(s) - conv(t0), conv(e) - conv(t0), p + transpose, a)
-             for (s, e, p), a in zip(raw, atts)]
-    voices, dropped = allocate(notes)
+    t0 = min(s for s, *_ in raw)
+    notes = [(conv(s) - conv(t0), conv(e) - conv(t0), p + transpose, a, t)
+             for (s, e, p, t), a in zip(raw, atts)]
+    rank = {t: i for i, t in enumerate(perf.parts)}
+    voices, dropped = allocate(notes, rank)
     data = sn76489.stream(voices, 1, PEAKS)
     secs = max(n[0] + n[1] for v in voices for n in v) / FPS
     return data, secs, len(raw), dropped

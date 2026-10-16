@@ -1,0 +1,54 @@
+# Aria "So oft ich meine Tobackspfeife", BWV 515 (from the 1725 Notebook
+# for Anna Magdalena Bach)
+#
+# No. 20 in the Notebook, a strophic song for voice and bass: the smoker's
+# meditation (as often as I fill my pipe, I think of death: the ash, the
+# glowing bowl, the smoke). The Notebook has it twice: BWV 515 in D minor
+# (this one) and BWV 515a, a fourth higher in G minor, in Anna Magdalena's
+# hand. The Notebook names no composer; the text may be Bach's own joke,
+# the music possibly by Gottfried Heinrich Bach. Mutopia: "Aria, BWV 515"
+# (No. 20a), D minor, Bach-Gesellschaft.
+#
+# Character: a sober, slightly wry dance-song in 3/4: plain quarter notes,
+# a little decorated turn in bars 2 and 6, a walking bass. Unhurried.
+#
+# Time signature: 3/4, 16 bars in the Mutopia score and in the MIDI
+# (8 + 8, each half repeated); the first note is on the downbeat. The
+# MIDI does not play the repeats; they are written out with `play`.
+# Here the melody stands for the voice: one stanza, as on a keyboard.
+#
+# Tempo: quarter = 96. With both repeats a stanza is 32 bars, 96 quarters.
+# MusicBrainz track times for keyboard versions (one stanza): Justin
+# Taylor (harpsichord, 0:59) about 98; Tragicomedia (Stephen Stubbs,
+# 1:00) about 96; Claudio Colombo (No. 20A, 1:18) about 74. Sung
+# recordings (Hermann Prey 2:33, Karina Gauvin 2:41, Ameling/Leonhardt
+# 3:47 for BWV 515a) sing several stanzas; I could not tell how many, so
+# they are not converted. 96 follows Taylor and Stubbs.
+#
+# Structure (my reading of the Mutopia score):
+#   1-4    D minor, first line; cadence on D (bar 4)
+#   5-8    to the relative major, cadence in F (bar 8)
+#   9-12   second half: C major colour (B natural, bar 10), then down to
+#          the half close on A (bar 12, C-sharp held)
+#   13-16  the bass walks up from C-sharp; final cadence in D minor
+#
+# Bars as performed (after `play`):
+#   A 1-8, A repeat 9-16, B 17-24 (score 9-16), B repeat 25-32.
+#
+# Plan: each half once at mf and repeated softer, as a second manual; the
+# half close on A gets a breath each time; a plain final ritardando.
+
+tempo 96
+play 1-8 1-8 9-16 9-16
+
+voice mid 0        # two voices only: no middle voice to set back
+
+dyn 1 mf           # bars 1-8: A, first time
+dyn 9 mp           # bars 9-16: A repeat
+dyn 17 mf          # bars 17-24: B, first time
+dyn 25 mp          # bars 25-32: B repeat
+
+broaden 20 0.92    # score bar 12: the half close on A
+broaden 28 0.92    # and in the repeat
+
+rit 2 0.75         # bars 31-32: the final cadence in D minor

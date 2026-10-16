@@ -1,0 +1,57 @@
+# Cello Suite No. 1 in G major, BWV 1007: Prelude (J. S. Bach)
+#
+# Character: the most famous page Bach wrote for the cello. An unbroken
+# stream of sixteenths, almost all broken chords over the open strings,
+# that wanders away from G major, stops on a held D (the fermata in bar
+# 22), then climbs back through scales and a long bariolage on the open A
+# string to a G major climax. Free in feeling, but the sixteenths must
+# keep flowing.
+#
+# Time signature: 4/4, 42 bars in the Mutopia score and in the MIDI
+# (bwv1007.mid, the first score of the set: checked against
+# bwv1007_prelude.ly). No repeats, no upbeat.
+#
+# Range: the Mutopia score is written an octave up and transposed down
+# (\transpose c c,), so it sounds at true cello pitch. 56 notes fall
+# below B2 (the open G and D strings in bars 1-4, 15-19, 36-42) and the
+# converter lifts them an octave: the G pedal of the opening and the low
+# D under the final climb sound an octave higher than written.
+#
+# Tempo: quarter = 66, 168 beats, about 2:35 with the fermata and the
+# final broadening. Track times: Pablo Casals (1938, EMI/Warner
+# transfers) 2:21 to 2:29 depending on the transfer, about 68 to 72;
+# Pierre Fournier (Archiv, 1960) 2:50, about 59. Both confirmed from
+# track listings. 66 sits between them: flowing like Casals, with the
+# chord changes still clear on the chip (each sixteenth about 14 frames).
+#
+# Structure (read from the Mutopia score; the bar plan is my own
+# reading, though the bar 22 fermata and the bariolage from bar 31 are
+# the landmarks every edition points out):
+#   1-4    G major over the open G: the famous opening arpeggios.
+#   5-11   Moving away: E minor, D major, toward A minor.
+#   12-14  A minor, then B7 (bar 13) to E minor (14).
+#   15-18  D7, G7 (16), C (17), D7 over G (18): back home.
+#   19-22  Falling scale, then the dominant (A7 over D) to the held D
+#          with its fermata (22): the halfway pause.
+#   23-30  Scales restart from D, chromatic turns (E flat, 24), falling
+#          runs (29-30).
+#   31-36  Bariolage: the open A sounded against a moving line, over
+#          the dominant.
+#   37-38  The chromatic climb from D, one semitone a beat.
+#   39-41  The climax: G major chords over a D pedal.
+#   42     Final G major chord.
+
+tempo 66
+
+dyn 1 mf             # bars 1-11: the opening, a full but unforced sound
+dyn 12 mp            # bars 12-18: the minor-key excursion, a softer colour
+dyn 19 mf            # bars 19-22: the falling scale and the approach to
+                     # the fermata
+broaden 21-22 0.85   # the dominant and the held D: the bar 22 fermata
+
+dyn 23 mp            # bars 23-30: start again quietly after the pause
+dyn 31 mp            # bars 31-38: the bariolage and the chromatic climb,
+ramp 31-38 f         # the long build the whole Prelude is aimed at
+dyn 39 ff            # bars 39-42: the climax in G major
+
+rit 2 0.7            # bars 41-42: broaden into the final chord

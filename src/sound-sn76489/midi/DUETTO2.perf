@@ -1,0 +1,64 @@
+# Duetto No. 2 in F major, BWV 803 (J. S. Bach)
+#
+# Character: the second of the four Duetti from Clavier-Uebung III
+# (1739), strict two-part counterpoint. A bright, rising subject in
+# F major in 2/4 frames a long, searching middle section in the minor,
+# built on a new chromatic subject that wanders through D minor,
+# A minor, F minor and C minor. The opening section then returns whole
+# (da capo, written out), now with a new bass under the subject.
+#
+# Time signature: 2/4, 149 bars, no upbeat, no repeat signs (Mutopia
+# duetto.mid / duetto.ly). The MIDI holds 148.5 bars: the last quarter
+# of bar 149 is a rest. I checked the da capo against the MIDI: bars
+# 117-148 are note for note bars 5-36.
+#
+# Tempo: quarter = 84, about 3:35. Track times (listing order taken as
+# BWV 802-805): Ralph Kirkpatrick (harpsichord, 1952) 3:11 and (Archiv,
+# 1959) 3:10, about quarter = 94; Ton Koopman (organ, Teldec, 1996) 3:35,
+# about 83; Rosalyn Tureck (piano, 1959) 3:44, about 80; Matteo Messori
+# (Brilliant) 3:52, about 77; Helmut Walcha (harpsichord, 1951) 4:20 and
+# Bernard Lagace (Analekta) 4:21, both about 69. Sources: the
+# bach-cantatas.com discographies and Apple Music/AllMusic listings.
+# 84 follows Koopman: brisk enough for the subject's energy, and the
+# chromatic middle section still has time to sound.
+#
+# Structure (my reading of the score and the MIDI):
+#   1-4    subject alone in the top, F major.
+#   5-16   the bass enters; sequences, falling broken chords (10-16).
+#   17-28  to C major and back, the lines in sixteenths.
+#   29-37  broken-chord climax high in the top; cadence in F at 37.
+#   38-61  middle section: the chromatic subject, D minor, then
+#          A minor; cadence in A minor at 61.
+#   62-68  A minor, cadence at 68.
+#   69-73  a brief F major sequence (the material of bars 29-33).
+#   74-90  F minor, the chromatic subject in close imitation; cadence
+#          in F minor at 90.
+#   91-105 C minor; half close on G at 105.
+#   106-112 back toward F, ending on its dominant.
+#   113-149 da capo: the subject in the top over a new bass (113-116),
+#          then bars 5-37 again; final cadence in F.
+#
+# Plan: terraced by section, as on two manuals: the outer F major
+# sections full, the minor middle a step softer, its darkest part (the
+# F minor chromatic passage) softest, rising again through C minor to
+# the da capo. Broaden only into the cadences that close sections.
+# The bass goes low (down to C2 in bars 28 and 140): 120 notes below B2
+# are lifted an octave by the converter, so the bass's broken chords in
+# those bars lose their depth and sit closer to the top.
+
+tempo 84
+
+voice mid 0           # two voices: no middle voice to set back
+
+dyn 1 mf              # bars 1-37: the F major opening
+broaden 36-37 0.93    # bars 36-37: the cadence that ends the section
+dyn 38 mp             # bars 38-73: middle section, D minor and A minor
+broaden 60 0.95       # bar 60: into the A minor cadence
+dyn 74 p              # bars 74-90: F minor, the chromatic subject
+broaden 89 0.95       # bar 89: into the F minor cadence
+dyn 91 mp             # bars 91-112: C minor, turning back toward F
+broaden 111-112 0.9   # bars 111-112: the dominant before the da capo
+dyn 113 mf            # bars 113-149: da capo
+lead 113-116 bottom   # the new bass under the returning subject
+
+rit 4 0.75            # bars 146-149: the final cadence

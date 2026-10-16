@@ -33,6 +33,8 @@ Plain text, one command per line, `#` starts a comment. Bars count from
 | `lead RANGE VOICE` | `lead 1-2 top` | Bring that voice forward one step over those bars, e.g. while it has the subject. |
 | `accent STEPS` | `accent 1` | Every note on a downbeat this many steps louder. |
 | `pickup UNIT` | `pickup 8` | The piece starts with an upbeat of this note value, so bar 1 is the first full bar, as in the score. |
+| `play RANGE...` | `play 1-8 1-8 9-16 9-16` | Play these stretches of the score in this order: written-out repeats, first and second endings, or one movement or section on its own (`play 1-29`). A whole bar number includes that bar; a fraction stops at that point (`0.75-8.75` for a repeat that begins and ends on a quarter upbeat). Needs `tempo`. |
+| `parts TRACK...` | `parts 3 4 1 2` | The MIDI file's tracks, most important first (track 0 is Mutopia's control track). When four notes sound at once, the least important part gives way instead of the middle pitch, so a melody that sits inside the texture survives. |
 
 A `--draft` build without a file gets `mf`, the middle voice one step
 back, and a gentle final ritardando (the last 2 bars to 0.75, or the
@@ -47,6 +49,11 @@ last 4 when a bar is shorter than 3 beats).
 - **Voices** are worked out per note from what else is sounding when it
   starts: the highest pitch is `top`, the lowest `bottom`, anything
   between `mid`. In a three-part piece that is soprano, alto and bass.
+- **Bars after `play`**: every other command counts bars along the
+  performance, starting from the first range's bar, not the score.
+  With `play 1-8 1-8 9-16 9-16`, bar 9 is the repeat of bar 1 and bar
+  17 is the score's bar 9, as the Badinerie's file does. An excerpt
+  (`play 30-60`) keeps the score's numbers.
 - **Tempo** shaping moves the waits between frames, so it is exact to a
   60 Hz frame (about 17 ms).
 

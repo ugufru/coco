@@ -1,0 +1,72 @@
+# Aria "Warum betruebst du dich", BWV 516 (from the 1725 Notebook for
+# Anna Magdalena Bach)
+#
+# No. 33 in the Notebook, a sacred song for voice and bass (why are you
+# troubled, my soul?), in F minor. The Notebook names no composer and
+# Bach's authorship is doubtful. Mutopia: Bach-Gesellschaft vol. 43.
+#
+# Character: a chorale-like devotional song, each line ending on a held
+# note with a fermata (bars 2, 4, 6, 10, 12, 14). Grave and intimate, the
+# melody in quarters with small eighth and sixteenth graces, the bass in
+# quarters. Each line should breathe at its fermata.
+#
+# Time signature: 4/4 with a quarter upbeat, 16 bars in the Mutopia score
+# (the MIDI has the upbeat plus 16 bars). The first half (upbeat to bar
+# 8) is repeated, carrying the second couplet of the stanza (the score
+# prints it as a second line of text); the second half is not repeated.
+# The MIDI does not play the repeat; it is written out with `play`.
+#
+# Tempo: quarter = 66. One stanza as performed is 96 quarters plus the
+# fermatas. MusicBrainz track times: Carolyn Sampson and Mahan Esfahani
+# 1:37; Margot Guilleaume and Fritz Neumeyer 1:39; Johannette Zomer and
+# Pieter-Jan Belder 1:48; Benjamin Luxon and Igor Kipnis 1:25; Karina
+# Gauvin and Luc Beausejour 1:21. Assuming one stanza with the repeat,
+# these run about 55 to 70 quarters a minute including the held
+# fermatas. 66 with the fermatas broadened gives about 1:36, close to
+# Sampson and Esfahani.
+#
+# Structure (Mutopia score; phrase ends from the fermatas):
+#   0.75-2  line 1, F minor, to a fermata on A-flat (bar 2)
+#   3-4     line 2, cadence in F minor, fermata (bar 4, beat 3)
+#   5-6     line 3, to E-flat, fermata on B-flat (bar 6)
+#   7-8     line 4, cadence in A-flat major (bar 8)
+#   8.75-10 second half, line 5, to a fermata on D-flat (bar 10)
+#   11-12   line 6, cadence in B-flat minor, fermata (bar 12, beat 3)
+#   13-14   line 7, rising to G over E natural, fermata (bar 14): the
+#           high point and the half close on C
+#   15-16   line 8, cadence in F minor
+#
+# Bars as performed (after `play`):
+#   first half 0.75-8.75, its repeat 8.75-16.75 (score bar x is x+8),
+#   second half 16.75-25 (score bar 9+y is 17+y).
+#
+# Plan: the first couplet mf, the second (the repeat) mp; the second half
+# mf, rising to f for its high line (score 13-14), mf to close. Every
+# fermata bar is broadened (the whole bar, so the next upbeat breathes
+# too), the cadences at the ends of the half a little.
+
+pickup 4
+tempo 66
+play 0.75-8.75 0.75-16
+
+voice mid 0        # two voices only: no middle voice to set back
+
+dyn 1 mf           # upbeat and bars 1-8.75: first couplet
+dyn 8.75 mp        # bars 8.75-16.75: the repeat, second couplet
+dyn 16.75 mf       # second half (score 8.75-12)
+dyn 21 f           # score 13-14: the rising line to G
+dyn 23 mf          # score 15-16: the last line
+
+broaden 2 0.8      # fermata, line 1
+broaden 4 0.85     # fermata, line 2 (beat 3)
+broaden 6 0.8      # fermata, line 3
+broaden 8 0.92     # end of the first couplet
+broaden 10 0.8     # the same in the repeat
+broaden 12 0.85
+broaden 14 0.8
+broaden 16 0.9     # end of the first half
+broaden 18 0.8     # score bar 10: fermata on D-flat
+broaden 20 0.85    # score bar 12: fermata, beat 3
+broaden 22 0.78    # score bar 14: fermata on G, the half close
+
+rit 2 0.7          # score bars 15-16: the final cadence in F minor

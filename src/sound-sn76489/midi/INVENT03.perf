@@ -1,0 +1,63 @@
+# Invention No. 3 in D major, BWV 774 (J. S. Bach)
+#
+# Character: a sunny, dancing piece in 3/8, felt one beat to the bar.
+# The subject is a falling-and-rising sixteenth figure (after an eighth
+# upbeat, D-E) that climbs the D major scale over four bars; the bass
+# answers it in canon two bars later. Long held notes in the top over
+# running bass give the middle its character. Lilting, not driven.
+#
+# Time signature: 3/8 with an eighth upbeat (D-E). 59 full bars after
+# the upbeat in the MIDI, which matches the score's 59 bars. (The
+# Mutopia source's "% bar" comments count the upbeat as bar 1, so they
+# run one ahead of the numbers here.)
+#
+# Tempo: dotted quarter = 54 (eighth = 162), 59 beats, about 1:07.
+# Track times: Glenn Gould (Sony, 1964) 1:00, about 59 bars a minute;
+# Angela Hewitt (Hyperion) 1:00, about 59; Andras Schiff (ECM,
+# clavichord) 1:15, about 47; Gustav Leonhardt (harpsichord, Apple Music
+# reissue) 1:17, about 46. 54 sits between the two pairs: the one-in-a-
+# bar swing survives and the sixteenths stay clean on the chip.
+#
+# Structure (read from the Mutopia score and checked against the MIDI;
+# my own reading, no published bar-by-bar analysis was used):
+#   1-4    Subject, top, D major (bass silent in bars 1-2).
+#   3-6    Subject, bottom, in canon two bars behind.
+#   5-9    Episode: the top's sixteenths over an A pedal in the bass
+#          (A3 A2 A3 in every bar), moving to the dominant.
+#   10-12  Cadence in A major at bar 12.
+#   12-23  Subject figures in both hands, through E and F-sharp,
+#          modulating to B minor; cadence in B minor at bar 24.
+#   24-31  Long held notes in the top (G in 26-27, F-sharp in 30-31)
+#          over running bass, and a held A in the bass (28-29).
+#   32-42  Working back through A major (arrival on A in 38) to the
+#          dominant of D (42).
+#   43-46  Subject returns, top, D major (as bars 1-4).
+#   45-48  Subject, bottom, in canon again.
+#   47-50  The episode inverted: D octaves held in the top (D5 D4 D5)
+#          while the bass runs, a mirror of the A pedal in 5-8.
+#   51-59  Closing: cadence figures, a last descent in the bass, final
+#          cadence in D major with a fermata.
+
+pickup 8             # the eighth upbeat D-E before bar 1
+tempo 54 4.          # dotted quarter, one beat to the 3/8 bar
+
+voice mid 0          # two voices only: there is no middle voice to set back
+
+dyn 1 mf             # bars 1-12: the exposition, D major to A major
+lead 3-6 bottom      # the canon entry in the bass (bars 1-2 the top alone)
+broaden 11 0.93      # bar 11: hold back into the A major cadence
+
+dyn 13 mp            # bars 13-24: after the cadence, the subject's
+                     # figures modulate to B minor: a softer manual
+broaden 23 0.93      # bar 23: into the B minor cadence
+
+dyn 25 mf            # bars 25-42: held notes over the running bass,
+                     # back through A major to the dominant
+lead 25-27 bottom    # the bass carries the music under the held G
+lead 30-31 bottom    # and under the held F-sharp
+
+dyn 43 f             # bars 43-59: the return in D major and the close
+lead 45-46 bottom    # subject, bass, in canon (bars 43-44 top alone)
+lead 47-50 bottom    # the bass runs under the top's D octaves
+
+rit 3 0.7            # the last three short bars into the final D

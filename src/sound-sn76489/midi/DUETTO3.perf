@@ -1,0 +1,65 @@
+# Duetto No. 3 in G major, BWV 804 (J. S. Bach)
+#
+# Character: the third of the four Duetti from Clavier-Uebung III
+# (1739), and the gentlest: a two-part invention in a lilting 12/8,
+# almost a pastorale or gigue at walking pace. The subject is a little
+# falling sixteenth run that ends in a leap (G, F-sharp, E, D, then B, A),
+# tossed between the hands; the counter-line flows in sixteenths.
+#
+# Time signature: 12/8, four dotted-quarter beats to the bar; 39 bars,
+# the last a whole note (Mutopia Bach-Duet3.mid / Bach-Duet3.ly). No
+# upbeat (the top's first beat is a rest under the bass's broken
+# chord), no repeats. The MIDI holds 38 2/3 bars.
+#
+# Tempo: dotted quarter = 54, about 2:52. Track times (listing order
+# taken as BWV 802-805): Ralph Kirkpatrick (harpsichord, 1952) 3:02,
+# about dotted quarter = 51, and (Archiv, 1959) 2:53, about 54; Ton
+# Koopman (organ, Teldec, 1996) 2:41, about 58; Helmut Walcha
+# (harpsichord, 1951) 3:20, about 46; Rosalyn Tureck (piano, 1959)
+# 3:45, about 41. Source: the bach-cantatas.com discographies. 54
+# follows Kirkpatrick's 1959 recording: it lilts, and the sixteenths
+# (11 frames each) run clearly.
+#
+# Structure (my reading of the score and the MIDI):
+#   1-2    subject in the top over the bass's broken G major chord.
+#   3-4    subject in the bass, the top running above.
+#   5-6    sequences.
+#   7-10   subject in the bass (7) and top (9); cadence in D major at
+#          10-11.
+#   11-15  long tied notes in the top over the bass's figures,
+#          falling by step: suspensions, toward E minor.
+#   16-19  subject in the bass (16) and top (18), E minor.
+#   20-23  held notes again, B minor, then toward C.
+#   24-27  subject in the bass in C major (24), sequences.
+#   28-33  subject in the bass back in G (28); the top's long run.
+#   34-39  last entries (top 37) over dominant-seventh harmony; final
+#          cadence in G.
+#
+# Plan: terraced by section at the cadences; the subject brought
+# forward where it enters in each hand, which is most of the shaping a
+# two-part piece needs. Bass notes below B2 are lifted an octave by the
+# converter.
+
+tempo 54 4.
+
+voice mid 0           # two voices only
+
+dyn 1 mf              # bars 1-10: exposition in G
+lead 1-2 top          # subject, top
+lead 3-4 bottom       # subject, bass
+lead 7-8 bottom       # subject, bass
+lead 9-10 top         # subject, top
+broaden 10 0.95       # bar 10: into the D major cadence
+
+dyn 11 mp             # bars 11-23: the suspensions, E minor, B minor
+lead 16-17 bottom     # subject, bass, E minor
+lead 18-19 top        # subject, top, E minor
+
+dyn 24 mf             # bars 24-27: subject in C major
+lead 24-25 bottom
+
+dyn 28 f              # bars 28-39: the subject home in G, to the end
+lead 28-29 bottom
+lead 37-38 top        # last entry, top
+
+rit 1.5 0.7           # from the middle of bar 38 into the final G

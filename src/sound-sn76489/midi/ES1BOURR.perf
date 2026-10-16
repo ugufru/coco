@@ -1,0 +1,67 @@
+# English Suite No. 1 in A major, BWV 806: Bourree I (J. S. Bach)
+#
+# Character: a bright, imitative bourree in cut time, two beats to the
+# bar, from a quarter upbeat. Slurred pairs of eighths in the theme
+# (a8 g# b a), answered in the bass a bar later; long runs of eighths
+# over repeated bass notes in the second half. Lively and singing.
+#
+# Time signature: 2/2, 50 bars in the Mutopia score and in the MIDI,
+# counting both endings of the first half. Mutopia places bar 1 before
+# the repeat sign and writes the first ending as two bars (16-17: the
+# cadence, then bar 1 again with a different bass), the second ending
+# as one short bar (18, three beats, plus the quarter upbeat to B).
+# Bar 50 is three beats. The MIDI plays the score once, both endings
+# in a row, which would sound wrong, so play restores the order.
+#
+# Repeats: both halves repeated. About 6 KB.
+#   play: upbeat to the first ending (0.75-17), the repeat from bar 2
+#   (2-15), the second ending and B (18-50.75), B again from its upbeat.
+#   Performed bars: A 0.75-18, A repeat 18-32 (score x is x+16),
+#   B 32-64.75 (score x is x+14), B repeat 64.75-97 (score x is x+46).
+#
+# Tempo: half note = 90, about 2:05 with repeats.
+# Track times: Richard Egarr (harpsichord, Harmonia Mundi 2013),
+# Bourree I on its own track, 2:07, about half = 91 with both repeats
+# (confirmed from the Harmonia Mundi track list). Leonhardt (Seon, 1974)
+# 3:47 and Andras Schiff (Decca) 4:11 put Bourree I and II on one track,
+# so they cannot be split. 90 follows Egarr: eighths 10 frames each.
+#
+# Structure (my reading of the Mutopia score):
+#   1-4     A major, the theme in the top; the bass imitates in 3-4.
+#   5-8     to E major, a pause on B in the top (8).
+#   9-12    the theme again in the top (= 1-3).
+#   13-16   descending sequence; cadence in E major (16, and 18).
+#   19-26   B: the theme on E in the top, imitated by the bass, moving
+#           through D major to B minor (26).
+#   27-31   E major, then A, cadence in A (31-32).
+#   32-40   long eighth-note sequences over repeated bass notes: A pedal
+#           (32-33), B (36-37), E (39), then D.
+#   41-42   cadence in A major.
+#   43-46   a closing four-bar phrase; 47-50 repeat it exactly.
+#
+# Plan: each half full the first time, echoed on the repeat. The
+# closing phrase is stated twice in a row in the score (43-46, 47-50),
+# so its restatement is an echo every time, as on a second manual.
+# Bass imitations brought forward where the bass answers the theme.
+
+pickup 4
+
+tempo 90 2
+
+play 0.75-17 2-15 18-50.75 18.75-50
+
+dyn 1 f            # A first time
+lead 3-4 bottom    # the bass imitates the theme
+dyn 18 mp          # A repeat (from bar 2), an echo; bar 17 = bar 1
+lead 19-20 bottom  # score 3-4: the bass imitation again
+broaden 32 0.95    # score 18: the E major cadence before B
+dyn 32.75 f        # B first time, from its upbeat
+lead 34-35 bottom  # score 20-21: bass imitation
+dyn 57 f           # score 43-46: the closing phrase (still full)
+dyn 61 mp          # score 47-50: the same phrase, echoed
+broaden 64 0.95    # score 50: a breath before the B repeat
+dyn 64.75 mp       # B repeat, an echo
+dyn 87 f           # score 41-46: full again for the close
+dyn 93 mp          # score 47-50: the closing echo, to the end
+
+rit 2 0.8          # the last two bars into the final A

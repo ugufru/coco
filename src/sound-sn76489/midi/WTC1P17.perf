@@ -1,0 +1,52 @@
+# Prelude No. 17 in A-flat major, Well-Tempered Clavier I, BWV 862
+# (J. S. Bach)
+#
+# Character: a little keyboard concerto. A ritornello in full chords
+# with a springing head motif (an eighth, a quick turn in sixteenths,
+# a leap) alternates with lighter solo episodes in running sixteenths.
+# Warm and confident, a steady three in a bar.
+#
+# Time signature and bars: 3/4, 44 bars, no upbeat; the MIDI has the
+# same 44 bars.
+#
+# Tempo: quarter = 92, 132 beats, about 1:28. Track times (MusicBrainz
+# track lists): Friedrich Gulda 1:36, about 82; Rosalyn Tureck 1:30 and
+# 1:25 (two sets), about 88 and 93; Angela Hewitt (Hyperion, 1998)
+# 1:26, about 92; Glenn Gould 1:23, about 95; Edwin Fischer 1:32 and
+# 1:16 (two issues); Sviatoslav Richter 1:10, about 113. 92 follows
+# Hewitt and Tureck: it keeps the dance in the three, and the sixteenth
+# episodes stay even on the chip. The Mutopia MIDI has 108.
+#
+# Structure (from the Mutopia score, checked against the MIDI; the
+# concerto reading, ritornello and episodes, is the usual one for this
+# prelude; the bar numbers are mine):
+#   1-8    ritornello, A-flat major: the head in the right hand (1-2),
+#          then in the left hand under chords (3-5), then right again
+#          (6-8).
+#   9-17   first episode: running sixteenths, a sequence to the
+#          dominant; cadence in E-flat major into bar 18.
+#   18-23  ritornello in E-flat major: the chords (18-19) and the head
+#          in sequence (20-23).
+#   24-25  sixteenths again, darkening (G-flat, B-flat minor).
+#   26-32  the head in a long falling sequence, one bar each, round
+#          the circle of fifths.
+#   33-34  a trilled cadence back to A-flat.
+#   35-44  the last ritornello in A-flat, with trills on the head
+#          (36, 38), sixteenths (39-40), and the final cadence; the last
+#          chord has a fermata.
+#
+# Range: the low bass notes (A-flat 2, B-flat 2 and below) are lifted
+# an octave by the converter.
+
+tempo 92
+
+dyn 1 f              # bars 1-8: ritornello, full (the "tutti")
+lead 3-5 bottom      # the head in the left hand under the chords
+dyn 9 mp             # bars 9-17: the first episode, the "solo"
+dyn 18 f             # bars 18-23: ritornello in E-flat
+dyn 24 mp            # bars 24-25: the darker sixteenths
+dyn 26 mf            # bars 26-34: the head in sequence, heading home
+broaden 34 0.93      # bar 34: the trilled cadence into the return
+dyn 35 f             # bars 35-44: the last ritornello
+
+rit 2 0.7            # bars 43-44 into the final chord

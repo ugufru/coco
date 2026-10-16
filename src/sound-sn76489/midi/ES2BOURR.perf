@@ -1,0 +1,65 @@
+# English Suite No. 2 in A minor, BWV 807: Bourree I (J. S. Bach)
+#
+# Character: an energetic bourree in cut time, two beats to the bar,
+# from a quarter upbeat. The theme is a trilled quarter-and-eighths
+# figure (e d e f e d); most of the piece is driving eighth-note
+# sequences over a bass in eighths or quarters. Firm and dancing, with
+# the half-bar pulse always felt.
+#
+# Time signature: 2/2, 57 bars in the Mutopia score and in the MIDI,
+# counting both endings of the first half: bar 24 is the first ending
+# (three beats, then the upbeat back to bar 1), bar 25 the second
+# ending (three beats, then the upbeat to B). Bar 57 is three beats.
+# The MIDI plays the score once, both endings in a row, so play
+# restores the order.
+#
+# Repeats: both halves repeated. About 7.5 KB.
+#   play: upbeat to the first ending (0.75-24), the repeat (1-23), the
+#   second ending and B (25-57.75), B again from its upbeat.
+#   Performed bars: A 0.75-25, A repeat 25-48 (score x is x+24),
+#   B 48-80.75 (score x is x+23), B repeat 80.75-113 (score x is x+55).
+#
+# Tempo: half note = 90, about 2:30 with repeats.
+# Track times: Richard Egarr (harpsichord, Harmonia Mundi 2013), Bourree
+# I on its own track, 2:27, about half = 91 with both repeats (confirmed
+# from the Harmonia Mundi track list). Angela Hewitt (Hyperion) 4:04 and
+# Andras Schiff (Decca) about 4:01 for Bourree I, II and I da capo on
+# one track; they cannot be split. Glenn Gould (Sony) 1:26 for Bourree I
+# alone, about 80 if without repeats (his plan not confirmed). 90
+# follows Egarr: eighths 10 frames each, clear on the chip.
+#
+# Structure (my reading of the Mutopia score):
+#   1-4     A minor, the theme in the top over a bass in eighths.
+#   5-8     the theme's figure in sequence; cadence in A minor (8).
+#   9-14    broken-chord sequence falling through A minor, G, F#.
+#   15-23   E minor, eighths in the top over a quarter bass; cadence in
+#           E minor (23, and the endings 24, 25).
+#   26-31   B: C major, moving to D minor (F, B flat, C sharp).
+#   32-40   falling sequence in D minor; cadence in D minor (40-41).
+#   42-49   the theme's figure returns, through A minor to a half close
+#           on E (49).
+#   50-54   rising sequence, each bar a step higher (C to A).
+#   55-57   final cadence in A minor.
+#
+# Plan: each half full the first time, echoed on the repeat. In B the
+# return of the theme's figure after the D minor cadence (score 42-49)
+# steps down to mf, and the rising sequence (score 50) builds back to
+# full. The final pass returns to full at the rising sequence.
+
+pickup 4
+
+tempo 90 2
+
+play 0.75-24 1-23 25-57.75 25.75-57
+
+dyn 1 f            # A first time
+dyn 24.75 mp       # A repeat from its upbeat, an echo
+broaden 48 0.95    # score 25: the E minor cadence before B
+dyn 48.75 f        # B first time, from its upbeat
+dyn 65 mf          # score 42-49: the theme's figure, a step down
+ramp 73-77 f       # score 50-54: the rising sequence builds to full
+broaden 80 0.95    # score 57: a breath before the B repeat
+dyn 80.75 mp       # B repeat, an echo
+ramp 105-109 f     # score 50-54: build to full for the close
+
+rit 2 0.8          # the last two bars into the final A

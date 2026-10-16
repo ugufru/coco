@@ -1,0 +1,66 @@
+# Partita No. 5 in G major, BWV 829: Tempo di Minuetta (J. S. Bach)
+#
+# Character: the fifth movement of the partita, a minuet in name and
+# metre but a famous rhythmic puzzle. Written in 3/4, it is built from
+# broken chords in eighths in which the melody note falls on every third
+# eighth, so the ear hears two beats of three eighths (6/8) against the
+# written three quarters, and the left hand crosses over the right to
+# play those notes. Only the hemiola cadences (bars 11-12, 31-32, 51-52)
+# settle into plain quarters. Light and graceful, never heavy.
+#
+# Time signature: 3/4, 52 bars, no upbeat. Two halves, each repeated:
+# A bars 1-12, B bars 13-52 (Mutopia 55title-hub.mid / 55hub.ly: the
+# fifth movement, "5. Tempo di Minuetta"; a comment in the title file
+# calls it the Sarabande, but the score and its header are the
+# Minuetta). The MIDI plays each half once; the repeats are written out
+# below.
+#
+# Bars as performed (play 1-12 1-12 13-52 13-52):
+#   A first time 1-12, A repeat 13-24,
+#   B first time 25-64, B repeat 65-104.
+#   Score bar Bx (13-52) is performed bar x+12 the first time, x+52 the
+#   repeat.
+#
+# Tempo: quarter = 150 (dotted half 50), with both repeats about 2:07.
+# Confirmed track times: Angela Hewitt (2018 recording, AHCD030, her own
+# listing) 1:51; Andras Schiff (live, Amazon listing) 2:23. Both
+# timings only make sense with the repeats taken (without them they
+# would mean quarter = 84 or less, far too slow for a minuet), giving
+# about quarter = 169 for Hewitt and 131 for Schiff. 150 lies between:
+# a flowing one-in-a-bar that keeps the cross-rhythm clear on the chip
+# (eighths of 12 frames).
+#
+# Structure (Bach-Gesellschaft text as set by Mutopia; my reading):
+#   1-4    G major, the crossing-hands figure on the tonic chord;
+#          a trilled cadence figure in bar 4.
+#   5-10   falling sequence through the circle of fifths.
+#   11-12  hemiola, cadence in D major. (Repeat.)
+#   13-16  D major, rising; cadence in E minor at 16.
+#   17-20  the same to A minor (20).
+#   21-30  sequences through B minor and E minor, the melody high.
+#   31-32  hemiola, cadence in E minor.
+#   33-40  over a pedal: A and D alternating in the bass with the figure
+#          above (the dominant of G returning).
+#   41-44  scales and broken chords in G: the home key arrives.
+#   45-50  falling sequence back to the tonic.
+#   51-52  hemiola, final cadence in G (fermata). (Repeat.)
+#
+# Plan: as on a two-manual harpsichord, each half is played full the
+# first time and echoed on the second manual for the repeat. In the B
+# repeat the full sound comes back at score bar 41 (performed 93), where
+# the home key returns, to close. Broadening only into the hemiola
+# cadences that end each half before going on, and a final ritardando.
+
+tempo 150
+play 1-12 1-12 13-52 13-52
+
+dyn 1 mf              # A, first time
+dyn 13 mp             # A repeat, echo
+broaden 23-24 0.93    # the hemiola into the D major cadence, before B
+dyn 25 mf             # B, first time (score 13)
+broaden 63-64 0.95    # the hemiola at the end of B, before its repeat
+dyn 65 mp             # B repeat, echo (score 13)
+dyn 93 mf             # score 41 in the repeat: G major returns, full
+                      # to the end
+
+rit 2 0.75            # performed 103-104: the last hemiola and fermata

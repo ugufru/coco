@@ -1,0 +1,62 @@
+# Prelude No. 3 in C-sharp major, Well-Tempered Clavier I, BWV 848
+# (J. S. Bach)
+#
+# Character: quick, bright and airy, one beat to the bar. A broken-chord
+# figure in sixteenths runs in one hand while the other answers in
+# eighths, and every eight bars the hands swap jobs. Late in the piece
+# the figure gives way to a long dominant pedal and a free, toccata-like
+# close. It should skip, not hurry.
+#
+# Time signature and bars: 3/8, 104 bars, no upbeat; the MIDI has the
+# same 104 bars.
+#
+# Tempo: dotted quarter = 76, one beat per bar (eighth = 228), 104
+# beats, about 1:22. Track times (MusicBrainz track lists): Angela
+# Hewitt (Hyperion, 1998) 1:24, about 74; Edwin Fischer 1:21, about 77;
+# Rosalyn Tureck 1:17 (older set), about 81; Sviatoslav Richter 1:14,
+# about 84; Friedrich Gulda 1:11, about 88; Glenn Gould 1:05 and Tureck
+# (2002 issue) 1:04, about 96. 76 sits with Hewitt and Fischer: the
+# sixteenths (about 7.6 a second) stay clean on the chip, and the
+# piece still has a one-in-a-bar lilt.
+#
+# Structure (from the Mutopia score, checked bar by bar against the
+# MIDI; the eight-bar exchange of the hands is plain in both; the key
+# plan is my reading of the bass):
+#   1-8    figure in the right hand, C-sharp major.
+#   9-16   the hands exchange: figure in the left hand, toward
+#          G-sharp major.
+#   17-24  figure in the right hand, G-sharp major (the dominant).
+#   25-32  figure in the left hand.
+#   33-54  shorter exchanges through the minor keys (D-sharp minor,
+#          A-sharp minor) and on to the subdominant, F-sharp major
+#          (47-54).
+#   55-62  the opening eight bars return in C-sharp major.
+#   63-86  a new texture: the hands in eighths over a G-sharp pedal
+#          (63-75), then sequences that tighten toward the dominant.
+#   87-97  the dominant pedal on G-sharp: broken chords in the left
+#          hand, single notes in the right.
+#   98-104 a free close: runs passed between the hands, and the final
+#          C-sharp major chord.
+#
+# Range: the dominant pedal G-sharp 2 (bars 87-99) and the last bass
+# notes sit below the chip's B2 and are lifted an octave, so the pedal
+# sounds at G-sharp 3; the build in those bars is carried by the ramp.
+
+tempo 76 4.          # dotted quarter, one beat to the 3/8 bar
+
+voice mid 0          # two lines, figure and answer: no inner voice
+
+dyn 1 mf             # bars 1-8: the figure on top, the home key
+dyn 9 mp             # bars 9-16: hands exchanged, an echo on the
+                     # second manual
+dyn 17 mf            # bars 17-24: the figure on top, G-sharp major
+dyn 25 mp            # bars 25-32: hands exchanged again
+dyn 33 mp            # bars 33-54: the minor keys, staying quiet
+dyn 55 f             # bars 55-62: the opening returns, full
+dyn 63 mp            # bars 63-75: the new eighth-note texture over the
+                     # pedal, softer to leave room
+ramp 76-86 mf        # bars 76-86: the sequences tighten
+ramp 87-97 f         # bars 87-97: the dominant pedal, the last build
+dyn 98 f             # bars 98-104: the free close
+
+rit 4 0.75           # the last four bars into the final chord

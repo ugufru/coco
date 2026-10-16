@@ -1,0 +1,57 @@
+# Partita No. 1 in B-flat major, BWV 825: Praeludium (J. S. Bach)
+#
+# Identification: Mutopia's Partita 1 set (Clavierubung I) is numbered
+# by movement; 11title-hub is movement 1, headed "1. Praeludium" in the
+# score (11hub.ly), 21 bars of 4/4 in B-flat. Confirmed.
+#
+# Character: the gentle, singing opening of the first published Partita
+# (1726/1731). Three voices: a melody built from a short turn figure
+# (B-flat, a quick mordent-like turn, then stepping eighths and
+# sixteenths), with flowing thirty-second-note turns passed between the
+# hands. Calm and lyrical, never rushed; four beats to the bar.
+#
+# Time signature: 4/4, 21 bars in the Mutopia score and in the MIDI, no
+# upbeat, no repeats (the Praeludium has none). The last bar is a
+# B-flat chord under a fermata.
+#
+# Tempo: quarter = 44, about 2:00.
+# Track times: Glenn Gould (Sony) 1:52 to 1:53, about quarter = 45;
+# Andras Schiff (live recording) 1:52 in one listing, about 45 (the same
+# figure as Gould, so possibly a listing error); Eleonor Bindman (Delos)
+# 2:28, about 34. 44 follows Gould and Schiff. At 44 a thirty-second is
+# about 10 frames, so the turns stay distinct on the chip; slower, the
+# long notes would fade.
+#
+# Structure (read from the Mutopia score; my reading):
+#   1-2     the turn figure, top, B-flat, over a held B-flat in the bass.
+#   3-4     thirty-second-note turns rising in sequence.
+#   4-6     the figure in the bass, on F; move to F major.
+#   7-8     the turns in the bass under suspensions above.
+#   9-10    the figure in the middle voice, on D (G minor).
+#   11-13   the figure in the top on C; cadence in F major (13-14).
+#   14-16   the turns in the bass, back toward B-flat.
+#   17-18   the figure in the bass on F, the dominant pedal region.
+#   19-20   the figure in the top again in B-flat (= bars 1-2), a tenor
+#           added below for a fuller close.
+#   21      final chord, fermata.
+#
+# Plan: no repeats, so the shape comes from the entries of the figure.
+# mf for the opening; a step down (mp) when the figure moves into the
+# middle voice and minor keys (9-13); back to mf from the F cadence;
+# full (f) for the return in 19 with the added tenor. Each entry of the
+# figure in an inner or lower voice brought forward. Breadth only at
+# the F major cadence and at the end.
+
+tempo 44
+
+dyn 1 mf           # 1-8: the opening, B-flat to F
+lead 4-5 bottom    # the figure in the bass, on F
+dyn 9 mp           # 9-13: the figure in the middle voice, G minor
+lead 9 mid         # the figure on D in the middle voice
+lead 12 top        # the figure on C in the top
+broaden 13 0.94    # into the F major cadence
+dyn 14 mf          # 14-18: the bass leads back to B-flat
+lead 17-18 bottom  # the figure in the bass on F
+dyn 19 f           # 19-21: the return, with the added tenor
+
+rit 2 0.6          # the last two bars into the fermata

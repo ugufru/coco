@@ -1,0 +1,53 @@
+# Cello Suite No. 1 in G major, BWV 1007: Courante (J. S. Bach)
+#
+# Character: a quick Italian-style corrente in 3/4, running sixteenths
+# against springing eighths and wide leaps across the strings. Bright
+# and forward-moving, with a clear three to the bar.
+#
+# Time signature: 3/4, 42 bars with an eighth-note upbeat (bar 42 is
+# short to match). Mutopia file bwv1007-2.mid, the third score of the
+# set (Prelude, Allemande, Courante): checked against
+# bwv1007_courante.ly. Both halves have repeat signs (A 1-18, B 19-42,
+# B entered on the upbeat at the end of bar 18). The MIDI plays each
+# half once, so the repeats are written out with play below.
+#
+# Range: written an octave up and transposed down in the score; 40 notes
+# fall below B2 (the low G and D strings, e.g. bars 1-4, 18, 42) and are
+# lifted an octave by the converter.
+#
+# Tempo: quarter = 100. With both repeats it is 252 beats, about 2:35.
+# Track times (with repeats): Pablo Casals (1938) 2:10 to 2:32 by
+# transfer, about 99 to 116; Pierre Fournier (Archiv, 1960) 2:45, about
+# 92. Confirmed from track listings. 100 follows the slower Casals
+# transfers and keeps the sixteenths clean (9 frames each).
+#
+# Structure (score bars; my reading of the Mutopia score):
+#   A  1-8    G major, the springing opening, to D (bar 8).
+#      9-18   D major: sequences, cadence in D (17-18).
+#   B  19-24  From D back through G, then E minor (24).
+#      25-28  A minor, D sharp diminished, E minor (28).
+#      29-34  Sequences through C, A7 and D7.
+#      35-42  Back in G major, the closing run and final cadence.
+#
+# Bars as performed (play), numbered along the performance:
+#   A first  0.83-18.83   A repeat  18.83-36.83   (score bar x = x+18)
+#   B first  36.83-60.83  (score x = x+18)
+#   B repeat 60.83-84.83  (score x = x+42)
+#
+# Plan: terraced, as on two manuals: each half full the first time and
+# echoed softer on the repeat, returning to the full sound for the last
+# phrase (score 35) on the way home.
+
+pickup 8
+tempo 100
+
+play 0.833333-18.833333 0.833333-18.833333 18.833333-42.833333 18.833333-42.833333
+
+dyn 1 f              # A, first time
+dyn 18.83 mp         # A repeat, an echo (from its upbeat)
+broaden 35-36 0.95   # score 17-18: the D major cadence before B
+dyn 36.83 f          # B, first time
+dyn 60.83 mp         # B repeat, an echo
+dyn 77 f             # score 35 on: home in G, full again to the end
+
+rit 2 0.8            # the last two bars: a modest broadening
