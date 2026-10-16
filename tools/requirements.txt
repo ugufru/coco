@@ -4,4 +4,4 @@
 #
 # mistune -- pure-Python markdown parser used by build-site.py (#539/#541).
 # Pinned so the generated site is reproducible across machines.
-mistune==3.3.2
+mistune==3.3.3
