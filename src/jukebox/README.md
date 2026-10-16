@@ -6,25 +6,22 @@ drives 0 to 3, one after another, and wraps around to the first. The screen is a
 90s MP3 player in CG2 (128x64, colour set 0: green, yellow, blue, red).
 
 ```
-make run    # builds jukebox.bin and the four song disks, then starts
-            # XRoar with a Multi-Pak (disk controller in slot 0,
-            # GameMaster in slot 1) and the disks in drives 0 to 3
+make run    # builds jukebox.bin and the demo disk, then starts XRoar
+            # with a Multi-Pak (disk controller in slot 0, GameMaster
+            # in slot 1) and the disk in drive 0
 ```
 
-The library is four disks (#612, #620), 95 songs, named for the drive
-each goes in (#625): `bach0.dsk` holds the player, the Badinerie, the
-Air, the Prelude, the Inventions, the Sinfonias and the Duetti;
-`bach1.dsk` holds the fugues (#611), the Well-Tempered Clavier preludes
-and the organ trio sonata; `bach2.dsk` holds the Toccata, Sheep May
-Safely Graze, the Anna Magdalena pieces, more Inventions and suite
-dances; `bach3.dsk` holds cello, flute, violin and lute movements,
-partita movements and chorales and songs. On a CoCo Zero, put BACH0 to
-BACH3 in drives 0 to 3 from the F12 menu (or in `coco/drives.txt`).
-Fewer disks work too: the jukebox plays whatever it finds.
+In coco it is a demo with one song (#627): `jukebox.dsk` holds the
+player and the Badinerie (`src/sound-sn76489`, hand-transcribed for
+#579). The Bach library it was built for, 95 songs on four disks, each
+with a researched performance, lives in its own project,
+~/github/coco-fm-bach. Copy more `.SNG` files onto the disk, or put song
+disks in drives 1 to 3, and it plays those too. On a CoCo Zero, put the
+disk in drive 0 from the F12 menu (or in `coco/drives.txt`).
 
 It runs like a radio station (#623): no fixed order. Each round plays
 every song once, shuffled, so the popular pieces come round no more
-often than the rest (95 songs is about three and a half hours). The
+often than the rest. The
 last quarter of a round is kept out of the next round's opening
 quarter, and two songs from one set (Inventions, Sinfonias, one cello
 suite...) do not follow each other where that can be helped. The
@@ -105,5 +102,5 @@ How it fits together:
   the directories of those that have one, and remembers each song's
   drive. That takes a few seconds. `dk-select` changes drive without
   stopping the motor.
-- Add songs by copying more `.SNG` files onto either disk (see the
+- Add songs by copying more `.SNG` files onto a disk (see the
   Makefile). Up to 99 are played; a disk holds about 30 small songs.

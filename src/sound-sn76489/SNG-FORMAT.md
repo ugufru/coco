@@ -214,9 +214,9 @@ through each half can be played as an echo. The last bytes:
   `header()` adds the v2 header. See `badinerie.py` for a full score.
 - `midi2sng.py in.mid out.sng [--speed X] [--transpose N] [--title T]
   [--composer C]`: converts a Standard MIDI File, putting notes on the
-  three tone channels, and writes the v2 header. Titles come from
-  `midi/TITLES.txt` by file name. `make songs` converts everything in
-  `midi/`.
+  three tone channels, and writes the v2 header. Titles come from a
+  `TITLES.txt` beside the MIDI file, by file name. The song library it
+  built is in ~/github/coco-fm-bach (#627).
 - `lib/sn76489.fs`: `addr sn-play ( -- brk? )` plays a song to the end,
   or call `addr sn-start`, then `sn-frame` once per frame. `n sn-skip`
   jumps ahead n frames without playing them (for seeking), and

@@ -3,9 +3,13 @@
 The MIDI files we import (Mutopia) are flat: one tempo for the whole
 piece and the same loudness on every note. A performance file adds the
 interpretation: how fast, where it broadens, where it is loud or soft,
-and which voice leads. `midi2sng.py` reads `midi/NAME.perf` beside
-`midi/NAME.mid` and bakes the result into the `.SNG` stream, so the
+and which voice leads. `midi2sng.py` reads `NAME.perf` beside
+`NAME.mid` and bakes the result into the `.SNG` stream, so the
 player needs nothing new (#609).
+
+In coco the Badinerie is the one song left (`badinerie.perf`). The 95-song
+Bach library that this layer was built for, with a `.perf` for every
+piece, lives in its own project, ~/github/coco-fm-bach (#627).
 
 **Every song ships with one** (#614). A piece added to the library gets
 the same respect as the rest: its tempo researched from respected

@@ -298,12 +298,12 @@ Byte layout is `1 C C C L3 L2 L1 L0`:
   terraced dynamics, voicing and timing shaped from that, with the
   reasons in comments. User direction 2026-10-15 (#614): "every song we
   add to the project needs to give the piece the respect it deserves".
-- MIDI imports: `src/sound-sn76489/midi/NAME.perf` beside `NAME.mid`;
-  the Badinerie: `src/sound-sn76489/badinerie.perf`. Format and
-  principles: `src/sound-sn76489/PERFORMANCE.md`. `midi2sng.py` refuses
-  a song without one (`--draft` only for trying an import out).
-- Public Domain sources only (record them in `midi/SOURCES.md`); Mutopia
-  editions under CC BY-SA are skipped.
+- In coco the only song is the Badinerie (`src/sound-sn76489/badinerie.perf`;
+  format and principles: `src/sound-sn76489/PERFORMANCE.md`). The jukebox
+  is a one-song demo. The 95-song Bach library lives in
+  ~/github/coco-fm-bach and its research in ~/github/bach-research (#627);
+  don't bring media back into coco.
+- Public Domain sources only; Mutopia editions under CC BY-SA are skipped.
 
 ## XRoar Setup
 - Machine: `coco2bus` (CoCo 2, NTSC)
