@@ -240,13 +240,30 @@ VARIABLE _dk-n
 VARIABLE _dk-hi
 VARIABLE _dk-lo
 
+\ No index pulse: ask for a sector instead (#619). Some controllers do
+\ not model the turning disk at all (the CoCo Zero's answers at once:
+\ DRQ with data, or NOT READY for an empty drive). Read Sector 1 on the
+\ current track with NMI off, and poll: DRQ means a disk is there;
+\ finishing without DRQ, or no answer within about a third of a second,
+\ means none. Force Interrupt then cancels the read.
+: _dk-probe  ( -- f )
+  1 $FF4A C!  $80 $FF48 C!
+  0 _dk-n !
+  BEGIN
+    $FF48 C@ DUP 2 AND IF DROP  $D0 $FF48 C!  $FF48 C@ DROP  -1 EXIT THEN
+    1 AND 0= IF 0 EXIT THEN
+    1 _dk-n +!  _dk-n @ 600 >
+  UNTIL
+  $D0 $FF48 C!  $FF48 C@ DROP  0 ;
+
 \ dk-ready? -- true if a disk is turning in dk-drive (#612). The index
 \ hole passes the sensor once a turn, five times a second, so the index
 \ bit of the Type I status goes on and off; with no disk it never
 \ changes. READY is no help: Tandy's controller (and XRoar's rsdos
 \ cart) ties it on. Spins the motor (a second, unless it is already
 \ running), lets a turn pass, then samples for about two turns. NMI
-\ stays disabled in the latch throughout.
+\ stays disabled in the latch throughout. With no pulse it falls back
+\ to _dk-probe.
 : dk-ready?  ( -- f )
   0 _dk-latch $DF AND $FF40 C!
   _dk-spun @ 0= IF 60 _dk-frames 1 _dk-spun ! THEN
@@ -256,7 +273,8 @@ VARIABLE _dk-lo
   2000 0 DO
     $FF48 C@ 2 AND IF 1 _dk-hi ! ELSE 1 _dk-lo ! THEN
   LOOP
-  _dk-hi @ _dk-lo @ AND ;
+  _dk-hi @ _dk-lo @ AND IF -1 EXIT THEN
+  _dk-probe ;
 
 \ dk-close -- stop the motor and give the NMI vector back
 \ dk-select -- switch to drive d (0-3); its head is re-homed on the
