@@ -11,15 +11,16 @@ make run    # builds jukebox.bin and the four song disks, then starts
             # GameMaster in slot 1) and the disks in drives 0 to 3
 ```
 
-The library is four disks (#612, #620), 95 songs: `songs.dsk` holds
-the player, the Badinerie, the Air, the Prelude, the Inventions, the
-Sinfonias and the Duetti; `fugues.dsk` holds the fugues (#611), the
-Well-Tempered Clavier preludes and the organ trio sonata; `bach3.dsk`
-holds the Toccata, Sheep May Safely Graze, the Anna Magdalena pieces,
-more Inventions and suite dances; `bach4.dsk` holds cello, flute,
-violin and lute movements, partita movements and chorales and songs. On a CoCo Zero, put them in drives 0 to
-3 from the F12 menu. Fewer disks work too: the jukebox plays whatever
-it finds.
+The library is four disks (#612, #620), 95 songs, named for the drive
+each goes in (#625): `bach0.dsk` holds the player, the Badinerie, the
+Air, the Prelude, the Inventions, the Sinfonias and the Duetti;
+`bach1.dsk` holds the fugues (#611), the Well-Tempered Clavier preludes
+and the organ trio sonata; `bach2.dsk` holds the Toccata, Sheep May
+Safely Graze, the Anna Magdalena pieces, more Inventions and suite
+dances; `bach3.dsk` holds cello, flute, violin and lute movements,
+partita movements and chorales and songs. On a CoCo Zero, put BACH0 to
+BACH3 in drives 0 to 3 from the F12 menu (or in `coco/drives.txt`).
+Fewer disks work too: the jukebox plays whatever it finds.
 
 It runs like a radio station (#623): no fixed order. Each round plays
 every song once, shuffled, so the popular pieces come round no more
