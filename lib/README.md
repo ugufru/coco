@@ -36,6 +36,7 @@ Each file shows a description list (what each word does) followed by a cost tabl
 - [`sprite.fs`](#spritefs)
 - [`trig.fs`](#trigfs)
 - [`vdg.fs`](#vdgfs)
+- [`vgm.fs`](#vgmfs)
 - [`wavetable.fs`](#wavetablefs)
 
 ---
@@ -775,6 +776,40 @@ VDG/SAM display mode switching library
 | `set-sam-f` | `( offset -- )` | colon | 60 | 978 |
 | `set-pia` | `( bits -- )` | colon | 24 | 287 |
 | `reset-text` | `( -- )` | colon | 16 | 2385 |
+
+---
+
+## `vgm.fs`
+
+play VGM (Video Game Music) files on the SN76489 (#598)
+
+**Provides:** vgm?, vgm-start, vgm-frame, vgm-skip, vgm-play, vgm-frames, vgm-title, vgm-author, vgm-pitch
+
+**Requires:** lib/sn76489.fs (the chip, sn-lvl, sn-atten, and the field-sync handler: sn-irq-on, sn-hold, sn-over?, sn-frames)
+
+- **`le@`**
+- **`vgm?`**: true if addr holds a VGM file with an SN76489 in it
+- **`vgm-frames`**: length in 60 Hz frames, the looped part counted twice
+- **`vgm-title`**
+- **`vgm-author`**
+- **`vgm-start`**: point the player at a VGM file in RAM and reset it.
+- **`vgm-pitch`**: the divider last sent to tone channel 0-2, at 4 MHz
+- **`vgm-frame`**: play one 60 Hz frame, polled; true once it has ended
+- **`vgm-skip`**: run n frames at once with the volumes left alone, for
+- **`vgm-play`**: play a VGM file to the end, polled; true if BREAK
+
+| Word | Stack | Kind | Bytes | Cycles |
+|------|-------|------|-------|--------|
+| `le@` | `( addr -- n )` | colon |  |  |
+| `vgm?` | `( addr -- f )` | colon |  |  |
+| `vgm-frames` | `( addr -- n )` | colon |  |  |
+| `vgm-title` | `( addr -- c-addr u )` | colon |  |  |
+| `vgm-author` | `( addr -- c-addr u )` | colon |  |  |
+| `vgm-start` | `( addr -- )` | colon |  |  |
+| `vgm-pitch` | `( ch -- n )` | colon |  |  |
+| `vgm-frame` | `( -- done? )` | colon |  |  |
+| `vgm-skip` | `( n -- )` | colon |  |  |
+| `vgm-play` | `( addr -- brk? )` | colon |  |  |
 
 ---
 

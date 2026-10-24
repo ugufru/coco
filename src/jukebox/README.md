@@ -1,7 +1,7 @@
 # Jukebox: COCO.FM (#588, #599-#602)
 
 A laid-back radio player for the SN76489 (GameMaster cart, or the CoCo
-Zero's built-in chip). It plays every `.SNG` song on the disks in
+Zero's built-in chip). It plays every `.SNG` and `.VGM` song on the disks in
 drives 0 to 3, one after another, and wraps around to the first. The screen is a
 90s MP3 player in CG2 (128x64, colour set 0: green, yellow, blue, red).
 
@@ -13,7 +13,8 @@ make run    # builds jukebox.bin and the demo disk, then starts XRoar
 
 In coco it is a demo with one song (#627): `jukebox.dsk` holds the
 player and the Badinerie (`src/sound-sn76489`, hand-transcribed for
-#579). The Bach library it was built for, 95 songs on four disks, each
+#579), as `BADINERI.SNG` and, to test VGM playback (#598), its first 20
+seconds as `BADINERI.VGM`. The two should sound the same. The Bach library it was built for, 95 songs on four disks, each
 with a researched performance, lives in its own project,
 ~/github/coco-fm-bach. Copy more `.SNG` files onto the disk, or put song
 disks in drives 1 to 3, and it plays those too. On a CoCo Zero, put the
@@ -76,13 +77,21 @@ How it fits together:
 
 - `lib/decb.fs` reads the disk directly through the WD17xx (no Disk BASIC
   calls). `dk-entry` walks the directory; `dk-open-fname` and
-  `dk-load-open` pull a song into `$5800` (at most `$2500` bytes,
-  #618). The song list lives at `$0E00`, above the CG2 screen.
+  `dk-load-open` pull a song into `$5E00` (at most `$1F00` bytes,
+  #618; it moved up from `$5800` when VGM support grew the program).
+  A bigger file shows DISK ERROR 09 and is not played. The song list lives at `$0E00`, above the CG2 screen.
 - `lib/sn76489.fs` plays it. Songs are `.SNG` streams
   (`src/sound-sn76489/SNG-FORMAT.md`); a v2 song's header gives the
   title, composer and length. `sn-atten` is the volume and `sn-skip`
   does the seeking: forward runs on from where it is, back restarts the
   song and runs up to the new time, since a stream only goes forward.
+- `lib/vgm.fs` plays `.VGM` files (#598): Master System and Game Gear
+  rips, Furnace and DefleMask exports. The title and composer come from
+  the GD3 tag, and pitch is corrected for the usual 3.58 MHz chip clock.
+  VGM is bulky (about 280 bytes a second, against 75 for `.SNG`), so only
+  about 30 seconds of music fits; a looped file plays its loop once more
+  and stops. Unpack `.vgz` files on the host (`gunzip -S .vgz`) and keep
+  the 8.3 name ending in `.VGM`.
 - `lib/cg-tiny.fs` draws the text: a 3x5 font in a 4x6 cell, one CG byte
   per glyph row, and the same glyphs doubled for the clock and buttons.
 - The song steps from the 60 Hz field-sync interrupt (`sn-irq-on`,
@@ -102,5 +111,5 @@ How it fits together:
   the directories of those that have one, and remembers each song's
   drive. That takes a few seconds. `dk-select` changes drive without
   stopping the motor.
-- Add songs by copying more `.SNG` files onto a disk (see the
+- Add songs by copying more `.SNG` or `.VGM` files onto a disk (see the
   Makefile). Up to 99 are played; a disk holds about 30 small songs.

@@ -142,92 +142,19 @@ VARIABLE _sn-reps    \ repeats still owed to that section
 : sng-body  ( addr -- addr' )
   DUP sng-v2? IF 4 + COUNT + COUNT + THEN ;
 
-\ sn-start -- point the player at a song (v1 or v2) and reset it
-: sn-start  ( addr -- )
-  sng-body _sn-sp !  1 _sn-wait !  0 _sn-tick !  0 _sn-reps !
-  4 0 DO 15 I sn-lvl + C! LOOP ;
+\ _sn-step holds the address of the routine the field-sync handler runs
+\ once a frame: the .SNG stepper below, or lib/vgm.fs's. Set by the
+\ player's start word, so one handler serves both formats.
+VARIABLE _sn-step
 
-\ sn-frame -- advance the song one 60 Hz frame; true once it has ended
-: sn-frame  ( -- done? )
-  _sn-wait @ 0= IF 1 EXIT THEN
-  1 _sn-tick +!
-  _sn-wait @ 1 - DUP _sn-wait !  0= IF _sn-events THEN
-  _sn-envelope
-  _sn-wait @ 0= ;
-
-\ sn-skip -- run n frames of the song at once, for seeking (#601)
-\ Tone and noise bytes still reach the chip and volume bytes still set
-\ the levels, but nothing decays and no volume is written, so it costs
-\ one step per wait byte rather than per frame. Stops at the end.
-: sn-skip  ( n -- )
-  DUP _sn-tick +!
-  BEGIN
-    _sn-wait @ 0= IF DROP EXIT THEN
-    DUP _sn-wait @ < IF  _sn-wait @ SWAP - _sn-wait !  EXIT THEN
-    _sn-wait @ -  _sn-events
-  DUP 0= UNTIL DROP ;
-
-\ ── Interrupt-driven playing (#604) ────────────────────────────────────
-\ sn-frame called from a busy main loop lands late whenever a pass
-\ overruns its frame, and the music wobbles. sn-irq-on instead steps the
-\ song from the field-sync interrupt (PIA0 CB1, 60 Hz, on every CoCo),
-\ in a 6809 handler that does exactly what sn-frame does. Then:
-\   - wait for frames with sn-vsync, not vsync: the handler clears the
-\     field-sync flag that vsync polls, and counts sn-ticks instead;
-\   - hold the player (1 sn-hold) around sn-start and sn-skip, and while
-\     paused, so the handler never sees half-changed state;
-\   - turn it off (sn-irq-off) before disk access: lib/decb.fs needs
-\     IRQs masked, and BASIC needs its own handler back on quit.
-
-VARIABLE sn-ticks    \ field syncs counted by the handler
-VARIABLE _sn-hold    \ nonzero: the handler leaves the song alone
-VARIABLE _sn-irq     \ nonzero while the handler is installed
-VARIABLE _sn-pl      \ addresses of sn-lvl, sn-dmask, sn-floor for it
-VARIABLE _sn-pd
-VARIABLE _sn-pf
-VARIABLE _sn-irq0    \ saved $010C (opcode, low byte)
-VARIABLE _sn-irq1    \ saved $010D-$010E (address)
-
-\ sn-hold -- true holds the song still, false lets it play on
-: sn-hold  ( f -- )  _sn-hold ! ;
-
-\ sn-over? -- true once the song has ended
-: sn-over?  ( -- f )  _sn-wait @ 0= ;
-
-\ sn-frames -- frames played since sn-start, seeking included
-: sn-frames  ( -- n )  _sn-tick @ ;
-
-\ Install the handler on the $010C IRQ trampoline and unmask IRQ.
-CODE _sn-irq-on  \ ( -- )
-        ORCC    #$50
-        LDA     $010C
-        STA     FVAR__sn_irq0+1
-        LDD     $010D
-        STD     FVAR__sn_irq1
-        LEAY    @irq,PCR
-        STY     $010D
-        LDA     #$7E            ; JMP extended
-        STA     $010C
-        LDA     $FF03
-        ORA     #$01            ; CB1 (field sync) raises IRQ
-        STA     $FF03
-        LDA     $FF02           ; drop a stale flag
-        ANDCC   #$EF
+\ Make the handler step .SNG streams. The routine after ;NEXT is that
+\ step, a subroutine (RTS) doing exactly what sn-frame does; it relies
+\ on _sn-pl, _sn-pd and _sn-pf, which sn-irq-on sets.
+CODE _sn-use-sng  \ ( -- )
+        LEAY    @step,PCR
+        STY     FVAR__sn_step
         ;NEXT
-@irq    LDA     $FF03
-        LBPL    @rti            ; not field sync
-        LDA     $FF02           ; clear the flag
-        LDD     FVAR_sn_ticks
-        ADDD    #1
-        STD     FVAR_sn_ticks
-        LDD     FVAR__sn_hold
-        LBNE    @rti
-        LDD     FVAR__sn_wait
-        LBEQ    @rti            ; the song is over
-        LDD     FVAR__sn_tick
-        ADDD    #1
-        STD     FVAR__sn_tick
-        LDD     FVAR__sn_wait
+@step   LDD     FVAR__sn_wait
         SUBD    #1
         STD     FVAR__sn_wait
         BNE     @env
@@ -295,6 +222,109 @@ CODE _sn-irq-on  \ ( -- )
         ADDB    #$20            ; next channel's latch
         CMPB    #$10            ; past channel 3 ($F0)
         BNE     @ech
+        RTS
+;CODE
+
+\ Run the current step routine once, from Forth (lib/vgm.fs seeks and
+\ plays polled with it). The routine is free to use every register.
+CODE _sn-step1  \ ( -- )
+        PSHS    X,U
+        LDY     FVAR__sn_step
+        BEQ     @none
+        JSR     ,Y
+@none   PULS    X,U
+        ;NEXT
+;CODE
+
+\ sn-start -- point the player at a song (v1 or v2) and reset it
+: sn-start  ( addr -- )
+  sng-body _sn-sp !  1 _sn-wait !  0 _sn-tick !  0 _sn-reps !
+  4 0 DO 15 I sn-lvl + C! LOOP  _sn-use-sng ;
+
+\ sn-frame -- advance the song one 60 Hz frame; true once it has ended
+: sn-frame  ( -- done? )
+  _sn-wait @ 0= IF 1 EXIT THEN
+  1 _sn-tick +!
+  _sn-wait @ 1 - DUP _sn-wait !  0= IF _sn-events THEN
+  _sn-envelope
+  _sn-wait @ 0= ;
+
+\ sn-skip -- run n frames of the song at once, for seeking (#601)
+\ Tone and noise bytes still reach the chip and volume bytes still set
+\ the levels, but nothing decays and no volume is written, so it costs
+\ one step per wait byte rather than per frame. Stops at the end.
+: sn-skip  ( n -- )
+  DUP _sn-tick +!
+  BEGIN
+    _sn-wait @ 0= IF DROP EXIT THEN
+    DUP _sn-wait @ < IF  _sn-wait @ SWAP - _sn-wait !  EXIT THEN
+    _sn-wait @ -  _sn-events
+  DUP 0= UNTIL DROP ;
+
+\ ── Interrupt-driven playing (#604) ────────────────────────────────────
+\ sn-frame called from a busy main loop lands late whenever a pass
+\ overruns its frame, and the music wobbles. sn-irq-on instead steps the
+\ song from the field-sync interrupt (PIA0 CB1, 60 Hz, on every CoCo):
+\ the handler counts the frame and calls the step in _sn-step, the .SNG
+\ one (as sn-frame) or lib/vgm.fs's. Then:
+\   - wait for frames with sn-vsync, not vsync: the handler clears the
+\     field-sync flag that vsync polls, and counts sn-ticks instead;
+\   - hold the player (1 sn-hold) around sn-start and sn-skip, and while
+\     paused, so the handler never sees half-changed state;
+\   - turn it off (sn-irq-off) before disk access: lib/decb.fs needs
+\     IRQs masked, and BASIC needs its own handler back on quit.
+
+VARIABLE sn-ticks    \ field syncs counted by the handler
+VARIABLE _sn-hold    \ nonzero: the handler leaves the song alone
+VARIABLE _sn-irq     \ nonzero while the handler is installed
+VARIABLE _sn-pl      \ addresses of sn-lvl, sn-dmask, sn-floor for it
+VARIABLE _sn-pd
+VARIABLE _sn-pf
+VARIABLE _sn-irq0    \ saved $010C (opcode, low byte)
+VARIABLE _sn-irq1    \ saved $010D-$010E (address)
+
+\ sn-hold -- true holds the song still, false lets it play on
+: sn-hold  ( f -- )  _sn-hold ! ;
+
+\ sn-over? -- true once the song has ended
+: sn-over?  ( -- f )  _sn-wait @ 0= ;
+
+\ sn-frames -- frames played since sn-start, seeking included
+: sn-frames  ( -- n )  _sn-tick @ ;
+
+\ Install the handler on the $010C IRQ trampoline and unmask IRQ.
+CODE _sn-irq-on  \ ( -- )
+        ORCC    #$50
+        LDA     $010C
+        STA     FVAR__sn_irq0+1
+        LDD     $010D
+        STD     FVAR__sn_irq1
+        LEAY    @irq,PCR
+        STY     $010D
+        LDA     #$7E            ; JMP extended
+        STA     $010C
+        LDA     $FF03
+        ORA     #$01            ; CB1 (field sync) raises IRQ
+        STA     $FF03
+        LDA     $FF02           ; drop a stale flag
+        ANDCC   #$EF
+        ;NEXT
+@irq    LDA     $FF03
+        LBPL    @rti            ; not field sync
+        LDA     $FF02           ; clear the flag
+        LDD     FVAR_sn_ticks
+        ADDD    #1
+        STD     FVAR_sn_ticks
+        LDD     FVAR__sn_hold
+        LBNE    @rti
+        LDD     FVAR__sn_wait
+        BEQ     @rti            ; the song is over
+        LDD     FVAR__sn_tick
+        ADDD    #1
+        STD     FVAR__sn_tick
+        LDY     FVAR__sn_step
+        BEQ     @rti
+        JSR     ,Y              ; one frame of the song
 @rti    RTI
 ;CODE
 

@@ -21,6 +21,7 @@ make run          # builds, then xroar ... -cart gmc -run badinerie.bin
 | `badinerie.perf` | Its performance: tempo, dynamics, voicing, repeats (#614) |
 | `sn76489.py`   | Score text to SN76489 byte stream |
 | `midi2sng.py`  | MIDI file to the same stream, and the performance layer the Badinerie uses. The Bach library it converted lives in ~/github/coco-fm-bach (#627) |
+| `sng2vgm.py`   | A .SNG song rendered to a VGM file, logged for a 3.58 MHz chip: test material for `lib/vgm.fs` (#598, checked by `src/vgm-test`) |
 | `SNG-FORMAT.md` | The song stream (.SNG) format spec |
 | `PERFORMANCE.md` | Performance files (`NAME.perf`): tempo shaping, dynamics and voicing (#609) |
 | `badinerie.fs` | The demo: banner, play-again prompt, and the song spliced in with `DATA[PY` |

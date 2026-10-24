@@ -1,10 +1,11 @@
 \ jukebox.fs - COCO.FM: a laid-back SN76489 radio player (#588, #599-#602)
 \
-\ Plays every .SNG file on the DECB disks in drives 0-3, one after another,
-\ radio style, on a 90s MP3-player screen in CG2 (128x64, 4 colours).
-\ Songs load into the heap with lib/decb.fs and play with
-\ lib/sn76489.fs. A v2 song (src/sound-sn76489/SNG-FORMAT.md) carries a
-\ title, composer and length for the display; a v1 song shows its file
+\ Plays every .SNG and .VGM file on the DECB disks in drives 0-3, one
+\ after another, radio style, on a 90s MP3-player screen in CG2 (128x64,
+\ 4 colours). Songs load into the heap with lib/decb.fs and play with
+\ lib/sn76489.fs, or lib/vgm.fs for VGM (#598). A v2 song
+\ (src/sound-sn76489/SNG-FORMAT.md) carries a title, composer and length
+\ for the display, and a VGM its GD3 tag; a song without shows its file
 \ name instead.
 \
 \ Keys, as in Winamp:
@@ -28,13 +29,14 @@ INCLUDE ../../lib/bye.fs
 INCLUDE ../../lib/vdg.fs
 INCLUDE ../../lib/cg-tiny.fs
 INCLUDE ../../lib/sn76489.fs
+INCLUDE ../../lib/vgm.fs
 INCLUDE ../../lib/decb.fs
 
 $00 CONSTANT disk-io    \ $FF7F value: ROM slot 0, I/O slot 0 (disk)
 $01 CONSTANT sound-io   \ $FF7F value: ROM slot 0, I/O slot 1 (GameMaster)
 
-$5800 CONSTANT song-buf \ songs load here, above the program (#618); the
-$2500 CONSTANT song-max \ program must end below it. $5800-$7CFF, under the stack
+$5E00 CONSTANT song-buf \ songs load here, above the program (#618, #598);
+$1F00 CONSTANT song-max \ the program must end below it. $5E00-$7CFF, under the stack
 $0600 CONSTANT cg-vram  \ CG2 screen, 2048 bytes, in the RG6 reservation
 
 
@@ -134,9 +136,13 @@ VARIABLE cur            \ the song playing or loaded, 0-based
 : name@  ( i -- addr )  12 * names + ;
 : drive@  ( i -- d )  name@ 11 + C@ ;
 
+\ Does a directory entry's extension match the three letters a b c?
+: ext?  ( entry a b c -- f )
+  >R >R >R  DUP 8 + C@ R> =  OVER 9 + C@ R> = AND  SWAP 10 + C@ R> = AND ;
+
 : sng?  ( entry -- f )
   DUP C@ 0= IF DROP 0 EXIT THEN
-  DUP 8 + C@ $53 =  OVER 9 + C@ $4E = AND  SWAP 10 + C@ $47 = AND ;
+  DUP $53 $4E $47 ext?  SWAP $56 $47 $4D ext? OR ;
 
 \ Collect the .SNG files on the disk in drive d, if one is turning
 \ there (#612).
@@ -527,7 +533,7 @@ VARIABLE mq-tick
   SWAP DROP ?DUP IF disk-error 0 EXIT THEN
   1 ;
 
-\ A v1 song's name is its 8-character file name, spaces trimmed.
+\ A song with no title shows its 8-character file name, spaces trimmed.
 : trim  ( addr u -- addr u' )
   BEGIN
     DUP 0= IF 1 ELSE
@@ -535,20 +541,27 @@ VARIABLE mq-tick
     THEN
   UNTIL ;
 
+\ The loaded song is a VGM file (#598), not a .SNG stream.
+: vgm-song?  ( -- f )  song-buf vgm? ;
+
 : song-info  ( -- )
-  song-buf sng-v2? IF
-    song-buf sng-title  tlen ! tptr !
-  ELSE
-    cur @ name@ 8 trim  tlen ! tptr !
-  THEN
+  vgm-song? IF song-buf vgm-title ELSE song-buf sng-title THEN
+  ?DUP 0= IF DROP cur @ name@ 8 trim THEN  tlen ! tptr !
   title-draw
-  lo ink  bg paper  song-buf sng-composer y-comp centre
-  song-buf sng-frames 1 RSHIFT 30 /MOD SWAP DROP  tsecs !
+  lo ink  bg paper
+  vgm-song? IF song-buf vgm-author ELSE song-buf sng-composer THEN
+  y-comp centre
+  vgm-song? IF song-buf vgm-frames ELSE song-buf sng-frames THEN
+  1 RSHIFT 30 /MOD SWAP DROP  tsecs !
   total ;
 
 \ ── Transport ──────────────────────────────────────────────────────────
 
-: rewound  ( -- )  song-buf sn-start  3 dirty! ;
+: rewound  ( -- )
+  song-buf  vgm-song? IF vgm-start ELSE sn-start THEN  3 dirty! ;
+
+\ Run n frames of the song without playing them.
+: skip  ( n -- )  vgm-song? IF vgm-skip ELSE sn-skip THEN ;
 
 \ The IRQ steps the song only while it is playing. Every change to the
 \ song's state happens with it held, then this lets it go again.
@@ -583,11 +596,11 @@ VARIABLE mq-tick
 \ here; back restarts the song and runs up to the new time.
 : fwd  ( -- )
   mode @ stopped = IF EXIT THEN
-  1 sn-hold  sn-silence  300 sn-skip  release  3 dirty! ;
+  1 sn-hold  sn-silence  300 skip  release  3 dirty! ;
 
 : back  ( -- )
   mode @ stopped = IF EXIT THEN
-  1 sn-hold  sn-silence  sn-frames 300 - 0 MAX  rewound  sn-skip
+  1 sn-hold  sn-silence  sn-frames 300 - 0 MAX  rewound  skip
   release  3 dirty! ;
 
 \ M swaps colour set 0 and colour set 1: $FF22 bit 3 (#603). With a
@@ -649,7 +662,7 @@ VARIABLE held
   S" SCANNING DISK..." msg
   >disk  scan  stir  >sound
   nsongs @ 0= IF
-    S" NO .SNG FILES ON ANY DRIVE" msg
+    S" NO SONGS ON ANY DRIVE" msg
     BEGIN sn-vsync KEY? UNTIL  quit
   THEN
   first-round  song tune
