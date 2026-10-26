@@ -205,7 +205,9 @@ fc.py: inline_constants(), FVAR_* EQU export, auto-detect ROM vs all-RAM,
 exposes build constants (font-base, vram-base, app-base, trig-base) as Forth
 literals. Lacks BEGIN/WHILE/REPEAT.
 fc.py quirks: preprocess_asm strips blank CODE block lines; ASCII-only
-comments; CONSTANT requires a literal (not another constant).
+comments; CONSTANT requires a literal (not another constant); text in
+parentheses is stripped as a comment even inside `."` / `S"` strings.
+No ?DO, 0<>, 0>, EXECUTE: use `?DUP IF 0 DO`, `0 <>`, `0 >`.
 fc.py entry point: top-level `main` call required at end of .fs file.
 
 ## Getting Started — Layout

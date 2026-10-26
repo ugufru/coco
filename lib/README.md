@@ -11,6 +11,7 @@ Each file shows a description list (what each word does) followed by a cost tabl
 ## Files
 
 - [`async-sound.fs`](#async-soundfs)
+- [`ay8910.fs`](#ay8910fs)
 - [`beam.fs`](#beamfs)
 - [`becker.fs`](#beckerfs)
 - [`bye.fs`](#byefs)
@@ -24,6 +25,7 @@ Each file shows a description list (what each word does) followed by a cost tabl
 - [`font5x7.fs`](#font5x7fs)
 - [`fujinet.fs`](#fujinetfs)
 - [`keyboard.fs`](#keyboardfs)
+- [`orch90.fs`](#orch90fs)
 - [`print.fs`](#printfs)
 - [`prox.fs`](#proxfs)
 - [`rg-pixel.fs`](#rg-pixelfs)
@@ -114,6 +116,46 @@ non-blocking (cooperative) DAC sound for the CoCo
 | `snd-env!` | `( delta -- )` | colon | 8 | 115 |
 | `snd-ringmod!` | `( period -- )` | colon | 20 | 306 |
 | `snd-playing?` | `( -- f )` | colon | 12 | 183 |
+
+---
+
+## `ay8910.fs`
+
+AY-3-8910 / YM2149 sound chip words (#632)
+
+**Provides:** ay-psg, ay-chip, ay-chips, ay!, ay-tone, ay-vol, ay-noise, ay-mix, ay-env, ay-silence, ay-init, ay-psg-slow, ay-found?
+
+**Requires:** kernel primitives only
+
+- **`ay!`**
+- **`ay-chips`**
+- **`ay-found?`**: true if the selected chip answers
+- **`ay-chip`**: select Symphony-12 chip 0-3
+- **`ay-psg`**: select the CoCo PSG
+- **`ay-tone`**: set channel 0-2's 12-bit tone period
+- **`ay-vol`**: set channel 0-2's level: 0 silent to 15, 16 = envelope
+- **`ay-noise`**: set the 5-bit noise period
+- **`ay-mix`**: set the mixer: bits 0-2 tone A-C off, bits 3-5 noise A-C
+- **`ay-env`**: set the envelope period and shape, and restart it
+- **`ay-silence`**
+- **`ay-psg-slow`**: true runs the CoCo PSG at 1 MHz, false at 2 MHz
+- **`ay-init`**: set up the Symphony-12's PIA, and silence whichever chips
+
+| Word | Stack | Kind | Bytes | Cycles |
+|------|-------|------|-------|--------|
+| `ay!` | `( data reg -- )` | CODE |  |  |
+| `ay-chips` | `( mask -- )` | colon |  |  |
+| `ay-found?` | `( -- f )` | colon |  |  |
+| `ay-chip` | `( n -- )` | colon |  |  |
+| `ay-psg` | `( -- )` | colon |  |  |
+| `ay-tone` | `( tp ch -- )` | colon |  |  |
+| `ay-vol` | `( level ch -- )` | colon |  |  |
+| `ay-noise` | `( np -- )` | colon |  |  |
+| `ay-mix` | `( bits -- )` | colon |  |  |
+| `ay-env` | `( ep shape -- )` | colon |  |  |
+| `ay-silence` | `( -- )` | colon |  |  |
+| `ay-psg-slow` | `( f -- )` | colon |  |  |
+| `ay-init` | `( -- )` | colon |  |  |
 
 ---
 
@@ -468,6 +510,32 @@ CoCo keyboard matrix constants and utilities
 | `KB-R6` |  | const |  |  |
 | `KB-R7` |  | const |  |  |
 | `KEY-HELD?` | `( col_mask row_bit -- flag )` | colon | 10 | 175 |
+
+---
+
+## `orch90.fs`
+
+Orchestra-90CC stereo DAC words (#633)
+
+**Provides:** orch!, orch-silence, orch-wave, orch-play, orch-hz>inc, orch-frames
+
+**Requires:** kernel primitives only. Wavetables come from lib/wavetable.fs (gen-sine etc.): generate one, then orch-wave ! it.
+
+- **`orch!`**: write a raw sample to each DAC
+- **`orch-silence`**: both DACs to the middle
+- **`orch-wave`**
+- **`orch-hz>inc`**
+- **`orch-frames`**: samples in n 60 Hz frames
+- **`orch-play`**: play n samples, one voice left and one right
+
+| Word | Stack | Kind | Bytes | Cycles |
+|------|-------|------|-------|--------|
+| `orch!` | `( left right -- )` | colon |  |  |
+| `orch-silence` | `( -- )` | colon |  |  |
+| `orch-wave` |  | var |  |  |
+| `orch-hz>inc` | `( hz -- inc )` | colon |  |  |
+| `orch-frames` | `( n -- samples )` | colon |  |  |
+| `orch-play` | `( inc-left inc-right n -- )` | CODE |  |  |
 
 ---
 
