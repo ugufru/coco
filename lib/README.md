@@ -69,7 +69,7 @@ non-blocking (cooperative) DAC sound for the CoCo
 - **`snd-poll`**: emit one wavetable sample to the DAC if a new HSYNC row elapsed; non-blocking.
 - **`snd-fill`**: emit n evenly HSYNC-locked samples back-to-back (blocking); for the VSYNC-wait spin. *(loop: ~8cy/iter, loop: ~150cy/iter)*
 - **`snd-noise-fill`**: emit n noise samples (pitch via snd-noise-div, level via snd-amp). *(loop: ~8cy/iter, loop: ~26cy/iter, loop: ~111cy/iter)*
-- **`freq>inc`**
+- **`freq>inc`**: Convert a frequency in Hz to the per-sample phase increment, assuming the full snd-fill sample rate.
 - **`snd-async-init`**: one-time setup: init the DAC path and noise (no default waveform).
 - **`snd-waveform`**: point the oscillator at a 256-byte signed wavetable (mode 0).
 - **`snd-shape`**: select an algorithmic (table-free) waveform: 1 saw, 2 square, 3 triangle.
@@ -127,8 +127,8 @@ AY-3-8910 / YM2149 sound chip words (#632)
 
 **Requires:** kernel primitives only
 
-- **`ay!`**
-- **`ay-chips`**
+- **`ay!`**: Write a register of the selected chip(s). CODE word.
+- **`ay-chips`**: Select Symphony-12 chips by mask (bit n = chip n), or 0 for the CoCo PSG.
 - **`ay-found?`**: true if the selected chip answers
 - **`ay-chip`**: select Symphony-12 chip 0-3
 - **`ay-psg`**: select the CoCo PSG
@@ -137,7 +137,7 @@ AY-3-8910 / YM2149 sound chip words (#632)
 - **`ay-noise`**: set the 5-bit noise period
 - **`ay-mix`**: set the mixer: bits 0-2 tone A-C off, bits 3-5 noise A-C
 - **`ay-env`**: set the envelope period and shape, and restart it
-- **`ay-silence`**
+- **`ay-silence`**: Levels to 0 and the mixer off on the selected chip(s).
 - **`ay-psg-slow`**: true runs the CoCo PSG at 1 MHz, false at 2 MHz
 - **`ay-init`**: set up the Symphony-12's PIA, and silence whichever chips
 
@@ -167,7 +167,7 @@ Beam pixel-save/restore system for artifact-free rendering
 
 **Requires:** kernel (VAR_BEAM_BUF, VAR_BEAM_VRAM, VAR_BEAM_CNT, VAR_LINE_*, VAR_RGVRAM), rg-pixel.fs
 
-- **`beam-restore-slice`**: Restore count pixels from buffer at index start using saved background colors. CODE word. *(loop: ~7cy/iter, loop: ~7cy/iter, loop: ~181cy/iter)*
+- **`beam-restore-slice`**: Restore count pixels of a traced beam to their original colors, starting at offset start. *(loop: ~7cy/iter, loop: ~7cy/iter, loop: ~181cy/iter)*
 
 | Word | Stack | Kind | Bytes | Cycles |
 |------|-------|------|-------|--------|
@@ -247,15 +247,15 @@ CG mode text rendering (2 bits/pixel)
 
 **Requires:** kernel primitives only
 
-- **`cg-base`**
-- **`cg-ink`**
-- **`cg-paper`**
+- **`cg-base`**: Variable: VRAM address of the screen&rsquo;s top-left byte.
+- **`cg-ink`**: Variable: fill byte for glyph pixels.
+- **`cg-paper`**: Variable: fill byte for the background.
 - **`cg-colour`**: the fill byte for colour 0-3
 - **`cg-at`**: put the cursor at byte column 0-31, pixel row y
 - **`cg-mix`**: a byte with ink where the mask is set, paper elsewhere
 - **`cg-emit`**: draw one character at the cursor and move right one cell
 - **`cg-type`**: draw a string at the cursor
-- **`cg-big`**
+- **`cg-big`**: Draw a character doubled, 8&times;12 pixels (two bytes wide), for clock digits.
 - **`cg-fill`**: fill a box with a fill byte: byte column, pixel row, width
 
 | Word | Stack | Kind | Bytes | Cycles |
@@ -361,17 +361,17 @@ Read files from a DECB (RS-DOS) floppy, no Disk BASIC needed
 
 **Footprint:** ~1.1 KB code + 335 bytes of buffers (sector, FAT, name).
 
-- **`dk-drive`**
+- **`dk-drive`**: Variable: the drive in use, 0-3.
 - **`dk-err`**: error number from the last dk-getc that returned -1
-- **`dk-sector`**
-- **`dk-ready?`**
-- **`dk-select`**
+- **`dk-sector`**: Read one sector (1-18) of dk-drive into buf: 0, or 3 on an I/O error.
+- **`dk-ready?`**: True if a disk is turning in dk-drive.
+- **`dk-select`**: Switch to drive 0-3 without stopping the motor; the head is re-homed on the next access.
 - **`dk-close`**: stop the motor and give the NMI vector back
 - **`dk-name`**: parse NAME.EXT:D into the 8+3 directory form; 0 or error
 - **`dk-entry`**: read directory entry 0-71 into dk-buf; its address, or 0
-- **`dk-open-fname`**
+- **`dk-open-fname`**: Open the file already named in dk-fname (8+3, space padded), as a directory entry holds it.
 - **`dk-open`**: open a file for dk-getc / dk-load-open; 0 or an error
-- **`dk-getc`**
+- **`dk-getc`**: The next byte of the open file, or -1 at the end or on an error (the reason in dk-err).
 - **`dk-load-open`**: read the rest of the open file to addr, at most max
 - **`dk-load`**: read a whole file to addr, at most max bytes; as dk-load-open
 
@@ -401,8 +401,8 @@ Artifact-safe font for RG6 NTSC display
 
 **Requires:** kernel primitives CMOVE, font-data fc.py-injected constant: font-base
 
-- **`glyph-addr`**: Return the address of the 7-byte glyph for the given ASCII character. Supports space, A–Z, 0–9.
-- **`init-font`**: Write the 5&times;7 bitmap font data to $6000 (259 bytes, 37 glyphs). Call once at startup.
+- **`glyph-addr`**: Address of the 8-byte glyph for a character; anything outside $20-$5A gives the space.
+- **`init-font`**: Copy the 472 bytes of glyph data to font-base. Call once at startup.
 
 | Word | Stack | Kind | Bytes | Cycles |
 |------|-------|------|-------|--------|
@@ -420,7 +420,7 @@ Artifact-safe font for RG6 NTSC display
 **Requires:** kernel primitives C!, +, -, *, <, AND, IF/ELSE/THEN, DO/LOOP fc.py-injected constant: font-base
 
 - **`glyph-addr`**: Return the address of the 7-byte glyph for the given ASCII character. Supports space, A–Z, 0–9.
-- **`init-font`**: Write the 5&times;7 bitmap font data to $6000 (259 bytes, 37 glyphs). Call once at startup.
+- **`init-font`**: Write the 5&times;7 bitmap font data to font-base (259 bytes, 37 glyphs): $5800 in ROM mode, $9000 in all-RAM mode.
 
 | Word | Stack | Kind | Bytes | Cycles |
 |------|-------|------|-------|--------|
@@ -523,8 +523,8 @@ Orchestra-90CC stereo DAC words (#633)
 
 - **`orch!`**: write a raw sample to each DAC
 - **`orch-silence`**: both DACs to the middle
-- **`orch-wave`**
-- **`orch-hz>inc`**
+- **`orch-wave`**: Variable: the 256-byte signed wavetable both sides play.
+- **`orch-hz>inc`**: The phase increment for a pitch: Hz &times; 5.78, good up to 2600 Hz.
 - **`orch-frames`**: samples in n 60 Hz frames
 - **`orch-play`**: play n samples, one voice left and one right
 
@@ -565,7 +565,7 @@ Spatial proximity query (Manhattan-distance bitmask)
 
 **Requires:** kernel CODE infrastructure
 
-- **`prox-scan`**: Proximity scan. *(loop: ~99cy/iter)*
+- **`prox-scan`**: Scan count (x, y) byte pairs at array; bit N of the result is set if entry N is within Manhattan distance radius of (... *(loop: ~99cy/iter)*
 
 | Word | Stack | Kind | Bytes | Cycles |
 |------|-------|------|-------|--------|
@@ -611,7 +611,7 @@ RG mode text rendering (1 bit/pixel)
 
 - **`cv`**: Variable: VRAM base address for text rendering. Set before calling any text rendering word.
 - **`cb`**: Variable: bytes per row for the current display mode.
-- **`rg-char`**: Render a character at column cx, row cy in an RG mode (1 bit per pixel). *(has DO/LOOP)*
+- **`rg-char`**: Render one glyph from the kernel font at character cell (cx,cy). *(has DO/LOOP)*
 - **`rg-type`**: Render a counted string at character cell (cx,cy) using the active RG6 framebuffer and the current cv/cb foreground/background colours. *(has DO/LOOP)*
 
 | Word | Stack | Kind | Bytes | Cycles |
@@ -686,19 +686,19 @@ SN76489 sound chip words and song stream player
 - **`sn!`**: write one byte to the SN76489
 - **`sn-silence`**: set all four channels to full attenuation
 - **`cart-audio`**: route the cartridge SND line to the speaker
-- **`sn-tone`**
+- **`sn-tone`**: Set tone channel 0-2 to a 10-bit divider (125000 / Hz).
 - **`sn-vol`**: set channel 0-3 attenuation, 0 loudest, 15 off
-- **`sn-noise`**
+- **`sn-noise`**: Set the noise control: bit 2 white (else periodic), bits 1-0 the rate (3 follows tone 2).
 - **`sn-atten`**: master attenuation, 0 full volume to 15 silent, added to
 - **`sng-v2?`**: true if the song at addr has a header
-- **`sng-frames`**
+- **`sng-frames`**: The song&rsquo;s length in frames from its header, repeats included; 0 if unknown.
 - **`sng-title`**: the song's title, or an empty string
 - **`sng-composer`**: the song's composer, or an empty string
 - **`sng-body`**: the first byte of the stream proper
-- **`sn-start`**
+- **`sn-start`**: Point the player at a song (v1 or v2) and reset it.
 - **`sn-frame`**: advance the song one 60 Hz frame; true once it has ended
-- **`sn-skip`**
-- **`sn-ticks`**
+- **`sn-skip`**: Run n frames at once without sounding them, for seeking: tone bytes still reach the chip, levels are not decayed or w...
+- **`sn-ticks`**: Variable: field syncs counted by the handler.
 - **`sn-hold`**: true holds the song still, false lets it play on
 - **`sn-over?`**: true once the song has ended
 - **`sn-frames`**: frames played since sn-start, seeking included
@@ -855,11 +855,11 @@ play VGM (Video Game Music) files on the SN76489 (#598)
 
 **Requires:** lib/sn76489.fs (the chip, sn-lvl, sn-atten, and the field-sync handler: sn-irq-on, sn-hold, sn-over?, sn-frames)
 
-- **`le@`**
+- **`le@`**: The low 16 bits of a little-endian field.
 - **`vgm?`**: true if addr holds a VGM file with an SN76489 in it
 - **`vgm-frames`**: length in 60 Hz frames, the looped part counted twice
-- **`vgm-title`**
-- **`vgm-author`**
+- **`vgm-title`**: The English track name from the GD3 tag, as ASCII (anything else becomes ?), or empty.
+- **`vgm-author`**: The English composer from the GD3 tag, or empty.
 - **`vgm-start`**: point the player at a VGM file in RAM and reset it.
 - **`vgm-pitch`**: the divider last sent to tone channel 0-2, at 4 MHz
 - **`vgm-frame`**: play one 60 Hz frame, polled; true once it has ended

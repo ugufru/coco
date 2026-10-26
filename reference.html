@@ -929,6 +929,35 @@ CODE fast-plot   ( x y -- )
         </table>
       </div>
 
+      <!-- bye.fs -->
+      <div class="ref-section">
+        <h3>Program Exit</h3>
+        <p class="lib-path">INCLUDE lib/bye.fs</p>
+        <p>Ways to end a program. <code>bye</code> works in every build; <code>exit-basic</code> and <code>basic-cold</code> return to the BASIC <code>OK</code> prompt and only work in ROM mode, where the BASIC ROMs are still mapped. In all-RAM mode <code>$A027</code> is RAM, and jumping there crashes.</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">bye</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Restore the VDG text mode, clear the screen black, and halt. Safe in any build profile; the only clean exit in all-RAM mode.</td>
+          </tr>
+          <tr>
+            <td class="word-name">exit-basic</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Restore the text mode, clear the screen, and return to BASIC through <code>basic-cold</code>. ROM mode only.</td>
+          </tr>
+          <tr>
+            <td class="word-name">basic-cold</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Jump to Color BASIC&rsquo;s cold start at <code>$A027</code>. ROM mode only. <em>CODE word.</em></td>
+          </tr>
+        </table>
+      </div>
+
       <!-- keyboard.fs -->
       <div class="ref-section">
         <h3>Keyboard Matrix</h3>
@@ -1063,12 +1092,36 @@ CODE fast-plot   ( x y -- )
           <tr>
             <td class="word-name">init-font</td>
             <td class="stack-effect">( -- )</td>
-            <td>Write the 5&times;7 bitmap font data to <code>$6000</code> (259 bytes, 37 glyphs). Call once at startup.</td>
+            <td>Write the 5&times;7 bitmap font data to <code>font-base</code> (259 bytes, 37 glyphs): <code>$5800</code> in ROM mode, <code>$9000</code> in all-RAM mode. Call once at startup.</td>
           </tr>
           <tr>
             <td class="word-name">glyph-addr</td>
             <td class="stack-effect">( char -- addr )</td>
             <td>Return the address of the 7-byte glyph for the given ASCII character. Supports space, A&ndash;Z, 0&ndash;9.</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- font-art.fs -->
+      <div class="ref-section">
+        <h3>Artifact-Safe Font</h3>
+        <p class="lib-path">INCLUDE lib/font-art.fs</p>
+        <p>A font for RG6 on an NTSC set: every pixel is a 2-bit artifact pair (11 on, 00 off), so letters never pick up colour fringes. 59 glyphs, ASCII <code>$20-$5A</code> (space, punctuation, 0-9, A-Z), 8 bytes each (7 rows and a blank spacer), 472 bytes in all. The data is in the kernel; <code>init-font</code> copies it to <code>font-base</code>, which the kernel build sets: <code>$5800</code> in ROM mode, <code>$9000</code> in all-RAM mode.</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">init-font</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Copy the 472 bytes of glyph data to <code>font-base</code>. Call once at startup.</td>
+          </tr>
+          <tr>
+            <td class="word-name">glyph-addr</td>
+            <td class="stack-effect">( char -- addr )</td>
+            <td>Address of the 8-byte glyph for a character; anything outside <code>$20-$5A</code> gives the space.</td>
           </tr>
         </table>
       </div>
@@ -1130,6 +1183,76 @@ CODE fast-plot   ( x y -- )
             <td class="word-name">cg-char</td>
             <td class="stack-effect">( char cx cy -- )</td>
             <td>Render a character at column <em>cx</em>, row <em>cy</em> in a CG mode (2 bits per pixel). Each glyph column becomes 2 CG pixels wide.</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- cg-tiny.fs -->
+      <div class="ref-section">
+        <h3>Tiny CG Text</h3>
+        <p class="lib-path">INCLUDE lib/cg-tiny.fs</p>
+        <p>A 3&times;5 font for the 4-colour CG modes. A CG byte is four 2-bit pixels, so a glyph and its spacing are exactly one byte wide, and a character cell is 4&times;6 pixels: 32 columns on a 128-pixel screen, 10 rows in CG2 (128&times;64), 32 in CG6. Colours are <em>fill bytes</em>, one colour in all four pixels; <code>cg-colour</code> makes them (colour set 0: <code>$00</code> green, <code>$55</code> yellow, <code>$AA</code> blue, <code>$FF</code> red).</p>
+        <p>Characters <code>$20-$60</code> are in the font and lowercase prints as uppercase. <code>[ \ ] ^ _ `</code> are media icons instead: rewind arrow, play, stop, pause, bar right and bar left, so <code>_[</code> draws |&lt; and <code>\`</code> draws &gt;|. Used by the jukebox. Kernel primitives only.</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">cg-base</td>
+            <td class="stack-effect">( -- addr )</td>
+            <td>Variable: VRAM address of the screen&rsquo;s top-left byte.</td>
+          </tr>
+          <tr>
+            <td class="word-name">cg-ink</td>
+            <td class="stack-effect">( -- addr )</td>
+            <td>Variable: fill byte for glyph pixels.</td>
+          </tr>
+          <tr>
+            <td class="word-name">cg-paper</td>
+            <td class="stack-effect">( -- addr )</td>
+            <td>Variable: fill byte for the background.</td>
+          </tr>
+          <tr>
+            <td class="word-name">cg-font</td>
+            <td class="stack-effect">( -- addr )</td>
+            <td>The glyph table: five row masks per character from <code>$20</code>.</td>
+          </tr>
+          <tr>
+            <td class="word-name">cg-colour</td>
+            <td class="stack-effect">( n -- fill )</td>
+            <td>The fill byte for colour 0-3.</td>
+          </tr>
+          <tr>
+            <td class="word-name">cg-at</td>
+            <td class="stack-effect">( col y -- )</td>
+            <td>Put the cursor at byte column 0-31, pixel row y.</td>
+          </tr>
+          <tr>
+            <td class="word-name">cg-mix</td>
+            <td class="stack-effect">( mask -- byte )</td>
+            <td>A byte with ink where the mask is set and paper elsewhere.</td>
+          </tr>
+          <tr>
+            <td class="word-name">cg-emit</td>
+            <td class="stack-effect">( c -- )</td>
+            <td>Draw one character at the cursor and move right one cell.</td>
+          </tr>
+          <tr>
+            <td class="word-name">cg-type</td>
+            <td class="stack-effect">( addr u -- )</td>
+            <td>Draw a string at the cursor.</td>
+          </tr>
+          <tr>
+            <td class="word-name">cg-big</td>
+            <td class="stack-effect">( c -- )</td>
+            <td>Draw a character doubled, 8&times;12 pixels (two bytes wide), for clock digits.</td>
+          </tr>
+          <tr>
+            <td class="word-name">cg-fill</td>
+            <td class="stack-effect">( col y w h fill -- )</td>
+            <td>Fill a box with a fill byte: byte column, pixel row, width in bytes, height in rows.</td>
           </tr>
         </table>
       </div>
@@ -1260,6 +1383,25 @@ CODE fast-plot   ( x y -- )
             <td class="word-name">count-blanking</td>
             <td class="stack-effect">( -- n )</td>
             <td>Diagnostic: wait for VSYNC then count 100 HSYNC pulses. Returns 100 (confirms timing). <em>CODE word.</em></td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- prox.fs -->
+      <div class="ref-section">
+        <h3>Proximity Query</h3>
+        <p class="lib-path">INCLUDE lib/prox.fs</p>
+        <p>Which of up to 16 objects are near a point, in one call: a Manhattan-distance test over an array of (x, y) byte pairs, answered as a bitmask. About 99 cycles per entry.</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">prox-scan</td>
+            <td class="stack-effect">( cx cy radius array count -- bitmask )</td>
+            <td>Scan <code>count</code> (x, y) byte pairs at <code>array</code>; bit N of the result is set if entry N is within Manhattan distance <code>radius</code> of (cx, cy). At most 16 entries. <em>CODE word.</em></td>
           </tr>
         </table>
       </div>
@@ -1494,6 +1636,98 @@ CODE fast-plot   ( x y -- )
             <td class="word-name">bk-type</td>
             <td class="stack-effect">( addr len -- )</td>
             <td>Send a buffer (addr len) byte by byte.</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- decb.fs -->
+      <div class="ref-section">
+        <h3>DECB Disk Files</h3>
+        <p class="lib-path">INCLUDE lib/decb.fs</p>
+        <p style="font-size:13px;color:#666"><strong>Footprint:</strong> ~1.1 KB code + 335 bytes of buffers (sector, FAT, name).</p>
+        <p>Reads files from a DECB (RS-DOS) floppy by talking to the disk controller&rsquo;s WD17xx directly: no Disk BASIC calls, and Disk BASIC&rsquo;s workspace (<code>$0600-$0DFF</code>) is never touched. Sector transfers use the CoCo&rsquo;s HALT trick (the CPU waits for each byte), and the controller&rsquo;s end-of-sector NMI steers it out of the loop. IRQs must be masked, as the kernel leaves them at start. CoCo 1/2 only for now: the NMI vector is the RAM trampoline at <code>$0109</code>.</p>
+        <p>Errors are small numbers, 0 meaning fine: 1 file not found, 3 I/O error, 4 bad FAT chain, 9 file too big, 10 bad file name, 11 bad drive, 12 end of file.</p>
+        <p>Typical use: <code>S&quot; SONG.SNG&quot; dk-open</code> then <code>dk-getc</code> until -1, then <code>dk-close</code>; or all at once, <code>$5A00 $1E00 S&quot; SONG.SNG&quot; dk-load ( len err ) dk-close</code>.</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">dk-open</td>
+            <td class="stack-effect">( addr u -- err )</td>
+            <td>Open <code>NAME.EXT</code> or <code>NAME.EXT:D</code> (drive 0-3) for reading.</td>
+          </tr>
+          <tr>
+            <td class="word-name">dk-getc</td>
+            <td class="stack-effect">( -- c | -1 )</td>
+            <td>The next byte of the open file, or -1 at the end or on an error (the reason in <code>dk-err</code>).</td>
+          </tr>
+          <tr>
+            <td class="word-name">dk-load</td>
+            <td class="stack-effect">( addr max c-addr u -- len err )</td>
+            <td>Open a file and read it all to <code>addr</code>, at most <code>max</code> bytes.</td>
+          </tr>
+          <tr>
+            <td class="word-name">dk-load-open</td>
+            <td class="stack-effect">( addr max -- len err )</td>
+            <td>Read the rest of the open file to addr, at most max bytes: its length and 0, or the length so far and an error (9 if the file is bigger than max; nothing past addr+max is written).</td>
+          </tr>
+          <tr>
+            <td class="word-name">dk-close</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Stop the motor and give the NMI vector back.</td>
+          </tr>
+          <tr>
+            <td class="word-name">dk-name</td>
+            <td class="stack-effect">( addr u -- err )</td>
+            <td>Parse <code>NAME.EXT:D</code> into <code>dk-fname</code> and <code>dk-drive</code>.</td>
+          </tr>
+          <tr>
+            <td class="word-name">dk-open-fname</td>
+            <td class="stack-effect">( -- err )</td>
+            <td>Open the file already named in <code>dk-fname</code> (8+3, space padded), as a directory entry holds it.</td>
+          </tr>
+          <tr>
+            <td class="word-name">dk-entry</td>
+            <td class="stack-effect">( n -- addr | 0 )</td>
+            <td>Read directory entry 0-71 into <code>dk-buf</code>; its address, or 0 past the last one.</td>
+          </tr>
+          <tr>
+            <td class="word-name">dk-sector</td>
+            <td class="stack-effect">( buf trk sec -- err )</td>
+            <td>Read one sector (1-18) of <code>dk-drive</code> into buf: 0, or 3 on an I/O error.</td>
+          </tr>
+          <tr>
+            <td class="word-name">dk-ready?</td>
+            <td class="stack-effect">( -- f )</td>
+            <td>True if a disk is turning in dk-drive. Watches the index pulse for about two turns (the controller&rsquo;s READY line is tied on), or asks for a sector where there is no pulse.</td>
+          </tr>
+          <tr>
+            <td class="word-name">dk-select</td>
+            <td class="stack-effect">( d -- )</td>
+            <td>Switch to drive 0-3 without stopping the motor; the head is re-homed on the next access.</td>
+          </tr>
+          <tr>
+            <td class="word-name">dk-drive</td>
+            <td class="stack-effect">( -- addr )</td>
+            <td>Variable: the drive in use, 0-3.</td>
+          </tr>
+          <tr>
+            <td class="word-name">dk-err</td>
+            <td class="stack-effect">( -- addr )</td>
+            <td>Variable: the error behind the last <code>dk-getc</code> that returned -1.</td>
+          </tr>
+          <tr>
+            <td class="word-name">dk-buf</td>
+            <td class="stack-effect">( -- addr )</td>
+            <td>The 256-byte sector buffer.</td>
+          </tr>
+          <tr>
+            <td class="word-name">dk-fname</td>
+            <td class="stack-effect">( -- addr )</td>
+            <td>The 11-byte file name, 8+3 and space padded.</td>
           </tr>
         </table>
       </div>
@@ -1779,6 +2013,344 @@ BEGIN
   snd-frame                    \ age the note once per frame
   snd-playing? 0=
 UNTIL</pre>
+      </div>
+
+      <!-- sn76489.fs -->
+      <div class="ref-section">
+        <h3>SN76489 Sound Chip (GameMaster)</h3>
+        <p class="lib-path">INCLUDE lib/sn76489.fs</p>
+        <p><strong>Cartridge sound chips.</strong> The four libraries that follow drive sound chips on cartridges. Their sound comes back on the cartridge&rsquo;s sound line, which the kernel leaves muted: call <code>cart-audio</code> (in this library) first. It sets the analog multiplexer to the cartridge (PIA0 CB2:CA2 = 10) and turns sound on (PIA1 CB2). The CoCo Zero has every chip here built in; stock XRoar has the GameMaster (<code>-cart gmc</code>) and the Orchestra-90 (<code>-cart orch90</code>). <code>src/sound-tour</code> plays one phrase on each.</p>
+        <p>The SN76489 sits at <code>$FF41</code> on John Linville&rsquo;s Games Master Cartridge, which takes any write to an odd address in <code>$FF40-$FF5F</code> (so no Becker port alongside). Clocked at 4 MHz: a tone divider is 125000 / Hz, 10 bits, down to about B2. Three square-wave channels and a noise channel, each with a 4-bit attenuation (0 loudest, 15 off).</p>
+        <p>The player walks <em>.SNG</em> song streams (specified in <code>src/sound-sn76489/SNG-FORMAT.md</code>): chip bytes and frame waits, with a per-channel decay envelope set by <code>sn-lvl</code>, <code>sn-dmask</code> and <code>sn-floor</code>, and a master volume in <code>sn-atten</code>. Poll it once a frame with <code>sn-frame</code>, or let the 60 Hz field-sync interrupt step it (<code>sn-irq-on</code>): then wait with <code>sn-vsync</code>, hold the song (<code>1 sn-hold</code>) while changing its state, and turn the interrupt off before disk access. The handler calls the step through a vector, so <code>lib/vgm.fs</code> shares it.</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">cart-audio</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Route the cartridge sound line to the speaker: needed before any cartridge chip is heard.</td>
+          </tr>
+          <tr>
+            <td class="word-name">sn!</td>
+            <td class="stack-effect">( b -- )</td>
+            <td>Write one byte to the SN76489 at <code>$FF41</code>.</td>
+          </tr>
+          <tr>
+            <td class="word-name">sn-tone</td>
+            <td class="stack-effect">( n ch -- )</td>
+            <td>Set tone channel 0-2 to a 10-bit divider (125000 / Hz).</td>
+          </tr>
+          <tr>
+            <td class="word-name">sn-vol</td>
+            <td class="stack-effect">( att ch -- )</td>
+            <td>Set channel 0-3&rsquo;s attenuation, 0 loudest, 15 off.</td>
+          </tr>
+          <tr>
+            <td class="word-name">sn-noise</td>
+            <td class="stack-effect">( ctrl -- )</td>
+            <td>Set the noise control: bit 2 white (else periodic), bits 1-0 the rate (3 follows tone 2).</td>
+          </tr>
+          <tr>
+            <td class="word-name">sn-silence</td>
+            <td class="stack-effect">( -- )</td>
+            <td>All four channels to full attenuation.</td>
+          </tr>
+          <tr>
+            <td class="word-name">sn-start</td>
+            <td class="stack-effect">( addr -- )</td>
+            <td>Point the player at a song (v1 or v2) and reset it.</td>
+          </tr>
+          <tr>
+            <td class="word-name">sn-frame</td>
+            <td class="stack-effect">( -- done? )</td>
+            <td>Advance the song one 60 Hz frame; true once it has ended.</td>
+          </tr>
+          <tr>
+            <td class="word-name">sn-play</td>
+            <td class="stack-effect">( addr -- brk? )</td>
+            <td>Play a song to the end, one frame per vsync; true if BREAK was pressed.</td>
+          </tr>
+          <tr>
+            <td class="word-name">sn-skip</td>
+            <td class="stack-effect">( n -- )</td>
+            <td>Run n frames at once without sounding them, for seeking: tone bytes still reach the chip, levels are not decayed or written. Stops at the end.</td>
+          </tr>
+          <tr>
+            <td class="word-name">sn-over?</td>
+            <td class="stack-effect">( -- f )</td>
+            <td>True once the song has ended.</td>
+          </tr>
+          <tr>
+            <td class="word-name">sn-frames</td>
+            <td class="stack-effect">( -- n )</td>
+            <td>Frames played since sn-start, seeking included.</td>
+          </tr>
+          <tr>
+            <td class="word-name">sn-atten</td>
+            <td class="stack-effect">( -- addr )</td>
+            <td>Variable: master attenuation, 0 full volume to 15 silent, added to every level the player writes.</td>
+          </tr>
+          <tr>
+            <td class="word-name">sn-lvl</td>
+            <td class="stack-effect">( -- addr )</td>
+            <td>Four bytes: each channel&rsquo;s current attenuation. Read it for level meters.</td>
+          </tr>
+          <tr>
+            <td class="word-name">sn-dmask</td>
+            <td class="stack-effect">( -- addr )</td>
+            <td>Four bytes: how often each channel decays (frame mask: 0 every frame, 1 every 2nd, 3 every 4th).</td>
+          </tr>
+          <tr>
+            <td class="word-name">sn-floor</td>
+            <td class="stack-effect">( -- addr )</td>
+            <td>Four bytes: the attenuation each channel&rsquo;s decay stops at. A song may store its own values in these tables before playing.</td>
+          </tr>
+          <tr>
+            <td class="word-name">sn-irq-on</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Step the song from the field-sync interrupt (PIA0 CB1) from now on.</td>
+          </tr>
+          <tr>
+            <td class="word-name">sn-irq-off</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Back to polled playing, IRQs masked, BASIC&rsquo;s handler restored.</td>
+          </tr>
+          <tr>
+            <td class="word-name">sn-hold</td>
+            <td class="stack-effect">( f -- )</td>
+            <td>True holds the song still (the interrupt leaves it alone), false lets it play on.</td>
+          </tr>
+          <tr>
+            <td class="word-name">sn-vsync</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Wait for the next frame, with or without the interrupt (the handler clears the flag vsync polls).</td>
+          </tr>
+          <tr>
+            <td class="word-name">sn-ticks</td>
+            <td class="stack-effect">( -- addr )</td>
+            <td>Variable: field syncs counted by the handler.</td>
+          </tr>
+          <tr>
+            <td class="word-name">sng-v2?</td>
+            <td class="stack-effect">( addr -- f )</td>
+            <td>True if the song at addr starts with a v2 header.</td>
+          </tr>
+          <tr>
+            <td class="word-name">sng-frames</td>
+            <td class="stack-effect">( addr -- n )</td>
+            <td>The song&rsquo;s length in frames from its header, repeats included; 0 if unknown.</td>
+          </tr>
+          <tr>
+            <td class="word-name">sng-title</td>
+            <td class="stack-effect">( addr -- c-addr u )</td>
+            <td>The song&rsquo;s title, or an empty string.</td>
+          </tr>
+          <tr>
+            <td class="word-name">sng-composer</td>
+            <td class="stack-effect">( addr -- c-addr u )</td>
+            <td>The song&rsquo;s composer, or an empty string.</td>
+          </tr>
+          <tr>
+            <td class="word-name">sng-body</td>
+            <td class="stack-effect">( addr -- addr&#x27; )</td>
+            <td>The first byte of the stream proper, past any header.</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- vgm.fs -->
+      <div class="ref-section">
+        <h3>VGM Playback</h3>
+        <p class="lib-path">INCLUDE lib/vgm.fs</p>
+        <p>Plays VGM (Video Game Music) files on the SN76489: Master System and Game Gear rips, and Furnace or DefleMask exports. Requires <code>lib/sn76489.fs</code>. The whole file is loaded into RAM and walked in place; unpack <code>.vgz</code> files on the host first. SN76489 writes, waits (<code>$61</code>, <code>$62</code>, <code>$63</code>, <code>$7n</code>, <code>$8n</code>), the end and the loop point are acted on; every other chip&rsquo;s command is skipped by its length.</p>
+        <p>Timing: each 60 Hz frame is worth 735 samples and runs the commands that fall inside it, so 50 Hz tunes keep their tempo. Pitch: most files are logged for a 3579545 Hz chip, which would play about two semitones sharp at 4 MHz, so each divider is rebuilt from its latch and data bytes and scaled by 4000000 / clock. Volume bytes set <code>sn-lvl</code> and every frame writes all four levels plus <code>sn-atten</code>, so volume control and level meters work as for .SNG. A looped file plays its loop once more and stops.</p>
+        <p>Size is the catch: about 280 bytes a second against about 75 for .SNG. Use <code>vgm-start</code> and the shared interrupt (<code>sn-irq-on</code>, <code>sn-hold</code>, <code>sn-over?</code>, <code>sn-frames</code>) as the jukebox does, or <code>vgm-play</code> to play polled.</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">vgm?</td>
+            <td class="stack-effect">( addr -- f )</td>
+            <td>True if addr holds a VGM file with an SN76489 in it.</td>
+          </tr>
+          <tr>
+            <td class="word-name">vgm-start</td>
+            <td class="stack-effect">( addr -- )</td>
+            <td>Point the player at a VGM file in RAM and reset it. Hold the player around it if the interrupt is on.</td>
+          </tr>
+          <tr>
+            <td class="word-name">vgm-frame</td>
+            <td class="stack-effect">( -- done? )</td>
+            <td>Play one 60 Hz frame, polled; true once it has ended.</td>
+          </tr>
+          <tr>
+            <td class="word-name">vgm-play</td>
+            <td class="stack-effect">( addr -- brk? )</td>
+            <td>Play a file to the end, polled; true if BREAK was pressed.</td>
+          </tr>
+          <tr>
+            <td class="word-name">vgm-skip</td>
+            <td class="stack-effect">( n -- )</td>
+            <td>Run n frames at once with the volumes left alone, for seeking. Tone writes still reach the chip, so silence it first.</td>
+          </tr>
+          <tr>
+            <td class="word-name">vgm-frames</td>
+            <td class="stack-effect">( addr -- n )</td>
+            <td>Length in frames from the header, the looped part counted twice.</td>
+          </tr>
+          <tr>
+            <td class="word-name">vgm-title</td>
+            <td class="stack-effect">( addr -- c-addr u )</td>
+            <td>The English track name from the GD3 tag, as ASCII (anything else becomes ?), or empty.</td>
+          </tr>
+          <tr>
+            <td class="word-name">vgm-author</td>
+            <td class="stack-effect">( addr -- c-addr u )</td>
+            <td>The English composer from the GD3 tag, or empty.</td>
+          </tr>
+          <tr>
+            <td class="word-name">vgm-pitch</td>
+            <td class="stack-effect">( ch -- n )</td>
+            <td>The divider last sent to tone channel 0-2, after scaling to 4 MHz.</td>
+          </tr>
+          <tr>
+            <td class="word-name">le@</td>
+            <td class="stack-effect">( addr -- n )</td>
+            <td>The low 16 bits of a little-endian field.</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- ay8910.fs -->
+      <div class="ref-section">
+        <h3>AY-3-8910 / YM2149 (CoCo PSG, Symphony-12)</h3>
+        <p class="lib-path">INCLUDE lib/ay8910.fs</p>
+        <p>Two cartridges carry the AY chip. The <strong>CoCo PSG</strong> (a YM2149): <code>$FF5E</code> latches a register, <code>$FF5F</code> writes or reads it, and <code>$FF5D</code> bit 0 picks the clock (2 MHz or 1 MHz). The <strong>Symphony-12</strong> (four AY-3-8910s, twelve voices): a 6821 PIA at <code>$FF60-$FF63</code>, port A the chips&rsquo; data bus and port B two bits per chip (11 latch, 10 write, 01 read, 00 idle), clocked at 894886 Hz; chips 0-1 play left and 2-3 right. Neither is in stock XRoar; both are on the CoCo Zero. The Deluxe CoCo&rsquo;s AY at <code>$FF38/$FF39</code> is not covered.</p>
+        <p>Each chip has three square-wave channels, f = clock / (16 &times; TP) with a 12-bit period TP (125000 / Hz on the CoCo PSG at 2 MHz, 55930 / Hz on the Symphony-12); one noise generator; a mixer; a level per channel, 0 silent to 15, or 16 to follow the envelope; and one envelope (writing the shape restarts it; shape 0 decays once, a plucked note). Every word acts on the selected chip or chips: <code>ay-psg</code>, <code>ay-chip</code>, or <code>ay-chips</code> with a mask, so one write can reach several Symphony-12 chips.</p>
+        <p><strong>Check first.</strong> Call <code>ay-found?</code> before writing to a cartridge you have not seen answer. Without the chip, a GameMaster takes the CoCo PSG&rsquo;s odd addresses and plays the AY data as SN76489 noise. The probe&rsquo;s own bytes are SN76489 &ldquo;channel off&rdquo; commands, so it is safe there, and <code>ay-init</code> only touches chips that answer.</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">ay-init</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Set up the Symphony-12&rsquo;s PIA, silence whichever chips answer (the PSG at 2 MHz), and select the CoCo PSG.</td>
+          </tr>
+          <tr>
+            <td class="word-name">ay-psg</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Select the CoCo PSG.</td>
+          </tr>
+          <tr>
+            <td class="word-name">ay-chip</td>
+            <td class="stack-effect">( n -- )</td>
+            <td>Select Symphony-12 chip 0-3.</td>
+          </tr>
+          <tr>
+            <td class="word-name">ay-chips</td>
+            <td class="stack-effect">( mask -- )</td>
+            <td>Select Symphony-12 chips by mask (bit n = chip n), or 0 for the CoCo PSG.</td>
+          </tr>
+          <tr>
+            <td class="word-name">ay-found?</td>
+            <td class="stack-effect">( -- f )</td>
+            <td>True if the selected chip answers: writes register 2 and reads it back, twice.</td>
+          </tr>
+          <tr>
+            <td class="word-name">ay!</td>
+            <td class="stack-effect">( data reg -- )</td>
+            <td>Write a register of the selected chip(s). <em>CODE word.</em></td>
+          </tr>
+          <tr>
+            <td class="word-name">ay-tone</td>
+            <td class="stack-effect">( tp ch -- )</td>
+            <td>Set channel 0-2&rsquo;s 12-bit tone period.</td>
+          </tr>
+          <tr>
+            <td class="word-name">ay-vol</td>
+            <td class="stack-effect">( level ch -- )</td>
+            <td>Set channel 0-2&rsquo;s level: 0 silent to 15, 16 follows the envelope.</td>
+          </tr>
+          <tr>
+            <td class="word-name">ay-noise</td>
+            <td class="stack-effect">( np -- )</td>
+            <td>Set the 5-bit noise period.</td>
+          </tr>
+          <tr>
+            <td class="word-name">ay-mix</td>
+            <td class="stack-effect">( bits -- )</td>
+            <td>Set the mixer: bits 0-2 turn tone A-C off, bits 3-5 noise A-C off. <code>$38</code> is three tones and no noise.</td>
+          </tr>
+          <tr>
+            <td class="word-name">ay-env</td>
+            <td class="stack-effect">( ep shape -- )</td>
+            <td>Set the envelope period and shape, and restart it. One decay takes 256 &times; ep / clock seconds.</td>
+          </tr>
+          <tr>
+            <td class="word-name">ay-silence</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Levels to 0 and the mixer off on the selected chip(s).</td>
+          </tr>
+          <tr>
+            <td class="word-name">ay-psg-slow</td>
+            <td class="stack-effect">( f -- )</td>
+            <td>True runs the CoCo PSG at 1 MHz, false at 2 MHz.</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- orch90.fs -->
+      <div class="ref-section">
+        <h3>Orchestra-90CC</h3>
+        <p class="lib-path">INCLUDE lib/orch90.fs</p>
+        <p>Tandy&rsquo;s Orchestra-90CC has two 8-bit DACs, left at <code>$FF7A</code> and right at <code>$FF7B</code>, write only, <code>$80</code> the middle. <code>orch-play</code> synthesises one voice per side by direct digital synthesis: a 16-bit phase per side, its high byte indexing a 256-byte wavetable from <code>lib/wavetable.fs</code>. One sample takes 79 cycles (measured with <code>fc.py --cycles</code>), so a CoCo 2 plays 11328 samples a second; a CoCo 3 at its fast speed plays twice as high. IRQs are masked while it plays. The phases carry over between calls, so notes join without clicks, and an increment of 0 holds a side still: silence.</p>
+        <p>Usage: <code>wave gen-tri  wave orch-wave !</code> then <code>440 orch-hz&gt;inc  220 orch-hz&gt;inc  30 orch-frames  orch-play</code>.</p>
+        <table class="ref-table">
+          <tr>
+            <th style="width:110px">Word</th>
+            <th style="width:180px">Stack</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td class="word-name">orch!</td>
+            <td class="stack-effect">( left right -- )</td>
+            <td>Write a raw sample to each DAC.</td>
+          </tr>
+          <tr>
+            <td class="word-name">orch-silence</td>
+            <td class="stack-effect">( -- )</td>
+            <td>Both DACs to the middle.</td>
+          </tr>
+          <tr>
+            <td class="word-name">orch-wave</td>
+            <td class="stack-effect">( -- addr )</td>
+            <td>Variable: the 256-byte signed wavetable both sides play.</td>
+          </tr>
+          <tr>
+            <td class="word-name">orch-play</td>
+            <td class="stack-effect">( inc-left inc-right n -- )</td>
+            <td>Play n samples, one voice left and one right. <em>CODE word.</em></td>
+          </tr>
+          <tr>
+            <td class="word-name">orch-hz&gt;inc</td>
+            <td class="stack-effect">( hz -- inc )</td>
+            <td>The phase increment for a pitch: Hz &times; 5.78, good up to 2600 Hz.</td>
+          </tr>
+          <tr>
+            <td class="word-name">orch-frames</td>
+            <td class="stack-effect">( n -- samples )</td>
+            <td>Samples in n 60 Hz frames (189 each).</td>
+          </tr>
+        </table>
       </div>
 
       <!-- dac.fs -->

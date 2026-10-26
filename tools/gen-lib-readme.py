@@ -14,6 +14,7 @@ library file.
 """
 
 import json
+import html
 import re
 import sys
 from pathlib import Path
@@ -30,6 +31,9 @@ REFERENCE = ROOT / "reference.html"
 DESC_RE = re.compile(
     r"^\s*\\\s+([A-Za-z0-9][\w\-/?!.]*)\s+(?:—|--)\s+(\S.*?)\s*$"
 )
+
+# reference.html section: <p class="lib-path">INCLUDE lib/NAME.fs</p>
+LIB_PATH_RE = re.compile(r'<p class="lib-path">INCLUDE lib/([^<\s]+)</p>')
 
 # reference.html row: <td class="word-name">N</td><td...>STACK or VALUE</td><td>DESC</td>
 # The middle cell is `class="stack-effect"` for words, or unclassed `<code>$XX</code>`
@@ -229,7 +233,13 @@ def scan_source_descriptions(path, defined_names):
 
 
 def parse_reference_html():
-    """Parse reference.html → {lower_name: description}.
+    """Parse reference.html → {(lib_file, lower_name): description}.
+
+    Each row belongs to the library named by the nearest
+    `INCLUDE lib/<file>` line above it, so two libraries that define the
+    same word (font5x7.fs and font-art.fs both have init-font) keep their
+    own descriptions. Rows outside any library section (kernel
+    primitives) get lib_file None.
 
     Strips inline tags to plain text; truncates very long descriptions to
     their first sentence (full prose stays in the HTML reference itself).
@@ -238,8 +248,14 @@ def parse_reference_html():
         return {}
     out = {}
     text = REFERENCE.read_text()
+    libs = [(m.start(), m.group(1)) for m in LIB_PATH_RE.finditer(text)]
     for m in HTML_ROW_RE.finditer(text):
-        name = m.group(1).strip().lower()
+        lib = None
+        for pos, name_ in libs:
+            if pos > m.start():
+                break
+            lib = name_
+        name = html.unescape(m.group(1).strip()).lower()
         desc = re.sub(r"<[^>]+>", "", m.group(2))
         # Collapse whitespace and decode the few HTML entities the reference uses.
         desc = re.sub(r"\s+", " ", desc).strip()
@@ -253,7 +269,7 @@ def parse_reference_html():
                 desc = desc[:cut + 1]
             else:
                 desc = desc[:117].rstrip() + "..."
-        out[name] = desc
+        out[(lib, name)] = desc
     return out
 
 
@@ -272,24 +288,33 @@ def load_descriptions(files_and_words):
     for path, words in files_and_words:
         defined = {n.lower() for (n, _stack, _kind) in words}
         for name, desc in scan_source_descriptions(path, defined).items():
-            descriptions[name] = (desc, "source")
+            descriptions[(path.name, name)] = (desc, "source")
 
+    # A word in reference.html's section for its own file; else the first
+    # row of that name anywhere (kernel primitives described in a library's
+    # section, or a library with no section of its own).
     ref = parse_reference_html()
+    anywhere = {}
+    for (lib, name), ref_desc in ref.items():
+        anywhere.setdefault(name, ref_desc)
     drift = []
-    for name, ref_desc in ref.items():
-        if name in descriptions:
-            src_desc, _ = descriptions[name]
-            if normalise_desc(src_desc) != normalise_desc(ref_desc):
-                drift.append((name, src_desc, ref_desc))
-        else:
-            descriptions[name] = (ref_desc, "reference.html")
+    for path, words in files_and_words:
+        for name, _stack, _kind in words:
+            key = (path.name, name.lower())
+            ref_desc = ref.get(key)
+            if key in descriptions:
+                src_desc, _ = descriptions[key]
+                if ref_desc and normalise_desc(src_desc) != normalise_desc(ref_desc):
+                    drift.append((f"{path.name} {name}", src_desc, ref_desc))
+            elif ref_desc:
+                descriptions[key] = (ref_desc, "reference.html")
+            elif name.lower() in anywhere:
+                descriptions[key] = (anywhere[name.lower()], "reference.html")
 
     # Missing = any defined word with no description from either source.
-    all_defined = set()
-    for _, words in files_and_words:
-        for name, _stack, _kind in words:
-            all_defined.add(name.lower())
-    missing = sorted(n for n in all_defined if n not in descriptions)
+    missing = sorted(f"{path.name} {name}" for path, words in files_and_words
+                     for name, _stack, _kind in words
+                     if (path.name, name.lower()) not in descriptions)
     return descriptions, drift, missing
 
 
@@ -400,7 +425,7 @@ def render():
         if words:
             # Description list first — what each word does, plus any flow-control notes.
             for name, _stack, _kind in words:
-                desc, _src = descriptions.get(name.lower(), ("", ""))
+                desc, _src = descriptions.get((f.name, name.lower()), ("", ""))
                 notes = fmt_notes(metrics.get(name.lower(), {}))
                 bits = []
                 if desc:
