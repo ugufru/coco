@@ -17,7 +17,7 @@ VARIABLE SECRET
 VARIABLE TRIES
 
 \ Seed the RNG from the player's keypress and pick a secret 1-9
-: PICK
+: CHOOSE
   KEY 31 * 3 + 9 /MOD DROP 1 + SECRET ! ;
 
 \ Screen layout words
@@ -63,7 +63,7 @@ VARIABLE TRIES
 : PLAY
   0 TRIES !
   .TITLE .PRESS
-  PICK                     \ wait for keypress; set SECRET
+  CHOOSE                   \ wait for keypress; set SECRET
   BEGIN
     .PROMPT .TRIES
     12  6 AT          \ park cursor at input slot (aligns with tries count)

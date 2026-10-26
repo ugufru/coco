@@ -210,6 +210,8 @@ fc.py quirks: preprocess_asm strips blank CODE block lines; ASCII-only
 comments; CONSTANT requires a literal (not another constant); text in
 parentheses is stripped as a comment even inside `."` / `S"` strings.
 No ?DO, 0<>, 0>, EXECUTE: use `?DUP IF 0 DO`, `0 <>`, `0 >`.
+Names resolve against the whole program, not in order: a repeat name or a
+kernel primitive's name takes over every use. fc.py warns, naming both sites (#592).
 fc.py entry point: top-level `main` call required at end of .fs file.
 
 ## Getting Started — Layout

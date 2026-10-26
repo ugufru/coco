@@ -793,6 +793,16 @@
         work too: <code>-1</code> compiles as <code>$FFFF</code>.</p>
       </div>
 
+      <div class="tip">
+        <p>One name, one word, for the whole program. Names are
+        case-insensitive and fc.py resolves every reference after it has
+        read everything, not in definition order. A name defined twice
+        gives one word for every reference, library code included, and a
+        definition named like a kernel primitive (say a menu word called
+        <code>pick</code>) replaces <code>PICK</code> everywhere. fc.py
+        prints a warning naming both sites when either happens.</p>
+      </div>
+
       <h3>Accessing variables from inline assembly</h3>
 
       <p>Inside <code>CODE</code> and <code>KCODE</code> blocks, fc.py exposes

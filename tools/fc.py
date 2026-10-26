@@ -30,6 +30,7 @@ Known limitations:
 
 import argparse
 import json
+import os
 import re
 import struct
 import subprocess
@@ -142,7 +143,19 @@ def kernel_words(symbols):
 
 # ── Tokeniser ─────────────────────────────────────────────────────────────────
 
-def tokenize(source, base_dir=None):
+class Tok(str):
+    """A token that remembers where it came from, as 'file:line'."""
+    def __new__(cls, text, site):
+        t = super().__new__(cls, text)
+        t.site = site
+        return t
+
+
+def site_of(tok):
+    return getattr(tok, 'site', '?')
+
+
+def tokenize(source, base_dir=None, path=None):
     """Strip comments, resolve INCLUDE directives, and split into tokens.
 
     Processes source line-by-line to capture CODE...;CODE blocks as raw
@@ -166,7 +179,8 @@ def tokenize(source, base_dir=None):
     data_lines = []
     in_block_comment = False
 
-    for line in source.split('\n'):
+    for lineno, line in enumerate(source.split('\n'), 1):
+        site = f"{path or '<source>'}:{lineno}"
         # Handle block comments that span multiple lines
         if in_block_comment:
             close = line.find(')')
@@ -228,7 +242,7 @@ def tokenize(source, base_dir=None):
             if len(tokens_on_line) < 2:
                 raise SyntaxError(f"{tokens_on_line[0]} requires a word name")
             code_tag = '__CODE__' if tokens_on_line[0].upper() == 'CODE' else '__KCODE__'
-            code_name = tokens_on_line[1]
+            code_name = Tok(tokens_on_line[1], site)
             code_lines = []
             in_code_block = True
             continue
@@ -237,7 +251,7 @@ def tokenize(source, base_dir=None):
         if tokens_on_line[0].upper() == 'DATA[PY':
             if len(tokens_on_line) < 2:
                 raise SyntaxError("DATA[PY requires a word name")
-            data_name = tokens_on_line[1]
+            data_name = Tok(tokens_on_line[1], site)
             data_lines = []
             in_data_block = True
             continue
@@ -252,7 +266,8 @@ def tokenize(source, base_dir=None):
                 i += 1
                 filename = tokens_on_line[i]
                 filepath = (Path(base_dir) / filename) if base_dir else Path(filename)
-                included = tokenize(filepath.read_text(), base_dir=filepath.parent)
+                included = tokenize(filepath.read_text(), base_dir=filepath.parent,
+                                    path=os.path.relpath(filepath))
                 result.extend(included)
             elif tok in ('S"', 's"', '."'):
                 # Find this token in the line and extract text until closing "
@@ -280,7 +295,7 @@ def tokenize(source, base_dir=None):
                 i = 0
                 continue
             else:
-                result.append(tok)
+                result.append(Tok(tok, site))
             i += 1
 
     if in_code_block:
@@ -291,7 +306,7 @@ def tokenize(source, base_dir=None):
 
 # ── Parser → IR ───────────────────────────────────────────────────────────────
 
-def parse(tokens):
+def parse(tokens, kernel_names=()):
     """
     Walk the token stream and return:
         definitions      — OrderedDict of name → [items]
@@ -313,6 +328,26 @@ def parse(tokens):
     data_blocks      = {}   # name → bytes (from DATA[PY ... ]DATA)
     main_thread      = []
 
+    # Every reference resolves against the whole program at the end, so a
+    # name defined twice, or a kernel primitive's name defined again, takes
+    # over every use of it, earlier ones and library ones included (#592).
+    sites = {}
+    kernel_names = set(kernel_names)
+
+    def define(tok, kind):
+        name = tok.lower()
+        here = site_of(tok)
+        if name in kernel_names:
+            print(f"fc.py: warning: {here}: {kind} {name!r} shadows the "
+                  f"kernel primitive {name.upper()} everywhere it is used",
+                  file=sys.stderr)
+        elif name in sites and sites[name] != here:
+            # (the same site twice is one file INCLUDEd twice: harmless)
+            print(f"fc.py: warning: {here}: {kind} {name!r} is already "
+                  f"defined at {sites[name]}; only one of them is used, "
+                  f"for every reference", file=sys.stderr)
+        sites.setdefault(name, here)
+
     current_def = None
     current_items = None
     do_counter = 0
@@ -330,6 +365,7 @@ def parse(tokens):
             name = tokens[i + 1].lower()
             asm_text = tokens[i + 2]
             # i+3 is __ENDCODE__
+            define(tokens[i + 1], 'CODE' if tok == '__CODE__' else 'KCODE')
             if name in definitions:
                 raise SyntaxError(f"CODE/KCODE word {name!r} collides with colon definition")
             if name in code_definitions or name in kcode_definitions:
@@ -345,6 +381,7 @@ def parse(tokens):
             name = tokens[i + 1].lower()
             py_source = tokens[i + 2]
             # i+3 is __ENDDATA__
+            define(tokens[i + 1], 'DATA[PY')
             if name in definitions or name in code_definitions or name in kcode_definitions or name in data_blocks or name in variables:
                 raise SyntaxError(f"DATA[PY] {name!r} collides with an existing definition")
             # Run the Python source.  The block is a list of statements ending
@@ -384,6 +421,7 @@ def parse(tokens):
         elif tok == ':':
             i += 1
             name = tokens[i].lower()
+            define(tokens[i], 'colon definition')
             if name in code_definitions:
                 raise SyntaxError(f"Colon definition {name!r} collides with CODE word")
             current_def = name
@@ -410,6 +448,7 @@ def parse(tokens):
                 raise SyntaxError("VARIABLE inside a definition is not supported")
             i += 1
             var_name = tokens[i].lower()
+            define(tokens[i], 'VARIABLE')
             variables.append(var_name)
 
         elif tok.upper() == 'CONSTANT':
@@ -417,6 +456,7 @@ def parse(tokens):
                 raise SyntaxError("CONSTANT inside a definition is not supported")
             i += 1
             const_name = tokens[i].lower()
+            define(tokens[i], 'CONSTANT')
             if not main_thread or main_thread[-1][0] != 'lit':
                 raise SyntaxError(f"CONSTANT {const_name!r} must follow a literal value")
             val = main_thread.pop()[1]
@@ -439,6 +479,7 @@ def parse(tokens):
             kind = tok.upper()
             i += 1
             field_name = tokens[i].lower()
+            define(tokens[i], tok.upper())
             if kind == '+FIELD':
                 if len(main_thread) < 2 or main_thread[-1][0] != 'lit' or main_thread[-2][0] != 'lit':
                     raise SyntaxError(f"+FIELD {field_name!r} requires offset and size as two literals on the stack")
@@ -1858,8 +1899,10 @@ def main():
         app_base = symbols.get('APP_BASE', 0x2000)
     src_path             = Path(args.source)
     source               = src_path.read_text()
-    tokens               = tokenize(source, base_dir=src_path.parent)
-    defs, variables, main, code_defs, kcode_defs, data_blocks = parse(tokens)
+    tokens               = tokenize(source, base_dir=src_path.parent,
+                                    path=os.path.relpath(src_path))
+    defs, variables, main, code_defs, kcode_defs, data_blocks = parse(
+        tokens, kernel_words(symbols))
 
     # Inject kernel symbols as Forth CONSTANTs:
     #   VAR_*        → KVAR-*        (variable addresses)

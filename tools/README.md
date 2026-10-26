@@ -192,6 +192,25 @@ BASIC's `LOADM` loads it and the kernel's `START` routine jumps to `APP_BASE`.
 | Interactive REPL | not applicable (cross-compiler) |
 | `BEGIN … WHILE … REPEAT` | not implemented |
 
+### Names: one word per name, for the whole program
+
+Names are case-insensitive, and every reference is resolved against the
+whole program once parsing ends, not in definition order. So a name
+defined twice gives one word for every reference, earlier ones and
+library ones included, and a definition named like a kernel primitive
+replaces the primitive everywhere (the jukebox's `pick` once broke
+`lib/decb.fs`'s `2 PICK` that way, #588). fc.py warns about both and
+names the sites (#592), for example:
+
+```
+fc.py: warning: game.fs:40: colon definition 'pick' shadows the kernel primitive PICK everywhere it is used
+fc.py: warning: game.fs:12: VARIABLE 'score' is already defined at game.fs:3; only one of them is used, for every reference
+```
+
+They are warnings, not errors, because some shadows are on purpose:
+`lib/rg-text.fs` and `src/bounce` replace `rg-char`, and tutorial 9
+builds its own `NEGATE` and `?DUP`. A file INCLUDEd twice does not warn.
+
 ---
 
 ## Inline assembly: CODE words

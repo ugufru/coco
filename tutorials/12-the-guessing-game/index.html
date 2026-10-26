@@ -66,7 +66,7 @@ loop:
         (A, space, ENTER — anything) becomes the seed:
       </p>
 
-<pre class="forth">: PICK
+<pre class="forth">: CHOOSE
   KEY 31 * 3 + 9 /MOD DROP 1 + SECRET ! ;</pre>
 
       <p>
@@ -74,6 +74,14 @@ loop:
         mod 9, add 1. The result is 1–9. Different keys give
         different numbers; the same key always gives the same
         number, but players don't think about that.
+      </p>
+
+      <p>
+        Why <code>CHOOSE</code> and not <code>PICK</code>? The kernel
+        already has a <code>PICK</code>, and the compiler looks words
+        up across the whole program, so a <code>PICK</code> of our
+        own would replace the kernel's everywhere, library code
+        included. <code>fc.py</code> warns when a definition does that.
       </p>
 
     </div>
@@ -120,7 +128,7 @@ loop:
 <pre class="forth">: PLAY
   0 TRIES !
   .TITLE .PRESS
-  PICK                     \ wait for keypress; set SECRET
+  CHOOSE                   \ wait for keypress; set SECRET
   BEGIN
     .PROMPT .TRIES
     12  6 AT          \ park cursor at input slot
@@ -176,7 +184,7 @@ loop:
 VARIABLE SECRET
 VARIABLE TRIES
 
-: PICK
+: CHOOSE
   KEY 31 * 3 + 9 /MOD DROP 1 + SECRET ! ;
 
 : .TITLE
@@ -214,7 +222,7 @@ VARIABLE TRIES
 : PLAY
   0 TRIES !
   .TITLE .PRESS
-  PICK
+  CHOOSE
   BEGIN
     .PROMPT .TRIES
     12  6 AT          \ park cursor at input slot
@@ -272,7 +280,7 @@ PLAY HALT</pre>
             </li>
             <li>
               Change the range from 1–9 to 1–5 by modifying one
-              number in <code>PICK</code>. Which number changes,
+              number in <code>CHOOSE</code>. Which number changes,
               and to what?
               <div class="answer-line"></div>
             </li>
