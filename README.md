@@ -11,6 +11,17 @@ Motorola 6809 CPU. Write Forth on a modern machine, cross-compile with
 > kernel changes. See `src/sound-async`, `proposals/SOUND_ENGINE_PROPOSAL.md`,
 > and `proposals/hsync_polling_budget_chart.html`.
 
+> **Since 1.2 (unreleased): the cartridge sound chips.** Forth libraries
+> now drive every sound chip the CoCo Zero carries: the SN76489 on the
+> GameMaster cartridge (`lib/sn76489.fs`, with a song player on the 60 Hz
+> interrupt), VGM files on it (`lib/vgm.fs`), the AY-3-8910 on the CoCo PSG
+> and the four-chip Symphony-12 (`lib/ay8910.fs`), and the Orchestra-90's
+> stereo DACs (`lib/orch90.fs`). `src/sound-tour` plays one phrase on each,
+> next to the CoCo's own 1-bit and 6-bit outputs; `src/jukebox` is a disk
+> radio player, built on `lib/decb.fs`, a DECB file reader that needs no Disk
+> BASIC; `src/sound-sn76489` plays Bach's Badinerie. Every library now has a
+> section in `reference.html`.
+
 > **Also new: a CoCo terminal for Claude Code.** `src/terminal` is a Forth
 > terminal that talks to Claude Code on the Mac over XRoar's Becker port.
 > `lib/console.fs` adds a scrolling console with true lowercase for the
@@ -23,7 +34,7 @@ Motorola 6809 CPU. Write Forth on a modern machine, cross-compile with
 
 - **Threading**: Indirect Threaded Code (ITC)
 - **CPU**: Motorola 6809 (X=IP, U=DSP, S=RSP, Y=scratch)
-- **Kernel**: ~4K of 6809 assembly — 81 primitives + 3 inline data words (`font-data`, `sprite-data`, `sin-data`); covers graphics, sprites, beam tracing, RNG, and small-int literal compression (`LIT0`/`LIT1`/`LIT2`/`LIT3`/`LIT4`/`LITM1`)
+- **Kernel**: ~4K of 6809 assembly — 84 primitives + 3 inline data words (`font-data`, `sprite-data`, `sin-data`); covers graphics, sprites, beam tracing, RNG, and small-int literal compression (`LIT0`/`LIT1`/`LIT2`/`LIT3`/`LIT4`/`LITM1`)
 - **Compiler**: Python cross-compiler (`fc.py`) — Forth source to DECB binary; supports CODE / KCODE inline assembly, `+FIELD` struct definers, and `DATA[PY]` compile-time data generation
 - **Target**: TRS-80 Color Computer 1/2/3, 32K minimum (64K for all-RAM apps)
 
@@ -52,14 +63,30 @@ tools/
 ├── cocoterm_bridge.py  Becker-port bridge from the CoCo terminal to Claude Code
 ├── cocoterm_mcp.py     peek/poke MCP tools for live CoCo memory
 └── README.md           compiler pipeline and tool docs
-lib/                    shared Forth libraries (.fs)
+lib/                    shared Forth libraries (.fs), 30 of them; index in lib/README.md
+├── sound.fs            DAC and 1-bit tones and effects (async-sound.fs: non-blocking)
+├── sn76489.fs          SN76489 (GameMaster) chip words and song player
+├── vgm.fs              VGM playback on the SN76489
+├── ay8910.fs           AY-3-8910 / YM2149: CoCo PSG and Symphony-12
+├── orch90.fs           Orchestra-90CC stereo DACs
+├── decb.fs             read DECB disk files without Disk BASIC
 ├── console.fs          scrolling console with MC6847T1 true lowercase
 └── becker.fs           XRoar Becker port byte I/O
-src/                    demo programs (each with its own Makefile)
+src/                    demo programs (each with its own Makefile and README)
 ├── hello/              hello world example
+├── tetris/ bounce/ ... games and graphics (gallery: tutorials/demos)
+├── sound-tour/         one phrase on every sound chip
+├── jukebox/            COCO.FM, a disk radio for .SNG and .VGM songs
+├── sound-sn76489/      Bach's Badinerie on the SN76489
 ├── terminal/           CoCo terminal for Claude Code
 └── vader/              SG4 art Claude pokes into video RAM
 make/demo.mk            shared per-demo build rules
+tutorials/              13-chapter Getting Started tutorial, demo gallery, disk guide
+reference.html          language reference: primitives, compiler, every library
+build/demos.dsk         16 demos on a DECB disk (make dsk)
+build/sound.dsk         the sound demos and the jukebox's songs (make sound-dsk)
+ROADMAP.md              where the project is going; roadmap.jsonl is the ranked queue
+issues.jsonl            the issue tracker; issues.html browses it (make issues)
 PROJECT_SETUP.md        setting up your own project — Makefile, fc.py options,
                         kernel build overrides, common scenarios
 LICENSE                 BSD 2-clause
@@ -112,18 +139,38 @@ Binaries are LOADM-safe by default. With a Disk BASIC system:
 LOADM"MYAPP":EXEC
 ```
 
+The demos come on two ready-made disks (needs Toolshed's `decb`):
+
+```sh
+make dsk          # build/demos.dsk: 16 demos
+make sound-dsk    # build/sound.dsk: the sound demos and the jukebox's songs
+```
+
+The sound demos that use a cartridge chip need it: a GameMaster for the
+SN76489, an Orchestra-90, or a CoCo Zero for the AY chips. Each entry in the
+demo gallery (`tutorials/demos`) says what it needs.
+
 ## Hello World
 
 ```forth
-\ hello.fs
-: space  $20 EMIT ;
-: bare   CHAR B EMIT CHAR A EMIT CHAR R EMIT CHAR E EMIT ;
-: naked  CHAR N EMIT CHAR A EMIT CHAR K EMIT CHAR E EMIT CHAR D EMIT ;
-: forth  CHAR F EMIT CHAR O EMIT CHAR R EMIT CHAR T EMIT CHAR H EMIT ;
-: main   bare space naked space forth HALT ;
+\ hello.fs (src/hello)
+INCLUDE ../../lib/bye.fs
+
+: SPACE  32 EMIT ;
+: DOT    CHAR . EMIT ;
+: BARE   CHAR B EMIT  CHAR A EMIT  CHAR R EMIT  CHAR E EMIT ;
+: NAKED  CHAR N EMIT  CHAR A EMIT  CHAR K EMIT  CHAR E EMIT  CHAR D EMIT ;
+: FORTH  CHAR F EMIT  CHAR O EMIT  CHAR R EMIT  CHAR T EMIT  CHAR H EMIT ;
+: digit  ( n -- )  CHAR 0 + EMIT ;
+: version  ( ver -- )  DUP 8 RSHIFT digit DOT $FF AND digit ;
+
+BARE SPACE NAKED SPACE FORTH SPACE KERN-VERSION version
+BEGIN KEY 3 = UNTIL exit-basic
 ```
 
-Produces: `BARE NAKED FORTH` on the CoCo screen.
+Produces `BARE NAKED FORTH 1.2` on the CoCo screen; BREAK returns to BASIC.
+`KERN-VERSION` is the kernel's own version, which `fc.py` passes in as a
+constant.
 
 ## License
 

@@ -200,7 +200,7 @@ Primary doc: `COCO_RENOVATION.md`. Tech reference: `coco-guides/coco_technical_r
 
 ## Current State (2026-04-28)
 Tutorial series complete: Getting Started ch1–13, all demos, calculator.
-Kernel: 81 primitives + 3 inline data words (font-data, sprite-data, sin-data), parameterized for ROM mode (default) and all-RAM mode.
+Kernel: 84 primitives + 3 inline data words (font-data, sprite-data, sin-data), parameterized for ROM mode (default) and all-RAM mode.
 ROM-mode kernel ORGs at $2000, no bootstrap, BREAK→BASIC OK via exit-basic.
 All 10 demos run in ROM mode on 32K (clock+fujinet-time need HDB-DOS-CC cart).
 fc.py: inline_constants(), FVAR_* EQU export, auto-detect ROM vs all-RAM,
