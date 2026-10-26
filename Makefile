@@ -15,7 +15,7 @@ TUTORIAL_DSK = build/tutorial.dsk
 FNTIME_DSK   = build/fntime.dsk
 CLOCK_DSK    = build/clock.dsk
 
-.PHONY: all kernel demos dsk tutorial-dsk dsks fntime-dsk clock-dsk lib-readme site clean
+.PHONY: issues all kernel demos dsk tutorial-dsk dsks fntime-dsk clock-dsk lib-readme site clean
 
 all: lib-readme demos
 
@@ -145,6 +145,12 @@ clock-dsk: kernel
 
 # Build the static documentation site into site/ (issue #539).
 # Requires the markdown parser: python3 -m pip install -r tools/requirements.txt
+# Browsable view of issues.jsonl and roadmap.jsonl (#639). Commit the
+# result: it is small, and it is what a clone opens.
+issues: issues.html
+issues.html: issues.jsonl roadmap.jsonl tools/issues_html.py
+	python3 tools/issues_html.py render issues.jsonl issues.html roadmap.jsonl --title="CoCo Renovation issues"
+
 site:
 	@python3 tools/build-site.py
 

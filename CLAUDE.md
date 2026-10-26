@@ -39,7 +39,9 @@ authority — the web is at best an echo of it and at worst contradicts it.
 |------------------------------------------------------------------|-------------------------------------------------------|
 | Project intent, design philosophy, vision                        | `COCO_RENOVATION.md`                                  |
 | Project plan, phasing, what's next                               | `ROADMAP.md`                                          |
+| What to do next, ranked with reasons                             | `roadmap.jsonl` (top of `issues.html`, `make issues`) |
 | Issue / bug / feature status                                     | `issues.jsonl` (use the `/issues` skill)              |
+| Browse issues and the ranked roadmap                             | `issues.html` (generated; rebuild with `make issues`) |
 | Past user / collaborator proposal documents                      | `proposals/`                       |
 
 ### Community & history (CoCo legends)
@@ -401,8 +403,9 @@ infrastructure for #551, NOT an alternative to on-device self-hosting.
 Key enabling fact: our dictionary is headerless (tools/fc.py:864), so adding a
 word to a running target needs no target-side linking.
 
-## Stale doc warning
-ROADMAP.md still presents the on-device-Forth strategic fork as undecided. It is
-not. Issue #551 (2026-07-19) settled it in favor of on-device self-hosting and is
-the epic. Do not argue the fork from ROADMAP.md or COCO_RENOVATION.md alone;
-check issues.jsonl. Tracked as #553.
+## Roadmap
+ROADMAP.md is the shape of the work (north star, tracks, icebox); roadmap.jsonl
+is the ranked queue, shown at the top of issues.html. Both refreshed 2026-10-26
+(#639). On-device self-hosting (#551) is decided, not an open fork; do not argue
+it from COCO_RENOVATION.md. After editing issues.jsonl or roadmap.jsonl, run
+`make issues` and commit issues.html with them.

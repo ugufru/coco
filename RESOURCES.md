@@ -37,7 +37,9 @@ kept in sync; either is a valid entry point.
 |------------------------------------------------------------------|-------------------------------------------------------|
 | Project intent, design philosophy, vision                        | `COCO_RENOVATION.md`                                  |
 | Project plan, phasing, what's next                               | `ROADMAP.md`                                          |
+| What to do next, ranked with reasons                             | `roadmap.jsonl` (top of `issues.html`, `make issues`) |
 | Issue / bug / feature status                                     | `issues.jsonl` (use the `/issues` skill)              |
+| Browse issues and the ranked roadmap                             | `issues.html` (generated; rebuild with `make issues`) |
 | Past user / collaborator proposal documents                      | `proposals/`                       |
 
 ## Community & history (CoCo legends)
