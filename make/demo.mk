@@ -34,6 +34,10 @@ BIN = $(NAME).bin
 
 all: $(BIN)
 
+# Just the program, whatever else a demo's all builds (the jukebox makes
+# a disk too). The root Makefile's demos target uses this (#640).
+bin: $(BIN)
+
 $(BIN): $(SRC) $(EXTRA_DEPS) $(KERNEL_MAP) $(KERNEL_BIN)
 	mkdir -p build
 	$(FC) $(SRC) \
@@ -53,4 +57,4 @@ kernel:
 clean:
 	rm -rf build $(BIN)
 
-.PHONY: all run kernel clean
+.PHONY: all bin run kernel clean

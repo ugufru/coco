@@ -37,12 +37,18 @@ backlog look far heavier and more committed than it was. This version keeps
 only genuinely-live work, honestly prioritized, and parks the rest in an
 explicit <strong>Icebox</strong> (see bottom) rather than leaving it masquerading as planned
 work.</p>
-<p><strong>Where things stand:</strong> a cross-developed Forth (kernel + <code>fc.py</code>) with ROM and
-all-RAM build profiles; a complete 13-chapter tutorial; ~15 demos; trig + sound
-libraries; an interactive ITC-threading tutorial; FujiNet/clock live on real
-hardware. Released as <strong>v1.2</strong>.</p>
+<p><strong>Where things stand (2026-10-26):</strong> a cross-developed Forth (kernel + <code>fc.py</code>)
+with ROM and all-RAM build profiles; a complete 13-chapter tutorial; ~20 demos;
+an interactive ITC-threading tutorial; FujiNet/clock live on real hardware; a
+Claude Code terminal over the Becker port; a disk library that reads DECB files
+without Disk BASIC. Since October the sound side has grown to every chip the
+CoCo Zero carries: SN76489 (GameMaster) with a song player and VGM playback, the
+AY-3-8910 (CoCo PSG and Symphony-12), and the Orchestra-90, shown side by side
+in <code>src/sound-tour</code>. Every library is in <code>reference.html</code>. Released as <strong>v1.2</strong>.</p>
 <p>For per-issue detail, see <code>issues.jsonl</code> (statuses: <code>open</code>, <code>in-progress</code>,
-<code>done</code>, <code>icebox</code>, <code>closed</code>).</p>
+<code>done</code>, <code>icebox</code>, <code>closed</code>), browsable as <code>issues.html</code>. What to do next, in
+order and with reasons, is <code>roadmap.jsonl</code> (shown at the top of <code>issues.html</code>):
+this file is the shape of the work, that one is the queue.</p>
 <hr />
 <h2>North star: on-device, self-hosting Forth (decided 2026-07-19)</h2>
 <p><em>This section previously described the direction as an open fork. It is not
@@ -67,15 +73,20 @@ building on its own terms.</p>
 <p>Goal: make what already exists excellent and reachable. This is the best
 return on effort right now — the project is good but hard to <em>experience</em>.</p>
 <ul>
-<li><strong>409 (high)</strong> — embed runnable <strong>XRoar (WASM)</strong> in the HTML docs (run demos
+<li><strong>409 (high)</strong>: embed runnable <strong>XRoar (WASM)</strong> in the HTML docs (run demos
 in-browser while reading)</li>
-<li><strong>467 (high)</strong> — audit + bulletproof the shipped demos (the per-demo
-standardization sweep is done; this is the final polish pass)</li>
-<li><strong>407</strong> — tutorial flow audit (re-read all 13 chapters against the current kernel)</li>
-<li><strong>411 (low)</strong> — bespoke tutorial artwork (owner: Paul)</li>
+<li><strong>467 (high)</strong>: audit + bulletproof the shipped demos, now including the
+jukebox and the sound tour</li>
+<li><strong>539</strong>: bespoke documentation publishing pipeline (markdown to servable HTML)</li>
+<li><strong>577 (low)</strong>: tutorial polish (example files out of sync with prose)</li>
+<li><strong>537 (low)</strong>: FujiNet Time screenshot for the gallery</li>
+<li><strong>411 (low)</strong>: bespoke tutorial artwork (owner: Paul)</li>
 </ul>
 <p>Done: <strong>410</strong> (static site hosted, #547), <strong>408</strong> (demo appendix), <strong>413</strong>
-(&quot;Working with Claude&quot; guide), <strong>412</strong> (DSK build &amp; distribution docs).</p>
+(&quot;Working with Claude&quot; guide), <strong>412</strong> (DSK build &amp; distribution docs), <strong>407</strong>
+(tutorial flow audit), <strong>637</strong> (library reference complete).
+Left from #637: <strong>638 (low)</strong>, settle the 63 places where a source comment and
+<code>reference.html</code> describe a word differently.</p>
 <hr />
 <h2>Track 2 — Real hardware</h2>
 <p>Goal: escape the emulator — the cartridge thesis from <code>COCO_RENOVATION.md</code>.
@@ -84,7 +95,12 @@ Important but not urgent; no committed timeline.</p>
 <li><strong>405</strong> — ROM cartridge image</li>
 <li><strong>404</strong> — serial / SD loader (bit-banged RS-232)</li>
 </ul>
-<p><em>(RP2350 co-processor parked — see Icebox; revisit after 404/405.)</em></p>
+<p>In practice the CoCo Zero (the RP2350 XRoar port in
+<code>~/github/xroar-waveshare-rp2350-pizero</code>) is now where work meets hardware:
+it boots our disks, autoruns them, and carries every sound chip. Everything
+shipped so far has now run there: the last two checks, the sound tour's AY
+sections (#635) and the jukebox keys (#605), passed on 2026-10-26.</p>
+<p><em>(RP2350 co-processor parked, see Icebox; revisit after 404/405.)</em></p>
 <hr />
 <h2>Track 3 — Interactive / on-device tooling</h2>
 <p>Small, useful introspection words that are worth having on their own, and that
@@ -96,14 +112,44 @@ seed the on-device experience #551 is heading for. Prerequisites named in #551.<
 <li><strong>22 (low)</strong> — memory monitor / hex editor</li>
 <li><strong>28 (low)</strong> — breakpoint trap</li>
 <li><strong>490 (low)</strong> — <code>fc.py</code> vocabularies / word lists</li>
+<li><strong>592 (medium, bug)</strong>: <code>fc.py</code> should warn when a definition shadows a
+kernel primitive or an earlier word. Its silent traps cost time in October
+(parenthesised text inside strings is stripped as a comment, now noted in
+CLAUDE.md).</li>
 </ul>
 <hr />
-<h2>Track 4 — Sound &amp; libraries (opportunistic, post-1.2)</h2>
-<p>Resume when motivated; not on the critical path.</p>
+<h2>Track 4: Sound &amp; libraries</h2>
+<p>Not on the critical path, but where most of October went. Done: SN76489 chip
+words and song player (#579-#604), VGM playback (#598), the AY and Orchestra-90
+libraries and the sound tour (#632-#634). The Bach library and the COCO.FM
+jukebox it grew into moved to <code>~/github/coco-fm-bach</code> (#626); coco keeps the
+Badinerie as its one song (#627).</p>
 <ul>
-<li><strong>522 / 523</strong> — <code>fc.py</code> shared-asm / macro support, then DRY the async-sound emit core</li>
-<li><strong>525</strong> — DP-locate voice state (CPU win)</li>
-<li><strong>530</strong> — sine / wavetable ring modulator (the full 2-op path; wants 522/523 first)</li>
+<li><strong>629</strong>: stream VGM from disk. A VGM is about 280 bytes a second, so only
+about 28 seconds fits in the jukebox today.</li>
+<li><strong>631 (on hold)</strong>: <code>vgmstrip.py</code>, a VGM cut to its SN76489 part. Waiting on
+direction: a Mega Drive track's melody is on its YM2612, which no CoCo
+hardware has; arranging it onto the Symphony-12's AY chips is the likely way.</li>
+<li><strong>580</strong>: YMF262 (OPL3) on the MEGA mini MPI. Not emulated by the CoCo Zero or
+XRoar, so it needs the hardware.</li>
+<li><strong>615 / 616 / 617 (low)</strong>: song player: per-song envelope, vibrato, bass below
+B2 via periodic noise. <strong>582 / 583 (low)</strong>: Badinerie polish and visualiser.</li>
+<li><strong>596 / 606 (low)</strong>: jukebox: a phantom song pick (unconfirmed), CoCo 3
+composite palettes.</li>
+<li><strong>522 / 523</strong>: <code>fc.py</code> shared-asm / macro support, then DRY the async-sound emit core</li>
+<li><strong>525</strong>: DP-locate voice state (CPU win)</li>
+<li><strong>530</strong>: sine / wavetable ring modulator (the full 2-op path; wants 522/523 first)</li>
+<li><strong>587 / 593 (low)</strong>: <code>lib/decb.fs</code> write support, and CoCo 3 support</li>
+</ul>
+<hr />
+<h2>Track 5: The CoCo terminal</h2>
+<p><code>src/terminal</code> talks to Claude Code over the Becker port (#24, done).</p>
+<ul>
+<li><strong>561 (low)</strong>: absorb <code>lib/console.fs</code> into the kernel's EMIT/CR/TYPE</li>
+<li><strong>562 (low)</strong>: key auto-repeat and rollover</li>
+<li><strong>558 (low)</strong>: VT52-style cursor escapes</li>
+<li><strong>559 (low)</strong>: a CoCo 3 40/80-column version</li>
+<li><strong>578 (low)</strong>: confirm T1 has no SG6 on real hardware; port or retire <code>tools/sg6_*</code></li>
 </ul>
 <hr />
 <h2>Icebox (parked 2026-06-16 — reopen on demand)</h2>
@@ -135,10 +181,10 @@ fallback or a clear message.</li>
 </ul>
 <hr />
 <h2>Suggested next move</h2>
-<p>The site is now hosted (410 done, #547), so the remaining Track 1 leverage is
-<strong>409</strong> — embed runnable XRoar (WASM) so the docs go from &quot;click a link and
-read&quot; to &quot;click a link and play.&quot; Highest-value item left here, and independent
-of #551.</p>
+<p>The ranked queue is <code>roadmap.jsonl</code> (top of <code>issues.html</code>). The hardware
+checks (#635, #605) passed, so it starts with <strong>409</strong>, embedding runnable
+XRoar (WASM) so the docs go from &quot;click a link and read&quot; to &quot;click a link and
+play&quot;: the highest-value item in Track 1, and independent of #551.</p>
 <p>The north star is settled (#551, on-device self-hosting). Its first spike is the
 postfix assembler's indexed-postbyte encoder, verified against lwasm. Track 3
 (#27, #26, #25) is the seed and can start whenever. See also

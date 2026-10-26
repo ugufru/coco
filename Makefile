@@ -8,14 +8,16 @@
 #   make site         build the static documentation site (site/)
 #   make clean        remove all build artifacts
 
-DEMOS        = hello bounce calculator kaleidoscope rain tetris rg-test typewriter vdg-modes clock fujinet-time sound sound1bit sound-async colored-text
+DEMOS        = hello bounce calculator kaleidoscope rain tetris rg-test typewriter vdg-modes clock fujinet-time colored-text \
+               sound sound1bit sound-async sound-sn76489 sound-tour jukebox terminal
 KERNEL       = kernel
 DSK          = build/demos.dsk
+SOUND_DSK    = build/sound.dsk
 TUTORIAL_DSK = build/tutorial.dsk
 FNTIME_DSK   = build/fntime.dsk
 CLOCK_DSK    = build/clock.dsk
 
-.PHONY: issues all kernel demos dsk tutorial-dsk dsks fntime-dsk clock-dsk lib-readme site clean
+.PHONY: issues all kernel demos dsk sound-dsk tutorial-dsk dsks fntime-dsk clock-dsk lib-readme site clean
 
 all: lib-readme demos
 
@@ -23,7 +25,7 @@ kernel:
 	$(MAKE) -C $(KERNEL)
 
 demos: kernel
-	@for d in $(DEMOS); do $(MAKE) -C src/$$d || exit 1; done
+	@for d in $(DEMOS); do $(MAKE) -C src/$$d bin || exit 1; done
 
 # Regenerate lib/README.md from lib/*.fs source headers and definitions.
 # Auto-runs as part of `make all`. Run by hand with `make lib-readme`.
@@ -68,8 +70,10 @@ dsk: demos
 	decb copy src/sound/sound.bin                  $(DSK),SOUND.BIN -2
 	decb copy src/sound1bit/sound1bit.bin          $(DSK),SOUND1B.BIN -2
 	decb copy src/sound-async/sound-async.bin      $(DSK),SNDASYNC.BIN -2
+	decb copy src/colored-text/colored-text.bin    $(DSK),COLORTXT.BIN -2
+	decb copy src/terminal/terminal.bin            $(DSK),TERMINAL.BIN -2
 	@echo ""
-	@echo "  $(DSK) created with 14 programs."
+	@echo "  $(DSK) created with 16 programs."
 	@echo "  Copy to SD card for FujiNet, or load in XRoar."
 	@echo "  In DECB:  LOADM\"BOUNCE\":EXEC"
 
@@ -106,7 +110,29 @@ tutorial-dsk:
 	@echo "  Copy to SD card for FujiNet, or load in XRoar."
 	@echo "  In DECB:  LOADM\"HELLO\":EXEC"
 
-dsks: dsk tutorial-dsk
+# The sound demos on a disk of their own (#640): with the cartridge chips
+# and the jukebox's songs they no longer fit on demos.dsk, whose every
+# program carries its own kernel. The sound tour goes first, so a CoCo
+# Zero with autorun on starts it. The cartridge demos need their chips:
+# a GameMaster (SN76489), an Orchestra-90, or a CoCo Zero for the AY.
+sound-dsk: demos
+	@command -v decb >/dev/null 2>&1 || { echo "  Error: 'decb' not found on PATH (install Toolshed)."; exit 1; }
+	$(MAKE) -C src/sound-sn76489 build/badinerie.snd build/badinerie.vgm
+	@mkdir -p build
+	decb dskini $(SOUND_DSK)
+	decb copy src/sound-tour/sound-tour.bin        $(SOUND_DSK),SOUNDTUR.BIN -2
+	decb copy src/sound/sound.bin                  $(SOUND_DSK),SOUND.BIN -2
+	decb copy src/sound1bit/sound1bit.bin          $(SOUND_DSK),SOUND1B.BIN -2
+	decb copy src/sound-async/sound-async.bin      $(SOUND_DSK),SNDASYNC.BIN -2
+	decb copy src/sound-sn76489/badinerie.bin      $(SOUND_DSK),BADINERI.BIN -2
+	decb copy src/jukebox/jukebox.bin              $(SOUND_DSK),JUKEBOX.BIN -2
+	decb copy src/sound-sn76489/build/badinerie.snd $(SOUND_DSK),BADINERI.SNG -2
+	decb copy src/sound-sn76489/build/badinerie.vgm $(SOUND_DSK),BADINERI.VGM -2
+	@echo ""
+	@echo "  $(SOUND_DSK) created with 6 programs and the jukebox's two songs."
+	@echo "  In DECB:  LOADM\"SOUNDTUR\":EXEC"
+
+dsks: dsk sound-dsk tutorial-dsk
 
 # Single-program DSK with the FujiNet RTC demo, for the FujiNet SD card.
 # Builds the .bin via the demo's own Makefile, then wraps it in a DECB image.
@@ -155,6 +181,6 @@ site:
 	@python3 tools/build-site.py
 
 clean:
-	@for d in $(DEMOS); do rm -f src/$$d/$$d.bin; done
-	rm -f $(DSK) $(TUTORIAL_DSK)
+	@for d in $(DEMOS); do $(MAKE) -C src/$$d clean || exit 1; done
+	rm -f $(DSK) $(SOUND_DSK) $(TUTORIAL_DSK)
 	$(MAKE) -C $(KERNEL) clean

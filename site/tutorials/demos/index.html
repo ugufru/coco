@@ -82,7 +82,7 @@
     <div class="chapter-opener">
       <div class="chapter-label">APPENDIX</div>
       <div class="chapter-title">Demo Gallery</div>
-      <div class="chapter-subtitle">Fifteen complete programs, and what each one teaches</div>
+      <div class="chapter-subtitle">Nineteen complete programs, and what each one teaches</div>
       <div class="chapter-green-bar"></div>
     </div>
 
@@ -99,10 +99,11 @@
         <code>src/</code>, built with the same <code>fc.py</code>
         toolchain, and each was written to exercise a particular corner of
         the CoCo — beam-racing, artifact colour, semigraphics, the two
-        audio paths, the FujiNet clock. Every one ships on
-        <code>build/demos.dsk</code> (see the
-        <a href="../dsk-workflow/index.html">disk build guide</a>) and
-        runs on real hardware.
+        audio paths, the cartridge sound chips, the FujiNet clock. Every one
+        ships on a disk: <code>build/demos.dsk</code>, or for the sound demos
+        <code>build/sound.dsk</code> (see the
+        <a href="../dsk-workflow/index.html">disk build guide</a>). A few
+        need hardware beyond the CoCo itself; their entries say what.
       </p>
 
       <p>
@@ -257,6 +258,29 @@
         </div>
       </div>
 
+      <div class="demo" id="terminal">
+        <img class="demo-shot" src="images/terminal.png" alt="A conversation with Claude Code in true lowercase on the CoCo text screen">
+        <div class="demo-body">
+          <h3>Claude Code Terminal</h3>
+          <p class="demo-what">A dumb terminal that lets you talk to Claude Code on a Mac from the
+            CoCo keyboard. Replies come back in true lowercase, wrapped to 32
+            columns, and Claude can read and write the CoCo&rsquo;s memory,
+            so it can draw on the screen in SG4 semigraphics.</p>
+          <p class="demo-meta"><strong>Exercises:</strong> MC6847T1 lowercase and a scrolling console (<code>lib/console.fs</code>),
+            Becker port I/O at <code>$FF41</code>/<code>$FF42</code>
+            (<code>lib/becker.fs</code>), a non-blocking keyboard poll, a
+            VSYNC-timed cursor.</p>
+          <p class="demo-meta"><strong>Technique:</strong> the CoCo end stays dumb: a Mac-side bridge
+            (<code>tools/cocoterm_bridge.py</code>) owns the line, runs one
+            Claude turn per ENTER, and carries memory peek and poke as escape
+            frames on the same byte stream.</p>
+          <p class="demo-meta"><strong>Needs:</strong> XRoar with the Becker port (<code>-cart rsdos -cart-becker</code>)
+            and the bridge running on the Mac first; a CoCo 2B (T1 VDG) for
+            lowercase.</p>
+          <p class="demo-src"><a href="https://github.com/ugufru/coco/tree/main/src/terminal">source &amp; README →</a></p>
+        </div>
+      </div>
+
       <!-- ── Display & Colour ───────────────────────────────────────── -->
       <h2 class="section-head">Display &amp; Colour</h2>
 
@@ -297,7 +321,7 @@
             software sprites with inline data (<code>lib/sprite.fs</code>),
             sin table (<code>lib/trig.fs</code>), keypress stepping with BREAK
             early-exit.</p>
-          <p class="demo-src"><a href="https://github.com/ugufru/coco/tree/main/src/rg-test">source →</a></p>
+          <p class="demo-src"><a href="https://github.com/ugufru/coco/tree/main/src/rg-test">source &amp; README →</a></p>
         </div>
       </div>
 
@@ -370,7 +394,7 @@
           <p class="demo-meta"><strong>Note:</strong> requires a real (or
             emulated) FujiNet as the time source — under plain XRoar it waits
             on a device that never answers.</p>
-          <p class="demo-src"><a href="https://github.com/ugufru/coco/tree/main/src/fujinet-time">source →</a></p>
+          <p class="demo-src"><a href="https://github.com/ugufru/coco/tree/main/src/fujinet-time">source &amp; README →</a></p>
         </div>
       </div>
 
@@ -444,6 +468,73 @@
             blocking, so gameplay continues during playback (~1.1&nbsp;KB plus
             one runtime-generated wavetable).</p>
           <p class="demo-src"><a href="https://github.com/ugufru/coco/tree/main/src/sound-async">source &amp; README →</a></p>
+        </div>
+      </div>
+
+      <!-- ── Cartridge Sound ─────────────────────────────────────────── -->
+      <h2 class="section-head">Cartridge Sound</h2>
+
+      <div class="demo" id="badinerie">
+        <img class="demo-shot" src="images/badinerie.png" alt="The Badinerie's title screen: J. S. Bach, Orchestral Suite No. 2, BWV 1067, SN76489 / GameMaster">
+        <div class="demo-body">
+          <h3>Bach&rsquo;s Badinerie on the SN76489</h3>
+          <p class="demo-what">The last movement of Bach&rsquo;s Orchestral Suite No. 2, hand
+            transcribed for three square-wave voices and noise percussion, with
+            a researched performance: tempo, terraced dynamics and voicing.</p>
+          <p class="demo-meta"><strong>Exercises:</strong> the SN76489 sound chip at <code>$FF41</code> and its song-stream
+            player (<code>lib/sn76489.fs</code>), the cartridge audio path
+            (<code>cart-audio</code>), the .SNG song format.</p>
+          <p class="demo-meta"><strong>Technique:</strong> the song is a byte stream built on the Mac and spliced into the
+            binary with <code>DATA[PY</code>; the player decays each note
+            with a per-channel envelope so notes pluck instead of drone.</p>
+          <p class="demo-meta"><strong>Needs:</strong> a GameMaster cartridge (<code>-cart gmc</code> in XRoar), or a
+            CoCo Zero.</p>
+          <p class="demo-src"><a href="https://github.com/ugufru/coco/tree/main/src/sound-sn76489">source &amp; README →</a></p>
+        </div>
+      </div>
+
+      <div class="demo" id="sound-tour">
+        <img class="demo-shot" src="images/sound-tour.png" alt="The Sound Tour menu: 1-bit, 6-bit DAC, SN76489, CoCo PSG, Symphony-12 and Orchestra-90">
+        <div class="demo-body">
+          <h3>Sound Tour</h3>
+          <p class="demo-what">One phrase, the opening of the Ode to Joy, played on every sound
+            option the project drives so the voices can be compared side by
+            side: the 1-bit output, the 6-bit DAC, the SN76489, the CoCo
+            PSG, the four-chip Symphony-12 in stereo, and the Orchestra-90.</p>
+          <p class="demo-meta"><strong>Exercises:</strong> <code>lib/sound.fs</code>, <code>lib/sn76489.fs</code>,
+            <code>lib/ay8910.fs</code> (with its <code>ay-found?</code>
+            probe), <code>lib/orch90.fs</code> and <code>lib/wavetable.fs</code>.</p>
+          <p class="demo-meta"><strong>Technique:</strong> pitch and length tables are worked out on the Mac from measured
+            loop timings (<code>fc.py --cycles</code>), within 3 cents on the
+            1-bit output; the Orchestra-90 voices are direct digital
+            synthesis at 11328 samples a second.</p>
+          <p class="demo-meta"><strong>Needs:</strong> keys 1 and 2 nothing extra; 3 a GameMaster; 6 an Orchestra-90; 4 and
+            5 a CoCo PSG or Symphony-12, which only the CoCo Zero has (stock
+            XRoar says &ldquo;not found&rdquo;).</p>
+          <p class="demo-src"><a href="https://github.com/ugufru/coco/tree/main/src/sound-tour">source &amp; README →</a></p>
+        </div>
+      </div>
+
+      <div class="demo" id="jukebox">
+        <img class="demo-shot" src="images/jukebox.png" alt="COCO.FM: the jukebox playing the Badinerie, with clock, title, progress bar and transport buttons">
+        <div class="demo-body">
+          <h3>COCO.FM Jukebox</h3>
+          <p class="demo-what">A laid-back radio player: it plays every .SNG and .VGM song on the
+            disks in drives 0-3, shuffled, one after another, on a 90s
+            MP3-player screen in CG2 with Winamp-style keys, volume and
+            seeking.</p>
+          <p class="demo-meta"><strong>Exercises:</strong> the DECB disk reader that needs no Disk BASIC
+            (<code>lib/decb.fs</code>), the SN76489 player on the field-sync
+            interrupt, VGM playback (<code>lib/vgm.fs</code>), a 3&times;5
+            CG font (<code>lib/cg-tiny.fs</code>), CoCo 3 / CoCo Zero
+            palettes.</p>
+          <p class="demo-meta"><strong>Technique:</strong> the song steps from the 60&nbsp;Hz interrupt, so its timing never
+            depends on the screen; the main loop does at most one big redraw
+            per frame.</p>
+          <p class="demo-meta"><strong>Needs:</strong> a disk controller and a GameMaster together (a Multi-Pak on a real
+            CoCo, built in on a CoCo Zero), with <code>sound.dsk</code> in
+            drive 0 for its two songs.</p>
+          <p class="demo-src"><a href="https://github.com/ugufru/coco/tree/main/src/jukebox">source &amp; README →</a></p>
         </div>
       </div>
 

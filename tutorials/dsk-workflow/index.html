@@ -69,7 +69,7 @@
 
 <pre class="shell"><span class="prompt">$</span> make dsk
 
-  build/demos.dsk created with 14 programs.
+  build/demos.dsk created with 16 programs.
   Copy to SD card for FujiNet, or load in XRoar.
   In DECB:  LOADM"BOUNCE":EXEC</pre>
 
@@ -126,11 +126,16 @@
   FNTIME   BIN  2  B  3
   SOUND    BIN  2  B  3
   SOUND1B  BIN  2  B  3
-  SNDASYNC BIN  2  B  4</pre>
+  SNDASYNC BIN  2  B  4
+  COLORTXT BIN  2  B  3
+  TERMINAL BIN  2  B  3</pre>
 
       <p>
-        Fourteen programs, each a Disk BASIC binary (<code>BIN</code>,
-        type&nbsp;2). The last column is the granule count — a rough size.
+        Sixteen programs, each a Disk BASIC binary (<code>BIN</code>,
+        type&nbsp;2). The last column is the granule count, a rough size: a
+        granule is 2304 bytes and a disk has 68. Every binary carries its
+        own copy of the kernel, which is why the disk fills up faster than
+        the programs&rsquo; Forth would suggest.
         Names are truncated to the CoCo's 8-character limit
         (<code>kaleidoscope</code>&nbsp;→&nbsp;<code>KALEIDSC</code>,
         <code>sound-async</code>&nbsp;→&nbsp;<code>SNDASYNC</code>).
@@ -181,6 +186,38 @@
         present.
       </div>
 
+      <h2>The Sound Disk</h2>
+
+      <p>
+        The sound demos have a disk of their own, <code>build/sound.dsk</code>
+        (<code>make sound-dsk</code>): with the cartridge sound chips and the
+        jukebox&rsquo;s songs they no longer fit beside everything else. The
+        sound tour comes first, so a CoCo Zero with autorun on starts it.
+      </p>
+
+<pre class="shell"><span class="prompt">$</span> decb dir build/sound.dsk
+
+  SOUNDTUR BIN  2  B  5
+  SOUND    BIN  2  B  3
+  SOUND1B  BIN  2  B  3
+  SNDASYNC BIN  2  B  4
+  BADINERI BIN  2  B  6
+  JUKEBOX  BIN  2  B  7
+  BADINERI SNG  2  B  3
+  BADINERI VGM  2  B  3</pre>
+
+      <p>
+        <code>SOUND</code>, <code>SOUND1B</code> and <code>SNDASYNC</code>
+        use the CoCo&rsquo;s own DAC and 1-bit output and are on
+        <code>demos.dsk</code> too. The rest need a sound cartridge: a
+        GameMaster (SN76489) for <code>BADINERI</code> and
+        <code>JUKEBOX</code>, which also needs the disk controller beside it
+        (a Multi-Pak), and for the tour&rsquo;s other keys an Orchestra-90,
+        or a CoCo Zero for the AY chips. The two song files are what the
+        jukebox plays; it finds every <code>.SNG</code> and
+        <code>.VGM</code> on the disks in drives 0-3.
+      </p>
+
       <h2>Single-Program Disks</h2>
 
       <p>
@@ -189,7 +226,8 @@
         twelve tutorial examples:
       </p>
 
-<pre class="shell"><span class="prompt">$</span> make tutorial-dsk   <span class="comment"># build/tutorial.dsk — chapters 1-12</span>
+<pre class="shell"><span class="prompt">$</span> make sound-dsk      <span class="comment"># build/sound.dsk: every sound demo</span>
+<span class="prompt">$</span> make tutorial-dsk   <span class="comment"># build/tutorial.dsk — chapters 1-12</span>
 <span class="prompt">$</span> make clock-dsk      <span class="comment"># build/clock.dsk</span>
 <span class="prompt">$</span> make fntime-dsk     <span class="comment"># build/fntime.dsk</span>
 <span class="prompt">$</span> make dsks           <span class="comment"># all of the above at once</span></pre>
@@ -216,7 +254,7 @@
             <h4>The Build</h4>
             <p><code>make dsk</code> → <code>build/demos.dsk</code></p>
             <p><code>dskini</code> + one <code>copy&nbsp;-2</code> per demo</p>
-            <p>14 programs, verify with <code>decb dir</code></p>
+            <p>16 programs (sound: <code>make sound-dsk</code>), verify with <code>decb dir</code></p>
           </div>
           <div class="learned-col">
             <h4>The Load</h4>
