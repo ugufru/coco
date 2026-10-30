@@ -17,6 +17,7 @@ authority — the web is at best an echo of it and at worst contradicts it.
 | Question / Task                                                  | Resource                                              |
 |------------------------------------------------------------------|-------------------------------------------------------|
 | 6809 / CoCo hardware (PIA, SAM, VDG, audio, IRQ, memory map)     | `coco-guides/coco_technical_reference.pdf`            |
+| Hardware registers $FF00-$FFFF: PIA, FDC, carts, GIME, SAM, vectors | `coco-guides/hardware-registers.md`                   |
 | VDG modes, MUX bits, semigraphics layouts, color sets            | `coco-guides/vdg-modes.md`                            |
 | Display modes compared — CoCo 1/2 (VDG) vs CoCo 3 (GIME)          | `coco-guides/display-modes.md`                         |
 | CoCo 3 / GIME architecture, 1/2→3 hardware evolution, history     | `coco-guides/coco3-intro.md`                          |

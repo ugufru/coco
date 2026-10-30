@@ -6,5 +6,8 @@ build/
 coco-guides/coco_technical_reference.txt
 coco-guides/coco_technical_reference.pdf
 
+# Lomont's CoCo hardware PDF: the author asks that it not be reposted (#643)
+coco-guides/lomont/
+
 # macOS
 .DS_Store
